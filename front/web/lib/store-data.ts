@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
+import postgres from "postgres";
 
 /**
  * Read-only projection of the Archive content store for the /store Workbench
- * panel. This mirrors the semantics of the Go `contentstore` package and the
- * `store` MCP server (content-addressed by SHA-256 hex, mutable head, append-only
- * history) without writing truth. It seeds a deterministic demo dataset — v1
- * then v2 under head "doc" — so the panel and its Playwright e2e are autonomous
- * (they do not require a live Postgres). The MCP `store` server is the live door;
- * this shim is the read-side fixture until the Next route handler is wired to it.
+ * panel. It reads the LIVE Postgres truth-store (schema `archive`: content / head
+ * / history) when POSTGRES_CONNECTION_STRING is reachable, and falls back to a
+ * deterministic demo fixture (v1→v2 under head "doc") when it is not — so the
+ * panel and its Playwright e2e stay autonomous if no DB is up. This panel never
+ * writes truth; writes flow through the `store` MCP server (the wall).
  */
 
 export interface ContentObject {
@@ -27,6 +27,7 @@ export interface StoreSnapshot {
 	objects: ContentObject[];
 	heads: { key: string; hash: string }[];
 	history: Record<string, HeadMove[]>;
+	source: "live" | "demo";
 }
 
 /** hash returns the canonical SHA-256 hex digest, matching contentstore.Hash. */
@@ -34,40 +35,83 @@ export function hash(s: string): string {
 	return createHash("sha256").update(Buffer.from(s, "utf8")).digest("hex");
 }
 
-/**
- * snapshot builds the deterministic demo dataset: put "v1" then "v2" under head
- * "doc". Both content objects survive (append-only); the head points at v2; the
- * history lists both moves oldest-first.
- */
-export function snapshot(): StoreSnapshot {
+/** shortHash trims a hex digest for display. */
+export function shortHash(h: string): string {
+	return h.slice(0, 12);
+}
+
+/** demoSnapshot is the deterministic fallback dataset (no live DB required). */
+function demoSnapshot(): StoreSnapshot {
 	const v1 = "v1";
 	const v2 = "v2";
 	const h1 = hash(v1);
 	const h2 = hash(v2);
-
-	const objects: ContentObject[] = [
-		{ hash: h1, byteSize: Buffer.byteLength(v1), body: v1 },
-		{ hash: h2, byteSize: Buffer.byteLength(v2), body: v2 },
-	];
-
-	const history: HeadMove[] = [
-		{
-			key: "doc",
-			hash: h1,
-			parentHash: null,
-			createdAt: "2026-05-30T00:00:00Z",
-		},
-		{ key: "doc", hash: h2, parentHash: h1, createdAt: "2026-05-30T00:00:01Z" },
-	];
-
 	return {
-		objects,
+		objects: [
+			{ hash: h1, byteSize: Buffer.byteLength(v1), body: v1 },
+			{ hash: h2, byteSize: Buffer.byteLength(v2), body: v2 },
+		],
 		heads: [{ key: "doc", hash: h2 }],
-		history: { doc: history },
+		history: {
+			doc: [
+				{ key: "doc", hash: h1, parentHash: null, createdAt: "2026-05-30T00:00:00Z" },
+				{ key: "doc", hash: h2, parentHash: h1, createdAt: "2026-05-30T00:00:01Z" },
+			],
+		},
+		source: "demo",
 	};
 }
 
-/** shortHash trims a hex digest for display. */
-export function shortHash(h: string): string {
-	return h.slice(0, 12);
+let sql: ReturnType<typeof postgres> | null = null;
+function client(): ReturnType<typeof postgres> | null {
+	const dsn = process.env.POSTGRES_CONNECTION_STRING;
+	if (!dsn) return null;
+	if (!sql) {
+		sql = postgres(dsn, { max: 2, idle_timeout: 20, connect_timeout: 8 });
+	}
+	return sql;
+}
+
+/**
+ * snapshot reads the live Archive content store; on any failure (no DSN, DB
+ * unreachable, empty store) it returns the demo fixture so the panel is never
+ * blank and the e2e stays autonomous.
+ */
+export async function snapshot(): Promise<StoreSnapshot> {
+	const c = client();
+	if (!c) return demoSnapshot();
+	try {
+		const objs = await c<{ hash: string; byte_size: number; body: string }[]>`
+			select hash, byte_size, convert_from(data, 'UTF8') as body
+			from archive.content order by created_at, hash`;
+		if (objs.length === 0) return demoSnapshot();
+		const heads = await c<{ key: string; hash: string }[]>`
+			select key, hash from archive.head order by key`;
+		const hist = await c<
+			{ key: string; hash: string; parent_hash: string | null; created_at: Date }[]
+		>`select key, hash, parent_hash, created_at from archive.history order by key, id`;
+
+		const history: Record<string, HeadMove[]> = {};
+		for (const r of hist) {
+			(history[r.key] ??= []).push({
+				key: r.key,
+				hash: r.hash,
+				parentHash: r.parent_hash ?? null,
+				createdAt: new Date(r.created_at).toISOString(),
+			});
+		}
+		return {
+			objects: objs.map((r) => ({
+				hash: r.hash,
+				byteSize: Number(r.byte_size),
+				body: r.body ?? "",
+			})),
+			heads: heads.map((r) => ({ key: r.key, hash: r.hash })),
+			history,
+			source: "live",
+		};
+	} catch (err) {
+		console.warn("[/store] live read failed, using demo fixture:", (err as Error).message);
+		return demoSnapshot();
+	}
 }
