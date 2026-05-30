@@ -1,0 +1,15 @@
+{
+  "$schema": "https://claude.com/schemas/marketplace.json",
+  "name": "expo-design-marketplace",
+  "owner": {
+    "name": "Stéphane Vigneron"
+  },
+  "plugins": [
+    {
+      "name": "expo-design",
+      "description": "Convert Claude Design handoffs into production-ready Expo React Native code",
+      "version": "1.0.0",
+      "source": "."
+    }
+  ]
+}

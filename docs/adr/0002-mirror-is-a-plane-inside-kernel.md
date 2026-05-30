@@ -1,0 +1,16 @@
+# The Mirror is a plane inside the Kernel context, not a separate top-level subsystem
+
+The Mirror (the executable-proof "proof" head) lives at `back/kernel/mirror/`, as a plane *inside* the Kernel context — not as a sibling `back/mirror/` subsystem. We chose this because the Kernel and Mirror are **bicephalous**: one body (the truth), two heads — intention (Kernel spec) and proof (Mirror) — joined by the `mirrors` link and the completeness law, and co-versioned through a single ChangeSet. A proof that can never move independently of the truth it proves is a plane of that context, not a context of its own.
+
+## Considered options
+
+- **`back/mirror/` as a fifth, top-level subsystem.** What the product owner's "Mirror as a first-class `./back/mirror/`" mandate most directly suggests, and what Tome §27 ("the test must be a first-class layer — its own identity, version, links, so it can break independently") is read to imply. Rejected: §27 buys the Mirror its own identity, version and links *as a Layer* — it does not require its own *bounded context*. The Mirror has no lifecycle independent of the Kernel (it cannot be versioned, reverted, or deployed apart from the truth it mirrors), so a top-level home would split a single bicephalous unit into two and invite treating them as independently-deployable services.
+- **The Mirror as a `test` attribute hanging off each Kernel layer.** Rejected outright: this is the exact subordinated-field anti-pattern §27 warns against (decorative, invisible when it breaks). It is *why* the Mirror needs first-class layer identity in the first place.
+- **A plane nested at `back/kernel/mirror/` (chosen).** The Tome's own arborescence (§95, the PLAN MIROIR, e.g. `/kernel/mirror/cart.e2e.feature`, `/kernel/mirror/canPlaceOrder.property.test`) nests `/mirror` under `/kernel`. The Mirror keeps first-class *layer* status (own identity/version/links, breaks independently) while living inside the *context* it is inseparable from.
+
+## Consequences
+
+- The four bounded contexts are **Runtime, Kernel, Archive, Workbench** — there is no fifth "Mirror" context. The Mirror plane is documented inside the Kernel `CONTEXT.md` under a `## Mirror plane` subsection, not in a context of its own.
+- **Co-versioning is structural, not conventional.** A ChangeSet mutates Kernel spec and Mirror proof together atomically; the completeness law (no truth without a living mirror, no orphan mirror — the *monstre*) is enforced on the joined unit. The nested tree makes this adjacency obvious.
+- **Hard to reverse.** The PreToolUse wall denies agent writes to `/kernel/**` (which now covers `/kernel/mirror/**`), the `mirrors` link and ChangeSet atomicity assume one co-versioned unit, and the directory tree encodes the nesting. Promoting the Mirror to a top-level `back/mirror/` later would mean reworking the write-permission hooks, the co-versioning envelope, and the arborescence at once.
+- **The deliberate no:** Runtime still *executes* the Mirror's cert-languages as sensors and *reads* its proofs for the stop condition — but it does not *own* them. Proof artifacts, the cert-language types, and the completeness-law engine remain the Kernel-context Mirror plane, not Runtime.

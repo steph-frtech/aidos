@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+# Fast pre-commit gate (CLAUDE.md §7): the Go engine must compile.
+# The full mirror suite (go test + Testcontainers + Playwright e2e) runs via
+# /test-suite and CI, never at commit time — pre-commit stays fast.
+( cd back && go build ./... ) || {
+  echo "pre-commit: 'cd back && go build ./...' failed — fix the build before committing." >&2
+  exit 1
+}

@@ -1,0 +1,18 @@
+{
+  "name": "mp-skills",
+  "version": "1.0.1",
+  "description": "Matt Pocock's agent skills collection, auto-synced from github.com/mattpocock/skills",
+  "author": {
+    "name": "Matt Pocock",
+    "url": "https://github.com/mattpocock"
+  },
+  "repository": "https://github.com/mattpocock/skills",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "tdd",
+    "planning",
+    "code-review",
+    "development"
+  ]
+}

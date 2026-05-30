@@ -1,0 +1,43 @@
+{
+  "name": "aidos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AIDOS — AI Development Operating System. Monorepo: back/ = the OS engine, front/web = the Workbench UI.",
+  "workspaces": [
+    "front/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @aidos/web",
+    "build": "npm run build -w @aidos/web",
+    "start": "npm run start -w @aidos/web",
+    "lint": "npm run lint -w @aidos/web",
+    "format": "biome check",
+    "format:fix": "biome check --write",
+    "prepare": "husky",
+    "test": "cd back && go test ./...",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.16",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^20",
+    "@types/supertest": "^7.2.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5",
+    "supertest": "^7.2.2",
+    "typescript": "^5",
+    "vitest": "^4.1.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/steph-frtech/aidos.git"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/steph-frtech/aidos/issues"
+  },
+  "homepage": "https://github.com/steph-frtech/aidos#readme"
+}

@@ -1,0 +1,15 @@
+hooks:
+  PreToolUse:
+    - block_agent_write_above_waterline
+    - block_memory_to_kernel_direct
+    - validate_scope_before_reuse
+  PostToolUse:
+    - run_affected_mirrors
+    - run_krd_check
+    - record_provenance
+  Stop:
+    - all_red_green
+    - no_previous_green_broken
+    - completeness_law_holds
+    - scope_valid
+    - authority_valid

@@ -1,0 +1,66 @@
+name: Sync upstream skills
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # Daily at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check for upstream changes
+        id: check
+        run: |
+          STORED_SHA=""
+          if [ -f .upstream-sha ]; then
+            STORED_SHA="$(cat .upstream-sha)"
+          fi
+
+          UPSTREAM_SHA="$(git ls-remote https://github.com/mattpocock/skills.git HEAD | cut -f1)"
+          echo "stored=$STORED_SHA" >> "$GITHUB_OUTPUT"
+          echo "upstream=$UPSTREAM_SHA" >> "$GITHUB_OUTPUT"
+
+          if [ "$STORED_SHA" = "$UPSTREAM_SHA" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No upstream changes detected."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Upstream changed: $STORED_SHA -> $UPSTREAM_SHA"
+          fi
+
+      - name: Sync skills
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          chmod +x scripts/sync-skills.sh
+          bash scripts/sync-skills.sh
+
+      - name: Bump version
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          chmod +x scripts/bump-version.sh
+          bash scripts/bump-version.sh
+
+      - name: Create Pull Request
+        if: steps.check.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: sync skills from mattpocock/skills@${{ steps.check.outputs.upstream }}"
+          branch: "sync/upstream-${{ steps.check.outputs.upstream }}"
+          delete-branch: true
+          title: "chore: sync skills from mattpocock/skills"
+          body: |
+            Automated sync of skills from [mattpocock/skills](https://github.com/mattpocock/skills).
+
+            **Upstream commit:** [`${{ steps.check.outputs.upstream }}`](https://github.com/mattpocock/skills/commit/${{ steps.check.outputs.upstream }})
+            **Previous SHA:** `${{ steps.check.outputs.stored }}`
+
+            [View upstream diff](https://github.com/mattpocock/skills/compare/${{ steps.check.outputs.stored }}...${{ steps.check.outputs.upstream }})

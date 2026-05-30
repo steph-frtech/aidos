@@ -1,0 +1,35 @@
+{
+  "name": "expo-design",
+  "version": "1.0.0",
+  "description": "Convert Claude Design handoffs (or any HTML/image mockup) into production-ready Expo React Native code with NativeWind. Orchestrates Superpowers brainstorm → spec → plan → TDD workflow.",
+  "author": "Stéphane Vigneron",
+  "license": "MIT",
+  "keywords": [
+    "expo",
+    "react-native",
+    "claude-design",
+    "nativewind",
+    "ui",
+    "mobile",
+    "design-to-code"
+  ],
+  "components": {
+    "skills": [
+      "skills/expo-from-claude-design"
+    ],
+    "commands": [
+      "commands/design-to-expo.md",
+      "commands/expo-screen.md",
+      "commands/expo-component.md"
+    ],
+    "agents": [
+      "agents/expo-converter.md",
+      "agents/expo-reviewer.md"
+    ]
+  },
+  "requires": {
+    "plugins": [
+      "superpowers"
+    ]
+  }
+}

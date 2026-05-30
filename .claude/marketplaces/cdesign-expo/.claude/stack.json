@@ -1,0 +1,282 @@
+{
+  "version": "1",
+  "createdBy": "claude-code-up@0.1.5",
+  "createdAt": "2026-05-15T16:12:01.182Z",
+  "components": [
+    {
+      "id": "karpathy",
+      "name": "Karpathy CLAUDE.md guidelines",
+      "source": "https://github.com/multica-ai/andrej-karpathy-skills",
+      "scope": "project",
+      "installed": true,
+      "items": [
+        {
+          "kind": "file",
+          "name": "CLAUDE.md",
+          "path": "CLAUDE.md",
+          "exists": true,
+          "bytes": 2357
+        }
+      ]
+    },
+    {
+      "id": "superpowers",
+      "name": "Superpowers (TDD, debugging, brainstorming)",
+      "source": "https://github.com/obra/superpowers",
+      "scope": "project",
+      "installed": true,
+      "items": [
+        {
+          "kind": "bulk",
+          "name": "superpowers marketplace mirror",
+          "path": ".claude/marketplaces/superpowers",
+          "exists": true,
+          "count": 146
+        },
+        {
+          "kind": "skill",
+          "name": "superpowers skills (flattened)",
+          "path": ".claude/skills/",
+          "exists": true,
+          "count": 7
+        }
+      ],
+      "available": {
+        "skills": 14
+      }
+    },
+    {
+      "id": "claude-mem",
+      "name": "claude-mem (persistent memory across sessions)",
+      "source": "https://github.com/thedotmack/claude-mem",
+      "scope": "user-documented",
+      "installed": false,
+      "items": [],
+      "available": {
+        "plugins": 1
+      },
+      "instructions": [
+        "In your shell:",
+        "  npx claude-mem install"
+      ]
+    },
+    {
+      "id": "subagents",
+      "name": "Default subagents (code-reviewer, security-auditor, test-writer)",
+      "source": "bundled in claude-code-up",
+      "scope": "project",
+      "installed": true,
+      "items": [
+        {
+          "kind": "agent",
+          "name": "code-reviewer",
+          "path": ".claude/agents/code-reviewer.md",
+          "exists": true,
+          "bytes": 655
+        },
+        {
+          "kind": "agent",
+          "name": "security-auditor",
+          "path": ".claude/agents/security-auditor.md",
+          "exists": true,
+          "bytes": 864
+        },
+        {
+          "kind": "agent",
+          "name": "test-writer",
+          "path": ".claude/agents/test-writer.md",
+          "exists": true,
+          "bytes": 813
+        }
+      ],
+      "available": {
+        "agents": 3
+      }
+    },
+    {
+      "id": "wshobson",
+      "name": "wshobson/agents (80 plugins — 2 pre-checked as defaults)",
+      "source": "https://github.com/wshobson/agents",
+      "scope": "project",
+      "installed": true,
+      "items": [
+        {
+          "kind": "bulk",
+          "name": "wshobson marketplace mirror",
+          "path": ".claude/marketplaces/wshobson",
+          "exists": true,
+          "count": 726
+        },
+        {
+          "kind": "agent",
+          "name": "wshobson agents (file-level extraction)",
+          "path": ".claude/agents/",
+          "exists": true,
+          "count": 4
+        }
+      ],
+      "available": {
+        "agents": 185,
+        "skills": 153,
+        "plugins": 80,
+        "commands": 100
+      },
+      "instructions": [
+        "To activate the cloned marketplace in Claude Code:",
+        "  /plugin marketplace add ./.claude/marketplaces/wshobson",
+        "  /plugin install <plugin-name>"
+      ]
+    },
+    {
+      "id": "cc-lens",
+      "name": "cc-lens (local analytics dashboard)",
+      "source": "https://github.com/Arindam200/cc-lens",
+      "scope": "user-documented",
+      "installed": false,
+      "items": [],
+      "instructions": [
+        "In your shell:",
+        "  npx cc-lens"
+      ]
+    },
+    {
+      "id": "agentshield",
+      "name": "agentshield (security audit CLI)",
+      "source": "https://github.com/affaan-m/agentshield",
+      "scope": "project",
+      "installed": true,
+      "items": [
+        {
+          "kind": "script",
+          "name": "audit.sh",
+          "path": ".claude/scripts/audit.sh",
+          "exists": true,
+          "bytes": 272,
+          "executable": true
+        },
+        {
+          "kind": "hook",
+          "name": "Stop hook → audit.sh",
+          "path": ".claude/settings.json#hooks.Stop",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "statusline",
+      "name": "Pretty statusline (tokens, rate limits, diff stats)",
+      "source": "bundled in claude-code-up",
+      "scope": "project",
+      "installed": true,
+      "items": [
+        {
+          "kind": "script",
+          "name": "statusline.sh",
+          "path": ".claude/statusline.sh",
+          "exists": true,
+          "bytes": 7556,
+          "executable": true
+        },
+        {
+          "kind": "file",
+          "name": "settings.json (statusLine)",
+          "path": ".claude/settings.json",
+          "exists": true,
+          "bytes": 164
+        }
+      ]
+    },
+    {
+      "id": "octo-issue-tracker",
+      "name": "octo-issue-tracker (GitHub issues triage skill)",
+      "source": "bundled in claude-code-up",
+      "scope": "project",
+      "installed": true,
+      "items": [
+        {
+          "kind": "skill",
+          "name": "octo-issue-tracker",
+          "path": ".claude/skills/octo-issue-tracker/SKILL.md",
+          "exists": true,
+          "bytes": 1992
+        }
+      ],
+      "available": {
+        "skills": 1
+      }
+    },
+    {
+      "id": "octo-scenario-tester",
+      "name": "octo-scenario-tester (scenarios-before-code discipline)",
+      "source": "bundled in claude-code-up",
+      "scope": "project",
+      "installed": true,
+      "items": [
+        {
+          "kind": "skill",
+          "name": "scenario-tester",
+          "path": ".claude/skills/scenario-tester/SKILL.md",
+          "exists": true,
+          "bytes": 7540
+        }
+      ],
+      "available": {
+        "skills": 1
+      }
+    },
+    {
+      "id": "pocock",
+      "name": "Matt Pocock skills (21 skills — curated subset pre-checked)",
+      "source": "https://github.com/ismaelJimenez/mp-skills",
+      "scope": "project",
+      "installed": true,
+      "items": [
+        {
+          "kind": "bulk",
+          "name": "pocock mirror",
+          "path": ".claude/marketplaces/pocock",
+          "exists": true,
+          "count": 40
+        },
+        {
+          "kind": "skill",
+          "name": "pocock skills (flattened)",
+          "path": ".claude/skills/",
+          "exists": true,
+          "count": 4
+        }
+      ],
+      "available": {
+        "skills": 21
+      }
+    },
+    {
+      "id": "agent-teams",
+      "name": "Agent Teams (research preview, swarms) ⚠ experimental",
+      "source": "Claude Code experimental flag",
+      "scope": "project",
+      "installed": true,
+      "items": [
+        {
+          "kind": "file",
+          "name": "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1",
+          "path": ".claude/settings.json#env",
+          "exists": true
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "project": {
+      "files": 3,
+      "items": 912,
+      "skills": 13,
+      "agents": 7,
+      "scripts": 2,
+      "hooks": 1
+    },
+    "available": {
+      "plugins": 1
+    }
+  }
+}
