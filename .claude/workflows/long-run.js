@@ -17,10 +17,6 @@ const MAX_RETRIES = (args && args.maxRetries) ?? 2
 const START_FROM = (args && args.startFrom) || null
 const MAX_STEPS = (args && args.maxSteps) || null
 const STOP_AFTER = (args && args.stopAfter) || null
-// nonStop: never hand back on a blocked/unvalidated step — record it and push on to
-// the next step, running the whole range to the end. Failures are collected and
-// returned. (Default false = stop-and-hand-back on the first unrecoverable step.)
-const NON_STOP = (args && args.nonStop) || false
 
 const PLAN_SCHEMA = {
   type: 'object', additionalProperties: false,
@@ -104,11 +100,10 @@ log(`${plan.steps.length} steps in plan; running ${steps.length}${MAX_STEPS || S
 // 2. Sequential loop: steps depend on each other → no parallelism.
 phase('Run')
 const done = []
-const failed = []
 let prevOutputs = []
 
 for (const s of steps) {
-  let report, verdict, attempt = 0, blocked = false
+  let report, verdict, attempt = 0
 
   while (attempt <= MAX_RETRIES) {
     const retryCtx = attempt > 0
@@ -133,7 +128,6 @@ for (const s of steps) {
     }
 
     if (report.status === 'blocked') {
-      if (NON_STOP) { blocked = true; break }
       return { verdict: 'BLOCKED', stoppedAt: s.id, reason: report.notes, ranBefore: done }
     }
 
@@ -148,20 +142,12 @@ for (const s of steps) {
     attempt++
   }
 
-  // 3. Guardrail. In nonStop mode, record the gap and push on; else hand back.
-  const green = !blocked && verdict && verdict.verification_status === 'passed' && verdict.residual_issues.length === 0
-  if (!green) {
-    if (NON_STOP) {
-      const detail = blocked ? (report?.notes ?? 'blocked') : (verdict?.residual_issues ?? [])
-      failed.push({ id: s.id, why: blocked ? 'blocked' : 'unvalidated', detail })
-      log(`✗ ${s.id} not green (non-stop → continue): ${(blocked ? 'blocked: ' + (report?.notes ?? '') : (verdict?.residual_issues ?? []).join('; ')).slice(0, 140)}`)
-      prevOutputs = report?.outputs ?? []
-      continue
-    }
+  // 3. Guardrail = the stop. No mid-run input → hand back.
+  if (verdict.verification_status !== 'passed' || verdict.residual_issues.length) {
     return {
-      verdict: blocked ? 'BLOCKED' : 'STOP',
+      verdict: 'STOP',
       stoppedAt: s.id,
-      residual_issues: verdict ? verdict.residual_issues : [report?.notes ?? 'blocked'],
+      residual_issues: verdict.residual_issues,
       ranBefore: done,
       message: `Step ${s.id} not validated after ${MAX_RETRIES} retries. Fix, then relaunch the workflow (validated steps return from cache).`,
     }
@@ -172,4 +158,4 @@ for (const s of steps) {
   log(`✓ ${s.id} validated`)
 }
 
-return { verdict: NON_STOP ? 'DONE (non-stop)' : 'DONE', steps: done.length, completed: done, failed }
+return { verdict: 'DONE', steps: done.length, completed: done }
