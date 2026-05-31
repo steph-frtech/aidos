@@ -5,7 +5,7 @@
 export const meta = {
   name: 'long-run',
   description: "Execute PLAN.md step by step: step-executor implements, step-verifier validates. Advances only after validation. Resumes from cache.",
-  whenToUse: "Long task split into sequential steps. No arg → reads PLAN.md ; {planPath:'...'} for another plan ; {maxRetries:N} retries per step (default 2) ; {maxSteps:N} stop after the first N steps ; {stopAfter:'S01'} stop after that step id.",
+  whenToUse: "Long task split into sequential steps. No arg → reads PLAN.md ; {planPath:'...'} for another plan ; {maxRetries:N} retries per step (default 2) ; {startFrom:'S02'} begin at that step id (skips earlier, already-done steps) ; {maxSteps:N} stop after the first N steps ; {stopAfter:'S47'} stop after that step id.",
   phases: [
     { title: 'Plan', detail: 'parse PLAN.md' },
     { title: 'Run', detail: 'executor + verifier per step, sequential' },
@@ -14,6 +14,7 @@ export const meta = {
 
 const PLAN_PATH = (args && args.planPath) || 'PLAN.md'
 const MAX_RETRIES = (args && args.maxRetries) ?? 2
+const START_FROM = (args && args.startFrom) || null
 const MAX_STEPS = (args && args.maxSteps) || null
 const STOP_AFTER = (args && args.stopAfter) || null
 
@@ -73,6 +74,17 @@ const plan = await agent(
 // bound does not match — run ONLY the first step rather than the whole plan.
 const norm = (x) => String(x ?? '').trim().toUpperCase()
 let steps = plan.steps
+// startFrom: begin at a given step id (skip earlier, already-done steps). Applied
+// BEFORE maxSteps/stopAfter so they compose. If the id isn't found, do NOT skip
+// (run the full plan) and warn — never silently drop every step.
+if (START_FROM) {
+  const idx = steps.findIndex((s) => norm(s.id) === norm(START_FROM))
+  if (idx >= 0) {
+    steps = steps.slice(idx)
+  } else {
+    log(`⚠ startFrom='${START_FROM}' not found among step ids [${steps.slice(0, 5).map((s) => s.id).join(', ')}…]; running the full plan from the start.`)
+  }
+}
 if (MAX_STEPS) steps = steps.slice(0, MAX_STEPS)
 if (STOP_AFTER) {
   const idx = steps.findIndex((s) => norm(s.id) === norm(STOP_AFTER))

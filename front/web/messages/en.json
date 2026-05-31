@@ -64,7 +64,50 @@
 		"setHeadFailed": "Move failed (the hash must already exist in the store).",
 		"dbUnreachable": "Postgres unreachable — write not possible. No data changed.",
 		"resultLabel": "Result",
-		"working": "Working…"
+		"working": "Working…",
+		"tutorial": {
+			"badge": "Tutorial",
+			"heading": "Understanding the content store",
+			"lead": "The concepts behind this screen, before the jargon. The store keeps bytes and never destroys anything.",
+			"t1": {
+				"title": "Content-addressing",
+				"body": "An object is named not by a label or a number, but by its content itself. The same byte sequence always yields the same address; two different contents have two different addresses."
+			},
+			"t2": {
+				"title": "The SHA-256 fingerprint",
+				"body": "That address is the SHA-256 fingerprint of the content — a hexadecimal digest computed over the bytes. It is both the storage key and the integrity proof: if the content changes, the fingerprint changes."
+			},
+			"t3": {
+				"title": "An object is immutable",
+				"body": "Once stored under its fingerprint, an object never moves again. Its content stays readable as-is, indefinitely. You don't overwrite an object: you store a new one."
+			},
+			"t4": {
+				"title": "The head, a mutable pointer",
+				"body": "The head is a mutable label binding a readable key (e.g. \"doc\") to a fingerprint. It is the only moving part: you point it at another fingerprint to \"advance\" the current version."
+			},
+			"t5": {
+				"title": "Append-only history, idempotent Put",
+				"body": "Every head move is appended to an append-only history: nothing is erased, you only stack. Put is idempotent — identical content returns the same fingerprint, with no new row. Editing makes a NEW fingerprint; the old one stays readable. Nothing is ever destroyed."
+			}
+		},
+		"example": {
+			"badge": "Example",
+			"heading": "Try this",
+			"lead": "A worked example that leans on the \"Store\" and \"Move a head\" controls below. Reproduce it step by step.",
+			"e1": {
+				"title": "1) Store a first content",
+				"body": "In \"Store content\", enter <code>hello</code> and submit. You get its SHA-256 fingerprint: that is the address of the first object."
+			},
+			"e2": {
+				"title": "2) Point the \"doc\" head at it",
+				"body": "In \"Move a head\", set the key <code>doc</code>, click \"Use last stored\" to reuse the fingerprint, then move the head. The <code>doc</code> head now names <code>hello</code>."
+			},
+			"e3": {
+				"title": "3) Edit: store \"hello v2\"",
+				"body": "Store <code>hello v2</code> (a new fingerprint), then move the <code>doc</code> head onto it. The head moves, the history now lists both moves, and the fingerprint of <code>hello</code> stays readable."
+			},
+			"takeaway": "Takeaway: editing overwrites nothing. A new fingerprint appears, the head advances, the history grows append-only — and every past version stays reachable by its fingerprint."
+		}
 	},
 	"contract": {
 		"eyebrow": "Runtime · execution contract",
@@ -108,6 +151,46 @@
 		"soonTitle": "The ChangeSet engine arrives at S20 (idea-intake at S27) — the control is present but disabled.",
 		"proposeWhy": "Why is this disabled?",
 		"proposeNote": "The governed write path — propose → ChangeSet → human approval — is not built yet (ChangeSet engine at S20, idea-intake at S27). The control is present to make the capability reachable, but disabled; it writes nothing. The wall holds: the screen never touches kernel/mirrors/ideas.",
-		"footer": "Source: live <code>ideas</code>/<code>kernel</code>/<code>mirrors</code>/<code>changesets</code>/<code>dag</code> schemas in Postgres — READ-ONLY projection (the agent role has SELECT only). Truth is written only via an approved ChangeSet through the <code>aidos</code> role; never from the Workbench."
+		"footer": "Source: live <code>ideas</code>/<code>kernel</code>/<code>mirrors</code>/<code>changesets</code>/<code>dag</code> schemas in Postgres — READ-ONLY projection (the agent role has SELECT only). Truth is written only via an approved ChangeSet through the <code>aidos</code> role; never from the Workbench.",
+		"tutorial": {
+			"badge": "Tutorial",
+			"heading": "Understanding the KRDCore records",
+			"lead": "The concepts behind this screen, before the jargon. A record is a frozen truth, addressed by its content, never erased.",
+			"t1": {
+				"title": "Seven record families",
+				"body": "AIDOS's truth is filed into seven families: the idea (<code>ideas.idea</code>), then in the kernel the truth, the layer and the link (<code>kernel.truth</code>/<code>layer</code>/<code>link</code>), the mirror (<code>mirrors.mirror</code>), the ChangeSet (<code>changesets.changeset</code>) and the DAG phase (<code>dag.phase</code>). Each has its own table, but all share the same record shape."
+			},
+			"t2": {
+				"title": "Content-addressed truth",
+				"body": "A record has no name: its <code>id</code> is the SHA-256 fingerprint of its canonical JSONB body. The same body always yields the same id; two different bodies have two different ids. The address is the content."
+			},
+			"t3": {
+				"title": "Append-only: never overwrite",
+				"body": "A body is never modified. To \"change\" a truth, you INSERT a new record and mark the old one <code>superseded_by</code> its successor. Nothing is destroyed: the head moves, the history stacks."
+			},
+			"t4": {
+				"title": "Version = fingerprint = licence to change",
+				"body": "The <code>version</code> is also a fingerprint of the content. It does not increment like a counter: it is recomputed. Knowing the current version is holding the licence to propose the next one — on the right base, with no collision."
+			},
+			"t5": {
+				"title": "The wall: the screen never touches truth",
+				"body": "These tables are ABOVE the line: the agent role has READ (SELECT) only. Every truth-write goes through propose → ChangeSet → human approval (<code>coming S20</code>). This screen reads the records; it never writes any."
+			}
+		},
+		"example": {
+			"badge": "Example",
+			"heading": "What a record looks like",
+			"lead": "A concrete example: the shape of a <code>kernel.truth</code> (a kernel truth). No input required — we show the addressing envelope and the JSONB body so the structure is clear.",
+			"idHash": "a1b2c3d4e5f6…",
+			"idNote": "= SHA-256 of the canonical body",
+			"versionHash": "a1b2c3d4e5f6…",
+			"versionNote": "fingerprint = licence to change",
+			"supersededNote": "∅ = this is the head (not superseded)",
+			"bodyLabel": "JSONB body (canonical)",
+			"body": {
+				"statement": "A record id is the SHA-256 fingerprint of its canonical body."
+			},
+			"takeaway": "Takeaway: every record carries the same envelope — <code>id</code>, <code>version</code>, <code>superseded_by</code>, <code>created_at</code> — plus a JSONB body specific to its family. To create a real one, you don't write it here: you go through propose → ChangeSet (coming S20)."
+		}
 	}
 }

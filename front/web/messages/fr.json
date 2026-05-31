@@ -64,7 +64,50 @@
 		"setHeadFailed": "Échec du déplacement (l'empreinte doit déjà exister dans le magasin).",
 		"dbUnreachable": "Postgres injoignable — écriture impossible. Aucune donnée modifiée.",
 		"resultLabel": "Résultat",
-		"working": "En cours…"
+		"working": "En cours…",
+		"tutorial": {
+			"badge": "Tutoriel",
+			"heading": "Comprendre le magasin de contenu",
+			"lead": "Les concepts derrière cet écran, avant le jargon. Le magasin range des octets et ne détruit jamais rien.",
+			"t1": {
+				"title": "Adressage par contenu",
+				"body": "Un objet n'est pas désigné par un nom ni un numéro, mais par son contenu lui-même. La même suite d'octets produit toujours la même adresse ; deux contenus différents ont deux adresses différentes."
+			},
+			"t2": {
+				"title": "L'empreinte SHA-256",
+				"body": "Cette adresse est l'empreinte SHA-256 du contenu — un condensé hexadécimal calculé sur les octets. C'est à la fois la clé de rangement et la preuve d'intégrité : si le contenu change, l'empreinte change."
+			},
+			"t3": {
+				"title": "Un objet est immuable",
+				"body": "Une fois stocké sous son empreinte, un objet ne bouge plus jamais. Son contenu reste lisible tel quel, indéfiniment. On n'écrase pas un objet : on en stocke un nouveau."
+			},
+			"t4": {
+				"title": "La tête, pointeur mutable",
+				"body": "La tête (head) est une étiquette mutable qui associe une clé lisible (p. ex. « doc ») à une empreinte. C'est le seul élément qui bouge : on la fait pointer vers une autre empreinte pour « avancer » la version courante."
+			},
+			"t5": {
+				"title": "Historique append-only, Put idempotent",
+				"body": "Chaque déplacement de tête est ajouté à un historique en ajout-seul (append-only) : rien n'est effacé, on ne fait qu'empiler. Stocker (Put) est idempotent — un contenu identique renvoie la même empreinte, sans nouvelle ligne. Éditer crée une NOUVELLE empreinte ; l'ancienne reste lisible. Rien n'est jamais détruit."
+			}
+		},
+		"example": {
+			"badge": "Exemple",
+			"heading": "Essayez ceci",
+			"lead": "Un exemple travaillé qui s'appuie sur les contrôles « Stocker » et « Déplacer une tête » ci-dessous. Reproduisez-le pas à pas.",
+			"e1": {
+				"title": "1) Stockez un premier contenu",
+				"body": "Dans « Stocker du contenu », saisissez <code>hello</code> puis validez. Vous obtenez son empreinte SHA-256 : c'est l'adresse du premier objet."
+			},
+			"e2": {
+				"title": "2) Pointez la tête « doc » dessus",
+				"body": "Dans « Déplacer une tête », mettez la clé <code>doc</code>, cliquez « Utiliser le dernier stockage » pour reprendre l'empreinte, puis déplacez la tête. La tête <code>doc</code> désigne maintenant <code>hello</code>."
+			},
+			"e3": {
+				"title": "3) Modifiez : stockez « hello v2 »",
+				"body": "Stockez <code>hello v2</code> (nouvelle empreinte), puis déplacez à nouveau la tête <code>doc</code> dessus. La tête bouge, l'historique liste désormais les deux déplacements, et l'empreinte de <code>hello</code> reste lisible."
+			},
+			"takeaway": "Bilan : éditer n'écrase rien. Une nouvelle empreinte apparaît, la tête avance, l'historique grandit en ajout-seul — et chaque version passée reste consultable par son empreinte."
+		}
 	},
 	"contract": {
 		"eyebrow": "Runtime · contrat d'exécution",
@@ -108,6 +151,46 @@
 		"soonTitle": "Le moteur de ChangeSet arrive en S20 (idée-intake en S27) — le contrôle est présent mais désactivé.",
 		"proposeWhy": "Pourquoi est-ce désactivé ?",
 		"proposeNote": "Le chemin d'écriture gouverné — proposer → ChangeSet → approbation humaine — n'est pas encore construit (moteur de ChangeSet en S20, idée-intake en S27). Le contrôle est présent pour rendre la capacité atteignable, mais désactivé ; il n'écrit rien. Le mur tient : l'écran ne touche jamais kernel/mirrors/ideas.",
-		"footer": "Source : schémas <code>ideas</code>/<code>kernel</code>/<code>mirrors</code>/<code>changesets</code>/<code>dag</code> en direct dans Postgres — projection en LECTURE SEULE (le rôle de l'agent n'a que SELECT). La vérité ne s'écrit que par un ChangeSet approuvé via le rôle <code>aidos</code> ; jamais depuis le Workbench."
+		"footer": "Source : schémas <code>ideas</code>/<code>kernel</code>/<code>mirrors</code>/<code>changesets</code>/<code>dag</code> en direct dans Postgres — projection en LECTURE SEULE (le rôle de l'agent n'a que SELECT). La vérité ne s'écrit que par un ChangeSet approuvé via le rôle <code>aidos</code> ; jamais depuis le Workbench.",
+		"tutorial": {
+			"badge": "Tutoriel",
+			"heading": "Comprendre les enregistrements KRDCore",
+			"lead": "Les concepts derrière cet écran, avant le jargon. Un enregistrement est une vérité figée, adressée par son contenu, qu'on n'efface jamais.",
+			"t1": {
+				"title": "Sept familles d'enregistrements",
+				"body": "La vérité d'AIDOS se range en sept familles : l'idée (<code>ideas.idea</code>), puis dans le noyau la vérité, la couche et le lien (<code>kernel.truth</code>/<code>layer</code>/<code>link</code>), le miroir (<code>mirrors.mirror</code>), le ChangeSet (<code>changesets.changeset</code>) et la phase du DAG (<code>dag.phase</code>). Chacune a sa table, mais toutes partagent la même forme d'enregistrement."
+			},
+			"t2": {
+				"title": "Vérité adressée par contenu",
+				"body": "Un enregistrement n'a pas de nom : son identité <code>id</code> est l'empreinte SHA-256 de son corps JSONB canonique. Le même corps produit toujours le même id ; deux corps différents ont deux id différents. L'adresse, c'est le contenu."
+			},
+			"t3": {
+				"title": "Append-only : on n'écrase jamais",
+				"body": "Un corps n'est jamais modifié. Pour « changer » une vérité, on INSÈRE un nouvel enregistrement et on marque l'ancien <code>superseded_by</code> (remplacé par) son successeur. Rien n'est détruit : la tête bouge, l'historique s'empile."
+			},
+			"t4": {
+				"title": "Version = empreinte = licence de changer",
+				"body": "La <code>version</code> est elle aussi une empreinte du contenu. Elle ne s'incrémente pas comme un compteur : elle se recalcule. Connaître la version courante, c'est détenir la licence de proposer la suivante — sur la bonne base, sans collision."
+			},
+			"t5": {
+				"title": "Le mur : l'écran ne touche jamais la vérité",
+				"body": "Ces tables sont AU-DESSUS de la ligne : le rôle de l'agent n'a que le droit de LECTURE (SELECT). Toute écriture de vérité passe par proposer → ChangeSet → approbation humaine (<code>à venir S20</code>). Cet écran lit les enregistrements ; il n'en écrit jamais aucun."
+			}
+		},
+		"example": {
+			"badge": "Exemple",
+			"heading": "À quoi ressemble un enregistrement",
+			"lead": "Un exemple concret : la forme d'une <code>kernel.truth</code> (une vérité du noyau). Aucune saisie requise — on montre l'enveloppe d'adressage et le corps JSONB pour comprendre la structure.",
+			"idHash": "a1b2c3d4e5f6…",
+			"idNote": "= SHA-256 du corps canonique",
+			"versionHash": "a1b2c3d4e5f6…",
+			"versionNote": "empreinte = licence de changer",
+			"supersededNote": "∅ = c'est la tête (non remplacée)",
+			"bodyLabel": "Corps JSONB (canonique)",
+			"body": {
+				"statement": "Un id d'enregistrement est l'empreinte SHA-256 de son corps canonique."
+			},
+			"takeaway": "Bilan : tout enregistrement porte la même enveloppe — <code>id</code>, <code>version</code>, <code>superseded_by</code>, <code>created_at</code> — plus un corps JSONB propre à sa famille. Pour en créer un vrai, on ne l'écrit pas ici : on passe par proposer → ChangeSet (à venir S20)."
+		}
 	}
 }

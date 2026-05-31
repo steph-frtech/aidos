@@ -68,6 +68,34 @@ test.describe("S01 — Archive content store", () => {
 	});
 });
 
+test.describe("S01 — Archive content store is self-teaching", () => {
+	test("the tutorial renders with its concept steps", async ({ page }) => {
+		await page.goto("/store");
+		const tutorial = page.getByTestId("tutorial");
+		await expect(tutorial).toBeVisible();
+		// The 5 concept steps (content-addressing → append-only) are all present.
+		for (let i = 0; i < 5; i++) {
+			await expect(page.getByTestId(`tutorial-step-${i}`)).toBeVisible();
+		}
+		// It teaches the vocabulary in the ubiquitous language.
+		await expect(tutorial).toContainText(/SHA-256/i);
+	});
+
+	test("the worked example renders as a « essayez ceci » walkthrough", async ({
+		page,
+	}) => {
+		await page.goto("/store");
+		const example = page.getByTestId("example");
+		await expect(example).toBeVisible();
+		// The 3-step end-to-end walkthrough (store → point head → edit) is present.
+		for (let i = 0; i < 3; i++) {
+			await expect(page.getByTestId(`example-step-${i}`)).toBeVisible();
+		}
+		// It leans on the Put control's sample content.
+		await expect(example).toContainText("hello");
+	});
+});
+
 test.describe("S01 — Archive content store actions (below the wall)", () => {
 	test("the put + set-head controls are present and reachable", async ({
 		page,

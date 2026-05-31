@@ -4,6 +4,7 @@ import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { snapshot } from "@/lib/store-data";
 import { StoreActions } from "./StoreActions";
 import { StorePanel } from "./StorePanel";
+import { StoreTeach } from "./StoreTeach";
 
 export const metadata: Metadata = {
 	title: "Content Store — AIDOS Workbench",
@@ -69,6 +70,10 @@ export default async function StorePage() {
 						{t("intro")}
 					</p>
 				</header>
+
+				<div className="mt-10">
+					<StoreTeach />
+				</div>
 
 				<div className="mt-10">
 					<StorePanel snapshot={snap} />

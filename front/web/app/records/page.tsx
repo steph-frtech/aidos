@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { snapshot } from "@/lib/records-data";
 import { RecordsPanel } from "./RecordsPanel";
+import { RecordsTeach } from "./RecordsTeach";
 
 export const metadata: Metadata = {
 	title: "Records — AIDOS Workbench",
@@ -77,6 +78,10 @@ export default async function RecordsPage() {
 						{t("intro")}
 					</p>
 				</header>
+
+				<div className="mt-10">
+					<RecordsTeach />
+				</div>
 
 				<div className="mt-10">
 					<RecordsPanel snapshot={snap} />

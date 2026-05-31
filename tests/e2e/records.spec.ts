@@ -118,3 +118,29 @@ test.describe("S02 — governed write path (propose → ChangeSet, à venir S20)
 		await expect(note).toContainText(/S20/);
 	});
 });
+
+test.describe("S02 — the screen teaches (ui-completeness: tutoriel + exemple)", () => {
+	test("a tutorial section explains the KRDCore record concepts", async ({
+		page,
+	}) => {
+		await page.goto("/records");
+		const tutorial = page.getByTestId("tutorial");
+		await expect(tutorial).toBeVisible();
+		// The concept-first steps render (the seven families … the wall).
+		await expect(page.getByTestId("tutorial-step-0")).toBeVisible();
+		await expect(page.getByTestId("tutorial-step-4")).toBeVisible();
+		// Names a core concept in either locale.
+		await expect(tutorial).toContainText(/SHA-256/);
+	});
+
+	test("a worked example shows the shape of a record", async ({ page }) => {
+		await page.goto("/records");
+		const example = page.getByTestId("example");
+		await expect(example).toBeVisible();
+		// The addressing envelope and the canonical JSONB body are shown.
+		await expect(page.getByTestId("example-record")).toBeVisible();
+		const body = page.getByTestId("example-body");
+		await expect(body).toBeVisible();
+		await expect(body).toContainText(/statement/);
+	});
+});

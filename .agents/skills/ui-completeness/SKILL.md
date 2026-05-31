@@ -1,6 +1,6 @@
 ---
 name: ui-completeness
-description: The UI-reachability completeness law — every capability a step develops must be reachable AND executable from a Workbench screen (a control bound to its operation, with a Playwright mirror). No headless capability. Use at every step's UI phase, before declaring a step done, when auditing whether all operations are doable via the UI, or when the user says "tout doit se faire par écran / make every screen do every action / is this op reachable in the UI?".
+description: The UI-reachability completeness law — every capability a step develops must be reachable AND executable from a Workbench screen (a control bound to its operation, with a Playwright mirror); every screen must also teach (a tutorial explaining the concepts + a worked example); and the home page is a re-questioned hub (« comment est codé AIDOS » · créer son app · le résultat de son app). No headless capability. Use at every step's UI phase, before declaring a step done, when auditing whether all operations are doable via the UI, or when the user says "tout doit se faire par écran / make every screen do every action / chaque écran doit avoir un tuto / is this op reachable in the UI?".
 ---
 
 # ui-completeness (KRD gesture)
@@ -34,7 +34,9 @@ It is the sibling of [check-completeness](../check-completeness/SKILL.md) (truth
 The UI plane of a step is complete iff:
 - Every op in `O` has a control on a screen (no headless capability), **and**
 - Each control's action respects the wall (below-line = direct; above-line = propose-ChangeSet), **and**
-- Each control has a green Playwright mirror proving it executes.
+- Each control has a green Playwright mirror proving it executes, **and**
+- **Each screen teaches** — it carries a **tutorial** (explains the concepts) **and a worked example**, bilingual and tested (see below), **and**
+- **The home page is the re-questioned hub** with its three zones (see below).
 
 Else the step is **not done** — the gap is a UI-monster, surfaced like a completeness violation.
 
@@ -50,6 +52,25 @@ If an above-the-line action's path is not built yet (the `idea-intake`/`changese
 | `kernel` / `mirrors` / `fitness` (truth) | opens a **ChangeSet proposal** (idea → mirror → /goal → approval) | only once S20+ exists; until then the control is present + stubbed + OpenQuestion |
 
 "Tout réalisable via écran" = every op has a control and is **triggerable through its legitimate path** — a direct action below the line, a governed proposal above it. The screen never bypasses the wall.
+
+## Chaque écran est auto-pédagogique : tutoriel + exemple
+
+Un écran qui ne montre que des contrôles ne suffit pas — il doit **enseigner**. **Tout** écran du Workbench porte, en plus de ses contrôles, deux choses :
+
+1. **Un tutoriel** — un panneau (« Tutoriel », un `<Steps>`/accordéon) qui explique, dans le **langage ubiquitaire** (FR par défaut + EN), les **concepts** que l'écran incarne : ce que c'est, pourquoi ça compte, le vocabulaire. Le concept d'abord, pas le jargon d'implémentation.
+2. **Un exemple** — un **exemple concret et travaillé** de la capacité : un échantillon illustratif pré-rempli **ou** un mini-walkthrough « essayez ceci » qui démontre l'opération de bout en bout (exécutable quand l'op est sous la ligne).
+
+Tutoriel et exemple sont **bilingues** (ADR 0011) et **tokenisés** (ADR 0010), exposés par un `data-testid`, et le **mirror Playwright assère qu'ils s'affichent**. Un écran sans tutoriel **ni** exemple est **incomplet** — au même titre qu'une capacité headless.
+
+## La page d'accueil — le hub (toujours re-questionnée)
+
+La page d'accueil (`/`) n'est **jamais figée** : à **chaque étape**, elle est **refaite et re-questionnée** — « reflète-t-elle ce qu'AIDOS sait faire *maintenant* ? ». C'est un livrable vivant, jamais laissé périmé. Elle présente **trois zones** (chacune marquée « à venir » honnêtement tant que sa substance n'est pas construite) :
+
+1. **« Pour moi » — comment est codé AIDOS** : la vue interne du build d'AIDOS lui-même (le contrat, noyau/miroir/archive, le DAG, les étapes) — liens vers les panneaux internes (`/contract`, `/store`, `/records`, …) et la doc « Pour moi » (Mintlify).
+2. **AIDOS — créer votre application** : la vraie surface produit, **tout ce qu'il faut pour qu'un utilisateur construise son application** (les gestes, le cycle KRD, les panneaux pour décrire entités/opérations/vues/actions et piloter le build) — lien vers le guide « Pour les futurs utilisateurs ».
+3. **Le résultat de votre application** : l'**app émise** et son **résultat** (aperçu / exécution / inspection de la projection qu'AIDOS a produite — web/mobile/cli/api/db).
+
+Comme tout écran, le hub est tokenisé + bilingue et porte son **tutoriel + exemple**. Les zones non encore construites (créer-son-app, résultat) affichent un état « à venir » honnête avec un lien vers la doc — jamais une fausse promesse.
 
 ## Outputs
 
