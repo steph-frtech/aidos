@@ -33,10 +33,15 @@ command -v claude >/dev/null 2>&1 || { echo "✗ 'claude' introuvable dans le PA
 
 # The build instruction. JSON args are passed verbatim to the Workflow tool.
 # (No apostrophes — keeps the single shell string simple.)
-PROMPT="Lance le workflow long-run avec args {\"startFrom\":\"S02\",\"nonStop\":true} : construis AIDOS de S02 jusqu a S47, NON-STOP. Chaque etape passe par son agent dedie step-sNN (validee par step-verifier) et suit CLAUDE.md section 6 — miroir BDD rouge puis vert, code, ses deux pages Mintlify, son issue Linear (In Progress vers Done), une UI actionnable + theme + bilingue + tutoriel/exemple (ui-completeness), dans le respect du mur. N arrete pas sur un echec : accumule-les et continue jusqu a S47. A la fin, donne la liste des etapes vertes et des echecs."
+PROMPT="Tu es en ULTRACODE (effort xhigh + orchestration par workflows, exhaustivite avant vitesse). Lance le workflow long-run avec args {\"startFrom\":\"S02\",\"nonStop\":true} : construis AIDOS de S02 jusqu a S47, NON-STOP. Chaque etape passe par son agent dedie step-sNN (validee par step-verifier) et suit CLAUDE.md section 6 — miroir BDD rouge puis vert, code, ses deux pages Mintlify, son issue Linear (In Progress vers Done), une UI actionnable + theme + bilingue + tutoriel/exemple (ui-completeness), dans le respect du mur. N arrete pas sur un echec : accumule-les et continue jusqu a S47. A la fin, donne la liste des etapes vertes et des echecs."
 
-echo "▶ Nouvelle session Claude pour le build AIDOS (long-run S02→S47, non-stop, agents dédiés)…"
+echo "▶ Nouvelle session Claude (ultracode/xhigh) pour le build AIDOS (long-run S02→S47, non-stop, agents dédiés)…"
+# Force ULTRACODE at startup. `--effort` only accepts low|medium|high|xhigh|max, and
+# ultracode = **xhigh + dynamic workflow orchestration**, so we pass --effort xhigh; the
+# orchestration half is guaranteed because the prompt explicitly launches the long-run
+# workflow. (There is no `--effort ultracode`; that name only exists for the interactive
+# /effort command.)
 # Fresh interactive session keeps the long (multi-hour) background workflow alive and
 # re-invokes the loop on each notification. Permissions: the project's
 # .claude/settings.local.json runs in bypassPermissions, so the build is unattended.
-exec claude "$PROMPT"
+exec claude --effort xhigh "$PROMPT"
