@@ -3,6 +3,11 @@ import { resolve } from "node:path";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+// Determinism-first: the parse + validate are an authoritative PURE core in
+// lib/contract.ts, covered by the reproducibility mirror lib/contract.test.ts.
+// This Server Component keeps only the I/O boundary (read the file) and delegates
+// every transformation to that pure function — same file content → same structure.
+import { type Contract, parseContract } from "@/lib/contract";
 import { ContractTeach } from "./ContractTeach";
 
 export const metadata: Metadata = {
@@ -11,101 +16,17 @@ export const metadata: Metadata = {
 		"Per-step loop and granularity rule, versioned and machine-readable.",
 };
 
-// ── Types ─────────────────────────────────────────────────────────────────
+// ── File read (I/O boundary) ──────────────────────────────────────────────
+// readContract reads docs/implementation_contract.md from disk and hands the raw
+// content to the pure parser. The only impure part lives here; parsing is pure.
 
-interface Phase {
-	id: string;
-	label: string;
-	description: string;
-	gate: "computational" | "human";
-}
-
-interface GranularityProp {
-	id: string;
-	label: string;
-	description: string;
-}
-
-interface Contract {
-	version: string;
-	kind: string;
-	description: string;
-	phases: Phase[];
-	granularity: GranularityProp[];
-}
-
-// ── Parser — no runtime dep, just the Node built-ins ─────────────────────
-// The front block is a YAML-ish block delimited by --- lines.
-// We parse it with targeted regexes since we control the file format.
-
-function parseContractFile(): Contract {
+function readContractFile(): Contract {
 	const contractPath = resolve(
 		process.cwd(),
 		"../../docs/implementation_contract.md",
 	);
 	const raw = readFileSync(contractPath, "utf8");
-
-	const frontMatch = raw.match(/^---\n([\s\S]*?)\n---/);
-	if (!frontMatch)
-		throw new Error("No front block found in implementation_contract.md");
-	const yaml = frontMatch[1];
-
-	const versionMatch = yaml.match(/^\s{2}version:\s*"([^"]+)"/m);
-	const kindMatch = yaml.match(/^\s{2}kind:\s*(\S+)/m);
-	const descMatch = yaml.match(
-		/^\s{2}description:\s*>\n([\s\S]*?)(?=\n\s{2}\w)/m,
-	);
-
-	const version = versionMatch?.[1] ?? "unknown";
-	const kind = kindMatch?.[1] ?? "unknown";
-	const description = descMatch
-		? descMatch[1]
-				.split("\n")
-				.map((l) => l.trim())
-				.filter(Boolean)
-				.join(" ")
-		: "";
-
-	// Parse phases
-	const phasesSection = yaml.match(
-		/\s{2}phases:\n([\s\S]*?)\n\s{2}granularity:/,
-	);
-	const phasesText = phasesSection?.[1] ?? "";
-	const phases = parseItems(phasesText) as unknown as Phase[];
-
-	// Parse granularity
-	const granularitySection = yaml.match(/\s{2}granularity:\n([\s\S]*)$/);
-	const granularityText = granularitySection?.[1] ?? "";
-	const granularity = parseItems(
-		granularityText,
-	) as unknown as GranularityProp[];
-
-	return { version, kind, description, phases, granularity };
-}
-
-function parseItems(block: string): Record<string, string>[] {
-	// Split on "    - id:" entry points
-	const entries = block.split(/(?=\s{4}-\s+id:)/g).filter((s) => s.trim());
-	return entries.map((entry) => {
-		const fields: Record<string, string> = {};
-		const idM = entry.match(/\s{4}-\s+id:\s+(\S+)/);
-		const labelM = entry.match(/\s{6}label:\s+"?([^"\n]+)"?/);
-		const gateM = entry.match(/\s{6}gate:\s+(\S+)/);
-		const descM = entry.match(
-			/\s{6}description:\s*>\n([\s\S]*?)(?=\s{6}\w|\s{4}-|\s{2}\w|$)/,
-		);
-		if (idM) fields.id = idM[1];
-		if (labelM) fields.label = labelM[1].trim();
-		if (gateM) fields.gate = gateM[1];
-		if (descM) {
-			fields.description = descM[1]
-				.split("\n")
-				.map((l) => l.trim())
-				.filter(Boolean)
-				.join(" ");
-		}
-		return fields;
-	});
+	return parseContract(raw);
 }
 
 // ── Gate chip styling ────────────────────────────────────────────────────
@@ -127,7 +48,7 @@ function gateClass(gate: string): string {
 // and the static labels are bilingual via next-intl (ADR 0011).
 
 export default async function ContractPage() {
-	const contract = parseContractFile();
+	const contract = readContractFile();
 	const t = await getTranslations("contract");
 
 	return (
