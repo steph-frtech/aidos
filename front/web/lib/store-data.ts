@@ -6,8 +6,15 @@ import postgres from "postgres";
  * panel. It reads the LIVE Postgres truth-store (schema `archive`: content / head
  * / history) when POSTGRES_CONNECTION_STRING is reachable, and falls back to a
  * deterministic demo fixture (v1→v2 under head "doc") when it is not — so the
- * panel and its Playwright e2e stay autonomous if no DB is up. This panel never
- * writes truth; writes flow through the `store` MCP server (the wall).
+ * panel and its Playwright e2e stay autonomous if no DB is up.
+ *
+ * This module is the READ projection. The panel now also WRITES — but only the
+ * Archive content store, which sits BELOW the wall (append-only content/history,
+ * mutable head; never kernel/mirrors/fitness). Those writes live in
+ * app/store/actions.ts (Server Actions). Truth above the line is still never
+ * written from the Workbench (CLAUDE.md §2). The canonical single door for store
+ * writes remains the `store` MCP server (ADR 0009); the direct server-action
+ * write is reconciled via an HTTP/API gateway at a later step (S36).
  */
 
 export interface ContentObject {

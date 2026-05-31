@@ -12,6 +12,7 @@ export async function WorkbenchHeader() {
 		{ href: "/", label: t("home") },
 		{ href: "/contract", label: t("contract") },
 		{ href: "/store", label: t("store") },
+		{ href: "/records", label: t("records") },
 	];
 
 	return (
