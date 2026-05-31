@@ -12,6 +12,13 @@ Author a **view source** — the *spec-écran* of one screen — as a Kernel **s
 
 > The wall (CLAUDE.md §2): this gesture never writes the `kernel`/`mirrors`/`fitness` schemas. It drafts a view source as an `idea`/changeset and routes the mirror via MCP. The only door to the kernel is `idea → mirror → /goal → human approval`.
 
+## Design system & bilingue (always)
+
+Every view is specified against two standing conventions, baked into the source and the mirror:
+
+- **Design system (ADR 0010):** the screen renders on the Workbench tokens (ccup zinc + blue-600, Tailwind v4 + shadcn) — `bg-background`/`text-foreground`/`bg-card`/`border-border`/`text-muted-foreground`/`bg-primary`, radius via `rounded-lg`. **No hardcoded `zinc-*`/hex** in the emitted route; the theme is swappable in one file. The spec names zones in token terms, not raw colours.
+- **Bilingue par défaut (ADR 0011):** every displayed label/string is **translatable, français par défaut + EN**. Static UI strings → a next-intl namespace in `messages/{fr,en}.json`; entity/content text → the Postgres `i18n.translation` table (FR required, FR fallback). The view source marks each `displayed_data` text field translatable; the mirror asserts the screen renders in `fr` (default) and that switching to `en` swaps the strings. Never bind a screen to a single-language literal.
+
 ## When to use
 
 - A new screen/panel/Workbench route is needed and must be specified *before* anyone builds it (step loop point 7: "a UI at every step").

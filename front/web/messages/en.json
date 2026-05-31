@@ -1,0 +1,57 @@
+{
+	"common": {
+		"appName": "AIDOS Workbench",
+		"tagline": "AIDOS's governance cockpit",
+		"language": "Language",
+		"live": "LIVE · Postgres",
+		"demo": "demo data",
+		"readOnly": "read-only",
+		"loading": "Loading…",
+		"backHome": "Home"
+	},
+	"nav": {
+		"home": "Home",
+		"contract": "Execution contract",
+		"store": "Content store",
+		"records": "Records"
+	},
+	"home": {
+		"eyebrow": "AI development operating system",
+		"title": "AIDOS Workbench",
+		"subtitle": "The AI development OS, KRD method. Truth is yours; the agent writes the implementation; the harness holds the wall.",
+		"panels": "Panels",
+		"panelsLead": "Explore the read-only projections of the truth AIDOS governs.",
+		"explore": "Open panel",
+		"contractTitle": "Execution contract",
+		"contractDescription": "The per-step loop and granularity rule, versioned and machine-readable.",
+		"storeTitle": "Content store",
+		"storeDescription": "The Archive's content-addressed, append-only store: objects by hash, head pointer, and head history.",
+		"footer": "Read-only projections. Truth lives in Postgres, out of the agent's reach; writes flow through an approved changeset."
+	},
+	"store": {
+		"eyebrow": "Archive · content store",
+		"title": "Content store",
+		"intro": "Content-addressed, append-only. Objects are stored by SHA-256 hash; editing produces a new hash while the old one stays readable. The head is a mutable pointer; its moves are an append-only history.",
+		"liveTitle": "Read live from the aidos Postgres (schema archive)",
+		"demoTitle": "Postgres unreachable — showing the demo fixture",
+		"objectsHeading": "Objects ({count})",
+		"headsHeading": "Heads ({count})",
+		"byteUnit": "{count} B",
+		"headBadge": "head: {key}",
+		"currentBodyLabel": "Current body of head",
+		"hashLabel": "hash",
+		"historyHeading": "History — oldest first",
+		"parentLabel": "parent:",
+		"footer": "Source: live <code>archive</code> schema in Postgres (read-only projection); falls back to a demo fixture if the base is unreachable. Writes flow through the <code>store</code> MCP server — never this panel."
+	},
+	"contract": {
+		"eyebrow": "Runtime · execution contract",
+		"title": "Execution contract",
+		"phasesHeading": "Per-step loop — {count} phases",
+		"colId": "id",
+		"colPhase": "Phase",
+		"colGate": "Gate",
+		"granularityHeading": "Granularity rule — {count} properties",
+		"footer": "Source: <source>docs/implementation_contract.md</source> — read-only projection. Changes require a ChangeSet (DRAFT → APPLIED) and a semver bump."
+	}
+}

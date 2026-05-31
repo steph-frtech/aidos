@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
+import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { snapshot } from "@/lib/store-data";
 import { StorePanel } from "./StorePanel";
 
@@ -18,48 +20,66 @@ export const dynamic = "force-dynamic";
  * content hash on the left and the selected head's current body + move history on
  * the right. Data is resolved on the server from the store projection (mirroring
  * the `store` MCP server) and never writes truth. Touches no existing route.
+ * Themed on the ADR 0010 design tokens; bilingual via next-intl (ADR 0011).
  */
 export default async function StorePage() {
 	const snap = await snapshot();
+	const t = await getTranslations("store");
+	const tc = await getTranslations("common");
+
+	const isLive = snap.source === "live";
 
 	return (
-		<div className="min-h-screen bg-zinc-50 px-4 py-12 sm:px-8 dark:bg-zinc-950">
-			<div className="mx-auto max-w-5xl space-y-8">
-				<header className="space-y-2">
-					<div className="flex items-center gap-3">
-						<h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-							Content Store
+		<div className="flex min-h-screen flex-col bg-background text-foreground">
+			<WorkbenchHeader />
+
+			<main className="mx-auto w-full max-w-5xl flex-1 px-4 py-12 sm:px-8 sm:py-16">
+				<header className="space-y-4">
+					<span className="inline-flex items-center rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+						{t("eyebrow")}
+					</span>
+					<div className="flex flex-wrap items-center gap-3">
+						<h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+							{t("title")}
 						</h1>
 						<span
 							className={
-								snap.source === "live"
-									? "rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/40 dark:text-green-300"
-									: "rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+								isLive
+									? "inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+									: "inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
 							}
-							title={
-								snap.source === "live"
-									? "Read live from the aidos Postgres (schema archive)"
-									: "Postgres unreachable — showing the demo fixture"
-							}
+							title={isLive ? t("liveTitle") : t("demoTitle")}
 						>
-							{snap.source === "live" ? "LIVE · Postgres" : "demo fixture"}
+							<span
+								aria-hidden="true"
+								className={
+									isLive
+										? "size-1.5 rounded-full bg-primary"
+										: "size-1.5 rounded-full bg-muted-foreground"
+								}
+							/>
+							{isLive ? tc("live") : tc("demo")}
 						</span>
 					</div>
-					<p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-						Content-addressed, append-only. Objects are stored by SHA-256 hash;
-						editing produces a new hash while the old one stays readable. The
-						head is a mutable pointer; its moves are an append-only history.
+					<p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+						{t("intro")}
 					</p>
 				</header>
 
-				<StorePanel snapshot={snap} />
+				<div className="mt-10">
+					<StorePanel snapshot={snap} />
+				</div>
 
-				<footer className="border-t border-zinc-200 pt-4 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-600">
-					Source: live <code>archive</code> schema in Postgres (read-only
-					projection); falls back to a demo fixture if the base is unreachable.
-					Writes flow through the <code>store</code> MCP server — never this panel.
+				<footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
+					{t.rich("footer", {
+						code: (chunks) => (
+							<code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.7rem] text-foreground">
+								{chunks}
+							</code>
+						),
+					})}
 				</footer>
-			</div>
+			</main>
 		</div>
 	);
 }

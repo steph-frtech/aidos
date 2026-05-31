@@ -1,0 +1,57 @@
+{
+	"common": {
+		"appName": "AIDOS Workbench",
+		"tagline": "Le cockpit de gouvernance d'AIDOS",
+		"language": "Langue",
+		"live": "EN DIRECT · Postgres",
+		"demo": "données de démo",
+		"readOnly": "lecture seule",
+		"loading": "Chargement…",
+		"backHome": "Accueil"
+	},
+	"nav": {
+		"home": "Accueil",
+		"contract": "Contrat d'exécution",
+		"store": "Magasin de contenu",
+		"records": "Enregistrements"
+	},
+	"home": {
+		"eyebrow": "Système d'exploitation de développement IA",
+		"title": "AIDOS Workbench",
+		"subtitle": "L'OS de développement assisté par IA, méthode KRD. La vérité vous appartient ; l'agent écrit l'implémentation ; le harnais tient le mur.",
+		"panels": "Panneaux",
+		"panelsLead": "Explorez les projections en lecture seule de la vérité gouvernée par AIDOS.",
+		"explore": "Ouvrir le panneau",
+		"contractTitle": "Contrat d'exécution",
+		"contractDescription": "La boucle par étape et la règle de granularité, versionnées et lisibles par la machine.",
+		"storeTitle": "Magasin de contenu",
+		"storeDescription": "Le magasin de l'Archive, adressé par contenu et append-only : objets par hash, pointeur de tête et historique.",
+		"footer": "Projections en lecture seule. La vérité vit dans Postgres, hors de portée de l'agent ; les écritures passent par un changeset approuvé."
+	},
+	"store": {
+		"eyebrow": "Archive · magasin de contenu",
+		"title": "Magasin de contenu",
+		"intro": "Adressé par contenu, append-only. Les objets sont stockés par empreinte SHA-256 ; une modification produit une nouvelle empreinte tandis que l'ancienne reste lisible. La tête est un pointeur mutable ; ses déplacements forment un historique append-only.",
+		"liveTitle": "Lu en direct depuis le Postgres aidos (schéma archive)",
+		"demoTitle": "Postgres injoignable — affichage des données de démo",
+		"objectsHeading": "Objets ({count})",
+		"headsHeading": "Têtes ({count})",
+		"byteUnit": "{count} o",
+		"headBadge": "tête : {key}",
+		"currentBodyLabel": "Corps actuel de la tête",
+		"hashLabel": "empreinte",
+		"historyHeading": "Historique — du plus ancien au plus récent",
+		"parentLabel": "parent :",
+		"footer": "Source : schéma <code>archive</code> en direct dans Postgres (projection en lecture seule) ; bascule sur des données de démo si la base est injoignable. Les écritures passent par le serveur MCP <code>store</code> — jamais par ce panneau."
+	},
+	"contract": {
+		"eyebrow": "Runtime · contrat d'exécution",
+		"title": "Contrat d'exécution",
+		"phasesHeading": "Boucle par étape — {count} phases",
+		"colId": "id",
+		"colPhase": "Phase",
+		"colGate": "Porte",
+		"granularityHeading": "Règle de granularité — {count} propriétés",
+		"footer": "Source : <source>docs/implementation_contract.md</source> — projection en lecture seule. Toute modification exige un ChangeSet (DRAFT → APPLIED) et un incrément de version semver."
+	}
+}

@@ -46,20 +46,31 @@ You author MDX + `docs.json` in `.aidos-docs/`, validate, commit, push. You neve
 - **`mint` CLI** (`npm i -g mint`) — `mint validate` (strict build check, run from
   `.aidos-docs/`) and `mint broken-links` before every push. Fix every warning.
 
-## 3. The two audiences (top-level tabs) and the three meta-levels
+## 3. The two docs (top-level tabs)
 
-The site has exactly **two tabs**, one per audience. Every step writes one page in each.
+The site is **two distinct docs**, one tab per reader — the same system told at two
+altitudes. **Do not** mix them.
 
-### Tab « Pour les futurs utilisateurs » — the *concept*
+### Tab « Pour moi » — the complete internals (*everything*)
 
-`steps/concept/sNN-<slug>.mdx`. For someone who has never seen the code and wants to
-understand **what the capability is, why it matters, and the vocabulary**. No file
-paths, no Go, no SQL. Concept-first and accessible.
+The full documentation of **AIDOS itself**, built tooth by tooth. It holds the
+**Fondations** and **every build step**; each step has a *concept* page
+(`steps/concept/sNN-<slug>.mdx` — the what/why of that build step) **and** an
+*internals* page (`steps/internals/sNN-<slug>.mdx`) carrying the three layers below.
+This is the build journal — Go, SQL, file paths (`path:line`), mirrors, ADRs all
+belong here. Audience: **me** (the builder), who wants to understand *tout*.
 
-### Tab « Pour moi » — the *detail*, in three layers
+### Tab « Pour les futurs utilisateurs » — the product guide (the End User)
 
-`steps/internals/sNN-<slug>.mdx`. For me, to understand the implementation deeply.
-**Always** three `##` sections, in this order:
+For someone who will **use AIDOS to develop their own app** — never a reader of AIDOS's
+own guts. It holds two things: **comment développer son app avec AIDOS** (the user's
+journey — getting started, the KRD workflow, the gestures, the Workbench, the app you
+get) **and tous les concepts** they need (what AIDOS is, the KRD method, the five
+subsystems, the glossary). Organized by the **user's journey, never by AIDOS's internal
+step numbers**; no AIDOS-internal Go/SQL. **Bilingue par défaut** (français d'abord,
+une seconde langue disponible — voir l'ADR i18n et la page `guide/your-app`).
+
+### The three internals layers (every « Pour moi » step *internals* page)
 
 1. **`## Implémentation`** — the actual code: packages, files (`path:line`), schema,
    the algorithms, how it really works, the commands to run it/test it.
@@ -70,24 +81,34 @@ paths, no Go, no SQL. Concept-first and accessible.
    ratchet, which wall / completeness / honesty rules apply, the relevant ADRs, and any
    bootstrap forward-dependency recorded as an OpenQuestion.
 
-> Implémentation, Méta and Méta-méta are the three things the user asked to see
-> documented for **every** step. They are not optional headings.
+> The three layers are not optional headings — every « Pour moi » internals page has them.
 
-## 4. Foundational pages (write once, then maintain)
+## 4. The pages
 
-Beyond the per-step pages, these shared pages give the site its spine:
+### « Pour les futurs utilisateurs » — the product guide
 
-| Tab | Page | Holds |
+| Group | Page | Holds |
 |---|---|---|
-| Concept | `index.mdx` | Landing — what AIDOS is, the two-audience split, cards into both tabs. |
-| Concept | `concepts/what-is-aidos.mdx` | The product: AI Development Operating System. |
-| Concept | `concepts/krd-method.mdx` | The method: Kernel-Ratchet Development (the two mandates, red→green→refactor). |
-| Concept | `concepts/five-subsystems.mdx` | Runtime · Kernel · Mirror · Archive · Workbench. |
-| Concept | `concepts/glossary.mdx` | The ubiquitous language (mirror of `CONTEXT-MAP.md`, accessible form). |
-| Pour moi | `internals/overview.mdx` | How the repo is built tooth-by-tooth; the per-step loop. |
-| Pour moi | `internals/the-wall-and-ratchet.mdx` | The wall (what the agent never writes) + the ratchet + completeness. |
-| Pour moi | `internals/the-stack.mdx` | The frozen stack (Go · Postgres · Next) and why. |
-| Pour moi | `internals/repo-structure.mdx` | The directory map and where each subsystem lives. |
+| Découvrir AIDOS | `index.mdx` | Landing — what AIDOS is, the two docs, cards into both tabs. |
+| Découvrir AIDOS | `concepts/what-is-aidos.mdx` | The product: AI Development Operating System. |
+| Découvrir AIDOS | `concepts/krd-method.mdx` | The method: Kernel-Ratchet Development (the two mandates). |
+| Découvrir AIDOS | `concepts/five-subsystems.mdx` | Runtime · Kernel · Mirror · Archive · Workbench. |
+| Découvrir AIDOS | `concepts/glossary.mdx` | The ubiquitous language (accessible form of `CONTEXT-MAP.md`). |
+| Développer votre app | `guide/getting-started.mdx` | Premiers pas : ouvrir le Workbench, le projet, la première intention. |
+| Développer votre app | `guide/krd-workflow.mdx` | Le cycle : intention → `/grill` → miroir BDD → `/goal` → AIDOS construit → Workbench → phase stable. |
+| Développer votre app | `guide/gestures.mdx` | Les gestes (commandes) que **vous** invoquez : grill, goal, tdd, spike, evolve, … |
+| Développer votre app | `guide/workbench.mdx` | Le Workbench — vos panneaux (contract, store, …) et comment gouverner. |
+| Développer votre app | `guide/your-app.mdx` | L'app que vous obtenez : projections émises (web/mobile/cli/api/db), données Doltgres, **bilingue par défaut**. |
+
+### « Pour moi » — the complete internals
+
+| Group | Page | Holds |
+|---|---|---|
+| Fondations | `internals/overview.mdx` | How the repo is built tooth-by-tooth; the per-step loop. |
+| Fondations | `internals/the-wall-and-ratchet.mdx` | The wall + the ratchet + completeness. |
+| Fondations | `internals/the-stack.mdx` | The frozen stack (Go · Postgres · Next) and why. |
+| Fondations | `internals/repo-structure.mdx` | The directory map and where each subsystem lives. |
+| Les étapes | `steps/concept/sNN-*.mdx` + `steps/internals/sNN-*.mdx` | Per build step: the what/why **and** the three-layer internals. |
 
 ## 5. Page templates
 
@@ -152,8 +173,10 @@ s'appliquent ; les ADR concernés ; toute forward-dependency en OpenQuestion.>
 
 ## 6. Registering pages in `docs.json`
 
-The navigation has the two audience tabs. Adding a step = adding its two pages to the
-two `"Les étapes …"` groups. Never reorder or drop an existing page.
+Two tabs (§3). Adding a **build step** = adding its two pages (`steps/concept/sNN-*` +
+`steps/internals/sNN-*`) to the « Pour moi » → "Les étapes" group. Shipping a
+**user-facing capability** = adding/updating a page in the « Pour les futurs
+utilisateurs » → "Développer votre app" group. Never reorder or drop an existing page.
 
 ```json
 {
@@ -166,14 +189,14 @@ two `"Les étapes …"` groups. Never reorder or drop an existing page.
         "tab": "Pour les futurs utilisateurs",
         "groups": [
           { "group": "Découvrir AIDOS", "pages": ["index", "concepts/what-is-aidos", "concepts/krd-method", "concepts/five-subsystems", "concepts/glossary"] },
-          { "group": "Les étapes — le concept", "pages": ["steps/concept/s00-exec-contract", "steps/concept/s01-content-store"] }
+          { "group": "Développer votre app", "pages": ["guide/getting-started", "guide/krd-workflow", "guide/gestures", "guide/workbench", "guide/your-app"] }
         ]
       },
       {
         "tab": "Pour moi",
         "groups": [
           { "group": "Fondations", "pages": ["internals/overview", "internals/the-wall-and-ratchet", "internals/the-stack", "internals/repo-structure"] },
-          { "group": "Les étapes — l'implémentation", "pages": ["steps/internals/s00-exec-contract", "steps/internals/s01-content-store"] }
+          { "group": "Les étapes", "pages": ["steps/concept/s00-exec-contract", "steps/internals/s00-exec-contract", "steps/concept/s01-content-store", "steps/internals/s01-content-store"] }
         ]
       }
     ]
@@ -196,17 +219,32 @@ git push origin main     # Mintlify rebuilds aidos.mintlify.app
 Then **verify with `mcp__mintlify-aidos`**: `tree /` shows the new pages, and a `search`
 for the step's name returns them. Mintlify takes ~30–60 s to rebuild — poll, don't assume.
 
-## 8. Lifecycle — what is known when
+## 8. Lifecycle — what each step writes, and when
 
-`/grill-with-docs` runs at the **start** of a step; the full implementation only exists at
-**green**. So:
+A build step **always** writes its « Pour moi » pages (the build journal). It touches
+the « Pour les futurs utilisateurs » product guide **only when it ships a user-facing
+capability** (a new gesture, a Workbench panel, an emitted-app capability, a concept the
+user must grasp) — the guide is organized by the user's journey, not 1:1 with steps.
 
-- **At grill time** (intention sharpened): write the **concept page in full**, and the
-  internals page's **Méta** (the mirror you are about to make red) and **Méta-méta**
-  (the ratchet placement, wall rules, ADRs). Leave `## Implémentation` as a short stub
-  noting "complété à green".
-- **At green** (per CLAUDE.md §6): complete `## Implémentation` with the real code, run
-  `mint validate`, push, verify. The step is not "done" until both pages are live and
-  the three internals layers are filled.
+`/grill-with-docs` runs at the **start** of a step; the implementation exists only at
+**green**:
+
+- **At grill time** (intention sharpened): write the « Pour moi » **concept page in
+  full**, and the internals page's **Méta** (the mirror about to go red) and **Méta-méta**
+  (ratchet placement, wall rules, ADRs). Leave `## Implémentation` a short stub
+  ("complété à green"). If the step adds a user-facing capability, draft/refresh the
+  matching `guide/*` page too.
+- **At green** (CLAUDE.md §6): complete `## Implémentation` with the real code, run
+  `mint validate` + `mint broken-links`, push, verify. The step is not "done" until its
+  « Pour moi » pages are live with the three internals layers filled (and any touched
+  `guide/*` page is current).
 
 This keeps the docs honest: they never claim an implementation that does not yet exist.
+
+## 9. Bilingue par défaut
+
+The **product** (Workbench + emitted apps) is bilingual by default — **français
+d'abord**, a second language available (i18n, strings in Postgres tables; see the i18n
+ADR). The **product guide** (« Pour les futurs utilisateurs ») documents this in
+`guide/your-app.mdx`. The docs prose here stays French; if the docs themselves go
+bilingual later, use Mintlify's `languages` navigation — not a parallel file tree by hand.
