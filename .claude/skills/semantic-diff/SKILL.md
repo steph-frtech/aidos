@@ -10,6 +10,8 @@ A KRD gesture: take one proposed kernel change and, **before it is applied**, na
 
 > The wall (CLAUDE.md §2): this gesture never writes the `kernel` / `mirrors` / `fitness` schemas. It produces a *classified diff* on a `changeset` (DRAFT). The only door to the kernel stays `idea → mirror → /goal → human approval`.
 
+> **Determinism-first (the diff is an algorithm, not an LLM).** Per the `determinism-first` law, every computable part here is **deterministic code**, never an LLM "diff agent": the before/after diff is a **structural / AST compare** (reuse a diff algorithm — `git`/`jj` for text, a structural differ for ASTs), the `blast_radius` is a **ContextGraph walk**, and the `change_kind` is chosen by **declared rules** (the table below) in `back/kernel/propagation/` with its property mirror. The LLM is used **only** for a genuinely undecidable kind — and even then the honest move is `unknown` + an OpenQuestion, **not** an LLM guess. Never reach for the model where the diff algorithm / graph walk / rule decides.
+
 ## Purpose
 
 Lift a raw proposed change out of ambiguity into a typed, bounded diff:
