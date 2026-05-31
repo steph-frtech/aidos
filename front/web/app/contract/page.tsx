@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { ContractTeach } from "./ContractTeach";
 
 export const metadata: Metadata = {
 	title: "Step Execution Contract — AIDOS Workbench",
@@ -160,6 +161,9 @@ export default async function ContractPage() {
 							</p>
 						)}
 					</header>
+
+					{/* Self-teaching: tutorial + worked example (ui-completeness) */}
+					<ContractTeach />
 
 					{/* Per-step loop phases */}
 					<section aria-label={t("phasesHeading")} className="space-y-4">

@@ -78,4 +78,25 @@ test.describe("S00 — Step execution contract", () => {
 		).toBeVisible();
 		await expect(page.getByText("step-contract")).toBeVisible();
 	});
+
+	// ui-completeness: every screen is self-teaching (tutorial + worked example).
+	test("the screen teaches — tutorial with five steps is visible", async ({
+		page,
+	}) => {
+		await page.goto("/contract");
+		const tutorial = page.getByTestId("tutorial");
+		await expect(tutorial).toBeVisible();
+		for (let i = 0; i < 5; i++) {
+			await expect(page.getByTestId(`tutorial-step-${i}`)).toBeVisible();
+		}
+	});
+
+	test("the screen teaches — worked example phase + body is visible", async ({
+		page,
+	}) => {
+		await page.goto("/contract");
+		await expect(page.getByTestId("example")).toBeVisible();
+		await expect(page.getByTestId("example-phase")).toBeVisible();
+		await expect(page.getByTestId("example-body")).toBeVisible();
+	});
 });

@@ -117,7 +117,48 @@
 		"colPhase": "Phase",
 		"colGate": "Gate",
 		"granularityHeading": "Granularity rule — {count} properties",
-		"footer": "Source: <source>docs/implementation_contract.md</source> — read-only projection. Changes require a ChangeSet (DRAFT → APPLIED) and a semver bump."
+		"footer": "Source: <source>docs/implementation_contract.md</source> — read-only projection. Changes require a ChangeSet (DRAFT → APPLIED) and a semver bump.",
+		"tutorial": {
+			"badge": "Tutorial",
+			"heading": "Understanding the execution contract",
+			"lead": "The concepts behind this screen, before the jargon. The contract is the root law every later step must obey — one file, two readers.",
+			"t1": {
+				"title": "One file, two readers",
+				"body": "The contract lives in <code>docs/implementation_contract.md</code>: a machine-readable YAML block (the harness reads it) topped by human-readable prose. Both say the same thing; the YAML is the canonical source, the prose is its projection."
+			},
+			"t2": {
+				"title": "The per-step loop — nine phases",
+				"body": "Every AIDOS step follows the same ordered loop: <code>grill-with-docs</code> → BDD mirror → <code>tdd</code> → sensors → completeness → <code>diagnose</code> → UI+Playwright → improve-architecture → artifacts. You never skip a phase."
+			},
+			"t3": {
+				"title": "Gate: computational or human",
+				"body": "Each phase carries a <code>gate</code>: <code>computational</code> if the harness can decide it alone, <code>human</code> if it needs a human judgement. That is what separates what self-certifies from what needs a decision."
+			},
+			"t4": {
+				"title": "The granularity rule — five properties",
+				"body": "Every step is <code>minimal</code> (one capability), <code>autonomous</code> (testable alone), <code>visualizable</code> (a route + an e2e), <code>non-destructive</code> (never silently breaks) and <code>chainable</code> (leaves a stable phase)."
+			},
+			"t5": {
+				"title": "\"Done is computed, never declared\"",
+				"body": "You never declare a step done: it is computed — red set green ∧ prior green intact ∧ no monster. Any change to the contract goes through a ChangeSet and a semver bump; the screen only projects, it never writes."
+			}
+		},
+		"example": {
+			"badge": "Example",
+			"heading": "What a phase looks like",
+			"lead": "A concrete example: the shape of one <code>phase</code> entry of the machine block — its <code>id</code>, <code>label</code> and <code>gate</code>. No input required; you read the contract as it is encoded.",
+			"idLabel": "id",
+			"idValue": "tdd",
+			"idNote": "stable, unique identifier",
+			"labelLabel": "label",
+			"labelValue": "/tdd to code",
+			"gateLabel": "gate",
+			"gateValue": "computational",
+			"gateNote": "decidable by the harness",
+			"bodyLabel": "Machine block (canonical YAML)",
+			"body": "- id: tdd\n  label: \"/tdd to code\"\n  description: >\n    red → green → refactor, in the step's own package.\n  gate: computational",
+			"takeaway": "Takeaway: every phase carries the same envelope — <code>id</code>, <code>label</code>, <code>gate</code> — and the table below is nothing more than the projection of these entries. To evolve the contract you don't edit it here: you go through a ChangeSet (coming S20) and bump the semver."
+		}
 	},
 	"records": {
 		"eyebrow": "Kernel · KRDCore records",

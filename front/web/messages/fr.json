@@ -117,7 +117,48 @@
 		"colPhase": "Phase",
 		"colGate": "Porte",
 		"granularityHeading": "Règle de granularité — {count} propriétés",
-		"footer": "Source : <source>docs/implementation_contract.md</source> — projection en lecture seule. Toute modification exige un ChangeSet (DRAFT → APPLIED) et un incrément de version semver."
+		"footer": "Source : <source>docs/implementation_contract.md</source> — projection en lecture seule. Toute modification exige un ChangeSet (DRAFT → APPLIED) et un incrément de version semver.",
+		"tutorial": {
+			"badge": "Tutoriel",
+			"heading": "Comprendre le contrat d'exécution",
+			"lead": "Les concepts derrière cet écran, avant le jargon. Le contrat est la loi-racine que toute étape suivante doit respecter — un fichier, deux lecteurs.",
+			"t1": {
+				"title": "Un fichier, deux lecteurs",
+				"body": "Le contrat vit dans <code>docs/implementation_contract.md</code> : un bloc YAML lisible par la machine (le harnais le lit) coiffé d'une prose lisible par l'humain. Les deux disent la même chose ; le YAML est la source canonique, la prose en est la projection."
+			},
+			"t2": {
+				"title": "La boucle par étape — neuf phases",
+				"body": "Chaque étape AIDOS suit la même boucle ordonnée : <code>grill-with-docs</code> → miroir BDD → <code>tdd</code> → capteurs → complétude → <code>diagnose</code> → UI+Playwright → amélioration archi → artefacts. On ne saute jamais une phase."
+			},
+			"t3": {
+				"title": "Porte : computationnelle ou humaine",
+				"body": "Chaque phase porte une <code>gate</code> : <code>computational</code> si le harnais peut la trancher seul, <code>human</code> si elle exige un jugement humain. C'est ce qui sépare ce qui s'auto-certifie de ce qui demande une décision."
+			},
+			"t4": {
+				"title": "La règle de granularité — cinq propriétés",
+				"body": "Toute étape est <code>minimal</code> (une capacité), <code>autonomous</code> (testable seule), <code>visualizable</code> (une route + un e2e), <code>non-destructive</code> (ne casse rien en silence) et <code>chainable</code> (laisse une phase stable)."
+			},
+			"t5": {
+				"title": "« Done est calculé, jamais déclaré »",
+				"body": "On ne décrète pas qu'une étape est finie : c'est calculé — jeu rouge au vert ∧ vert antérieur intact ∧ aucun monstre. Tout changement du contrat passe par un ChangeSet et un incrément semver ; l'écran ne fait que projeter, il n'écrit rien."
+			}
+		},
+		"example": {
+			"badge": "Exemple",
+			"heading": "À quoi ressemble une phase",
+			"lead": "Un exemple concret : la forme d'une entrée <code>phase</code> du bloc machine — son <code>id</code>, son <code>label</code> et sa <code>gate</code>. Aucune saisie requise ; on lit le contrat tel qu'il est encodé.",
+			"idLabel": "id",
+			"idValue": "tdd",
+			"idNote": "identifiant stable, unique",
+			"labelLabel": "label",
+			"labelValue": "/tdd pour coder",
+			"gateLabel": "gate",
+			"gateValue": "computational",
+			"gateNote": "tranchable par le harnais",
+			"bodyLabel": "Bloc machine (YAML canonique)",
+			"body": "- id: tdd\n  label: \"/tdd to code\"\n  description: >\n    red → green → refactor, dans le paquet de l'étape.\n  gate: computational",
+			"takeaway": "Bilan : chaque phase porte la même enveloppe — <code>id</code>, <code>label</code>, <code>gate</code> — et le tableau ci-dessous n'est rien d'autre que la projection de ces entrées. Pour faire évoluer le contrat, on ne l'édite pas ici : on passe par un ChangeSet (à venir S20) et on incrémente le semver."
+		}
 	},
 	"records": {
 		"eyebrow": "Kernel · enregistrements KRDCore",
