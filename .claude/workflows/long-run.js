@@ -110,13 +110,22 @@ for (const s of steps) {
       ? `\nRetry ${attempt}. Residual issues to fix:\n- ${verdict.residual_issues.join('\n- ')}`
       : ''
 
-    report = await agent(
+    const execPrompt =
       `Step ${s.id}\nObjective: ${s.objectif}\n` +
       `Detailed spec: read ${s.detailDoc || `docs/plan/${s.id}.md`} and follow CLAUDE.md §6 (the per-step KRD loop: grill→BDD mirror→tdd→sensors→diagnose→UI+Playwright→improve).\n` +
       `Inputs: ${(s.inputs ?? []).concat(prevOutputs).join(', ') || '(none)'}\n` +
-      `Done criteria: ${s.criteres}${retryCtx}`,
-      { label: `exec:${s.id}:${attempt}`, phase: 'Run', agentType: 'step-executor', schema: EXEC_SCHEMA },
-    )
+      `Done criteria: ${s.criteres}${retryCtx}`
+    const execOpts = { label: `exec:${s.id}:${attempt}`, phase: 'Run', schema: EXEC_SCHEMA }
+    // Dispatch to this step's DEDICATED agent (CLAUDE.md §6: one agent per step,
+    // step-sNN). It is only in the registry after a Claude restart, so fall back to
+    // the generic step-executor (same contract) when it isn't loaded yet.
+    const dedicated = `step-${norm(s.id).toLowerCase()}`
+    try {
+      report = await agent(execPrompt, { ...execOpts, agentType: dedicated })
+    } catch (e) {
+      log(`↪ dedicated agent '${dedicated}' unavailable (${String(e?.message ?? e).slice(0, 80)}); using step-executor`)
+      report = await agent(execPrompt, { ...execOpts, agentType: 'step-executor' })
+    }
 
     if (report.status === 'blocked') {
       return { verdict: 'BLOCKED', stoppedAt: s.id, reason: report.notes, ranBefore: done }
