@@ -167,7 +167,7 @@ At **every** step, ask in this order and create the artifact **iff** the answer 
 
 Each step is **minimal** (one verifiable capability), **autonomous** (testable alone, mocks what doesn't exist yet — never the reverse), **visualizable** (a Workbench UI route + a Playwright e2e), **non-destructive**, **chainable** (leaves a stable phase the next step consumes).
 
-1. **`/grill-with-docs`** the intention first — you do **not** start a step without it. One intention, ≤ 5 scenarios; sharpen the ubiquitous language; update `CONTEXT.md`/ADRs.
+1. **`/grill-with-docs`** the intention first — you do **not** start a step without it. One intention, ≤ 5 scenarios; sharpen the ubiquitous language; update `CONTEXT.md`/ADRs; **seed the step's Mintlify docs** — the « Pour les futurs utilisateurs » concept page plus the « Pour moi » **Méta / Méta-méta** layers (the **Documentation mandate** below).
 2. **Write the BDD mirror first** (Gherkin / property / fixture), stored in the `mirrors` schema, materialized for the runner. It is **red**. That red **is** the `/goal`.
 3. **`/tdd`** to code — you do **not** code without it. `red → green → refactor`, outside-in, in this step's own package only.
 4. **Sensors green at each diff** (PostToolUse hook). Self-certify on the **computational** only.
@@ -177,6 +177,8 @@ Each step is **minimal** (one verifiable capability), **autonomous** (testable a
 8. **`/improve-codebase-architecture`** — you do **not** move to the next step without it.
 9. Create this step's migration/projection artifacts per §5.
 10. **Artifact accretion (end of step, ADR 0009).** Using the official **`skill-creator`** skill and the **`agent-creator`** agent, create the **skills + agents** this step (and the near future) needs; **scaffold** the **hooks + MCP servers** it implies (activated + fault-injected only at the step that needs them — a hook that never fires is dead). Think MCP for **both planes**: the **AIDOS code/codegen** *and* the **emitted app**. Every backend op gets an **MCP tool** (no exception). S00–S01 carry a larger upfront batch (the §6 skill/agent inventory + MCP/hook scaffolds).
+
+> **Documentation mandate (Mintlify) — every step, no exception.** Each step ships its public documentation to **`aidos.mintlify.app`** (connected repo `steph-frtech/docs`, gitignored working clone `.aidos-docs/`). It produces **two pages**: a « **Pour les futurs utilisateurs** » *concept* page (`steps/concept/sNN-*.mdx`) and a « **Pour moi** » *internals* page (`steps/internals/sNN-*.mdx`) that always carries the three layers **Implémentation · Méta · Méta-méta**. Phase 1 (`/grill-with-docs`) writes the concept page in full plus the **Méta** (the mirror) and **Méta-méta** (ratchet placement, wall/completeness rules, ADRs) layers; the **Implémentation** layer is completed at green. The step is **not done** until both pages are live — `mint validate` + `mint broken-links` clean, pushed to `steph-frtech/docs` `main`, and verified through the `mcp__mintlify-aidos` MCP. Convention: `.agents/skills/grill-with-docs/MINTLIFY-DOCS.md`; component/`docs.json` syntax: the **`mintlify`** skill. Prose is **French** (`vous`); KRD terms (kernel/noyau, miroir, cliquet, mur, ChangeSet…) stay verbatim. This is a guardrail the meta-loop only ADDs to (§5); it does not alter the contract's nine `phases` — documentation is woven into phase 1 and finished at green.
 
 > **Bootstrap exception (forward dependencies).** Early steps build the substrate later steps rely on: the `mirrors` Postgres schema doesn't exist until **S06**, the wall hook until **S04**, the changeset engine until **S20**, etc. A step whose mirror cannot *yet* be persisted to Postgres **materializes it as a file + an executable test** (that test IS the red→green proof); Postgres persistence is **back-filled at the step that builds the schema** (S06 for mirrors). More generally a step may mock/defer substrate owned by a later step ("mocks what doesn't exist yet"), recorded as a **documented OpenQuestion** — and this **does NOT block the step**. By-design forward-dependencies are OpenQuestions, never failing `residual_issues`.
 
@@ -215,6 +217,15 @@ Allowed: add new files; add a ChangeSet; supersede via version; deprecate via li
 - Match the existing style of each file. **Biome** owns formatting (tabs, double quotes) at the monorepo root; **ESLint** owns Next rules in `front/web`. `back/` is Go (`gofmt`).
 - The Karpathy working guidelines (`STACK.md`) still apply: simplicity first, surgical changes, think before coding, goal-driven execution.
 - A `Stop` hook (`.claude/scripts/audit.sh`) runs an `agentshield` scan after each session — keep it.
+- **Mintlify CLI** `mint` is installed globally — use it in every doc gesture (`mint validate`, `mint broken-links`, `mint dev` to preview) before pushing docs.
+
+## 11. Work tracking — Linear (the tracker)
+
+**Linear is the single work-tracking tracker for AIDOS.** This OVERRIDES any skill's default of "GitHub issues" or a generic "project issue tracker": all tickets, ADRs, and step progress go to the **AIDOS** Linear project (`aidos-2a9085453be8`, workspace `aidos-linear`) via the **`linear` skill** and the `linear-server` MCP (`https://mcp.linear.app/mcp`). The Linear tracker is *work* truth, not *product* truth — the Postgres kernel/mirrors stay the product truth-store (the wall is unchanged).
+
+- **Three tracked kinds:** **KRD steps** (one issue `Sxx · …`, label `step`, status mirrors reality — `In Progress` at step start, `Done` only when green ∧ verified), **ADRs** (one issue `ADR 000N · …`, label `adr`, `Done` when accepted), **tickets** (feature/bug/refactor/spike from `/to-issues`, `/triage`, `/qa`, `/request-refactor-plan`, `/to-prd`).
+- **Who updates what:** `/grill-with-docs` files/updates the ADR issue when an ADR lands; the **step-executor** moves the step issue to `In Progress`/`Done`; the **step-verifier** flips it back on a failed verification. The generic ticket skills target the AIDOS Linear project (not GitHub).
+- **How:** MCP-first (`mcp__linear-server__*`), six-section issue template, the label taxonomy, every issue attached to the AIDOS project. First use needs OAuth — see the `linear` skill.
 
 ### In one sentence
 

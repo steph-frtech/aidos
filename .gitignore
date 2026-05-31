@@ -43,3 +43,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Mintlify docs working clone (deploys steph-frtech/docs → aidos.mintlify.app)
+/.aidos-docs/
