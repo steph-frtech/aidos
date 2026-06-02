@@ -1,0 +1,9 @@
+# 2026/05/31 20:53:41.350078 [TestProp_CosmeticNeverPropagatesAlone] [rapid] draw from: "Order"
+# 2026/05/31 20:53:41.350084 [TestProp_CosmeticNeverPropagatesAlone] [rapid] draw to: "api"
+# 2026/05/31 20:53:41.350086 [TestProp_CosmeticNeverPropagatesAlone] a COSMETIC edge must never propagate red to its consumer "Order", wave=[{Target:Order Reason:version_stale Dependencies:[api] Layer:button WaveID:}]
+# 
+v0.4.8#3185067678435587324
+0x0
+0x0
+0x0
+0x1
