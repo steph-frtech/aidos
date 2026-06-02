@@ -1,36 +1,59 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { GraphCockpit } from "@/app/_graph/GraphCockpit";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { buildGraph } from "@/lib/workbench-graph";
+import { EXAMPLE_HEAD } from "@/lib/workbench-graph-data";
 
 /**
- * / — la vitrine du Workbench (ADR 0010 design system + ADR 0011 bilingue).
- * Server Component, libellés via next-intl (namespace `home`). Aucune logique de
- * données : seulement le titre, le partage des rôles et les cartes vers les
- * panneaux /contract et /store.
+ * / — the full Workbench graph cockpit (AIDOS step S44, ADR 0010 design system + ADR 0011
+ * bilingue). It renders the WorkbenchGraph (a deterministic, READ-ONLY projection of prior
+ * kernel truth — lib/workbench-graph.ts) as a navigable map: button → view → action →
+ * operation → entity → mirror → scope → incident, each node DEEP-LINKING to its per-step
+ * panel via its route, under a declared color legend (truth-type / liveness / red-wave).
+ * The cockpit LINKS, it never re-renders those panels. Read-only; the wall is untouched.
+ *
+ * Determinism-first: buildGraph is pure; same head ⇒ byte-identical graph + a content
+ * graph_hash, so the UI snapshot is stable. A dangling/unknown ref ⇒ a BlockReason surfaced
+ * inline, never a crash.
  */
 export default async function Home() {
 	const t = await getTranslations("home");
+	const built = buildGraph(EXAMPLE_HEAD);
 
-	const panels = [
-		{
-			href: "/contract",
-			title: t("contractTitle"),
-			description: t("contractDescription"),
+	const labels = {
+		nodesHeading: t("nodesHeading"),
+		edgesHeading: t("edgesHeading"),
+		legendHeading: t("legendHeading"),
+		open: t("open"),
+		fromLabel: t("fromLabel"),
+		toLabel: t("toLabel"),
+		relationLabel: t("relationLabel"),
+		hashLabel: t("hashLabel"),
+		kind: {
+			button: t("kindButton"),
+			view: t("kindView"),
+			action: t("kindAction"),
+			operation: t("kindOperation"),
+			entity: t("kindEntity"),
+			mirror: t("kindMirror"),
+			scope: t("kindScope"),
+			incident: t("kindIncident"),
 		},
-		{
-			href: "/store",
-			title: t("storeTitle"),
-			description: t("storeDescription"),
+		dimension: {
+			truth_type: t("dimTruthType"),
+			liveness: t("dimLiveness"),
+			red_wave: t("dimRedWave"),
 		},
-	] as const;
+	} as const;
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
 			<WorkbenchHeader />
 
-			<main className="mx-auto w-full max-w-5xl flex-1 px-4 py-16 sm:px-8 sm:py-24">
+			<main className="mx-auto w-full max-w-5xl flex-1 px-4 py-16 sm:px-8 sm:py-20">
 				{/* Hero */}
-				<section className="space-y-6">
+				<section className="space-y-5">
 					<span className="inline-flex items-center rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
 						{t("eyebrow")}
 					</span>
@@ -40,54 +63,74 @@ export default async function Home() {
 					<p className="max-w-2xl text-lg leading-relaxed text-muted-foreground">
 						{t("subtitle")}
 					</p>
+					<div className="flex flex-wrap items-center gap-3">
+						<span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+							{t("readOnly")}
+						</span>
+						<Link
+							href="/brain"
+							data-testid="brain-link"
+							className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+						>
+							{t("brainLink")}
+						</Link>
+					</div>
 				</section>
 
-				{/* Panels */}
-				<section aria-label={t("panels")} className="mt-16 space-y-6">
-					<div className="space-y-1">
-						<h2 className="text-sm font-semibold tracking-wide text-foreground uppercase">
-							{t("panels")}
-						</h2>
-						<p className="text-sm text-muted-foreground">{t("panelsLead")}</p>
-					</div>
+				{/* Tutorial — how to read the cockpit */}
+				<section
+					aria-label={t("tutorialHeading")}
+					data-testid="tutorial"
+					className="mt-12 space-y-2 rounded-xl border border-border bg-muted/40 p-5"
+				>
+					<h2 className="text-sm font-semibold tracking-tight text-foreground">
+						{t("tutorialHeading")}
+					</h2>
+					<p className="text-sm leading-relaxed text-muted-foreground">
+						{t("tutorialBody")}
+					</p>
+				</section>
 
-					<div className="grid gap-4 sm:grid-cols-2">
-						{panels.map((panel) => (
-							<Link
-								key={panel.href}
-								href={panel.href}
-								className="group flex flex-col justify-between gap-6 rounded-xl border border-border bg-card p-6 text-card-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-							>
-								<div className="space-y-2">
-									<h3 className="text-lg font-semibold tracking-tight text-card-foreground">
-										{panel.title}
-									</h3>
-									<p className="text-sm leading-relaxed text-muted-foreground">
-										{panel.description}
-									</p>
-								</div>
-								<span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
-									{t("explore")}
-									<svg
-										aria-hidden="true"
-										viewBox="0 0 20 20"
-										fill="currentColor"
-										className="size-4 transition-transform group-hover:translate-x-0.5"
-									>
-										<path
-											fillRule="evenodd"
-											d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z"
-											clipRule="evenodd"
-										/>
-									</svg>
-								</span>
-							</Link>
-						))}
-					</div>
+				{/* The full graph cockpit */}
+				<section aria-label={t("graphHeading")} className="mt-10 space-y-6">
+					<h2 className="text-lg font-semibold tracking-tight text-foreground">
+						{t("graphHeading")}
+					</h2>
+					{built.ok ? (
+						<GraphCockpit
+							nodes={built.graph.nodes}
+							edges={built.graph.edges}
+							legend={built.graph.legend}
+							graphHash={built.graph.graphHash}
+							labels={labels}
+						/>
+					) : (
+						<div
+							data-testid="graph-blocked"
+							className="rounded-xl border border-destructive/40 bg-destructive/10 p-5 text-sm text-destructive"
+						>
+							<p className="font-semibold">{built.block.code}</p>
+							<p className="mt-1">{built.block.explanation}</p>
+						</div>
+					)}
+				</section>
+
+				{/* Worked example */}
+				<section
+					aria-label={t("exampleHeading")}
+					data-testid="example"
+					className="mt-10 space-y-2 rounded-xl border border-border bg-card p-5"
+				>
+					<h2 className="text-sm font-semibold tracking-tight text-foreground">
+						{t("exampleHeading")}
+					</h2>
+					<p className="text-sm leading-relaxed text-muted-foreground">
+						{t("exampleBody")}
+					</p>
 				</section>
 
 				{/* Footer */}
-				<footer className="mt-16 border-t border-border pt-6 text-xs text-muted-foreground">
+				<footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
 					{t("footer")}
 				</footer>
 			</main>

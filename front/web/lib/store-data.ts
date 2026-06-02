@@ -61,8 +61,18 @@ function demoSnapshot(): StoreSnapshot {
 		heads: [{ key: "doc", hash: h2 }],
 		history: {
 			doc: [
-				{ key: "doc", hash: h1, parentHash: null, createdAt: "2026-05-30T00:00:00Z" },
-				{ key: "doc", hash: h2, parentHash: h1, createdAt: "2026-05-30T00:00:01Z" },
+				{
+					key: "doc",
+					hash: h1,
+					parentHash: null,
+					createdAt: "2026-05-30T00:00:00Z",
+				},
+				{
+					key: "doc",
+					hash: h2,
+					parentHash: h1,
+					createdAt: "2026-05-30T00:00:01Z",
+				},
 			],
 		},
 		source: "demo",
@@ -95,17 +105,24 @@ export async function snapshot(): Promise<StoreSnapshot> {
 		const heads = await c<{ key: string; hash: string }[]>`
 			select key, hash from archive.head order by key`;
 		const hist = await c<
-			{ key: string; hash: string; parent_hash: string | null; created_at: Date }[]
+			{
+				key: string;
+				hash: string;
+				parent_hash: string | null;
+				created_at: Date;
+			}[]
 		>`select key, hash, parent_hash, created_at from archive.history order by key, id`;
 
 		const history: Record<string, HeadMove[]> = {};
 		for (const r of hist) {
-			(history[r.key] ??= []).push({
+			const moves = history[r.key] ?? [];
+			moves.push({
 				key: r.key,
 				hash: r.hash,
 				parentHash: r.parent_hash ?? null,
 				createdAt: new Date(r.created_at).toISOString(),
 			});
+			history[r.key] = moves;
 		}
 		return {
 			objects: objs.map((r) => ({
@@ -118,7 +135,10 @@ export async function snapshot(): Promise<StoreSnapshot> {
 			source: "live",
 		};
 	} catch (err) {
-		console.warn("[/store] live read failed, using demo fixture:", (err as Error).message);
+		console.warn(
+			"[/store] live read failed, using demo fixture:",
+			(err as Error).message,
+		);
 		return demoSnapshot();
 	}
 }
