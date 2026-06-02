@@ -68,6 +68,13 @@ export default async function Home() {
 							{t("readOnly")}
 						</span>
 						<Link
+							href="/first-app"
+							data-testid="first-app-link"
+							className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/80"
+						>
+							{t("firstAppLink")}
+						</Link>
+						<Link
 							href="/brain"
 							data-testid="brain-link"
 							className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"

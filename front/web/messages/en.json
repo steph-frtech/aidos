@@ -58,7 +58,8 @@
 		"brain": "Brain",
 		"check": "aidos check",
 		"demoCheckout": "Demo checkout",
-		"adoption": "Adoption"
+		"adoption": "Adoption",
+		"firstApp": "First app"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -97,7 +98,8 @@
 		"kindIncident": "incident",
 		"dimTruthType": "type",
 		"dimLiveness": "liveness",
-		"dimRedWave": "red wave"
+		"dimRedWave": "red wave",
+		"firstAppLink": "▶ Build your first app"
 	},
 	"store": {
 		"eyebrow": "Archive · content store",
@@ -1821,5 +1823,102 @@
 		"scenarioT2Reality": "T2 unlocked (RealityMirror live)",
 		"scenarioT4Blocked": "Through T3 → T4 blocked without an EvolutionSandbox",
 		"scenarioEmpty": "Empty view → empty-but-valid pack"
+	},
+	"firstApp": {
+		"eyebrow": "AIDOS Workbench · Getting started",
+		"title": "Your first application",
+		"subtitle": "A guided, step-by-step tutorial: from intention to a clickable button, following the KRD loop — without ever going from prompt to code.",
+		"build": {
+			"heading": "What you'll build",
+			"body": "One small, canonical capability: “a customer places an order from their cart” (createOrder). You'll drive it through the whole KRD verticale, from a fuzzy idea to a green, clickable checkout button.",
+			"cta": "See the finished result (demo checkout)"
+		},
+		"rule": {
+			"heading": "The golden rule",
+			"body": "You never write a line of code without a red scenario first. The human owns truth, the agent owns implementation, the wall enforces the boundary. Every truth goes through this loop:",
+			"loop": "Idea → Mirror (BDD) → Goal (red set) → Kernel → Green → Stable phase"
+		},
+		"guide": {
+			"heading": "The guided walkthrough",
+			"lead": "Eight steps, from idea to button. Check each one off as you go (your progress is saved), and open the matching panel to do it for real — everything happens on a screen.",
+			"progress": "Progress",
+			"open": "Open",
+			"gestureLabel": "Gesture",
+			"doneWhenLabel": "Done when:",
+			"reset": "Reset",
+			"complete": "🎉 Congratulations — your first application went through the whole loop!",
+			"completeBody": "You drove an intention from idea to a green, clickable button, through the mirror, the goal, the kernel (via an approved ChangeSet) and a stable phase. This is exactly how every capability is born in AIDOS."
+		},
+		"steps": {
+			"s1": {
+				"title": "1 · Capture the idea",
+				"body": "It all starts from an intention, never a prompt. Drop the candidate-truth “a customer places an order from their cart” into the ideas store. An idea has no version and no mirror: it's a wish, not yet a truth.",
+				"gesture": "/ideas",
+				"doneWhen": "the idea appears in the store, in the candidate state (no freeze).",
+				"panelLabel": "Open the ideas store"
+			},
+			"s2": {
+				"title": "2 · Grill the intention",
+				"body": "Before nearing the kernel, sharpen the intention above the wall: is it falsifiable? is the language crisp? /grill routes it — sharp → ready, fuzzy → explore (/spike), bad → rejected (and traced).",
+				"gesture": "/grill",
+				"doneWhen": "the intention is sharp and falsifiable (verdict “grilled”).",
+				"panelLabel": "Open exploration"
+			},
+			"s3": {
+				"title": "3 · Open a goal — the red set",
+				"body": "Promote the idea toward truth: opening the goal writes the RED mirror of createOrder. The red IS the goal. At this point no truth is written — a DRAFT ChangeSet is opened, never applied (the agent has no GRANT).",
+				"gesture": "/goal",
+				"doneWhen": "a red set is computed; the ChangeSet is DRAFT.",
+				"panelLabel": "Open the goal engine"
+			},
+			"s4": {
+				"title": "4 · Choose the mirror form",
+				"body": "The nature of the truth dictates its language: a journey → Gherkin (Godog), an invariant ∀ → property test (rapid / fast-check), a workflow → state→command→events fixture. You don't prove a UX truth like a business invariant.",
+				"gesture": "BDD first (red)",
+				"doneWhen": "the red mirror is linked to the truth (reflects) and it fails (red).",
+				"panelLabel": "See the mirrors"
+			},
+			"s5": {
+				"title": "5 · Approve the ChangeSet — the only door",
+				"body": "The kernel is written only through an approved ChangeSet, admitted by the completeness gate (the spec_delta carries its mirror_delta — no monster). This is the wall: the agent never writes truth; only the aidos role applies it.",
+				"gesture": "/changeset",
+				"doneWhen": "the ChangeSet goes DRAFT → APPLIED; the mirror is alive.",
+				"panelLabel": "Open the ChangeSets"
+			},
+			"s6": {
+				"title": "6 · Code to green",
+				"body": "Now — and only now — you code. red → green → refactor, outside-in, in this goal's package only. Sensors stay green at every diff (typecheck, lint, tests, architecture).",
+				"gesture": "/tdd",
+				"doneWhen": "the red set is green ∧ prior green intact ∧ no red sensor.",
+				"panelLabel": "See the sensors"
+			},
+			"s7": {
+				"title": "7 · Emit the projections",
+				"body": "From the single source (the entity), the emitters generate — deterministically, byte-identical on re-run — the Go struct (sqlc), the Postgres DDL, the TS type and the UI. Never double-typed, never hand-edited.",
+				"gesture": "/project",
+				"doneWhen": "projections are up to date and byte-identical on re-run.",
+				"panelLabel": "Open the emitters"
+			},
+			"s8": {
+				"title": "8 · Seal a stable phase",
+				"body": "When everything resolves and is green, seal a content-addressed stable phase on the DAG: the “kernel lockfile”, the resting point the next step consumes. Done is COMPUTED, never declared.",
+				"gesture": "/phase-stable",
+				"doneWhen": "a new stable phase is sealed; the button is green and clickable.",
+				"panelLabel": "See the stable phase"
+			}
+		},
+		"see": {
+			"heading": "See it green, for real",
+			"body": "The checkout slice is already implemented and proven end to end — Godog acceptance on real Postgres, ∀ properties, a front twin and the button's e2e. Open the demo and click: the order is really placed.",
+			"cta": "Open the demo checkout"
+		},
+		"more": {
+			"heading": "Go further",
+			"body": "The concepts behind each step, in the public documentation:",
+			"proofLevels": "The proof levels (N0–N5)",
+			"certLanguages": "The certification languages",
+			"guide": "Guide: develop your app"
+		},
+		"footer": "Read-only against truth: this tutorial guides you and takes you to each panel, but never writes the kernel. The only door stays idea → mirror → /goal → human approval."
 	}
 }

@@ -58,7 +58,8 @@
 		"brain": "Cerveau",
 		"check": "aidos check",
 		"demoCheckout": "Démo checkout",
-		"adoption": "Adoption"
+		"adoption": "Adoption",
+		"firstApp": "Première app"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -97,7 +98,8 @@
 		"kindIncident": "incident",
 		"dimTruthType": "type",
 		"dimLiveness": "vivacité",
-		"dimRedWave": "vague de rouge"
+		"dimRedWave": "vague de rouge",
+		"firstAppLink": "▶ Construire votre première app"
 	},
 	"store": {
 		"eyebrow": "Archive · magasin de contenu",
@@ -1821,5 +1823,102 @@
 		"scenarioT2Reality": "T2 débloqué (RealityMirror vivant)",
 		"scenarioT4Blocked": "Jusqu'à T3 → T4 bloqué sans EvolutionSandbox",
 		"scenarioEmpty": "Vue vide → pack vide-mais-valide"
+	},
+	"firstApp": {
+		"eyebrow": "AIDOS Workbench · Prise en main",
+		"title": "Votre première application",
+		"subtitle": "Un tutoriel guidé, pas à pas : de l'intention au bouton cliquable, en suivant la boucle KRD — sans jamais aller du prompt au code.",
+		"build": {
+			"heading": "Ce que vous allez construire",
+			"body": "Une capacité simple et canonique : « un client passe une commande depuis son panier » (createOrder). Vous la conduirez à travers toute la verticale KRD, d'une idée floue jusqu'à un bouton checkout vert et cliquable.",
+			"cta": "Voir le résultat fini (démo checkout)"
+		},
+		"rule": {
+			"heading": "La règle d'or",
+			"body": "On n'écrit jamais une ligne de code sans un scénario rouge d'abord. L'humain possède la vérité, l'agent possède l'implémentation, le mur fait respecter la frontière. Chaque vérité passe par cette boucle :",
+			"loop": "Idée → Miroir (BDD) → Goal (set rouge) → Noyau → Vert → Phase stable"
+		},
+		"guide": {
+			"heading": "Le parcours guidé",
+			"lead": "Huit étapes, de l'idée au bouton. Cochez chacune au fur et à mesure (votre progression est sauvegardée), et ouvrez le panneau correspondant pour la réaliser pour de vrai — tout se fait par écran.",
+			"progress": "Progression",
+			"open": "Ouvrir",
+			"gestureLabel": "Geste",
+			"doneWhenLabel": "Fait quand :",
+			"reset": "Réinitialiser",
+			"complete": "🎉 Félicitations — votre première application a traversé toute la boucle !",
+			"completeBody": "Vous avez conduit une intention de l'idée à un bouton vert et cliquable, en passant par le miroir, le goal, le noyau (via un ChangeSet approuvé) et une phase stable. C'est exactement ainsi que toute capacité naît dans AIDOS."
+		},
+		"steps": {
+			"s1": {
+				"title": "1 · Capter l'idée",
+				"body": "Tout part d'une intention, jamais d'un prompt. Déposez la vérité candidate « un client passe une commande depuis son panier » dans le magasin d'idées. Une idée n'a ni version ni miroir : c'est un souhait, pas encore une vérité.",
+				"gesture": "/ideas",
+				"doneWhen": "l'idée apparaît dans le magasin, à l'état candidate (aucun gel).",
+				"panelLabel": "Ouvrir le magasin d'idées"
+			},
+			"s2": {
+				"title": "2 · Griller l'intention",
+				"body": "Avant d'approcher le noyau, on aiguise l'intention au-dessus du mur : est-elle falsifiable ? le langage est-il net ? Le /grill la route — nette → prête, floue → à explorer (/spike), mauvaise → rejetée (et tracée).",
+				"gesture": "/grill",
+				"doneWhen": "l'intention est nette et falsifiable (verdict « grilled »).",
+				"panelLabel": "Ouvrir l'exploration"
+			},
+			"s3": {
+				"title": "3 · Ouvrir un goal — le set rouge",
+				"body": "Promouvez l'idée vers la vérité : ouvrir le goal écrit le miroir ROUGE de createOrder. Le rouge EST le goal. À ce stade, aucune vérité n'est écrite — un ChangeSet DRAFT est ouvert, jamais appliqué (l'agent n'a aucun GRANT).",
+				"gesture": "/goal",
+				"doneWhen": "un set rouge est calculé ; le ChangeSet est en DRAFT.",
+				"panelLabel": "Ouvrir le moteur de goal"
+			},
+			"s4": {
+				"title": "4 · Choisir la forme du miroir",
+				"body": "La nature de la vérité dicte sa langue : un parcours → Gherkin (Godog), un invariant ∀ → property test (rapid / fast-check), un workflow → fixture état→commande→events. On ne prouve pas une vérité UX comme un invariant métier.",
+				"gesture": "BDD d'abord (rouge)",
+				"doneWhen": "le miroir rouge est lié à la vérité (reflects) et il échoue (rouge).",
+				"panelLabel": "Voir les miroirs"
+			},
+			"s5": {
+				"title": "5 · Approuver le ChangeSet — la seule porte",
+				"body": "Le noyau ne s'écrit que par un ChangeSet approuvé, admis par la porte de complétude (le spec_delta porte son mirror_delta — pas de monstre). C'est le mur : l'agent n'écrit jamais la vérité ; seul le rôle aidos l'applique.",
+				"gesture": "/changeset",
+				"doneWhen": "le ChangeSet passe de DRAFT à APPLIED ; le miroir est vivant.",
+				"panelLabel": "Ouvrir les ChangeSets"
+			},
+			"s6": {
+				"title": "6 · Coder jusqu'au vert",
+				"body": "Maintenant — et seulement maintenant — vous codez. red → green → refactor, outside-in, dans le seul package de ce goal. Les sensors sont verts à chaque diff (typecheck, lint, tests, architecture).",
+				"gesture": "/tdd",
+				"doneWhen": "le set rouge est vert ∧ le vert antérieur intact ∧ aucun sensor rouge.",
+				"panelLabel": "Voir les sensors"
+			},
+			"s7": {
+				"title": "7 · Émettre les projections",
+				"body": "Depuis la source unique (l'entité), les émetteurs génèrent — déterministe, byte-identique au re-run — la struct Go (sqlc), le DDL Postgres, le type TS et l'UI. Jamais de double-typage, jamais d'édition à la main.",
+				"gesture": "/project",
+				"doneWhen": "les projections sont à jour et byte-identiques au re-run.",
+				"panelLabel": "Ouvrir les émetteurs"
+			},
+			"s8": {
+				"title": "8 · Sceller une phase stable",
+				"body": "Quand tout est résolu et vert, scellez une phase stable content-addressed sur le DAG : le « lockfile du noyau », le point de repos que l'étape suivante consomme. Done est CALCULÉ, jamais déclaré.",
+				"gesture": "/phase-stable",
+				"doneWhen": "une nouvelle phase stable est scellée ; le bouton est vert et cliquable.",
+				"panelLabel": "Voir la phase stable"
+			}
+		},
+		"see": {
+			"heading": "Voyez-la verte, pour de vrai",
+			"body": "La tranche checkout est déjà implémentée et prouvée de bout en bout — acceptance Godog sur vrai Postgres, propriétés ∀, jumeau front et e2e du bouton. Ouvrez la démo et cliquez : la commande se place réellement.",
+			"cta": "Ouvrir la démo checkout"
+		},
+		"more": {
+			"heading": "Pour aller plus loin",
+			"body": "Les concepts derrière chaque étape, dans la documentation publique :",
+			"proofLevels": "Les couches de preuve (N0–N5)",
+			"certLanguages": "Les langages de certification",
+			"guide": "Guide : développer votre app"
+		},
+		"footer": "Lecture seule contre la vérité : ce tutoriel vous guide et vous emmène sur chaque panneau, mais n'écrit jamais le noyau. La seule porte reste idée → miroir → /goal → approbation humaine."
 	}
 }

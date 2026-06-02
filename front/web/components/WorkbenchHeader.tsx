@@ -10,6 +10,7 @@ export async function WorkbenchHeader() {
 	const t = await getTranslations("nav");
 	const links = [
 		{ href: "/", label: t("home") },
+		{ href: "/first-app", label: t("firstApp") },
 		{ href: "/brain", label: t("brain") },
 		{ href: "/contract", label: t("contract") },
 		{ href: "/store", label: t("store") },
