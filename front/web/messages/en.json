@@ -1920,5 +1920,17 @@
 			"guide": "Guide: develop your app"
 		},
 		"footer": "Read-only against truth: this tutorial guides you and takes you to each panel, but never writes the kernel. The only door stays idea → mirror → /goal → human approval."
+	},
+	"navGroups": {
+		"start": "Getting started",
+		"brain": "Brain & context",
+		"kernel": "Kernel — the truth",
+		"mirror": "Mirror & completeness",
+		"links": "Links & propagation",
+		"versions": "Versions & archive",
+		"build": "Goals & projections",
+		"meta": "Meta, reality & adoption",
+		"tools": "Store & tools",
+		"menu": "Menu"
 	}
 }

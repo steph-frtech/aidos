@@ -1920,5 +1920,17 @@
 			"guide": "Guide : développer votre app"
 		},
 		"footer": "Lecture seule contre la vérité : ce tutoriel vous guide et vous emmène sur chaque panneau, mais n'écrit jamais le noyau. La seule porte reste idée → miroir → /goal → approbation humaine."
+	},
+	"navGroups": {
+		"start": "Prise en main",
+		"brain": "Cerveau & contexte",
+		"kernel": "Noyau — la vérité",
+		"mirror": "Miroir & complétude",
+		"links": "Liens & propagation",
+		"versions": "Versions & archive",
+		"build": "Goals & projections",
+		"meta": "Méta, réel & adoption",
+		"tools": "Magasin & outils",
+		"menu": "Menu"
 	}
 }
