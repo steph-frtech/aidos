@@ -301,3 +301,33 @@ Subsystem tags: **Runtime · Kernel · Mirror · Archive · Workbench**.
 **Detail:** docs/plan/S47-adoption-release.md
 **Inputs:** S45, S46
 **Criteres de done:** AdoptionStage advances T0→T4 progressively; Release v0 bundles CLI+Workbench+demo+docs+tests with a changelog and known-limits; the release ratchet is green.
+
+## S48
+**Objectif:** Kernel — GlobalInvariant: cross-cell/federation invariant (scope local_cell|contract_pair|federation_policy, blast_radius small|bounded|global, approval_required cell_owner|both_contract_owners|architecture_owner), distinct from per-truth TruthScope.
+**Detail:** docs/plan/S48-global-invariant.md
+**Inputs:** S16, S19, S22
+**Criteres de done:** a GlobalInvariant AST persists with its three CHECK enums; a mirror proves a cross-cell invariant reddens the relevant cells on violation and that a wider blast_radius demands wider authority approval; a Workbench route shows it; the wall holds (agent proposes via ChangeSet, never writes truth).
+
+## S49
+**Objectif:** Kernel — InvariantSaga + CoherenceTest: distributed-transaction invariant (participants + property + compensations), e.g. payment_captured ⇒ order_confirmed ∨ compensation_executed.
+**Detail:** docs/plan/S49-saga-invariant.md
+**Inputs:** S48, S10, S17
+**Criteres de done:** a SagaInvariant persists with participants/property/compensations; a statechart/fixture mirror proves the property holds on the happy path AND that a failed leg triggers compensation; a Workbench route shows it; mirror-first red→green.
+
+## S50
+**Objectif:** Kernel — TemporalInvariant: time-dependent invariant TYPE (property + clock system|external|logical + tolerance + temporal mirror), distinct from the DAG temporal axis and from scope TimeWindow.
+**Detail:** docs/plan/S50-temporal-invariant.md
+**Inputs:** S14, S06
+**Criteres de done:** a TemporalInvariant persists with clock + tolerance; the truth-typing/mirror enums are extended for the temporal kind/cert-language; a mirror proves a concrete time property (e.g. confirm within 5 min ± tolerance) reddens when violated without being flaky; a Workbench route shows it.
+
+## S51
+**Objectif:** Runtime — Harness economics: HarnessCostBudget (max ci_minutes/llm_tokens_per_goal/mutation_runtime/human_review_minutes + expected_risk_reduction) + ValueCase (risk_if_broken, expected_impact, harness_cost, decision justified|too_expensive|revisit).
+**Detail:** docs/plan/S51-harness-economics.md
+**Inputs:** S39, S40, S41
+**Criteres de done:** a per-cell HarnessCostBudget + a ValueCase persist (declared, never learned); a mirror proves a costly truth exceeding its budget without a justified ValueCase is flagged (advisory BlockReason) and the caps are surfaced; a Workbench route shows it.
+
+## S52
+**Objectif:** Kernel + Runtime — The Agent as a GOVERNED LAYER: CoucheAgent (agent|equipe_agents|orchestration layer-kinds, AgentSpec + skill/MCP/hook bindings + policies) with AgentRun/AgentAction/AgentAssignment as runtime events (not layers); the wall refuses agent writes above the waterline.
+**Detail:** docs/plan/S52-agent-layer.md
+**Inputs:** S04, S16, S29, S30
+**Criteres de done:** an `agent` layer-kind + its AST persist; a mirror proves an agent role writing above the waterline (kernel/mirrors/fitness) is refused with BlockReason AGENT_WRITE_ABOVE_WATERLINE, and that an agent can PROPOSE a truth/scenario but cannot self-approve (requires human authority); an AgentRun traces one execution; a /agents Workbench route + Playwright e2e; the wall enforces it.
