@@ -2,7 +2,7 @@
 name: step-s39
 description: Dedicated executor for AIDOS step S39 — Méta-méta (fitness) (runtime). Runs ONLY this step's KRD loop; delegate S39 to this agent.
 model: opus
-maxTurns: 80
+maxTurns: 120
 effort: high
 color: blue
 ---

@@ -61,7 +61,7 @@ Reality is a mirror too. When the **RealityMirror** (the external-world / produc
 ## Related hooks
 
 - `PreToolUse` (the wall) — refuses any write to `kernel` / `mirrors` / `fitness`; route the signal through `idea-intake` instead. Ships a fault-injection test.
-- **memory-firewall / `pretooluse`** — refuses the direct edge `signal/Memory → Kernel` with `MEMORY_CANNOT_DECLARE_TRUTH` (`how_to_fix[]` = "signal → Idea → Mirror → Goal → Kernel").
+- **the wall + the S27 promotion-gate (S43, no new hook)** — the direct edge `Incident → Kernel` is the pure `reality.ToKernel` gate, which **always** returns `REALITY_CANNOT_DECLARE_TRUTH` (`how_to_fix[]` = "incident → /learn → mirror → /goal → approval"); the RealityMirror has no key to the kernel. The kindred memory edge is refused with `MEMORY_CANNOT_DECLARE_TRUTH` (`signal → Idea → Mirror → Goal → Kernel`).
 - `Stop` (completeness) — a half-finished capture (no Idea, no recorded provenance) blocks the stop.
 
 ## Related MCP tools

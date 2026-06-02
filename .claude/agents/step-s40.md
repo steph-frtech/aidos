@@ -2,7 +2,7 @@
 name: step-s40
 description: Dedicated executor for AIDOS step S40 — Mutation testing (runtime). Runs ONLY this step's KRD loop; delegate S40 to this agent.
 model: opus
-maxTurns: 80
+maxTurns: 120
 effort: high
 color: blue
 ---

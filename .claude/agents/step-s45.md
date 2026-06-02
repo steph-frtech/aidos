@@ -2,7 +2,7 @@
 name: step-s45
 description: Dedicated executor for AIDOS step S45 — AIDOS compiler (runtime). Runs ONLY this step's KRD loop; delegate S45 to this agent.
 model: opus
-maxTurns: 80
+maxTurns: 120
 effort: high
 color: blue
 ---

@@ -2,7 +2,7 @@
 name: step-s31
 description: Dedicated executor for AIDOS step S31 — Memory (pgvector) (archive). Runs ONLY this step's KRD loop; delegate S31 to this agent.
 model: opus
-maxTurns: 80
+maxTurns: 120
 effort: high
 color: blue
 ---

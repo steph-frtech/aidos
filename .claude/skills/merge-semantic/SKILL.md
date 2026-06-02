@@ -90,9 +90,19 @@ This is a verification + gating gesture, not a behaviour. It writes no truth, so
 - **store** — read the kernel ASTs on both branches to union the cut and detect candidate conflicts (read-only).
 - **context** — walk the ContextGraph to know which mirrors are live on the cut.
 
+## Reference implementation (S25)
+
+The deterministic decider lives in **`back/archive/merge/`** — `MergeSemantic(base, left, right, heads) → MergeResult`, a **pure** function (no DB, no clock, no rng, no write). It:
+
+- assembles the **merged cut** = the union selection `base.Cut + left.Deltas + right.Deltas` (+ concatenated links + de-duplicated sensors, last-writer per id),
+- hands that cut to **`phases.IsStable`** (S23) — the SAME coherent-cut oracle a stable phase uses (which reuses S17 `links.Resolve` + the S07 sensor verdict + the recursive aggregate referenced from S18/§109). It does **not** re-implement the aggregate (S18), the propagation (S19) or the red wave (S22),
+- returns `Status ∈ {clean, conflict, unresolvable}`, `ConflictingMirrors[]` (the IsStable reasons that reddened the cut), `MergedCutHash` (S02 content address of the proposed cut), `RequiresAuthority` (true on a conflict — an override, S16), and an `OpenQuestion` when unresolvable.
+
+THE done criterion (`back/archive/merge/merge_fixture_test.go`): a textually-clean refund EU/US pair (disjoint deltas, git would auto-merge) with a red merged-cut mirror ⇒ `conflict`, `refund ∈ conflicting_mirrors`, BLOCKED → `requires_authority`. The merge status set is **CLOSED** — never add a status KRD does not name. A merge with no common ancestor (`left.Ancestor != base.ID`) is `unresolvable → OpenQuestion`, **never** a fabricated `clean`.
+
 ## Workbench visualization
 
-Next route `front/web/app/dag/` (or a dedicated merge panel): one merge per card showing the DAG with the two branch tips, the merge-base, the merged-cut node, a green/red **mirror verdict** strip, and — when blocked — the named `blocking_mirrors` and conflicting truths. A Playwright e2e asserts that a semantic-conflict merge renders **red + blocked** (not mergeable) even when the text diff is clean, and that an all-green merge renders mergeable pending approval. Add/extend this route's e2e for the visualization (never touch existing routes).
+Next route **`front/web/app/semantic-merge/`** (`/semantic-merge`, S25): the read-only panel takes a `base + left/right` triple (via the SELECT-only role / DAG-node refs from S23) and renders the SAME `MergeSemantic` verdict as a **mirror decision, not a line diff** — a `status` badge (clean / conflict), and on conflict the `conflicting_mirrors[]` plus a plain sentence ("git would merge these cleanly, but the merged cut reddens the `refund` invariant — override decision; required authority: …") and the referenced `merged_cut@hash` / `requires_authority`. The front lib `front/web/lib/semantic-merge.ts` is the deterministic TWIN of the Go decider (covered by `semantic-merge.test.ts`, fast-check). A Playwright e2e (`tests/e2e/semantic-merge.spec.ts`) asserts the no-overlap refund EU/US pair renders **conflict + blocked / override required**, the disjoint-lines cart pair renders **conflict**, and the free-space promo-banner / help-link pair renders **clean**. Never touch existing routes.
 
 ## Honesty rules
 

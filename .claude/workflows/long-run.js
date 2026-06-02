@@ -63,11 +63,23 @@ const VERIFY_SCHEMA = {
 }
 
 // 1. Parse the plan (the script reads no file: the agent reads).
+// Wrapped in a retry: a one-off StructuredOutput miss here must NOT kill the whole
+// run (this was the only agent() call outside the per-step try/catch).
 phase('Plan')
-const plan = await agent(
-  `Read ${PLAN_PATH} and return each step: id, objectif, detailDoc (its docs/plan/*.md), inputs, done criteria. Execute no step.`,
-  { label: 'plan:parse', phase: 'Plan', schema: PLAN_SCHEMA, model: 'opus' },
-)
+let plan = null
+for (let pa = 0; pa < 3 && !plan; pa++) {
+  try {
+    plan = await agent(
+      `Read ${PLAN_PATH} and return each step: id, objectif, detailDoc (its docs/plan/*.md), inputs, done criteria. Execute no step.`,
+      { label: `plan:parse:${pa}`, phase: 'Plan', schema: PLAN_SCHEMA, model: 'opus' },
+    )
+  } catch (e) {
+    log(`⚠ plan:parse attempt ${pa} failed (${String(e?.message ?? e).slice(0, 80)}); retrying`)
+  }
+}
+if (!plan) {
+  return { verdict: 'STOP', stoppedAt: 'plan', message: 'plan:parse never returned StructuredOutput after 3 tries' }
+}
 
 // Bound the run: maxSteps (first N) and/or stopAfter (step id, inclusive).
 // Robust id match (trim + case-insensitive); anti-runaway guard if a requested
@@ -106,6 +118,7 @@ for (const s of steps) {
   let report, verdict, attempt = 0
 
   while (attempt <= MAX_RETRIES) {
+    try {
     const retryCtx = attempt > 0
       ? `\nRetry ${attempt}. Residual issues to fix:\n- ${verdict.residual_issues.join('\n- ')}`
       : ''
@@ -114,7 +127,9 @@ for (const s of steps) {
       `Step ${s.id}\nObjective: ${s.objectif}\n` +
       `Detailed spec: read ${s.detailDoc || `docs/plan/${s.id}.md`} and follow CLAUDE.md §6 (the per-step KRD loop: grill→BDD mirror→tdd→sensors→diagnose→UI+Playwright→improve).\n` +
       `Inputs: ${(s.inputs ?? []).concat(prevOutputs).join(', ') || '(none)'}\n` +
-      `Done criteria: ${s.criteres}${retryCtx}`
+      `Done criteria: ${s.criteres}${retryCtx}\n\n` +
+      `⛔ REPORTING DISCIPLINE (a hard rule — violating it has wasted entire steps). Your turn budget is FINITE and you do NOT reliably sense when it is near. Therefore: the MOMENT your done-criteria above are met, call StructuredOutput as your VERY NEXT action — BEFORE any final-polish pass. Do NOT, after the work is done, run redundant verification (re-running biome/go test/git status, re-reading files you just wrote, "let me do one last check"): that endless final-checking is exactly what burned the turn budget on a prior step and left no turn to report. Reserve your last few turns for the StructuredOutput call. If you have NOT finished, still emit StructuredOutput with status:'blocked' and notes listing precisely what remains. Never end with a plain-text message.\n` +
+      `If much of this step already exists on disk from a prior interrupted attempt (files present, Linear issue already Done), do NOT redo it — verify it meets the done-criteria and report status:'done' quickly.`
     const execOpts = { label: `exec:${s.id}:${attempt}`, phase: 'Run', schema: EXEC_SCHEMA }
     // Dispatch to this step's DEDICATED agent (CLAUDE.md §6: one agent per step,
     // step-sNN). It is only in the registry after a Claude restart, so fall back to
@@ -139,15 +154,21 @@ for (const s of steps) {
     )
 
     if (verdict.verification_status === 'passed' && verdict.residual_issues.length === 0) break
+    } catch (e) {
+      // An agent finished without StructuredOutput (or another infra error). Don't let it
+      // kill the whole run — treat the attempt as a failure and retry the step.
+      log(`⚠ ${s.id} attempt ${attempt}: agent infra error (${String(e?.message ?? e).slice(0, 90)}); retrying the step`)
+      verdict = { verification_status: 'failed', residual_issues: [`infra: agent did not report — ${String(e?.message ?? e).slice(0, 100)}`] }
+    }
     attempt++
   }
 
   // 3. Guardrail = the stop. No mid-run input → hand back.
-  if (verdict.verification_status !== 'passed' || verdict.residual_issues.length) {
+  if (!verdict || verdict.verification_status !== 'passed' || verdict.residual_issues.length) {
     return {
       verdict: 'STOP',
       stoppedAt: s.id,
-      residual_issues: verdict.residual_issues,
+      residual_issues: verdict ? verdict.residual_issues : ['no verdict (agent never reported after retries)'],
       ranBefore: done,
       message: `Step ${s.id} not validated after ${MAX_RETRIES} retries. Fix, then relaunch the workflow (validated steps return from cache).`,
     }

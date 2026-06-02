@@ -102,9 +102,13 @@ This is a classification + impact gesture, not a behaviour. It writes no truth, 
 - **store** — read the before/after AST and confirm the target exists (read-only).
 - **dag** — locate the change in the phase/changeset graph; confirm the supersede/revert path for override/deprecate.
 
+## Landed implementation (S21)
+
+The classifier itself is the pure Go function `Classify(old, new Artifact) → SemanticDiff` in `back/runtime/semanticdiff/` (the closed six-value `change_type` enum + `unclassifiable`/`none`; same `(old,new)` ⇒ same `change_type`, no DB/clock/RNG, never panics, never writes). It is surfaced read-only by `aidos diff <id> --from <v> --to <v>` (`back/cmd/aidos/diff.go`) and rendered in human language by `/semantic-diff` (the Workbench panel). The body equality reuses S02's `records.Canonicalize`; `blast_radius`/`requires_authority`/`red_wave` are *referenced* from S15/S16/S17, never recomputed at S21. The done criteria: an incompatible `enabled_when` ⇒ `override`; a scope move ⇒ `rescope` (not override); cosmetic→load-bearing ⇒ `reweight`.
+
 ## Workbench visualization
 
-Next route `front/web/app/diff/` (or the changeset/impact panel): one changeset per card showing the `change_kind` badge, the blast-radius graph (target → affected truths → mirrors → projections), the propagation that will fire, and its OpenQuestions. A Playwright e2e asserts a `rescope` renders a non-empty downstream set and that an `override` shows a supersede edge (not a destructive edit).
+Next route `front/web/app/semantic-diff/` → `/semantic-diff`: pick one of the three canonical pairs and run the classification — a `change_type` badge, the plain-language sentence (KRD §44.1: not a YAML patch), and the referenced `blast_radius` / `requires_authority` / `red_wave`. A Playwright e2e (`tests/e2e/semantic-diff.spec.ts`) asserts the incompatible-`enabled_when` pair shows `override`, the widened-scope pair shows `rescope` (not override), and the cosmetic→load-bearing pair shows `reweight`.
 
 ## Honesty rules
 

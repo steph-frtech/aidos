@@ -2,7 +2,7 @@
 name: step-s44
 description: Dedicated executor for AIDOS step S44 — Workbench complet (workbench). Runs ONLY this step's KRD loop; delegate S44 to this agent.
 model: opus
-maxTurns: 80
+maxTurns: 120
 effort: high
 color: blue
 ---

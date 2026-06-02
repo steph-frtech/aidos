@@ -1,0 +1,16 @@
+---
+name: s23-phasestable
+description: S23 stable phase — pure IsStable(cut,heads,links,sensors)→StablePhase (stable iff all links Resolve green ∧ all sensors Pass); content-addressed dag.stable_phase node reusing S02 records.Hash; verified-green
+metadata:
+  type: project
+---
+
+S23 — phase stable / coherent DAG cut (KRD §43/§44). "Is this a stable phase?" = "all links resolved + all green?". Empty cut vacuously stable; any single red mirror (red sensor OR stale/absent link) ⇒ unstable, offender named in reasons.
+
+- **Core** `back/archive/phases/phases.go`: pure total `IsStable(cut, heads, ls, sensors) → StablePhase`. REUSES S17 `links.Resolve` for staleness (never forks), S07 `CheckResult.Pass` shape (SensorStatus{ID,Pass}), S02 `records.NewRecord`/KindPhase for the content address. `Record()`/`Version()` give id==version==Hash(Canonicalize(body)). Reasons sorted byte-stable; reasons empty ⇔ stable. No I/O/clock/rng, never panics.
+- **Migration** `dag_stable_phase_baseline.sql`: expand-only `dag.stable_phase` (id PK = hash, body jsonb {cut,sensor_status,stable,reasons}, version with CHECK version=id, parent text NULL = §44 DAG edge, created_at). dag is ABOVE waterline: agent SELECT-only (INSERT/UPDATE/DELETE/TRUNCATE revoked), only `aidos` writer role INSERTs via ChangeSet. S02 dag.phase + prior GRANTs untouched.
+- **Mirrors**: fixture (5 rows: empty⇒stable, all-green⇒stable, red-sensor⇒unstable+named, stale-link⇒unstable+named, absent-link⇒unstable+named) + 2 record-address tests + rapid property (6 invariants: determinism, empty⇒stable, stable⇔allGreen both ways, any-red⇒unstable, reasons⇔¬stable + names real offenders, no-panic) + fast-check TS twin lib/phase-stable.test.ts (10/10). Testcontainers migration_roundtrip: content-address CHECK, parent-edge append-only, expand-only (S02 untouched), agent SELECT-only/INSERT refused, writer can INSERT — all genuinely fault-inject the wall.
+- **CLI** `aidos stable <id>`: read-only over deterministic catalogue of canonical §43 cuts (live store read = OQ-S23-1, forward dep like S22 OQ-S22-1); runs IsStable, prints STABLE/UNSTABLE + reasons + content address; records nothing.
+- **UI** `/phase-stable`: action-capable panel (pick a cut + evaluate → runs same pure isStable, renders cut/links-coloured/sensors/badge/reasons). Read-only / no truth write ⇒ ui-completeness vacuous on write-path (recording via ChangeSet S20). Panel PhaseStablePanel.tsx + lib/phase-stable.ts + lib/phase-stable-data.ts. i18n phaseStable.* + nav.phaseStable present FR+EN (all 24 t() keys verified in BOTH locales). e2e stale-link matches label /stale.?link|lien périmé/i — both locale labels match.
+- **Verified green**: gofmt/vet clean; go test archive/phases PASS 12.8s (incl 5 Testcontainers); cmd/aidos PASS; vitest 10/10; build clean; biome clean; prior green intact (changeset/links/records PASS); Playwright 3/3 on :3000 (PLAYWRIGHT_WEB_PORT=3000); mint validate clean; docs 2 pages (3 layers) registered docs.json + pushed (0b97e7a, HEAD==upstream); Linear AID-45 Done.
+- OpenQuestions (by-design forward deps, non-blocking): OQ-S23-1 live-cut feed (cut+heads+links+latest sensor results from store/DAG/S07) = S02/S24; node-INSERT wired to ChangeSet engine = S20; no branch/merge/revert (S25); no federation/recursive aggregate (§43 fractal); no QD-curation (§44.4 S26).

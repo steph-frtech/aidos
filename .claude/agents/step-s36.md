@@ -2,7 +2,7 @@
 name: step-s36
 description: Dedicated executor for AIDOS step S36 — API projection (runtime). Runs ONLY this step's KRD loop; delegate S36 to this agent.
 model: opus
-maxTurns: 80
+maxTurns: 120
 effort: high
 color: blue
 ---
