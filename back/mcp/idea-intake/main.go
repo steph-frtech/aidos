@@ -1,0 +1,202 @@
+// Command idea-intake is the AIDOS Kernel idea-intake MCP server (KRD §75/§116/
+// §117/§118; ADR 0009).
+//
+// It is the single capability door (ADR 0009: every backend op is an MCP tool) over
+// the `ideas` schema — candidate-truths staged ABOVE product but BELOW the freeze,
+// with no version-freeze and no mirror (KRD §118). It is the legal on-ramp toward
+// truth: a human ("finalement je veux que…") or an incident (#NNNN) captures an
+// Idea with provenance, then the lifecycle advances it
+// draft → grilled → {spiking → harvested | harvested}, with a traced reject branch.
+//
+// It carries the `ideas`-schema lifecycle grant (INSERT/SELECT/UPDATE — never
+// DELETE; a rejected idea is kept). It deliberately has NO tool that bypasses the
+// mirror: there is no `idea_promote_to_kernel` here. Promotion = writing the idea's
+// mirror = the /goal = the freeze, gated by the promotion-gate hook
+// (NO_MIRROR_NO_KERNEL); the kernel write is the aidos CLI role, never this server
+// (the wall, CLAUDE.md §2).
+//
+// Tools (one tool = one backend op):
+//
+//	idea_capture — human|incident → draft (records a candidate-truth + provenance)
+//	idea_grill   — draft → grilled
+//	idea_spike   — grilled → spiking (the floue branch, ratchet OFF)
+//	idea_harvest — grilled|spiking → harvested
+//	idea_reject  — → rejected (traced, kept; never deleted)
+//	idea_status  — read one idea + its provenance + status
+//	idea_list    — list candidate-truths (the triage queue), optional status filter
+//
+// DETERMINISM-FIRST (CLAUDE.md §6): every transition is the pure ideas.* functions;
+// this server only persists an already-decided transition. Transport: stdio. DSN
+// comes from AIDOS_IDEAS_DSN.
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/steph-frtech/aidos/back/kernel/ideas"
+)
+
+// ── Tool I/O types ──
+
+type captureInput struct {
+	Proposes string `json:"proposes" jsonschema:"the layer/kind the idea would become: control|policy|operation|action|entity|product"`
+	Intent   string `json:"intent" jsonschema:"the sketched behaviour in prose (not yet falsifiable)"`
+	Source   string `json:"source" jsonschema:"the provenance source: human | incident"`
+	Detail   string `json:"detail" jsonschema:"the human utterance verbatim, or the incident reference #NNNN"`
+}
+
+type ideaOutput struct {
+	ID           string `json:"id"`
+	Proposes     string `json:"proposes"`
+	Intent       string `json:"intent"`
+	Source       string `json:"source"`
+	Detail       string `json:"detail"`
+	Status       string `json:"status"`
+	RejectReason string `json:"reject_reason,omitempty"`
+	// HasMirror is always false from this server: an idea has no mirror — that is
+	// what makes it an idea. The Workbench renders the "no mirror yet" marker.
+	HasMirror bool `json:"has_mirror"`
+}
+
+type idInput struct {
+	ID string `json:"id" jsonschema:"the idea content-hash id"`
+}
+
+type rejectInput struct {
+	ID     string `json:"id" jsonschema:"the idea content-hash id"`
+	Reason string `json:"reason" jsonschema:"the traced reason the idea is rejected (kept, never deleted)"`
+}
+
+type listInput struct {
+	Status string `json:"status,omitempty" jsonschema:"optional lifecycle filter: draft|grilled|spiking|harvested|rejected"`
+}
+type listOutput struct {
+	Ideas []ideaOutput `json:"ideas"`
+}
+
+func toOutput(i ideas.Idea) ideaOutput {
+	return ideaOutput{
+		ID:           i.ID,
+		Proposes:     string(i.Proposes),
+		Intent:       i.Intent,
+		Source:       string(i.Provenance.Source),
+		Detail:       i.Provenance.Detail,
+		Status:       string(i.Status),
+		RejectReason: i.RejectReason,
+		HasMirror:    false, // an idea never carries a mirror (KRD §118).
+	}
+}
+
+// server wires the MCP tools to one idea-intake Store.
+type server struct {
+	store *Store
+}
+
+func (s *server) capture(ctx context.Context, _ *mcp.CallToolRequest, in captureInput) (*mcp.CallToolResult, ideaOutput, error) {
+	i, err := ideas.Capture(
+		ideas.Proposes(in.Proposes),
+		in.Intent,
+		ideas.Provenance{Source: ideas.ProvenanceSource(in.Source), Detail: in.Detail},
+	)
+	if err != nil {
+		return nil, ideaOutput{}, err
+	}
+	if err := s.store.Insert(ctx, i); err != nil {
+		return nil, ideaOutput{}, err
+	}
+	return nil, toOutput(i), nil
+}
+
+// advance loads an idea, applies a pure lifecycle gesture, and persists the result.
+func (s *server) advance(ctx context.Context, id string, gesture func(ideas.Idea) (ideas.Idea, error)) (ideaOutput, error) {
+	i, err := s.store.Get(ctx, id)
+	if err != nil {
+		return ideaOutput{}, err
+	}
+	next, err := gesture(i)
+	if err != nil {
+		return ideaOutput{}, err
+	}
+	if err := s.store.Update(ctx, next); err != nil {
+		return ideaOutput{}, err
+	}
+	return toOutput(next), nil
+}
+
+func (s *server) grill(ctx context.Context, _ *mcp.CallToolRequest, in idInput) (*mcp.CallToolResult, ideaOutput, error) {
+	out, err := s.advance(ctx, in.ID, ideas.Grill)
+	return nil, out, err
+}
+
+func (s *server) spike(ctx context.Context, _ *mcp.CallToolRequest, in idInput) (*mcp.CallToolResult, ideaOutput, error) {
+	out, err := s.advance(ctx, in.ID, ideas.Spike)
+	return nil, out, err
+}
+
+func (s *server) harvest(ctx context.Context, _ *mcp.CallToolRequest, in idInput) (*mcp.CallToolResult, ideaOutput, error) {
+	out, err := s.advance(ctx, in.ID, ideas.Harvest)
+	return nil, out, err
+}
+
+func (s *server) reject(ctx context.Context, _ *mcp.CallToolRequest, in rejectInput) (*mcp.CallToolResult, ideaOutput, error) {
+	out, err := s.advance(ctx, in.ID, func(i ideas.Idea) (ideas.Idea, error) {
+		return ideas.Reject(i, in.Reason)
+	})
+	return nil, out, err
+}
+
+func (s *server) statusTool(ctx context.Context, _ *mcp.CallToolRequest, in idInput) (*mcp.CallToolResult, ideaOutput, error) {
+	i, err := s.store.Get(ctx, in.ID)
+	if err != nil {
+		return nil, ideaOutput{}, err
+	}
+	return nil, toOutput(i), nil
+}
+
+func (s *server) list(ctx context.Context, _ *mcp.CallToolRequest, in listInput) (*mcp.CallToolResult, listOutput, error) {
+	all, err := s.store.List(ctx, in.Status)
+	if err != nil {
+		return nil, listOutput{}, err
+	}
+	out := listOutput{Ideas: make([]ideaOutput, len(all))}
+	for i, idea := range all {
+		out.Ideas[i] = toOutput(idea)
+	}
+	return nil, out, nil
+}
+
+// newMCPServer builds the MCP server and registers the seven idea-intake tools.
+// There is deliberately NO promote-to-kernel tool: promotion is the /goal flow.
+func newMCPServer(s *server) *mcp.Server {
+	srv := mcp.NewServer(&mcp.Implementation{Name: "aidos-idea-intake", Version: "v0.1.0"}, nil)
+	mcp.AddTool(srv, &mcp.Tool{Name: "idea_capture", Description: "Capture a candidate-truth (human|incident) with provenance → draft. Never writes the kernel."}, s.capture)
+	mcp.AddTool(srv, &mcp.Tool{Name: "idea_grill", Description: "Advance an idea draft → grilled."}, s.grill)
+	mcp.AddTool(srv, &mcp.Tool{Name: "idea_spike", Description: "Advance an idea grilled → spiking (exploration, ratchet OFF)."}, s.spike)
+	mcp.AddTool(srv, &mcp.Tool{Name: "idea_harvest", Description: "Advance an idea grilled|spiking → harvested."}, s.harvest)
+	mcp.AddTool(srv, &mcp.Tool{Name: "idea_reject", Description: "Reject an idea (traced, kept; never deleted)."}, s.reject)
+	mcp.AddTool(srv, &mcp.Tool{Name: "idea_status", Description: "Read one idea + its provenance + status."}, s.statusTool)
+	mcp.AddTool(srv, &mcp.Tool{Name: "idea_list", Description: "List candidate-truths (triage queue), optional status filter."}, s.list)
+	return srv
+}
+
+func main() {
+	dsn := os.Getenv("AIDOS_IDEAS_DSN")
+	if dsn == "" {
+		log.Fatal("idea-intake: AIDOS_IDEAS_DSN is required")
+	}
+	ctx := context.Background()
+	st, err := NewStore(ctx, dsn)
+	if err != nil {
+		log.Fatal(fmt.Errorf("idea-intake: open store: %w", err))
+	}
+	defer st.Close()
+
+	srv := newMCPServer(&server{store: st})
+	if err := srv.Run(ctx, &mcp.StdioTransport{}); err != nil {
+		log.Fatalf("idea-intake: run: %v", err)
+	}
+}

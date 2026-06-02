@@ -1,9 +1,10 @@
-# MCP server: `mirror-runner` — SCAFFOLD (activated at S05)
+# MCP server: `mirror-runner` — ACTIVE (S05, the cliquet)
 
-> **Status: scaffold / declared spec, NOT a working server.** Per ADR 0009's
-> honesty guard, an MCP server is front-loaded only as a *spec*; it is
-> **activated at S05** with a working implementation and a fault-injection test.
-> A scaffold registers no tools and runs no logic. The working reference is
+> **Status: active.** S05 turned the scaffold into a working `mcp.Server`
+> (`main/main.go`) over the cliquet core (`regression.go`) + the runner shell
+> (`runner.go`), with property, workflow, Godog and Testcontainers mirrors and a
+> ci-ratchet fault-injection meta-test. The pure regression decision is code, not
+> an agent (determinism-first, CLAUDE.md §6). The working reference is still
 > [`back/mcp/store/main.go`](../store/main.go).
 
 ## Purpose
@@ -27,15 +28,20 @@ collects the verdict. Replay mode runs every living mirror and aggregates.
 
 | Tool | Op | Direction |
 |---|---|---|
-| `mirror_run` | run one mirror by id/hash; return its verdict + output | read truth, run runner |
-| `mirror_replay` | replay all living mirrors; return per-mirror verdicts + summary | read truth, run runner |
+| `mirror_replay` | replay all living mirrors; record runs append-only; return per-mirror verdicts + verdict | read truth, write own run-log |
+| `ratchet_check` | replay + compare to the recorded baseline; return the merge verdict + the regressed set + a `RED_REGRESSION` BlockReason on rejection | read truth, write own run-log |
 
 ### Input / output sketch
 
 ```
-mirror_run    in  { mirror_id: string }                  → out { mirror_id, status: "green"|"red", duration_ms, output: string }
-mirror_replay in  { reflects?: string, kinds?: string[] } → out { results: [{mirror_id, status, duration_ms}], green: int, red: int }
+mirror_replay in  { ref: string }              → out { run_id, results: [RunRecord], verdict: "ALLOWED"|"REJECTED" }
+ratchet_check in  { ref: string, run_id: string } → out { run_id, verdict, regressed: [Regression], block_reason? }
 ```
+
+The cliquet decision (`Decide`/`Regressed`/`Verdict` in `regression.go`) is a pure
+total function — same input → same output — pinned by a rapid reproducibility
+mirror. The replay (running the mirrors) is the only impure part, behind the
+`Replayer` seam.
 
 ## Permissions — read/write zones
 

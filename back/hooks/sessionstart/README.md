@@ -1,9 +1,15 @@
-# SessionStart hook — harness self-test (SCAFFOLD)
+# SessionStart hook — harness self-test (ACTIVE, S39)
 
-> **Status: SPEC ONLY. Not wired live.** This is a scaffold per CLAUDE.md §5
-> (hook-honesty: *a hook that never fires is dead*). It is **activated and
-> fault-injection-tested at step S39**, never before. The `doc.go` in this
-> package compiles but carries **no logic** on purpose.
+> **Status: ACTIVE (S39).** The binary (`harness-self-test`, package `main`) runs the
+> meta-meta self-test (`selftest/`) at every session start. Its own meaning IS
+> fault-injection — §5 hook-honesty is satisfied because the self-test deliberately
+> reddens each guardrail and asserts it fires; there is no separate "does the self-test
+> detect?" regress (the floor is deterministic mutation, not an LLM judge — KRD §70).
+>
+> Mirrors: `selftest/selftest_fixture_test.go` (the six fixtures, THE done criterion),
+> `selftest/selftest_property_test.go` (the seven `rapid` ∀ invariants),
+> `selftest/selftest_ledger_roundtrip_test.go` (Testcontainers GRANT proof + ledger
+> round-trip), `main_test.go` (the exit-code mapping).
 
 ## Role
 

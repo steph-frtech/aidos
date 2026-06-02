@@ -1,10 +1,11 @@
-# MCP server: `context` — SCAFFOLD (activated at S33)
+# MCP server: `context` — ACTIVE (since S33)
 
-> **Status: scaffold / declared spec, NOT a working server.** Per ADR 0009's
-> honesty guard, an MCP server is front-loaded only as a *spec*; it is
-> **activated at S33** with a working implementation and a fault-injection test.
-> A scaffold registers no tools and runs no logic. The working reference is
-> [`back/mcp/store/main.go`](../store/main.go).
+> **Status: working server (S33).** The ContextRouter capability door is live:
+> `main.go` runs the pure `back/runtime/context.Compile` over a read-only
+> ContextGraph view and exposes it as MCP tools, with `main_test.go` proving the
+> capability end-to-end + the wall (no truth-write tool). The derived `context`
+> schema is a separate persistence step; until it lands, the server compiles over
+> the deterministic `ExampleGraph` mocked read-only view (§6).
 
 ## Purpose
 

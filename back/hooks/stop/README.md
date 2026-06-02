@@ -1,9 +1,13 @@
-# Stop hook — goal-check + completeness (SCAFFOLD)
+# Stop hook — completeness (ACTIVE, S12) + goal-check (scaffold, S29)
 
-> **Status: SPEC ONLY. Not wired live.** This is a scaffold per CLAUDE.md §5
-> (hook-honesty: *a hook that never fires is dead*). It is **activated and
-> fault-injection-tested at steps S12 (goal-check) and S29 (completeness)**,
-> never before. The `doc.go` in this package compiles but carries **no logic**.
+> **Status (S12): the COMPLETENESS half is ACTIVE and fault-injection-tested.**
+> The Stop hook now reads the current cut of `mirrors ⋈ kernel`, runs S06's monster
+> detector + the S12 gate (`back/kernel/mirror/completeness`), and **blocks** the
+> Stop on any monster (BlockReason code `MONSTER`; `INCOMPLETE` when the check
+> itself cannot run — KRD §82 fail-closed). Every evaluation is recorded
+> append-only in `runtime.completeness_runs` (ADR 0014/0015, below the waterline).
+> The **goal-check half** (`red set → green ∧ prior green intact ∧ mutation ≥
+> threshold`) remains a scaffold, **activated at S29** (OQ-S12-2).
 
 ## Role
 

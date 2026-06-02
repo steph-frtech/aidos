@@ -1,53 +1,41 @@
-# MCP server: `memory` — SCAFFOLD (activated at S31)
+# `memory` MCP server — the `/brain` memory adapter (S31)
 
-> **Status: scaffold / declared spec, NOT a working server.** Per ADR 0009's
-> honesty guard, an MCP server is front-loaded only as a *spec*; it is
-> **activated at S31** with a working implementation and a fault-injection test.
-> A scaffold registers no tools and runs no logic. The working reference is
-> [`back/mcp/store/main.go`](../store/main.go).
+The single capability door (ADR 0009) over the engine-side `/brain` memory adapter: write a
+`MemoryItem` and **recall it by similarity** over pgvector, across the four *indexable* KRD memories
+(episodic / semantic / procedural / structural, KRD §136). The Workbench and other agents call these
+tools; they never touch `brain.memory_item` directly.
 
-## Purpose
+## Tools (one per backend op)
 
-The single capability door (ADR 0009: every backend op is an MCP tool) for the
-**`brain` schema** — `MemoryItem`s (episodic, semantic, procedural…) with
-pgvector embeddings. Store and recall-by-similarity, but **only through the
-MemoryFirewall**: recall is filtered/scoped so memory informs without leaking or
-poisoning the kernel. Memory is advisory context, never truth.
+| Tool | Does |
+|---|---|
+| `memory_write` | Append a `MemoryItem` (content-addressed, append-only); returns its id. |
+| `memory_recall` | Recall the nearest memories by similarity, `kind`/`branch`-filtered, top-`k`. |
+| `memory_get` | Read one `MemoryItem` by content-addressed id. |
 
-## The op
+## Context fuel, never truth
 
-`store/recall MemoryItem by similarity (pgvector) behind the MemoryFirewall`
+This server reaches **nothing** above the wall. The store is **below the waterline**: the agent role
+holds `SELECT + INSERT` on `brain.memory_item` only — **no** `UPDATE`/`DELETE` (memory is
+append-only; supersession is a new row, expiry is `expires_at`). The MemoryFirewall promotion flow
+(`Memory → ContextPack → Idea → Mirror → Goal → Kernel`, §119.1) is a **separate** concern.
 
-Store embeds a MemoryItem and persists it. Recall embeds a query, runs a pgvector
-nearest-neighbour search, and returns matches *after* the MemoryFirewall applies
-scope/trust filtering. The firewall is mandatory on every recall.
+## Injection seam
 
-## Tools (one tool = one backend op)
+The server is constructed with whichever `memory.Store` backend is configured:
 
-| Tool | Op | Direction |
-|---|---|---|
-| `memory_store` | persist a MemoryItem (+ embedding) | write `brain` |
-| `memory_recall` | similarity search (pgvector) through the MemoryFirewall | read `brain` |
+- **mock** — the deterministic `MockStore` (no DB) when `AIDOS_ARCHIVE_DSN` is empty. Used by tests
+  and by the Workbench mock toggle.
+- **pgx** — `PgxStore` over pgvector (HNSW + cosine, ADR 0025) when `AIDOS_ARCHIVE_DSN` is set.
 
-### Input / output sketch
+The `Embedder` is injected too — the deterministic `HashEmbedder` (seed from `AIDOS_MEMORY_SEED`,
+default 31) so recall is reproducible; the runtime would inject a real 384-dim model.
 
+## Run
+
+```sh
+AIDOS_ARCHIVE_DSN=postgres://... go run ./back/mcp/memory   # pgvector backend
+go run ./back/mcp/memory                                    # in-memory mock backend
 ```
-memory_store  in  { kind:"episodic"|"semantic"|"procedural", content: string, tags?: string[] }
-                                                  → out { item_id }
-memory_recall in  { query: string, k?: int, scope?: string }
-                                                  → out { items: [{item_id, kind, content, score}] }   // post-firewall
-```
 
-## Permissions — read/write zones
-
-- **Reads/Writes:** `brain` schema only (MemoryItems + pgvector embeddings).
-- **Mandatory filter:** every recall passes through the **MemoryFirewall** (scope + trust); raw unscoped recall is not exposed.
-- **Forbidden (the wall, CLAUDE.md §2):** no write to `kernel`, `mirrors`, or `fitness`. Memory may *suggest* an Idea (via `idea-intake`) but can never write truth; it never feeds the kernel directly.
-
-## Related hook
-
-A memory-firewall guard (sensor) enforces that no recall path bypasses the
-firewall; its fault-injection test breaks the firewall and asserts recall is
-refused.
-
-## Activated at step **S31**
+Transport: stdio.
