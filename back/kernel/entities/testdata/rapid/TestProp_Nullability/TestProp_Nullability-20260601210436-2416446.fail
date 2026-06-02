@@ -1,0 +1,27 @@
+# 2026/06/01 21:04:36.317459 [TestProp_Nullability] [rapid] draw name: "A"
+# 2026/06/01 21:04:36.317464 [TestProp_Nullability] [rapid] draw natt: 1
+# 2026/06/01 21:04:36.317465 [TestProp_Nullability] [rapid] draw idIdx: 0
+# 2026/06/01 21:04:36.317467 [TestProp_Nullability] [rapid] draw attr: "a"
+# 2026/06/01 21:04:36.317467 [TestProp_Nullability] [rapid] draw ty: 0
+# 2026/06/01 21:04:36.317468 [TestProp_Nullability] [rapid] draw req: false
+# 2026/06/01 21:04:36.317517 [TestProp_Nullability] ¬required attr "a" not optional in TS
+# 
+v0.4.8#859961956324843184
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

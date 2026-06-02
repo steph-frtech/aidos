@@ -1,0 +1,21 @@
+# 2026/05/31 17:04:10.490932 [TestCutHashDeterministicAndOrderIndependent] [rapid] draw layers: []records.Layer{records.Layer{LayerID:"b", Version:"v1", Kind:"control"}, records.Layer{LayerID:"b", Version:"v1", Kind:"view"}}
+# 2026/05/31 17:04:10.490946 [TestCutHashDeterministicAndOrderIndependent] [rapid] draw mirrors: []records.Mirror{}
+# 2026/05/31 17:04:10.490950 [TestCutHashDeterministicAndOrderIndependent] cut hash is order-dependent: bec7d800e27dc67f6dfb6ec59f898cd277eae62ee7067007225f745163ad702c != e5ca101872db98bbbaf17cb7b67727f2065fe68128150b174a5cc627662e7dce
+# 
+v0.4.8#10482660533440355849
+0xaaaaaaaaaaaaa
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0xaaaaaaaaaaaaa
+0x0
+0x1
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0

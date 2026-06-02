@@ -1,0 +1,24 @@
+# 2026/05/31 14:44:56.368088 [TestOrphanAlwaysMonster] [rapid] draw mirror_id: "m1"
+# 2026/05/31 14:44:56.368093 [TestOrphanAlwaysMonster] [rapid] draw rl: "a"
+# 2026/05/31 14:44:56.368095 [TestOrphanAlwaysMonster] [rapid] draw rv: "v1"
+# 2026/05/31 14:44:56.368096 [TestOrphanAlwaysMonster] [rapid] draw test_kind: "fixture"
+# 2026/05/31 14:44:56.368102 [TestOrphanAlwaysMonster] [rapid] draw cert: "gherkin"
+# 2026/05/31 14:44:56.368104 [TestOrphanAlwaysMonster] [rapid] draw auth: "above"
+# 2026/05/31 14:44:56.368106 [TestOrphanAlwaysMonster] [rapid] draw live: "alive"
+# 2026/05/31 14:44:56.368109 [TestOrphanAlwaysMonster] mirror m1 over empty kernel must be an orphan monster; got []
+# 
+v0.4.8#8965803006500460081
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

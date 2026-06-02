@@ -32,6 +32,22 @@ _Avoid_: metadata, tags, type annotations (generic).
 Derived boundary ports (e.g. `api.pact`, `types.zod`) declared inside the Kernel as frozen, versioned N3 contracts, born from the domain's need. The contract artifact is Kernel-owned source; a shipped client SDK is a separate emitted projection.
 _Avoid_: API (generic), interface (generic), the emitted SDK (that is a projection).
 
+**control (control-spec / le bouton)**:
+A button AS a Kernel source (KRD §24.1, §94): a typed AST `{view, label, visible_when Expr, enabled_when Expr, triggers}`. Its truth is a STATE fixture (`given → button.visible/enabled`); the rendered `<button>`/`<Pressable>`/voice command is a later projection guarded by that mirror. The two conditions are Expr DSL ASTs (reused, never free code).
+_Avoid_: button component, widget, the rendered onClick (that is the projection), a UI control as a React element.
+
+**action (action-spec)**:
+The Kernel source that `binds` a control to an operation (KRD §24.2, §94): `{on: click(controlRef), invoke: operation@version with {…}, on_success[], on_error[]}`. Its truth is an EVENT fixture (`event → invoke/effect`). The generated `onClick` handler is a projection; the action-spec is the source — behaviour stays in Operation/Policy/Expr, never free code, all the way down to the button.
+_Avoid_: event handler, callback, the emitted handler (that is the projection).
+
+**triggers (control → action link)**:
+The versioned link from a control-spec to the action-spec it fires (KRD §28, §41). A control whose `triggers` does not resolve to a known action ref is an orphan trigger — a monster the validator rejects.
+_Avoid_: onClick (that is the projection), wiring (generic), event binding.
+
+**binds (action → operation link)**:
+The versioned link from an action-spec to the operation it invokes (KRD §28, §41). The action-spec event fixture is green only when the bind resolves the click to its operation — "the action binds an operation".
+_Avoid_: calls, dispatch (generic), invoke (that is the field, not the link kind).
+
 ## Mirror plane
 
 The Mirror is a plane inside this context at `back/kernel/mirror/`, not a separate subsystem; Kernel and Mirror are one bicephalous unit, co-versioned and joined by the `mirrors` link and the completeness law.

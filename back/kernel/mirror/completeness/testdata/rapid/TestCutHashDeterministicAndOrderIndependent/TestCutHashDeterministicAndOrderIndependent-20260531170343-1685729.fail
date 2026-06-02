@@ -1,0 +1,17 @@
+# 2026/05/31 17:03:43.629544 [TestCutHashDeterministicAndOrderIndependent] [rapid] draw layers: []records.Layer{}
+# 2026/05/31 17:03:43.629550 [TestCutHashDeterministicAndOrderIndependent] [rapid] draw mirrors: []records.Mirror{records.Mirror{MirrorID:"m1", Reflects:records.LayerRef{LayerID:"a", Version:"v1"}, TestKind:"fixture", CertLanguage:"fixture", Authority:"", Liveness:"alive", ContentHash:""}, records.Mirror{MirrorID:"m1", Reflects:records.LayerRef{LayerID:"b", Version:"v1"}, TestKind:"fixture", CertLanguage:"fixture", Authority:"", Liveness:"alive", ContentHash:""}}
+# 2026/05/31 17:03:43.629565 [TestCutHashDeterministicAndOrderIndependent] cut hash is order-dependent: 56ffcc82a79551a4dc52abbef9afc7d919ebaa541c66f34b4abac20ea764de9d != 5de1b3cb17f643cd82c5d013130bb8eaf2ae33e0b574b8c5ab4aa8e23cc55cf6
+# 
+v0.4.8#16203434634494193073
+0x0
+0xaaaaaaaaaaaaa
+0x0
+0x0
+0x0
+0x0
+0xaaaaaaaaaaaaa
+0x0
+0x0
+0x0
+0x1
+0x0
