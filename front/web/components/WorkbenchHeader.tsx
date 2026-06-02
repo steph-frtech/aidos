@@ -48,6 +48,10 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/truth-typing", k: "truthTyping" },
 			{ href: "/scopes", k: "scopes" },
 			{ href: "/authorities", k: "authorities" },
+			{ href: "/agents", k: "agents" },
+			{ href: "/global-invariants", k: "globalInvariants" },
+			{ href: "/sagas", k: "sagas" },
+			{ href: "/temporal-invariants", k: "temporal" },
 		],
 	},
 	{
@@ -98,6 +102,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/meta", k: "meta" },
 			{ href: "/mutation-score", k: "mutationScore" },
 			{ href: "/kernel-debt", k: "kernelDebt" },
+			{ href: "/harness-economics", k: "economics" },
 			{ href: "/evolution-sandbox", k: "evolutionSandbox" },
 			{ href: "/incidents-to-ideas", k: "incidentsToIdeas" },
 			{ href: "/adoption", k: "adoption" },
