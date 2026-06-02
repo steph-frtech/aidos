@@ -13,3 +13,10 @@ hooks:
     - completeness_law_holds
     - scope_valid
     - authority_valid
+  SessionStart:
+    # S39: the meta-meta self-test (KRD §71). At every session start it fault-injects
+    # the three inviolable guarantees of NIVEAU 3 — each sensor still fires, the wall
+    # still holds, the fitness is unchanged — and blocks the session on any failure.
+    # Binary: back/hooks/sessionstart (harness-self-test). Below the line, SELECT-only
+    # on the fitness baseline it asserts unchanged.
+    - harness-self-test

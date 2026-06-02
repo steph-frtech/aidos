@@ -1,0 +1,38 @@
+{
+  "consumer": {
+    "name": "aidos-workbench"
+  },
+  "interactions": [
+    {
+      "description": "createOrder creates a Order",
+      "request": {
+        "body": {
+          "customer": "example",
+          "id": 1,
+          "placed_at": "1970-01-01T00:00:00Z",
+          "total": "0"
+        },
+        "method": "POST",
+        "path": "/orders"
+      },
+      "response": {
+        "body": {
+          "customer": "example",
+          "discount": "0",
+          "id": 1,
+          "placed_at": "1970-01-01T00:00:00Z",
+          "total": "0"
+        },
+        "status": 201
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "createOrder-provider"
+  }
+}

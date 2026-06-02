@@ -1,0 +1,17 @@
+
+# compiled Go binaries (go build output) — never commit
+/dag
+/main
+/stop
+/memory
+/idea-intake
+/posttooluse
+/telemetry-reader
+/changeset
+/context
+/evolve
+/mirror-runner
+/pact-verifier
+/backtester
+/sensors
+/store
