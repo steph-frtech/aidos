@@ -2,58 +2,58 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
-import { FirstAppGuide, type GuideStep } from "./FirstAppGuide";
+import { type BuilderStage, FirstAppBuilder } from "./FirstAppBuilder";
 
 export const metadata: Metadata = {
 	title: "Votre première application — AIDOS Workbench",
 	description:
-		"Un tutoriel guidé pas à pas pour construire votre première application avec AIDOS : la boucle KRD de l'intention au bouton cliquable, sans jamais aller du prompt au code.",
+		"Un tutoriel guidé, interactif : suivez les flèches et construisez votre première capacité, de l'intention au bouton cliquable, en suivant la boucle KRD.",
 };
 
 /**
- * /first-app — the guided onboarding tutorial: how to build your FIRST application with
- * AIDOS. It walks the whole KRD verticale (Idea → grill → Goal/red set → mirror → kernel
- * via an approved ChangeSet → green → projections → stable phase → clickable button) as an
- * interactive, checkable guide, each step deep-linking to the real Workbench panel where
- * you do it. It composes existing routes; it authors no new capability, truth or kernel
- * write. Server Component (strings via next-intl, ADR 0011; design tokens, ADR 0010); the
- * interactive checklist is the FirstAppGuide client component. Read-only; the wall is
- * untouched.
+ * /first-app — the guided, HANDS-ON onboarding. The star is FirstAppBuilder: an
+ * interactive coach-mark walkthrough where the user clicks the highlighted button at each
+ * stage (arrow → "Cliquez ici"), the pipeline fills idea→…→button, and the last stage is
+ * the real checkout button they just built. Below it, the same eight teeth deep-link to
+ * the real Workbench panels ("le faire pour de vrai"). Server Component (strings via
+ * next-intl, ADR 0011; tokens, ADR 0010); read-only, the wall is untouched.
  */
 export default async function FirstAppPage() {
 	const t = await getTranslations("firstApp");
 
-	// The eight teeth of the verticale, each bound to the panel where you act it out.
-	const stepDefs: { key: string; href: string }[] = [
-		{ key: "s1", href: "/ideas" },
-		{ key: "s2", href: "/exploration" },
-		{ key: "s3", href: "/goal" },
-		{ key: "s4", href: "/mirrors" },
-		{ key: "s5", href: "/changeset" },
-		{ key: "s6", href: "/sensors" },
-		{ key: "s7", href: "/emitters" },
-		{ key: "s8", href: "/phase-stable" },
-	];
+	const builderStages: BuilderStage[] = Array.from({ length: 8 }, (_, i) => {
+		const n = i + 1;
+		return {
+			n,
+			action: t(`builder.stages.s${n}.action`),
+			active: t(`builder.stages.s${n}.active`),
+			done: t(`builder.stages.s${n}.done`),
+			node: t(`builder.stages.s${n}.node`),
+		};
+	});
 
-	const steps: GuideStep[] = stepDefs.map((d, i) => ({
-		n: i + 1,
-		href: d.href,
-		title: t(`steps.${d.key}.title`),
-		body: t(`steps.${d.key}.body`),
-		gesture: t(`steps.${d.key}.gesture`),
-		doneWhen: t(`steps.${d.key}.doneWhen`),
-		panelLabel: t(`steps.${d.key}.panelLabel`),
-	}));
-
-	const labels = {
-		progress: t("guide.progress"),
-		open: t("guide.open"),
-		gestureLabel: t("guide.gestureLabel"),
-		doneWhenLabel: t("guide.doneWhenLabel"),
-		reset: t("guide.reset"),
-		complete: t("guide.complete"),
-		completeBody: t("guide.completeBody"),
+	const builderLabels = {
+		arrow: t("builder.arrow"),
+		restart: t("builder.restart"),
+		progress: t("builder.progress"),
+		intentionLabel: t("builder.intentionLabel"),
+		intention: t("builder.intention"),
+		complete: t("builder.complete"),
+		completeBody: t("builder.completeBody"),
+		orderPlaced: t("builder.orderPlaced"),
 	};
+
+	// The eight teeth deep-linked to the real Workbench panels.
+	const panels = [
+		{ k: "s1", href: "/ideas" },
+		{ k: "s2", href: "/exploration" },
+		{ k: "s3", href: "/goal" },
+		{ k: "s4", href: "/mirrors" },
+		{ k: "s5", href: "/changeset" },
+		{ k: "s6", href: "/sensors" },
+		{ k: "s7", href: "/emitters" },
+		{ k: "s8", href: "/phase-stable" },
+	];
 
 	const moreLinks = [
 		{
@@ -101,14 +101,6 @@ export default async function FirstAppPage() {
 						<p className="mt-1 text-sm leading-relaxed text-muted-foreground">
 							{t("build.body")}
 						</p>
-						<Link
-							href="/demo-checkout"
-							data-testid="build-cta"
-							className="mt-4 inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
-						>
-							{t("build.cta")}
-							<span aria-hidden="true">→</span>
-						</Link>
 					</section>
 
 					<section
@@ -119,33 +111,61 @@ export default async function FirstAppPage() {
 						<h2 className="text-base font-semibold text-card-foreground">
 							{t("rule.heading")}
 						</h2>
-						<p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-							{t("rule.body")}
-						</p>
 						<p className="mt-3 rounded-lg bg-background px-3 py-2 text-center font-mono text-xs text-foreground">
 							{t("rule.loop")}
 						</p>
 					</section>
 				</div>
 
-				{/* The guided, interactive walkthrough */}
-				<section className="mt-12 space-y-4" aria-label={t("guide.heading")}>
+				{/* The interactive, hands-on builder — the star */}
+				<section className="mt-12 space-y-4" aria-label={t("builder.title")}>
 					<div className="space-y-1">
 						<h2 className="text-lg font-semibold tracking-tight text-foreground">
-							{t("guide.heading")}
+							{t("builder.title")}
 						</h2>
 						<p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-							{t("guide.lead")}
+							{t("builder.lead")}
 						</p>
 					</div>
-					<FirstAppGuide steps={steps} labels={labels} />
+					<FirstAppBuilder stages={builderStages} labels={builderLabels} />
 				</section>
 
-				{/* See it green, for real */}
+				{/* Do it for real — deep links to the actual panels */}
+				<section
+					data-testid="panels"
+					aria-label={t("panels.heading")}
+					className="mt-12 rounded-xl border border-border bg-card p-5"
+				>
+					<h2 className="text-base font-semibold text-card-foreground">
+						{t("panels.heading")}
+					</h2>
+					<p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+						{t("panels.lead")}
+					</p>
+					<ol className="mt-4 grid gap-2 sm:grid-cols-2">
+						{panels.map((p, i) => (
+							<li key={p.href}>
+								<Link
+									href={p.href}
+									data-testid={`panel-link-${i + 1}`}
+									className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+								>
+									<span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary tabular-nums">
+										{i + 1}
+									</span>
+									<span className="flex-1">{t(`steps.${p.k}.panelLabel`)}</span>
+									<span aria-hidden="true">→</span>
+								</Link>
+							</li>
+						))}
+					</ol>
+				</section>
+
+				{/* See the canonical slice green, end to end */}
 				<section
 					data-testid="see"
 					aria-label={t("see.heading")}
-					className="mt-12 rounded-xl border border-primary/40 bg-primary/5 p-6"
+					className="mt-10 rounded-xl border border-primary/40 bg-primary/5 p-6"
 				>
 					<h2 className="text-base font-semibold text-card-foreground">
 						{t("see.heading")}
@@ -172,9 +192,6 @@ export default async function FirstAppPage() {
 					<h2 className="text-base font-semibold text-card-foreground">
 						{t("more.heading")}
 					</h2>
-					<p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-						{t("more.body")}
-					</p>
 					<ul className="mt-3 flex flex-wrap gap-2">
 						{moreLinks.map((l) => (
 							<li key={l.href}>

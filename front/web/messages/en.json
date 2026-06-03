@@ -1924,7 +1924,73 @@
 			"certLanguages": "The certification languages",
 			"guide": "Guide: develop your app"
 		},
-		"footer": "Read-only against truth: this tutorial guides you and takes you to each panel, but never writes the kernel. The only door stays idea → mirror → /goal → human approval."
+		"footer": "Read-only against truth: this tutorial guides you and takes you to each panel, but never writes the kernel. The only door stays idea → mirror → /goal → human approval.",
+		"builder": {
+			"title": "Build it, step by step",
+			"lead": "Follow the arrow: at each step, click the highlighted button. You drive the intention “a customer places an order from their cart” from idea to a clickable button.",
+			"arrow": "Click here",
+			"restart": "Restart",
+			"progress": "Progress",
+			"intentionLabel": "The intention you're building",
+			"intention": "A customer places an order from their cart",
+			"complete": "🎉 Well done — your first application is born, from idea to clickable button.",
+			"completeBody": "You drove an intention through the whole KRD loop: idea → red mirror → goal → approved ChangeSet (the door) → green → stable phase → button. This is exactly how every capability is born in AIDOS.",
+			"orderPlaced": "Order placed ✓ — 2 items",
+			"stages": {
+				"s1": {
+					"action": "Capture the idea",
+					"active": "It all starts from an intention, never a prompt.",
+					"done": "Idea captured — candidate, no freeze",
+					"node": "Idea"
+				},
+				"s2": {
+					"action": "Grill the intention",
+					"active": "Sharpen the intention above the wall: is it falsifiable?",
+					"done": "Sharp & falsifiable — verdict “grilled”",
+					"node": "Grill"
+				},
+				"s3": {
+					"action": "Open the goal",
+					"active": "The red IS the goal — write the mirror that fails.",
+					"done": "Red set opened — createOrder is RED",
+					"node": "Goal"
+				},
+				"s4": {
+					"action": "Write the mirror (fixture)",
+					"active": "The truth's nature picks its language: here, a fixture.",
+					"done": "Red mirror linked — state→events fixture",
+					"node": "Mirror"
+				},
+				"s5": {
+					"action": "Approve the ChangeSet",
+					"active": "The only door to the kernel: the human approves, the agent never writes truth.",
+					"done": "DRAFT → APPLIED — the door; mirror alive",
+					"node": "ChangeSet"
+				},
+				"s6": {
+					"action": "Code to green",
+					"active": "Now — and only now — you code. red → green.",
+					"done": "red → green — the mirror turns GREEN",
+					"node": "Green"
+				},
+				"s7": {
+					"action": "Emit & seal",
+					"active": "From the source, projections emit; seal the stable phase.",
+					"done": "Projections emitted · stable phase sealed",
+					"node": "Stable"
+				},
+				"s8": {
+					"action": "Checkout — 2 items",
+					"active": "Your app is ready: click the button you just built!",
+					"done": "Order placed ✓ — 2 items",
+					"node": "Button"
+				}
+			}
+		},
+		"panels": {
+			"heading": "Do it for real",
+			"lead": "The assistant above simulates the loop. To do it on the real Workbench panels:"
+		}
 	},
 	"navGroups": {
 		"start": "Getting started",

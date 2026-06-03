@@ -1924,7 +1924,73 @@
 			"certLanguages": "Les langages de certification",
 			"guide": "Guide : développer votre app"
 		},
-		"footer": "Lecture seule contre la vérité : ce tutoriel vous guide et vous emmène sur chaque panneau, mais n'écrit jamais le noyau. La seule porte reste idée → miroir → /goal → approbation humaine."
+		"footer": "Lecture seule contre la vérité : ce tutoriel vous guide et vous emmène sur chaque panneau, mais n'écrit jamais le noyau. La seule porte reste idée → miroir → /goal → approbation humaine.",
+		"builder": {
+			"title": "Construisez-la, pas à pas",
+			"lead": "Suivez la flèche : à chaque étape, cliquez le bouton surligné. Vous conduisez l'intention « un client passe une commande depuis son panier » de l'idée au bouton cliquable.",
+			"arrow": "Cliquez ici",
+			"restart": "Recommencer",
+			"progress": "Progression",
+			"intentionLabel": "L'intention que vous construisez",
+			"intention": "Un client passe une commande depuis son panier",
+			"complete": "🎉 Bravo — votre première application est née, de l'idée au bouton cliquable.",
+			"completeBody": "Vous avez conduit une intention à travers toute la boucle KRD : idée → miroir rouge → goal → ChangeSet approuvé (la porte) → vert → phase stable → bouton. C'est exactement ainsi que naît chaque capacité dans AIDOS.",
+			"orderPlaced": "Commande passée ✓ — 2 articles",
+			"stages": {
+				"s1": {
+					"action": "Capter l'idée",
+					"active": "Tout part d'une intention, jamais d'un prompt.",
+					"done": "Idée captée — candidate, sans gel",
+					"node": "Idée"
+				},
+				"s2": {
+					"action": "Griller l'intention",
+					"active": "On aiguise l'intention au-dessus du mur : est-elle falsifiable ?",
+					"done": "Nette & falsifiable — verdict « grilled »",
+					"node": "Grill"
+				},
+				"s3": {
+					"action": "Ouvrir le goal",
+					"active": "Le rouge EST le goal — on écrit le miroir qui échoue.",
+					"done": "Set rouge ouvert — createOrder est ROUGE",
+					"node": "Goal"
+				},
+				"s4": {
+					"action": "Écrire le miroir (fixture)",
+					"active": "La nature de la vérité choisit sa langue : ici, une fixture.",
+					"done": "Miroir rouge lié — fixture état→events",
+					"node": "Miroir"
+				},
+				"s5": {
+					"action": "Approuver le ChangeSet",
+					"active": "La seule porte du noyau : l'humain approuve, l'agent n'écrit jamais la vérité.",
+					"done": "DRAFT → APPLIED — la porte ; miroir vivant",
+					"node": "ChangeSet"
+				},
+				"s6": {
+					"action": "Coder au vert",
+					"active": "Maintenant — et seulement maintenant — on code. red → green.",
+					"done": "red → green — le miroir passe au VERT",
+					"node": "Vert"
+				},
+				"s7": {
+					"action": "Émettre & sceller",
+					"active": "Depuis la source, les projections s'émettent ; on scelle la phase stable.",
+					"done": "Projections émises · phase stable scellée",
+					"node": "Stable"
+				},
+				"s8": {
+					"action": "Checkout — 2 articles",
+					"active": "Votre app est prête : cliquez le bouton que vous venez de construire !",
+					"done": "Commande passée ✓ — 2 articles",
+					"node": "Bouton"
+				}
+			}
+		},
+		"panels": {
+			"heading": "Le faire pour de vrai",
+			"lead": "L'assistant ci-dessus simule la boucle. Pour la faire sur les vrais panneaux du Workbench :"
+		}
 	},
 	"navGroups": {
 		"start": "Prise en main",

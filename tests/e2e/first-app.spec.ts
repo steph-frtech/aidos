@@ -1,25 +1,20 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Playwright e2e — the guided first-app onboarding tutorial (/first-app).
- * mirror record: reflects=front.first-app.guided-tutorial, test_kind=e2e,
+ * Playwright e2e — the hands-on guided first-app builder (/first-app).
+ * mirror record: reflects=front.first-app.guided-builder, test_kind=e2e,
  *                cert_language=playwright-bdd, liveness=alive, authority=above
  *
- * Feature: a newcomer is guided, step by step, from intention to a clickable button
+ * Feature: a newcomer builds their first capability by following arrows, idea → button
  *
- *   Scenario: the guide renders the eight verticale steps, each deep-linking to its panel
+ *   Scenario: each stage is an action the user performs, guided by an arrow
  *     Given I open "/first-app"
- *     Then I see the guided walkthrough with 8 steps
- *     And step 1 deep-links to the ideas store, step 5 to the changesets, step 8 to the stable phase
- *
- *   Scenario: progress is interactive and persists
- *     When I check off a step
- *     Then the progress counter advances
- *     And reloading keeps it checked (localStorage)
- *     And checking all 8 shows the completion banner
+ *     When I click the highlighted button at each of the 8 stages
+ *     Then the pipeline fills idea → … → button and the progress advances
+ *     And the last click is the real checkout button I just built → the order is placed
  */
 
-test.describe("first-app — the guided onboarding tutorial", () => {
+test.describe("first-app — the hands-on guided builder", () => {
 	test.beforeEach(async ({ page }) => {
 		await page.goto("/first-app");
 		await expect(
@@ -30,57 +25,56 @@ test.describe("first-app — the guided onboarding tutorial", () => {
 		).toBeVisible({ timeout: 15000 });
 	});
 
-	test("renders the 8 verticale steps deep-linked to their panels", async ({
+	test("the user clicks through all 8 stages, guided by the arrow, to a placed order", async ({
 		page,
 	}) => {
-		await expect(page.getByTestId("first-app-guide")).toBeVisible();
+		const builder = page.getByTestId("first-app-builder");
+		await expect(builder).toBeVisible();
+		await expect(page.getByTestId("builder-progress")).toHaveText("0 / 8");
+
 		for (let n = 1; n <= 8; n++) {
-			await expect(page.getByTestId(`guide-step-${n}`)).toBeVisible();
+			// the arrow coach-mark points at the active stage until the build is complete
+			await expect(page.getByTestId("builder-arrow")).toBeVisible();
+			const action = page.getByTestId(`builder-action-${n}`);
+			await expect(action).toBeVisible();
+			await action.click();
+			await expect(page.getByTestId("builder-progress")).toHaveText(`${n} / 8`);
+			await expect(page.getByTestId(`pipeline-node-${n}`)).toHaveAttribute(
+				"data-done",
+				"true",
+			);
 		}
-		// each step deep-links to a real Workbench panel
-		await expect(page.getByTestId("step-open-1")).toHaveAttribute(
+
+		// the built button placed the order; the celebration shows
+		await expect(page.getByTestId("order-placed")).toBeVisible();
+		await expect(page.getByTestId("builder-complete")).toBeVisible();
+		// no arrow once there is nothing left to click
+		await expect(page.getByTestId("builder-arrow")).toHaveCount(0);
+
+		// restart clears it
+		await page.getByTestId("builder-restart").click();
+		await expect(page.getByTestId("builder-progress")).toHaveText("0 / 8");
+	});
+
+	test("the real panels are deep-linked, and the slice can be seen green", async ({
+		page,
+	}) => {
+		await expect(page.getByTestId("panel-link-1")).toHaveAttribute(
 			"href",
 			"/ideas",
 		);
-		await expect(page.getByTestId("step-open-5")).toHaveAttribute(
+		await expect(page.getByTestId("panel-link-5")).toHaveAttribute(
 			"href",
 			"/changeset",
 		);
-		await expect(page.getByTestId("step-open-8")).toHaveAttribute(
+		await expect(page.getByTestId("panel-link-8")).toHaveAttribute(
 			"href",
 			"/phase-stable",
 		);
-		// the worked example links to the live, green verticale
 		await expect(page.getByTestId("see-cta")).toHaveAttribute(
 			"href",
 			"/demo-checkout",
 		);
-	});
-
-	test("progress is interactive, persists, and completes", async ({ page }) => {
-		await expect(page.getByTestId("guide-progress")).toHaveText("0 / 8");
-
-		await page.getByTestId("step-toggle-1").click();
-		await expect(page.getByTestId("guide-progress")).toHaveText("1 / 8");
-		await expect(page.getByTestId("guide-step-1")).toHaveAttribute(
-			"data-done",
-			"true",
-		);
-
-		// persists across reload (localStorage)
-		await page.reload();
-		await expect(page.getByTestId("guide-progress")).toHaveText("1 / 8");
-
-		// complete the loop → the celebration banner appears
-		for (let n = 2; n <= 8; n++) {
-			await page.getByTestId(`step-toggle-${n}`).click();
-		}
-		await expect(page.getByTestId("guide-progress")).toHaveText("8 / 8");
-		await expect(page.getByTestId("guide-complete")).toBeVisible();
-
-		// reset clears it
-		await page.getByTestId("guide-reset").click();
-		await expect(page.getByTestId("guide-progress")).toHaveText("0 / 8");
 	});
 
 	test("is reachable from the home hero", async ({ page }) => {
