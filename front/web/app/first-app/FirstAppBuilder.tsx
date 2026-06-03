@@ -32,6 +32,42 @@ export type BuilderLabels = {
 	orderPlaced: string;
 };
 
+// Deterministic confetti pieces (no Math.random → no hydration mismatch); they burst once
+// over the completion banner when the build finishes. Honors prefers-reduced-motion (CSS).
+const CONFETTI_PIECES = Array.from({ length: 32 }, (_, i) => ({
+	left: (i * 41) % 100,
+	delay: ((i * 17) % 12) / 10,
+	size: 5 + (i % 3) * 3,
+	color: ["#2563eb", "#60a5fa", "#34d399", "#fbbf24", "#f472b6", "#a78bfa"][
+		i % 6
+	],
+}));
+
+function Confetti() {
+	return (
+		<div
+			aria-hidden="true"
+			data-testid="builder-confetti"
+			className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0"
+		>
+			{CONFETTI_PIECES.map((p, i) => (
+				<span
+					// biome-ignore lint/suspicious/noArrayIndexKey: a fixed decorative list
+					key={i}
+					className="animate-confetti absolute top-0 rounded-sm"
+					style={{
+						left: `${p.left}%`,
+						width: p.size,
+						height: p.size,
+						background: p.color,
+						animationDelay: `${p.delay}s`,
+					}}
+				/>
+			))}
+		</div>
+	);
+}
+
 export function FirstAppBuilder({
 	stages,
 	labels,
@@ -117,8 +153,9 @@ export function FirstAppBuilder({
 			{allDone ? (
 				<div
 					data-testid="builder-complete"
-					className="rounded-xl border border-primary/40 bg-primary/10 p-5 text-sm text-primary"
+					className="relative rounded-xl border border-primary/40 bg-primary/10 p-5 text-sm text-primary"
 				>
+					<Confetti />
 					<p className="font-semibold">{labels.complete}</p>
 					<p className="mt-1 leading-relaxed">{labels.completeBody}</p>
 				</div>
@@ -182,10 +219,13 @@ export function FirstAppBuilder({
 											<div className="mt-4 flex flex-wrap items-center gap-3">
 												<span
 													data-testid="builder-arrow"
-													className="inline-flex animate-pulse items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"
+													className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"
 												>
 													{labels.arrow}
-													<span aria-hidden="true" className="text-base">
+													<span
+														aria-hidden="true"
+														className="animate-arrow-x text-base"
+													>
 														→
 													</span>
 												</span>

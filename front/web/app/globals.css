@@ -50,84 +50,118 @@
 }
 
 :root {
-  /* AIDOS Workbench — ccup "design-to-fullstack" palette: zinc base + blue-600 accent */
-  --background: var(--color-zinc-50);
-  --foreground: var(--color-zinc-900);
-  --card: #ffffff;
-  --card-foreground: var(--color-zinc-900);
-  --popover: #ffffff;
-  --popover-foreground: var(--color-zinc-900);
-  --primary: var(--color-blue-600);
-  --primary-foreground: #ffffff;
-  --secondary: var(--color-zinc-100);
-  --secondary-foreground: var(--color-zinc-900);
-  --muted: var(--color-zinc-100);
-  --muted-foreground: var(--color-zinc-500);
-  --accent: var(--color-zinc-100);
-  --accent-foreground: var(--color-zinc-900);
-  --destructive: var(--color-red-600);
-  --border: var(--color-zinc-200);
-  --input: var(--color-zinc-200);
-  --ring: var(--color-blue-500);
-  --chart-1: var(--color-blue-500);
-  --chart-2: var(--color-zinc-400);
-  --chart-3: var(--color-emerald-500);
-  --chart-4: var(--color-amber-500);
-  --chart-5: var(--color-red-500);
-  --radius: 0.5rem;
-  --sidebar: #ffffff;
-  --sidebar-foreground: var(--color-zinc-900);
-  --sidebar-primary: var(--color-blue-600);
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--color-blue-50);
-  --sidebar-accent-foreground: var(--color-blue-700);
-  --sidebar-border: var(--color-zinc-200);
-  --sidebar-ring: var(--color-blue-500);
+	/* AIDOS Workbench — ccup "design-to-fullstack" palette: zinc base + blue-600 accent */
+	--background: var(--color-zinc-50);
+	--foreground: var(--color-zinc-900);
+	--card: #ffffff;
+	--card-foreground: var(--color-zinc-900);
+	--popover: #ffffff;
+	--popover-foreground: var(--color-zinc-900);
+	--primary: var(--color-blue-600);
+	--primary-foreground: #ffffff;
+	--secondary: var(--color-zinc-100);
+	--secondary-foreground: var(--color-zinc-900);
+	--muted: var(--color-zinc-100);
+	--muted-foreground: var(--color-zinc-500);
+	--accent: var(--color-zinc-100);
+	--accent-foreground: var(--color-zinc-900);
+	--destructive: var(--color-red-600);
+	--border: var(--color-zinc-200);
+	--input: var(--color-zinc-200);
+	--ring: var(--color-blue-500);
+	--chart-1: var(--color-blue-500);
+	--chart-2: var(--color-zinc-400);
+	--chart-3: var(--color-emerald-500);
+	--chart-4: var(--color-amber-500);
+	--chart-5: var(--color-red-500);
+	--radius: 0.5rem;
+	--sidebar: #ffffff;
+	--sidebar-foreground: var(--color-zinc-900);
+	--sidebar-primary: var(--color-blue-600);
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: var(--color-blue-50);
+	--sidebar-accent-foreground: var(--color-blue-700);
+	--sidebar-border: var(--color-zinc-200);
+	--sidebar-ring: var(--color-blue-500);
 }
 
 .dark {
-  /* zinc-950 base + blue-500 accent, derived from the ccup light palette */
-  --background: var(--color-zinc-950);
-  --foreground: var(--color-zinc-50);
-  --card: var(--color-zinc-900);
-  --card-foreground: var(--color-zinc-50);
-  --popover: var(--color-zinc-900);
-  --popover-foreground: var(--color-zinc-50);
-  --primary: var(--color-blue-500);
-  --primary-foreground: #ffffff;
-  --secondary: var(--color-zinc-800);
-  --secondary-foreground: var(--color-zinc-50);
-  --muted: var(--color-zinc-800);
-  --muted-foreground: var(--color-zinc-400);
-  --accent: var(--color-zinc-800);
-  --accent-foreground: var(--color-zinc-50);
-  --destructive: var(--color-red-500);
-  --border: var(--color-zinc-800);
-  --input: var(--color-zinc-800);
-  --ring: var(--color-blue-500);
-  --chart-1: var(--color-blue-500);
-  --chart-2: var(--color-zinc-500);
-  --chart-3: var(--color-emerald-500);
-  --chart-4: var(--color-amber-500);
-  --chart-5: var(--color-red-500);
-  --sidebar: var(--color-zinc-900);
-  --sidebar-foreground: var(--color-zinc-50);
-  --sidebar-primary: var(--color-blue-500);
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--color-zinc-800);
-  --sidebar-accent-foreground: var(--color-blue-300);
-  --sidebar-border: var(--color-zinc-800);
-  --sidebar-ring: var(--color-blue-500);
+	/* zinc-950 base + blue-500 accent, derived from the ccup light palette */
+	--background: var(--color-zinc-950);
+	--foreground: var(--color-zinc-50);
+	--card: var(--color-zinc-900);
+	--card-foreground: var(--color-zinc-50);
+	--popover: var(--color-zinc-900);
+	--popover-foreground: var(--color-zinc-50);
+	--primary: var(--color-blue-500);
+	--primary-foreground: #ffffff;
+	--secondary: var(--color-zinc-800);
+	--secondary-foreground: var(--color-zinc-50);
+	--muted: var(--color-zinc-800);
+	--muted-foreground: var(--color-zinc-400);
+	--accent: var(--color-zinc-800);
+	--accent-foreground: var(--color-zinc-50);
+	--destructive: var(--color-red-500);
+	--border: var(--color-zinc-800);
+	--input: var(--color-zinc-800);
+	--ring: var(--color-blue-500);
+	--chart-1: var(--color-blue-500);
+	--chart-2: var(--color-zinc-500);
+	--chart-3: var(--color-emerald-500);
+	--chart-4: var(--color-amber-500);
+	--chart-5: var(--color-red-500);
+	--sidebar: var(--color-zinc-900);
+	--sidebar-foreground: var(--color-zinc-50);
+	--sidebar-primary: var(--color-blue-500);
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: var(--color-zinc-800);
+	--sidebar-accent-foreground: var(--color-blue-300);
+	--sidebar-border: var(--color-zinc-800);
+	--sidebar-ring: var(--color-blue-500);
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground antialiased;
-  }
-  html {
-    @apply font-sans;
-  }
+	* {
+		@apply border-border outline-ring/50;
+	}
+	body {
+		@apply bg-background text-foreground antialiased;
+	}
+	html {
+		@apply font-sans;
+	}
+}
+
+/* Guided builder animations (/first-app) — a horizontal arrow nudge + a confetti burst. */
+@keyframes aidos-arrow-x {
+	0%,
+	100% {
+		transform: translateX(0);
+	}
+	50% {
+		transform: translateX(5px);
+	}
+}
+@keyframes aidos-confetti {
+	0% {
+		transform: translateY(-8px) rotate(0deg);
+		opacity: 1;
+	}
+	100% {
+		transform: translateY(260px) rotate(420deg);
+		opacity: 0;
+	}
+}
+.animate-arrow-x {
+	animation: aidos-arrow-x 0.8s ease-in-out infinite;
+}
+.animate-confetti {
+	animation: aidos-confetti 1.3s ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.animate-arrow-x,
+	.animate-confetti {
+		animation: none;
+	}
 }
