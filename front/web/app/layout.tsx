@@ -34,7 +34,7 @@ export default async function RootLayout({
 			lang={locale}
 			className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
 		>
-			<body className="min-h-full flex flex-col md:pl-64">
+			<body className="min-h-full flex flex-col sm:pl-64">
 				<NextIntlClientProvider messages={messages}>
 					{children}
 				</NextIntlClientProvider>

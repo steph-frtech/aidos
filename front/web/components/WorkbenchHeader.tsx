@@ -207,7 +207,7 @@ export function WorkbenchHeader() {
 			{/* Desktop: fixed left sidebar */}
 			<aside
 				data-testid="workbench-sidebar"
-				className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-background md:flex"
+				className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-card sm:flex"
 			>
 				<div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
 					<Link
@@ -221,34 +221,65 @@ export function WorkbenchHeader() {
 				<div className="flex-1 overflow-y-auto">{nav}</div>
 			</aside>
 
-			{/* Mobile: top bar + collapsible drawer */}
-			<header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur md:hidden">
+			{/* Mobile (< sm): a top bar whose Menu button opens a LEFT off-canvas drawer */}
+			<header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur sm:hidden">
 				<div className="flex items-center justify-between gap-3 px-4 py-3">
+					<button
+						type="button"
+						data-testid="nav-mobile-toggle"
+						aria-expanded={mobileOpen}
+						aria-label={tg("menu")}
+						onClick={() => setMobileOpen((v) => !v)}
+						className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+					>
+						<span aria-hidden="true">☰</span>
+						{tg("menu")}
+					</button>
 					<Link
 						href="/"
 						className="font-semibold tracking-tight text-foreground"
 					>
 						AIDOS
 					</Link>
-					<div className="flex items-center gap-2">
-						<LanguageSwitcher />
-						<button
-							type="button"
-							data-testid="nav-mobile-toggle"
-							aria-expanded={mobileOpen}
-							onClick={() => setMobileOpen((v) => !v)}
-							className="rounded-md border border-border px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-						>
-							{tg("menu")}
-						</button>
-					</div>
+					<LanguageSwitcher />
 				</div>
-				{mobileOpen ? (
-					<div className="max-h-[70vh] overflow-y-auto border-t border-border">
-						{nav}
-					</div>
-				) : null}
 			</header>
+
+			{/* Mobile left drawer + backdrop */}
+			{mobileOpen ? (
+				<div className="sm:hidden">
+					{/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop is a supplementary close affordance; the drawer links and Esc-free toggle remain keyboard-reachable */}
+					<div
+						data-testid="nav-backdrop"
+						onClick={() => setMobileOpen(false)}
+						aria-hidden="true"
+						className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm"
+					/>
+					<aside
+						data-testid="workbench-drawer"
+						className="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-border bg-card shadow-xl"
+					>
+						<div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+							<Link
+								href="/"
+								onClick={() => setMobileOpen(false)}
+								className="font-semibold tracking-tight text-foreground"
+							>
+								AIDOS
+							</Link>
+							<button
+								type="button"
+								aria-label="Fermer"
+								onClick={() => setMobileOpen(false)}
+								className="rounded-md border border-border px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+							>
+								✕
+							</button>
+						</div>
+						<div className="flex-1 overflow-y-auto">{nav}</div>
+					</aside>
+				</div>
+			) : null}
 		</>
 	);
 }
