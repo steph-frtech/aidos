@@ -64,7 +64,8 @@
 		"globalInvariants": "Invariants transverses",
 		"sagas": "Sagas",
 		"temporal": "Invariants temporels",
-		"economics": "Économie du harnais"
+		"economics": "Économie du harnais",
+		"proofLevels": "Couches de preuve"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -2207,5 +2208,76 @@
 		"recordDone": "AgentRun enregistré sous la ligne (runtime, append-only). Un run n'a ni version ni miroir — ce n'est pas une couche, pas une vérité : juste la trace de ce que l'agent a fait.",
 		"notALayerTag": "pas une couche",
 		"footer": "Projection de lecture des couches agent (KRD §21/§13.8). Le CoucheAgent est un source au-dessus de la ligne ; les fonctions pures vivent dans <code>back/kernel/agentlayer</code> + <code>lib/agentlayer.ts</code>, l'AgentRun dans <code>back/runtime/agentrun</code> + <code>lib/agentrun.ts</code>. Le mur (S04) refuse toute écriture au-dessus de la ligne avec AGENT_WRITE_ABOVE_WATERLINE."
+	},
+	"proofLevels": {
+		"eyebrow": "AIDOS Workbench · Essai",
+		"title": "Les couches de preuve — N0 à N5",
+		"subtitle": "Cliquez une couche pour voir sa langue de preuve. Six natures de vérité, chacune avec sa forme de preuve et son juge — on ne prouve pas une vérité UX comme un invariant métier.",
+		"pick": "Cliquez une couche",
+		"waterline": "≈≈≈ Ligne de flottaison ≈≈≈  au-dessus : l'humain ancre le sens · en dessous : l'agent s'auto-certifie",
+		"fProves": "Prouve",
+		"fForm": "Forme de preuve (le miroir)",
+		"fCert": "Langage de certification",
+		"fVerdict": "Qui certifie",
+		"above": "au-dessus",
+		"below": "sous la ligne",
+		"proseNote": "Au-delà de l'échelle : une vérité UX / un ressenti se prouve en prose (revue humaine, accessibilité, A/B) — non exécutable, elle ne compte pas dans la loi de complétude.",
+		"docLink": "Le catalogue complet des langages de certification →",
+		"levels": {
+			"n0": {
+				"level": "N0",
+				"name": "Intention / Parcours",
+				"proves": "Qu'un parcours utilisateur complet fait ce que l'humain attend, de bout en bout.",
+				"form": "Un scénario d'acceptation approuvé — Given / When / Then.",
+				"cert": "gherkin · Godog · Playwright-bdd",
+				"verdict": "L'humain — l'agent ne se déclare jamais vert sur le sens d'un parcours.",
+				"pos": "above"
+			},
+			"n1": {
+				"level": "N1",
+				"name": "Domaine / Invariants (∀)",
+				"proves": "Une règle métier vraie sur TOUS les chemins — un invariant, indépendant du chemin.",
+				"form": "Une propriété (∀), pas un exemple.",
+				"cert": "rapid (Go) · fast-check (TS)",
+				"verdict": "Ancrage humain — l'agent peut faire passer l'existant, jamais inventer une règle.",
+				"pos": "above"
+			},
+			"n2": {
+				"level": "N2",
+				"name": "Workflow / Use-case",
+				"proves": "Que ce chemin précis produit ce résultat précis.",
+				"form": "Une fixture état → commande → état + events, l'exemple canonique gelé.",
+				"cert": "fixture · xstate (Operation DSL)",
+				"verdict": "Ancrage humain — l'agent ajoute des variantes, jamais ne touche au canon gelé.",
+				"pos": "above"
+			},
+			"n3": {
+				"level": "N3",
+				"name": "Contrat / Frontière (port)",
+				"proves": "Que les frontières entre morceaux tiennent : schémas versionnés, contrats de port (l'interface dessinée du dedans).",
+				"form": "Schéma versionné + Context Map + contrats inter-cellules.",
+				"cert": "pact · zod",
+				"verdict": "L'IA s'auto-certifie.",
+				"pos": "below"
+			},
+			"n4": {
+				"level": "N4",
+				"name": "Code / Unité",
+				"proves": "Qu'une fonction fait ce que sa signature promet.",
+				"form": "Test unitaire + TDD local, doublé du typage strict comme sensor gratuit.",
+				"cert": "unit (go test · Vitest) · type-check",
+				"verdict": "L'IA s'auto-certifie.",
+				"pos": "below"
+			},
+			"n5": {
+				"level": "N5",
+				"name": "Infra / Adaptateurs",
+				"proves": "Que l'adaptateur réel (vraie base, vrai service) honore le contrat — pas seulement le faux.",
+				"form": "Vérification fournisseur Pact + Testcontainers sur une vraie infra.",
+				"cert": "pact (fournisseur) · k6 · snapshot",
+				"verdict": "L'IA s'auto-certifie.",
+				"pos": "below"
+			}
+		}
 	}
 }

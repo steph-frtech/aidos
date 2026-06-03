@@ -64,7 +64,8 @@
 		"globalInvariants": "Cross-cell invariants",
 		"sagas": "Sagas",
 		"temporal": "Temporal invariants",
-		"economics": "Harness economics"
+		"economics": "Harness economics",
+		"proofLevels": "Proof levels"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -2207,5 +2208,76 @@
 		"recordDone": "AgentRun recorded below the line (runtime, append-only). A run carries no version and no mirror — it is not a layer, not a truth: just the trace of what the agent did.",
 		"notALayerTag": "not a layer",
 		"footer": "Read-only projection of the agent layers (KRD §21/§13.8). The CoucheAgent is a source above the line; the pure functions live in <code>back/kernel/agentlayer</code> + <code>lib/agentlayer.ts</code>, the AgentRun in <code>back/runtime/agentrun</code> + <code>lib/agentrun.ts</code>. The wall (S04) refuses any write above the line with AGENT_WRITE_ABOVE_WATERLINE."
+	},
+	"proofLevels": {
+		"eyebrow": "AIDOS Workbench · Try it",
+		"title": "The proof levels — N0 to N5",
+		"subtitle": "Click a level to see its proof language. Six natures of truth, each with its proof form and its judge — you don't prove a UX truth like a business invariant.",
+		"pick": "Click a level",
+		"waterline": "≈≈≈ Waterline ≈≈≈  above: the human anchors meaning · below: the agent self-certifies",
+		"fProves": "Proves",
+		"fForm": "Proof form (the mirror)",
+		"fCert": "Certification language",
+		"fVerdict": "Who certifies",
+		"above": "above",
+		"below": "below",
+		"proseNote": "Beyond the ladder: a UX truth / a feeling is proven in prose (human review, a11y, A/B) — non-executable, it does not count in the completeness law.",
+		"docLink": "The full catalogue of certification languages →",
+		"levels": {
+			"n0": {
+				"level": "N0",
+				"name": "Intention / Journey",
+				"proves": "That a full user journey does what the human expects, end to end.",
+				"form": "An approved acceptance scenario — Given / When / Then.",
+				"cert": "gherkin · Godog · Playwright-bdd",
+				"verdict": "The human — the agent never declares itself green on a journey's meaning.",
+				"pos": "above"
+			},
+			"n1": {
+				"level": "N1",
+				"name": "Domain / Invariants (∀)",
+				"proves": "A business rule true on ALL paths — an invariant, path-independent.",
+				"form": "A property (∀), not an example.",
+				"cert": "rapid (Go) · fast-check (TS)",
+				"verdict": "Human-anchored — the agent may pass the existing rule, never invent one.",
+				"pos": "above"
+			},
+			"n2": {
+				"level": "N2",
+				"name": "Workflow / Use-case",
+				"proves": "That this exact path produces this exact result.",
+				"form": "A state → command → state + events fixture, the frozen canonical example.",
+				"cert": "fixture · xstate (Operation DSL)",
+				"verdict": "Human-anchored — the agent adds variants, never touches the frozen canon.",
+				"pos": "above"
+			},
+			"n3": {
+				"level": "N3",
+				"name": "Contract / Boundary (port)",
+				"proves": "That boundaries between pieces hold: versioned schemas, port contracts.",
+				"form": "Versioned schema + Context Map + inter-cell contracts.",
+				"cert": "pact · zod",
+				"verdict": "The AI self-certifies.",
+				"pos": "below"
+			},
+			"n4": {
+				"level": "N4",
+				"name": "Code / Unit",
+				"proves": "That a function does what its signature promises.",
+				"form": "Unit test + local TDD, doubled by strict typing as a free sensor.",
+				"cert": "unit (go test · Vitest) · type-check",
+				"verdict": "The AI self-certifies.",
+				"pos": "below"
+			},
+			"n5": {
+				"level": "N5",
+				"name": "Infra / Adapters",
+				"proves": "That the real adapter (real DB, real service) honors the contract — not just the fake.",
+				"form": "Pact provider verification + Testcontainers on real infra.",
+				"cert": "pact (provider) · k6 · snapshot",
+				"verdict": "The AI self-certifies.",
+				"pos": "below"
+			}
+		}
 	}
 }
