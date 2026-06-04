@@ -25,12 +25,31 @@ export const BDD_WRITER: CoucheAgent = {
 		zonesLecture: ["kernel", "mirrors", "ideas", "brain"],
 		zonesEcriture: ["ideas"],
 		stopConditions: ["red set still red"],
+		// BA01 — governed knobs. The bdd-writer is MAX-confined: no egress, no exec.
+		temperature: 0.2,
+		maxTurns: 40,
+		seed: "",
+		allowedNetworkHosts: [],
+		allowedExec: [],
+		resourceLimits: {
+			maxMemoryMb: 2048,
+			maxCpuMillis: 4000,
+			maxWallSeconds: 600,
+		},
+		maxConcurrency: 1,
 	},
 	skills: [
 		{ skillName: "write-bdd-scenario", enabled: true },
 		{ skillName: "derive-mirror", enabled: true },
+		// A DISABLED skill: governance declared it then turned it off. BA05 must DROP it
+		// — the resolved surface is a strict subset (governance narrows, never widens).
+		{ skillName: "evolve", enabled: false },
 	],
-	mcp: [{ server: "idea-intake", tool: "submit_idea", enabled: true }],
+	mcp: [
+		{ server: "idea-intake", tool: "submit_idea", enabled: true },
+		// A DISABLED MCP binding: it can NEVER appear in the resolved Tools[] (BA05).
+		{ server: "changeset", tool: "apply_changeset", enabled: false },
+	],
 	hooks: [{ phase: "PreToolUse", hook: "pretooluse (wall)", mandatory: true }],
 	approvers: ["product_owner"],
 	domain: "checkout",
@@ -54,6 +73,18 @@ export const EXECUTOR: CoucheAgent = {
 		zonesLecture: ["kernel", "mirrors"],
 		zonesEcriture: ["back/gen", "runtime"],
 		stopConditions: ["red set still red", "prior green broken"],
+		// BA01 — governed knobs. The executor declares one egress host + go/git exec.
+		temperature: 0,
+		maxTurns: 80,
+		seed: "",
+		allowedNetworkHosts: ["api.anthropic.com"],
+		allowedExec: ["go", "git"],
+		resourceLimits: {
+			maxMemoryMb: 4096,
+			maxCpuMillis: 8000,
+			maxWallSeconds: 1800,
+		},
+		maxConcurrency: 2,
 	},
 	skills: [{ skillName: "tdd", enabled: true }],
 	mcp: [{ server: "mirror-runner", tool: "run_mirror", enabled: true }],
