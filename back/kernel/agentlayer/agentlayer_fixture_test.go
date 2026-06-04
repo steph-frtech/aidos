@@ -103,6 +103,20 @@ func TestFixture_Validate_ClosedTaxonomy(t *testing.T) {
 	} {
 		c := bddWriter()
 		c.Kind = k
+		// BA24 — kind-aware Validate: an orchestration layer also REQUIRES a non-empty
+		// team AND a well-formed policy (the closed taxonomy is unchanged; the kind-aware
+		// shape guard is the BA24 addition).
+		if k == agentlayer.LayerKindOrchestration {
+			p := agentlayer.OrchestrationPolicy{
+				ClaimArbitrage:     agentlayer.ConflictSerialiseThenMerge,
+				FanOut:             agentlayer.FanModeParallel,
+				FanIn:              agentlayer.FanModePipeline,
+				ConflitMemeFichier: agentlayer.ConflictSerialiseThenMerge,
+				MaxConcurrency:     0,
+			}
+			c.Equipe = []string{"member-a@v1", "member-b@v1"}
+			c.Orchestration = &p
+		}
 		if err := agentlayer.Validate(c); err != nil {
 			t.Fatalf("kind %q must validate, got %v", k, err)
 		}

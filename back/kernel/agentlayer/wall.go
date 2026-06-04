@@ -1,50 +1,18 @@
 package agentlayer
 
 import (
-	"strings"
-
+	"github.com/steph-frtech/aidos/back/hooks/pretooluse/wall"
 	"github.com/steph-frtech/aidos/back/runtime/blockreason"
 )
 
-// aboveWaterlineSchemas are the truth schemas above the line — the SAME closed set
-// the S04 wall (back/hooks/pretooluse/wall.go) classifies. The wall's Classify lives
-// in package main (the hook binary) and is not importable; this mirrors its
-// predicate verbatim (same schemas, same on-disk truth prefixes) so the verdict is
-// identical. (OpenQuestion OQ-S52-wall: extract the S04 waterline predicate into an
-// importable package so MayWrite imports it instead of re-deriving it.)
-var aboveWaterlineSchemas = []string{"kernel", "mirrors", "fitness"}
-
-// aboveWaterlinePathPrefixes are the on-disk source zones that ARE truth — mirrors
-// the S04 wall's prefixes (back/kernel/** covers back/kernel/mirror/** by ADR 0002).
-var aboveWaterlinePathPrefixes = []string{
-	"back/kernel/",
-	"back/migrations/",
-}
-
 // aboveWaterline reports whether a write target string names a truth zone above the
-// waterline. It matches a bare schema name ("kernel"), a schema-qualified table
-// ("kernel.truth"/"kernel.agent_layer"), and an on-disk source path
-// ("back/kernel/..."). PURE and TOTAL — the same target always yields the same
-// verdict (the property mirror pins it). This IS the S04 wall predicate.
+// waterline. It is SINGLE-SOURCED through the extracted S04 wall classifier
+// (wall.IsAboveWaterline — OQ-S52-wall, resolved at BA03): the hook, this agentlayer
+// wall, and the agentimpl emitter all read the SAME predicate, no longer a verbatim
+// hand-copy. It matches a bare schema name ("kernel"), a schema-qualified table
+// ("kernel.truth"), and an on-disk source path ("back/kernel/..."). PURE and TOTAL.
 func aboveWaterline(target string) bool {
-	t := strings.ToLower(strings.TrimSpace(target))
-	t = strings.TrimPrefix(t, "/")
-
-	head := t
-	if i := strings.IndexAny(head, "./ \t"); i >= 0 {
-		head = head[:i]
-	}
-	for _, s := range aboveWaterlineSchemas {
-		if head == s {
-			return true
-		}
-	}
-	for _, p := range aboveWaterlinePathPrefixes {
-		if strings.HasPrefix(t, p) {
-			return true
-		}
-	}
-	return false
+	return wall.IsAboveWaterline(target)
 }
 
 // WriteDecision is MayWrite's verdict: allowed or denied, with the S13 BlockReason

@@ -1,0 +1,37 @@
+# 2026/06/04 10:04:01.691525 [TestProp_Knobs_ValidateAcceptsInRange] [rapid] draw role: 0
+# 2026/06/04 10:04:01.691530 [TestProp_Knobs_ValidateAcceptsInRange] [rapid] draw kind: 2
+# 2026/06/04 10:04:01.691531 [TestProp_Knobs_ValidateAcceptsInRange] [rapid] draw objectif: ""
+# 2026/06/04 10:04:01.691533 [TestProp_Knobs_ValidateAcceptsInRange] [rapid] draw provider: 0
+# 2026/06/04 10:04:01.691533 [TestProp_Knobs_ValidateAcceptsInRange] [rapid] draw propose: false
+# 2026/06/04 10:04:01.691534 [TestProp_Knobs_ValidateAcceptsInRange] [rapid] draw miroir: false
+# 2026/06/04 10:04:01.691535 [TestProp_Knobs_ValidateAcceptsInRange] [rapid] draw t: 1
+# 2026/06/04 10:04:01.691537 [TestProp_Knobs_ValidateAcceptsInRange] [rapid] draw mt: 0
+# 2026/06/04 10:04:01.691538 [TestProp_Knobs_ValidateAcceptsInRange] [rapid] draw mc: 0
+# 2026/06/04 10:04:01.691609 [TestProp_Knobs_ValidateAcceptsInRange] a well-formed knobful spec must validate, got agentlayer: an orchestration layer REQUIRES an OrchestrationPolicy
+# 
+v0.4.8#4534626453059466272
+0x0
+0x0
+0x0
+0x0
+0x38e38e38e38e4
+0x2
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

@@ -43,9 +43,26 @@ func drawProvider(rt *rapid.T) agentlayer.Provider {
 func drawAgent(rt *rapid.T) agentlayer.CoucheAgent {
 	roles := []string{"bdd-writer", "executor", "orchestrator", "reviewer", "explorer"}
 	role := roles[rapid.IntRange(0, len(roles)-1).Draw(rt, "role")]
+	kind := drawKind(rt)
+	// BA24 — a well-formed orchestration layer carries a non-empty team AND a policy
+	// bounded by the spec knob; any other kind carries NEITHER (kind-aware Validate).
+	var equipe []string
+	var orch *agentlayer.OrchestrationPolicy
+	if kind == agentlayer.LayerKindOrchestration {
+		equipe = []string{"member-a@v1", "member-b@v1"}
+		orch = &agentlayer.OrchestrationPolicy{
+			ClaimArbitrage:     agentlayer.ConflictSerialiseThenMerge,
+			FanOut:             agentlayer.FanModeParallel,
+			FanIn:              agentlayer.FanModePipeline,
+			ConflitMemeFichier: agentlayer.ConflictSerialiseThenMerge,
+			MaxConcurrency:     0, // 0 = bounded only by the spec knob (never a phantom)
+		}
+	}
 	return agentlayer.CoucheAgent{
-		Layer: records.AuthorityAbove,
-		Kind:  drawKind(rt),
+		Layer:         records.AuthorityAbove,
+		Kind:          kind,
+		Equipe:        equipe,
+		Orchestration: orch,
 		Spec: agentlayer.AgentSpec{
 			ID:                 "a-" + role,
 			Nom:                role,

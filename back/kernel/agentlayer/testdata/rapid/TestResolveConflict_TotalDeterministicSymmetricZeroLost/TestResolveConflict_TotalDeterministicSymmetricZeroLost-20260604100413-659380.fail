@@ -1,0 +1,27 @@
+# 2026/06/04 10:04:13.373101 [TestResolveConflict_TotalDeterministicSymmetricZeroLost] [rapid] draw a.agent: "b@v1"
+# 2026/06/04 10:04:13.373105 [TestResolveConflict_TotalDeterministicSymmetricZeroLost] [rapid] draw a.target: "file-x"
+# 2026/06/04 10:04:13.373106 [TestResolveConflict_TotalDeterministicSymmetricZeroLost] [rapid] draw a.layer: "??"
+# 2026/06/04 10:04:13.373108 [TestResolveConflict_TotalDeterministicSymmetricZeroLost] [rapid] draw a.hash: "ab"
+# 2026/06/04 10:04:13.373108 [TestResolveConflict_TotalDeterministicSymmetricZeroLost] [rapid] draw b.agent: "b@v1"
+# 2026/06/04 10:04:13.373109 [TestResolveConflict_TotalDeterministicSymmetricZeroLost] [rapid] draw b.target: "file-y"
+# 2026/06/04 10:04:13.373110 [TestResolveConflict_TotalDeterministicSymmetricZeroLost] [rapid] draw b.layer: "??"
+# 2026/06/04 10:04:13.373111 [TestResolveConflict_TotalDeterministicSymmetricZeroLost] [rapid] draw b.hash: "ab"
+# 2026/06/04 10:04:13.373112 [TestResolveConflict_TotalDeterministicSymmetricZeroLost] ResolveConflict must be symmetric: winner {Agent:b@v1 Target:file-y Layer:?? ContentHash:ab} vs {Agent:b@v1 Target:file-x Layer:?? ContentHash:ab}
+# 
+v0.4.8#5893835831800588771
+0x0
+0x1
+0x0
+0x0
+0x6b74f03291620
+0x4
+0x0
+0x1
+0x0
+0x1
+0x0
+0x1
+0x6b74f03291620
+0x4
+0x0
+0x1

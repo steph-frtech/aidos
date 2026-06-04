@@ -96,6 +96,39 @@ func IsKnownProvider(p Provider) bool {
 	return false
 }
 
+// knownModelsByProvider is the CLOSED model set, keyed by provider — pinned here,
+// never discovered at runtime. A model a step needs is ADDED to this declared set
+// (above the line, via /goal); it is never inferred. A retired/non-existent model
+// fails the gate at projection time (agentimpl.Project), never opaquely at the
+// provider. Mirrors the closed-set discipline of providerOrder/IsKnownProvider.
+var knownModelsByProvider = map[Provider][]string{
+	ProviderAnthropic: {"claude-opus-4-8", "claude-sonnet-4-5", "claude-haiku-4-5"},
+	ProviderOpenAI:    {"gpt-5", "gpt-5-mini", "o4"},
+	ProviderGoogle:    {"gemini-3-pro", "gemini-3-flash"},
+}
+
+// ModelsFor returns a FRESH copy of the closed model set declared for provider p, in
+// canonical order. An unknown provider yields an empty slice (fail-closed). The
+// caller can never mutate the canonical set.
+func ModelsFor(p Provider) []string {
+	src := knownModelsByProvider[p]
+	out := make([]string, len(src))
+	copy(out, src)
+	return out
+}
+
+// IsKnownModel reports whether model is a member of the closed model set declared
+// for provider p. It is the model-axis twin of IsKnownProvider: a closed, per-provider
+// set, fail-closed (an unknown provider OR an undeclared model ⇒ false). Pure, total.
+func IsKnownModel(p Provider, model string) bool {
+	for _, m := range knownModelsByProvider[p] {
+		if m == model {
+			return true
+		}
+	}
+	return false
+}
+
 // AgentSpec is the governed-rights core of a CoucheAgent. Rights are DECLARED,
 // never learned (CLAUDE.md §8). PeutModifierNoyau and PeutModifierFitness are
 // STRUCTURAL guarantees of the wall — they are not toggles a screen can flip; a
@@ -119,6 +152,29 @@ type AgentSpec struct {
 	ZonesLecture   []string `json:"zones_lecture"`   // schemas/paths it may read
 	ZonesEcriture  []string `json:"zones_ecriture"`  // schemas/paths it may write — NONE above the waterline
 	StopConditions []string `json:"stop_conditions"` // declared halt rules (e.g. "red set still red")
+
+	// BA01 — GOVERNED BEHAVIOUR KNOBS. Every knob projection and replay depend on
+	// lives HERE, in the governed layer (above the line), NEVER in a providerCfg
+	// (a providerCfg carries only the resolved endpoint/credential — BA03). A knob
+	// not declared here is a determinism gap (CLAUDE.md §6/§8). Validate is
+	// kind-aware and the empty defaults are MAX confinement, fail-closed.
+	Temperature         float64        `json:"temperature"`           // sampling temperature, range [0,2]; 0 = most deterministic
+	MaxTurns            int            `json:"max_turns"`             // hard cap on agent turns (≥ 0)
+	Seed                string         `json:"seed"`                  // replay seed; if empty, derive deterministically via DeriveSeed(impl‖pack‖item) — NEVER an RNG
+	AllowedNetworkHosts []string       `json:"allowed_network_hosts"` // egress allow-list; EMPTY ⇒ no egress (fail-closed)
+	AllowedExec         []string       `json:"allowed_exec"`          // subprocess allow-list; EMPTY ⇒ no subprocess (fail-closed)
+	ResourceLimits      ResourceLimits `json:"resource_limits"`       // cgroup/ulimit caps
+	MaxConcurrency      int            `json:"max_concurrency"`       // max concurrent leases/agents (≥ 0; BA24/BA25 enforce it)
+}
+
+// ResourceLimits are the declared cgroup/ulimit caps for an agent run (BA01). They are
+// DECLARED in the governed layer, never discovered at runtime. A zero value means
+// "unbounded for that axis" only insofar as the runtime applies no extra cap — but a
+// NEGATIVE value is always invalid (Validate rejects it, fail-closed).
+type ResourceLimits struct {
+	MaxMemoryMB    int `json:"max_memory_mb"`    // memory ceiling (MB, ≥ 0)
+	MaxCPUMillis   int `json:"max_cpu_millis"`   // CPU quota (milli-cores, ≥ 0)
+	MaxWallSeconds int `json:"max_wall_seconds"` // wall-clock budget (seconds, ≥ 0)
 }
 
 // SkillBinding — a Skill the agent may replay (S35 generic gesture). Enabled is the
@@ -168,19 +224,24 @@ type WritePolicy struct {
 // verbatim — it does NOT fork them. The Layer base is the S02 metamodel record;
 // authority is ALWAYS above the line (a CoucheAgent is a SOURCE/truth, KRD §21).
 type CoucheAgent struct {
-	Layer              records.Authority        `json:"layer"` // the S02 waterline placement (always "above")
-	Kind               LayerKind                `json:"kind"`  // agent | equipe_agents | orchestration
-	Spec               AgentSpec                `json:"spec"`
-	SkillsAutorises    []SkillBinding           `json:"skills_autorises"`
-	OutilsMCPAutorises []MCPBinding             `json:"outils_mcp_autorises"`
-	HooksObligatoires  []AgentHookPolicy        `json:"hooks_obligatoires"` // non-bypassable hooks the agent MUST run under
-	PolitiqueMemoire   AgentContextPolicy       `json:"politique_memoire"`  // memory read policy (defers to S30 firewall)
-	PolitiqueContexte  AgentContextPolicy       `json:"politique_contexte"`
-	PolitiqueEcriture  WritePolicy              `json:"politique_ecriture"` // what it may write — NONE above the line
-	PolitiqueEvolution EvolutionAgentPolicy     `json:"politique_evolution"`
-	Autorite           authority.AuthorityGraph `json:"autorite"` // S16 — who approves the agent's proposals
-	Scope              scope.TruthScope         `json:"scope"`    // S15 — where/when the agent layer holds
-	Version            string                   `json:"version"`  // == Spec.ID (content-addressed, S02)
+	Layer              records.Authority    `json:"layer"` // the S02 waterline placement (always "above")
+	Kind               LayerKind            `json:"kind"`  // agent | equipe_agents | orchestration
+	Spec               AgentSpec            `json:"spec"`
+	SkillsAutorises    []SkillBinding       `json:"skills_autorises"`
+	OutilsMCPAutorises []MCPBinding         `json:"outils_mcp_autorises"`
+	HooksObligatoires  []AgentHookPolicy    `json:"hooks_obligatoires"` // non-bypassable hooks the agent MUST run under
+	PolitiqueMemoire   AgentContextPolicy   `json:"politique_memoire"`  // memory read policy (defers to S30 firewall)
+	PolitiqueContexte  AgentContextPolicy   `json:"politique_contexte"`
+	PolitiqueEcriture  WritePolicy          `json:"politique_ecriture"` // what it may write — NONE above the line
+	PolitiqueEvolution EvolutionAgentPolicy `json:"politique_evolution"`
+	// BA24 — orchestration. A LayerKindOrchestration REQUIRES a non-empty Equipe AND a
+	// well-formed OrchestrationPolicy; a non-orchestration layer must carry NEITHER
+	// (Validate is kind-aware). The team is a list of member CoucheAgent @versions.
+	Equipe        []string                 `json:"equipe,omitempty"`        // team member @versions (orchestration only)
+	Orchestration *OrchestrationPolicy     `json:"orchestration,omitempty"` // coordination rules (orchestration only)
+	Autorite      authority.AuthorityGraph `json:"autorite"`                // S16 — who approves the agent's proposals
+	Scope         scope.TruthScope         `json:"scope"`                   // S15 — where/when the agent layer holds
+	Version       string                   `json:"version"`                 // == Spec.ID (content-addressed, S02)
 }
 
 // Validation errors.
@@ -240,6 +301,34 @@ func Validate(c CoucheAgent) error {
 	for _, z := range c.PolitiqueEcriture.AllowedWriteZones {
 		if aboveWaterline(z) {
 			return fmt.Errorf("%w: %q", ErrWriteZoneAboveWaterline, z)
+		}
+	}
+	// BA01 — the governed behaviour knobs are in range (fail-closed: out-of-range ⇒
+	// invalid). Kind-aware: the ranges hold for every layer-kind; the empty
+	// network/exec allow-lists are MAX confinement (enforced by EgressAllowed /
+	// ExecAllowed, not a range — an empty list is the valid, most-confined default).
+	if err := validateKnobs(c.Spec); err != nil {
+		return err
+	}
+	// BA24 — KIND-AWARE orchestration guard. An `orchestration` layer REQUIRES a
+	// non-empty team AND a well-formed OrchestrationPolicy (bounded by the spec's BA01
+	// MaxConcurrency knob — gap F1); a non-orchestration layer must carry NEITHER.
+	if c.Kind == LayerKindOrchestration {
+		if c.Orchestration == nil {
+			return ErrOrchestrationNeedsPolicy
+		}
+		if len(c.Equipe) == 0 {
+			return ErrOrchestrationNeedsTeam
+		}
+		if err := validatePolicy(*c.Orchestration, c.Spec.MaxConcurrency); err != nil {
+			return err
+		}
+	} else {
+		if c.Orchestration != nil {
+			return ErrNonOrchestrationCarriesPolicy
+		}
+		if len(c.Equipe) > 0 {
+			return ErrNonOrchestrationCarriesTeam
 		}
 	}
 	// A CoucheAgent is a SOURCE/truth — it must be above the waterline.
