@@ -132,6 +132,159 @@ const (
 	// S43 (the RealityMirror) — additive enum extension (change_type: refine, never a removal);
 	// recorded by a ChangeSet + SemanticDiff + ADR.
 	CodeRealityCannotDeclareTruth Code = "REALITY_CANNOT_DECLARE_TRUTH"
+	// CodeAgentToolNotBound — a governed build-agent attempted to exercise an MCP
+	// (server, tool) that is NOT present as an Enabled binding in its resolved
+	// AgentImplementation (back/runtime/agentimpl, BA07). This is the CAPACITY axis of
+	// the wall: the S04/S52 wall applies the ZONE axis (AGENT_WRITE_ABOVE_WATERLINE —
+	// deny truth zones), this code applies the capability axis (default-deny — an
+	// agent may only use a tool its governed layer explicitly granted). A capability
+	// is never widened below the line: the only door to grant a new tool is the
+	// governed layer (idée → miroir → /goal → approbation). ADDED at BA07 (the
+	// CAPACITY-axis enforcer ToolAllowed) — additive enum extension (change_type:
+	// refine, never a removal); recorded by a ChangeSet + SemanticDiff + ADR.
+	CodeAgentToolNotBound Code = "AGENT_TOOL_NOT_BOUND"
+	// CodeAgentSkillNotBound — a governed build-agent attempted to use a skill that is
+	// NOT present as an Enabled binding in its resolved AgentImplementation
+	// (back/runtime/agentimpl, BA08). This is the SKILL axis of the wall — the 3rd of
+	// the four declared axes. The S04/S52 wall applies the ZONE axis
+	// (AGENT_WRITE_ABOVE_WATERLINE — deny truth zones), BA07 the CAPACITY axis
+	// (AGENT_TOOL_NOT_BOUND — default-deny an unbound MCP tool); this code applies the
+	// skill axis (default-deny — an agent may only use a skill its governed layer
+	// explicitly granted). Without it SkillBinding.Enabled is mere documentation: an
+	// ungoverned skill is the same leak class as an ungoverned tool. A skill is never
+	// widened below the line: the only door to grant a new skill is the governed layer
+	// (idée → miroir → /goal → approbation). ADDED at BA08 (the SKILL-axis enforcer
+	// SkillAllowed) — additive enum extension (change_type: refine, never a removal);
+	// recorded by a ChangeSet + SemanticDiff + ADR.
+	CodeAgentSkillNotBound Code = "AGENT_SKILL_NOT_BOUND"
+	// CodeAgentPathNotAllowed — a governed build-agent attempted to write/read a path
+	// NOT covered by its resolved AgentImplementation.AllowedPaths (or covered by a
+	// ForbiddenPaths prefix) — back/runtime/agentimpl, BA09. This is the CONFINEMENT
+	// axis of the wall, an ALLOW-LIST that is DISTINCT from the ZONE deny-list: the
+	// S04/S52 wall (AGENT_WRITE_ABOVE_WATERLINE) refuses the truth zones above the
+	// waterline; this code refuses everything NOT explicitly inside the agent's
+	// declared writable root (default-deny — an empty AllowedPaths denies every path,
+	// the max-confinement default). A path is never widened below the line: the only
+	// door to grant a new writable zone is the governed layer (idée → miroir → /goal →
+	// approbation). ADDED at BA09 (the CONFINEMENT enforcer PathAllowed) — additive enum
+	// extension (change_type: refine, never a removal); recorded by a ChangeSet +
+	// SemanticDiff + ADR.
+	CodeAgentPathNotAllowed Code = "AGENT_PATH_NOT_ALLOWED"
+	// CodeAgentEgressNotAllowed — a governed build-agent attempted to reach a network
+	// host NOT present in its resolved AgentImplementation.AllowedNetworkHosts
+	// (back/runtime/agentimpl, BA09). The network-confinement axis: an EMPTY allow-list
+	// denies EVERY host (no egress by default — fail-closed). A host is never widened
+	// below the line: the only door is the governed layer (idée → miroir → /goal →
+	// approbation). ADDED at BA09 — additive enum extension (change_type: refine, never
+	// a removal); recorded by a ChangeSet + SemanticDiff + ADR.
+	CodeAgentEgressNotAllowed Code = "AGENT_EGRESS_NOT_ALLOWED"
+	// CodeAgentExecNotAllowed — a governed build-agent attempted to run a subprocess
+	// (command) NOT present in its resolved AgentImplementation.AllowedExec
+	// (back/runtime/agentimpl, BA09). The exec-confinement axis: an EMPTY allow-list
+	// denies EVERY command (no subprocess by default — fail-closed). The agent's Bash is
+	// itself gated — every command passes ExecAllowed, never a free shell. A command is
+	// never widened below the line: the only door is the governed layer (idée → miroir →
+	// /goal → approbation). ADDED at BA09 — additive enum extension (change_type: refine,
+	// never a removal); recorded by a ChangeSet + SemanticDiff + ADR.
+	CodeAgentExecNotAllowed Code = "AGENT_EXEC_NOT_ALLOWED"
+	// CodeAgentMandatoryHookSkipped — the turn-acceptance gate refused a governed
+	// build-agent's turn because a HooksObligatoires{Mandatory:true} declared in its
+	// resolved AgentImplementation NEVER RAN (no verdict from its hook binary) —
+	// back/runtime/agentimpl, BA10. This is the HOOK axis of acceptance: the four wall
+	// axes (zone/capacity/skill/confinement) gate what an action may TOUCH; this gates
+	// whether a TURN may be ACCEPTED. A turn is admissible ONLY when every mandatory
+	// hook actually ran (presence of the verdict, from the binary's own deterministic
+	// exit — NEVER the agent's transcript, §8). A mandatory hook is never waived below
+	// the line: the only door to change which hooks are mandatory is the governed layer
+	// (idée → miroir → /goal → approbation). ADDED at BA10 (the MANDATORY-HOOK enforcer
+	// HooksSatisfied) — additive enum extension (change_type: refine, never a removal);
+	// recorded by a ChangeSet + SemanticDiff + ADR.
+	CodeAgentMandatoryHookSkipped Code = "AGENT_MANDATORY_HOOK_SKIPPED"
+	// CodeAgentMandatoryHookRed — the turn-acceptance gate refused a governed
+	// build-agent's turn because a HooksObligatoires{Mandatory:true} RAN but is NOT
+	// GREEN (the hook binary returned a failing verdict) — back/runtime/agentimpl, BA10.
+	// PRESENCE ≠ GREEN: a mandatory hook that ran and failed blocks acceptance just as a
+	// skipped one does. The verdict comes from the hook BINARY's own deterministic exit/
+	// BlockReason, never an agent-self-reported set (§8 — the judge is deterministic).
+	// ADDED at BA10 (the MANDATORY-HOOK enforcer HooksSatisfied) — additive enum
+	// extension (change_type: refine, never a removal); recorded by a ChangeSet +
+	// SemanticDiff + ADR.
+	CodeAgentMandatoryHookRed Code = "AGENT_MANDATORY_HOOK_RED"
+	// CodeAgentBudgetExceeded — a governed build-agent's run BREACHED its declared
+	// budget on at least one axis (tokens / turns / ci-minutes / wall-clock) —
+	// back/runtime/agentimpl (budget.go), BA11. The effective per-axis cap is the
+	// MINIMUM of the two declarations that share that axis: goal.Budgets (S29, the
+	// secondary anti-runaway guard) and economics.HarnessCostBudget (S51, the harness
+	// economy cap). The tightest cap wins (fail-closed): a run is within budget IFF the
+	// measured cost is ≤ min(cap_S29, cap_S51) on EVERY shared axis AND ≤ each axis's
+	// single declared cap otherwise. Cost is COST-AWARE (tokens × the declared model
+	// rate → a unit comparable across an équipe) and includes a wall-clock DEADLINE (a
+	// hung agent burns time without burning tokens). The verdict is PURE and the gate
+	// is the authoritative deterministic min() — never an LLM judgment (§8). ADDED at
+	// BA11 (the RunMeter + CheckBudget gate) — additive enum extension (change_type:
+	// refine, never a removal); recorded by a ChangeSet + SemanticDiff + ADR.
+	CodeAgentBudgetExceeded Code = "AGENT_BUDGET_EXCEEDED"
+	// CodeAgentDeterminismGap — the determinism-first ARBITER (back/runtime/agentimpl,
+	// arbiter.go, BA12) refused an action that would have asked the LLM to do what a
+	// DETERMINISTIC TOOL can already do: a diff (jj/Myers), a search (rg), a format
+	// (biome/gofmt), a codegen (S34 emitters) or a validate (kernel validators). The
+	// intent is classified from the action's STRUCTURE (tool name + args), NEVER from a
+	// model-supplied label — re-labelling the displayed intent cannot change the verdict,
+	// only the structure can. An agent doing what a pure function could is a determinism
+	// gap that BLOCKS the action (CLAUDE.md §6/§8 — the LLM is the gated exception, only
+	// for irreducible generation). ADDED at BA12 (the Arbitrate gate) — additive enum
+	// extension (change_type: refine, never a removal); recorded by a ChangeSet +
+	// SemanticDiff + ADR.
+	CodeAgentDeterminismGap Code = "AGENT_DETERMINISM_GAP"
+	// CodeAgentPostCheckFailed — the deterministic POST-CHECK (back/runtime/agentloop,
+	// postcheck.go, BA16) refused to ACCEPT an action's claimed effect AFTER it ran. The
+	// gate (BA13) decided BEFORE; the post-check decides AFTER, per the action's NATURE:
+	// a code-changing action (write / run_mirror) is accepted ONLY when the relevant
+	// mirror/sensor AGREES the red-set mirror went green (goal.SensorState — the agent's
+	// claimed confidence is never trusted, §8: done is computed); a propose is accepted
+	// only when its proposal passes a SHAPE-check (the cause_sketch is a hypothesis, never
+	// a truth); a read is accepted only when it lands NO side effect (a read that flips a
+	// sensor is a read with side effects, refused). An action whose NATURE carries no
+	// deterministic post-check is ITSELF a determinism gap that refuses to accept the
+	// effect (CLAUDE.md §6/§8 — the judge is the mirror, EVERY action re-checked, not only
+	// the code-changing ones). ADDED at BA16 — additive enum extension (change_type:
+	// refine, never a removal); recorded by a ChangeSet + SemanticDiff + ADR.
+	CodeAgentPostCheckFailed Code = "AGENT_POSTCHECK_FAILED"
+	// CodeAgentIdentityUnverified — a call to an MCP server (agentimpl/scheduler/agentloop)
+	// arrived WITHOUT a valid capability token, or with a token that does NOT bind the
+	// calling process to exactly the CoucheAgent@version the server expects (gap K3, BA18).
+	// The identity of the writer is PROVEN, never chain-declared: owner_agent/owner is not a
+	// field the caller fills, it is DERIVED from a content-hash token the loop presents and
+	// the server re-derives and matches. A missing token, a malformed token, or a token for
+	// ANOTHER identity (a different LayerRef) all refuse here, fail-closed — the server never
+	// trusts a self-asserted owner. ADDED at BA18 — additive enum extension (change_type:
+	// refine, never a removal); recorded by a ChangeSet + SemanticDiff + ADR.
+	CodeAgentIdentityUnverified Code = "AGENT_IDENTITY_UNVERIFIED"
+	// CodeAgentLeaseFenced — the write-path FENCING gate (back/runtime/scheduler,
+	// lease.go, BA22) refused an agent write whose LeaseEpoch is STALE: the item it
+	// targets has since been re-leased (its current lease_epoch is strictly greater
+	// than the epoch the write carries), so the writer is an agent woken late after its
+	// lease expired and the item was reclaimed by another. Accepting the write would be a
+	// LOST UPDATE (gap E2). The fence is a deterministic comparison — write.epoch ==
+	// item.lease_epoch ⇒ live, write.epoch < item.lease_epoch ⇒ stale (refused), a future
+	// epoch is impossible (refused too). The verdict is the scheduler-role UPDATE's own
+	// epoch check / the gate's pure compare, never an LLM judgment (§8). ADDED at BA22 (the
+	// lease/expire engine + write-path fencing) — additive enum extension (change_type:
+	// refine, never a removal); recorded by a ChangeSet + SemanticDiff + ADR.
+	CodeAgentLeaseFenced Code = "AGENT_LEASE_FENCED"
+	// CodeProposalNotAdmitted — the BA31 apply gate (back/runtime/agentloop, applygate.go)
+	// refused a Proposal whose Status field READS "admitted" but for which NO corresponding
+	// S16 authority record actually admits it. The transition proposed→admitted lives in S16
+	// (authority.Decide); BA31 re-asserts it at the apply seam: the agent builds structs
+	// FREELY (a buggy/malicious loop can forge Proposal{Status:"admitted"} in memory), so the
+	// apply NEVER trusts the self-asserted field — it RE-DERIVES the admission verdict from the
+	// authority graph + the roles actually granted, and admits ONLY when authority.Decide
+	// returns `admitted`. A forged "admitted" with no admitting authority record is refused
+	// here, fail-closed — the wall holds (the reality on-ramp PROPOSES a draft idea; it never
+	// applies a truth). ADDED at BA31 (the reality-to-idea on-ramp + provenance-verified
+	// apply) — additive enum extension (change_type: refine, never a removal); recorded by a
+	// ChangeSet + SemanticDiff + ADR.
+	CodeProposalNotAdmitted Code = "PROPOSAL_NOT_ADMITTED"
 )
 
 // Severity is the gravity marker of a refusal. The KRD §44.5 example uses
@@ -369,6 +522,223 @@ var reasons = map[Code]BlockReason{
 			"rerun aidos check : le blocage est permanent sur l'arête directe ; la seule sortie est l'idée DRAFT remise à l'idea-intake (S27), qui doit encore acquérir son miroir.",
 		},
 	},
+	CodeAgentToolNotBound: {
+		Code:     CodeAgentToolNotBound,
+		Severity: SeverityBlocking,
+		Explanation: "Refus du mur — axe CAPACITÉ : l'agent gouverné tente d'exercer un outil MCP " +
+			"(server, tool) qui n'est PAS un binding `Enabled` de son implémentation résolue " +
+			"(back/runtime/agentimpl, BA07). Le mur S04/S52 applique l'axe ZONE (refus des zones de " +
+			"vérité) ; ceci applique l'axe capacité : un agent ne peut utiliser qu'un outil que sa " +
+			"couche gouvernée a explicitement accordé (default-deny — ce qui n'est pas lié est refusé). " +
+			"Une capacité ne s'élargit jamais sous la ligne : la gouvernance ne peut que rétrécir.",
+		HowToFix: []string{
+			"add_binding_via_governed_layer : pour accorder cet outil, ajoutez un OutilMCPAutorisé `Enabled` à la CoucheAgent (la SOURCE, au-dessus de la ligne) — la seule porte est idée → miroir → /goal → approbation humaine.",
+			"governance_only_narrows : l'implémentation projetée est un sous-ensemble prouvable de la couche gouvernée ; aucune écriture sous la ligne ni depuis l'écran n'élargit la surface de capacité.",
+			"rerun aidos check : le blocage se lève dès que (server, tool) est un binding activé de l'implémentation résolue.",
+		},
+	},
+	CodeAgentSkillNotBound: {
+		Code:     CodeAgentSkillNotBound,
+		Severity: SeverityBlocking,
+		Explanation: "Refus du mur — axe SKILL : l'agent gouverné tente d'utiliser un skill qui " +
+			"n'est PAS un binding `Enabled` de son implémentation résolue " +
+			"(back/runtime/agentimpl, BA08). C'est le 3ᵉ des quatre axes déclarés : le mur " +
+			"S04/S52 applique l'axe ZONE (refus des zones de vérité), BA07 l'axe CAPACITÉ " +
+			"(refus d'un outil MCP non lié) ; ceci applique l'axe skill : un agent ne peut " +
+			"utiliser qu'un skill que sa couche gouvernée a explicitement accordé " +
+			"(default-deny — ce qui n'est pas lié est refusé). Sans cet enforcer, " +
+			"`SkillBinding.Enabled` n'est que de la documentation : un skill ungouverné est " +
+			"la même classe de fuite qu'un outil ungouverné. Une capacité ne s'élargit " +
+			"jamais sous la ligne : la gouvernance ne peut que rétrécir.",
+		HowToFix: []string{
+			"add_binding_via_governed_layer : pour accorder ce skill, ajoutez un SkillAutorisé `Enabled` à la CoucheAgent (la SOURCE, au-dessus de la ligne) — la seule porte est idée → miroir → /goal → approbation humaine.",
+			"governance_only_narrows : l'implémentation projetée est un sous-ensemble prouvable de la couche gouvernée ; aucune écriture sous la ligne ni depuis l'écran n'élargit la surface de skills.",
+			"rerun aidos check : le blocage se lève dès que le skill est un binding activé de l'implémentation résolue.",
+		},
+	},
+	CodeAgentPathNotAllowed: {
+		Code:     CodeAgentPathNotAllowed,
+		Severity: SeverityBlocking,
+		Explanation: "Refus du mur — axe CONFINEMENT : l'agent gouverné vise un chemin qui n'est PAS " +
+			"couvert par sa liste d'autorisation `AllowedPaths` (ou il tombe sous un préfixe " +
+			"`ForbiddenPaths`) — back/runtime/agentimpl, BA09. C'est une ALLOW-LIST, DISTINCTE de la " +
+			"deny-list de ZONE : le mur S04/S52 (AGENT_WRITE_ABOVE_WATERLINE) refuse les zones de " +
+			"vérité au-dessus de la ligne ; ce code refuse tout ce qui n'est PAS explicitement dans " +
+			"la racine inscriptible déclarée de l'agent (default-deny — une `AllowedPaths` vide refuse " +
+			"tout chemin, confinement maximal). Une zone ne s'élargit jamais sous la ligne.",
+		HowToFix: []string{
+			"add_allowed_path_via_governed_layer : pour accorder ce chemin, ajoutez-le aux zones d'écriture de la CoucheAgent (la SOURCE, au-dessus de la ligne) — la seule porte est idée → miroir → /goal → approbation humaine.",
+			"keep_out_of_forbidden : assurez-vous que le chemin ne tombe pas sous un préfixe `ForbiddenPaths` (le mur est toujours porté par la projection) ; la racine inscriptible est l'arbre de l'app, pas /kernel ni /mirrors.",
+			"rerun aidos check : le blocage se lève dès que le chemin est couvert par un préfixe `AllowedPaths` et hors `ForbiddenPaths`.",
+		},
+	},
+	CodeAgentEgressNotAllowed: {
+		Code:     CodeAgentEgressNotAllowed,
+		Severity: SeverityBlocking,
+		Explanation: "Refus du mur — axe CONFINEMENT RÉSEAU : l'agent gouverné tente de joindre un host " +
+			"réseau qui n'est PAS dans sa liste `AllowedNetworkHosts` (back/runtime/agentimpl, BA09). " +
+			"Une `AllowedNetworkHosts` vide refuse TOUT host (aucun egress par défaut — fail-closed). " +
+			"Un host ne s'élargit jamais sous la ligne.",
+		HowToFix: []string{
+			"add_allowed_host_via_governed_layer : pour accorder ce host, ajoutez-le aux hosts réseau autorisés de la CoucheAgent (la SOURCE) — la seule porte est idée → miroir → /goal → approbation humaine.",
+			"egress_is_fail_closed : par défaut aucun egress n'est permis ; déclarez explicitement chaque host requis (registry, API du provider…).",
+			"rerun aidos check : le blocage se lève dès que le host est un membre déclaré de `AllowedNetworkHosts`.",
+		},
+	},
+	CodeAgentExecNotAllowed: {
+		Code:     CodeAgentExecNotAllowed,
+		Severity: SeverityBlocking,
+		Explanation: "Refus du mur — axe CONFINEMENT EXEC : l'agent gouverné tente d'exécuter une commande " +
+			"qui n'est PAS dans sa liste `AllowedExec` (back/runtime/agentimpl, BA09). Une `AllowedExec` " +
+			"vide refuse TOUTE commande (aucun sous-processus par défaut — fail-closed). Le `Bash` de " +
+			"l'agent est lui-même gaté : toute commande passe par `ExecAllowed`, jamais un shell libre.",
+		HowToFix: []string{
+			"add_allowed_exec_via_governed_layer : pour accorder cette commande, ajoutez-la aux exécutables autorisés de la CoucheAgent (la SOURCE) — la seule porte est idée → miroir → /goal → approbation humaine.",
+			"exec_is_fail_closed : par défaut aucun sous-processus n'est permis ; déclarez explicitement chaque exécutable requis (go, npm…) — jamais un shell libre.",
+			"rerun aidos check : le blocage se lève dès que la commande est un membre déclaré de `AllowedExec`.",
+		},
+	},
+	CodeAgentMandatoryHookSkipped: {
+		Code:     CodeAgentMandatoryHookSkipped,
+		Severity: SeverityBlocking,
+		Explanation: "Refus de l'ACCEPTATION DU TOUR — axe HOOK : un hook OBLIGATOIRE " +
+			"(HooksObligatoires{Mandatory:true}) déclaré dans l'implémentation résolue de l'agent " +
+			"gouverné n'a JAMAIS tourné (aucun verdict de son binaire) — back/runtime/agentimpl, BA10. " +
+			"Les quatre axes du mur (zone/capacité/skill/confinement) gatent ce qu'une action peut " +
+			"TOUCHER ; ceci gate si un TOUR peut être ACCEPTÉ : un tour n'est admissible que si chaque " +
+			"hook obligatoire a réellement tourné. Présence du verdict = exit déterministe du BINAIRE " +
+			"hook, jamais le transcript auto-rapporté de l'agent (CLAUDE.md §8 — le juge est déterministe).",
+		HowToFix: []string{
+			"run_the_mandatory_hook : exécutez le hook obligatoire manquant (sa phase PreToolUse/PostToolUse/Stop/SessionStart) — l'acceptation est gatée sur des hooks VERTS, jamais sur leur seule déclaration.",
+			"verdict_from_the_binary : fournissez le verdict produit par le BINAIRE du hook (exit/BlockReason), jamais un set de noms rapporté par l'agent — un hook qui ne tourne pas est mort.",
+			"change_mandatory_via_governed_layer : pour qu'un hook cesse d'être obligatoire, modifiez la CoucheAgent (la SOURCE, au-dessus de la ligne) — la seule porte est idée → miroir → /goal → approbation humaine ; jamais une dispense sous la ligne.",
+			"rerun aidos check : le blocage se lève dès que tout hook obligatoire a tourné ET est vert.",
+		},
+	},
+	CodeAgentMandatoryHookRed: {
+		Code:     CodeAgentMandatoryHookRed,
+		Severity: SeverityBlocking,
+		Explanation: "Refus de l'ACCEPTATION DU TOUR — axe HOOK : un hook OBLIGATOIRE " +
+			"(HooksObligatoires{Mandatory:true}) a TOURNÉ mais n'est PAS VERT (son binaire a renvoyé un " +
+			"verdict en échec) — back/runtime/agentimpl, BA10. PRÉSENCE ≠ VERT : un hook obligatoire qui " +
+			"a tourné et échoué bloque l'acceptation autant qu'un hook sauté. Le verdict provient de " +
+			"l'exit/BlockReason déterministe du BINAIRE du hook, jamais d'un set auto-rapporté par " +
+			"l'agent (CLAUDE.md §8 — le juge est déterministe, jamais le transcript).",
+		HowToFix: []string{
+			"fix_what_the_hook_flags : lisez le BlockReason renvoyé par le binaire du hook et corrigez la cause (le mur franchi, la complétude violée, le sensor rouge) — passez le hook au VERT.",
+			"presence_is_not_green : un hook présent mais rouge ne suffit pas ; l'acceptation exige des hooks obligatoires VERTS, pas seulement exécutés.",
+			"rerun aidos check : le blocage se lève dès que le hook obligatoire rouge redevient vert.",
+		},
+	},
+	CodeAgentBudgetExceeded: {
+		Code:     CodeAgentBudgetExceeded,
+		Severity: SeverityBlocking,
+		Explanation: "Refus du BUDGET DE RUN : le run de l'agent gouverné a DÉPASSÉ son budget déclaré sur " +
+			"au moins un axe (tokens / turns / ci-minutes / wall-clock) — back/runtime/agentimpl (budget.go), " +
+			"BA11. Le cap effectif par axe partagé est le MINIMUM des deux déclarations : goal.Budgets (S29, " +
+			"le garde-fou anti-runaway secondaire) ET economics.HarnessCostBudget (S51, le cap d'économie du " +
+			"harnais) — le cap le plus serré gagne (fail-closed). Le coût est COST-AWARE (tokens × le taux " +
+			"modèle déclaré) et inclut une DEADLINE wall-clock (un agent hung brûle du temps sans brûler de " +
+			"tokens). Le gate est le min() déterministe autoritaire, jamais un jugement de l'agent (§8).",
+		HowToFix: []string{
+			"reduce_run_cost : ramenez le coût du run sous le cap dépassé — moins de tours, moins de tokens, un run plus court ; le compteur est monotone, il ne fait que croître.",
+			"tightest_cap_wins : le cap effectif est min(goal.Budgets, economics.HarnessCostBudget) sur l'axe partagé ; relever UN seul des deux ne lève pas le blocage si l'autre reste serré.",
+			"raise_budget_via_goal : si un cap déclaré est trop bas, RELEVEZ-le via un /goal (la zone fitness pour HarnessCostBudget, le corps du goal pour Budgets) — jamais une édition directe ; l'agent est SELECT-only sur fitness.",
+			"rerun aidos check : le blocage se lève dès que le coût mesuré repasse ≤ min() des caps sur chaque axe.",
+		},
+	},
+	CodeAgentDeterminismGap: {
+		Code:     CodeAgentDeterminismGap,
+		Severity: SeverityBlocking,
+		Explanation: "Refus de l'ARBITRE determinism-first : l'action voulait confier au LLM ce qu'un OUTIL " +
+			"DÉTERMINISTE sait déjà faire — un diff (jj/Myers), une recherche (rg), un format (biome/gofmt), " +
+			"une génération de code (émetteurs S34) ou une validation (validateurs kernel) — back/runtime/agentimpl " +
+			"(arbiter.go), BA12. L'intent est classifié depuis la STRUCTURE de l'action (nom d'outil + args), " +
+			"jamais depuis un label fourni par le modèle : ré-étiqueter l'intent affiché ne change pas le verdict, " +
+			"seule la structure le peut. Un agent qui fait ce qu'une fonction pure pourrait faire est un " +
+			"determinism gap qui bloque l'action (CLAUDE.md §6/§8 — le LLM est l'exception gatée, réservée à la " +
+			"génération irréductible).",
+		HowToFix: []string{
+			"use_deterministic_tool : routez l'action vers l'outil déterministe que la table de la SKILL declare (diff→jj/Myers, search→rg, format→biome/gofmt, codegen→émetteurs S34, validate→validateurs kernel) — le code gagne, l'agent défère.",
+			"classify_by_structure : ne re-labelisez pas l'intent pour contourner le gate ; le verdict vient de la structure (nom d'outil + args), pas du label revendiqué.",
+			"llm_is_the_gated_exception : ne réservez le LLM qu'à la génération/jugement irréductible, isolé à la plus petite surface et re-checké déterministiquement ; jamais pour ce qu'une fonction pure couvre.",
+			"rerun aidos check : le blocage se lève dès que l'action emprunte l'outil déterministe au lieu du LLM.",
+		},
+	},
+	CodeAgentPostCheckFailed: {
+		Code:     CodeAgentPostCheckFailed,
+		Severity: SeverityBlocking,
+		Explanation: "Refus du POST-CHECK déterministe (back/runtime/agentloop, postcheck.go, BA16) : APRÈS " +
+			"l'exécution d'une action, l'effet revendiqué n'est ACCEPTÉ que si le juge déterministe est " +
+			"d'accord, selon la NATURE de l'action — une action qui change du code (write / run_mirror) n'est " +
+			"acceptée que si le miroir/sensor pertinent confirme que le miroir du set rouge est passé au vert " +
+			"(goal.SensorState ; la confiance revendiquée par l'agent n'est jamais crue, §8 « done is computed ») ; " +
+			"une action propose n'est acceptée que si sa proposition passe un contrôle de FORME (le cause_sketch " +
+			"est une hypothèse, jamais une vérité) ; une action read n'est acceptée que si elle ne pose AUCUN " +
+			"effet de bord (une lecture qui bascule un sensor est une lecture avec effet, refusée). Une action " +
+			"dont la NATURE ne porte aucun post-check déterministe est ELLE-MÊME un determinism gap (CLAUDE.md " +
+			"§6/§8 — le juge est le miroir, CHAQUE action re-checkée, pas seulement celles qui changent du code).",
+		HowToFix: []string{
+			"let_the_mirror_judge : pour une action qui change du code, ne déclarez l'effet vert que lorsque le miroir/sensor du set rouge le confirme réellement — la confiance revendiquée ne ferme pas le goal, le sensor le ferme (§8).",
+			"shape_check_the_proposal : pour un propose, faites passer la proposition (le cause_sketch) par le contrôle de forme avant de l'accepter ; une hypothèse mal formée n'est pas acceptée et ne devient jamais une vérité.",
+			"reads_are_side_effect_free : pour un read, n'attachez aucun effet de bord (aucun flip de sensor) ; une lecture qui mute l'état est refusée par l'assertion no-op.",
+			"every_action_needs_a_postcheck : donnez à chaque action une nature connue (read | write | propose | run_mirror) — une nature sans post-check déterministe est un determinism gap qui bloque le pas.",
+			"rerun aidos check : le blocage se lève dès que le juge déterministe (le miroir / la forme / l'assertion no-op) accepte l'effet.",
+		},
+	},
+	CodeAgentIdentityUnverified: {
+		Code:     CodeAgentIdentityUnverified,
+		Severity: SeverityBlocking,
+		Explanation: "L'appel à un serveur MCP est arrivé sans token de capacité valide, ou avec un token qui ne " +
+			"lie PAS le process appelant à exactement le CoucheAgent@version attendu (gap K3, BA18). En KRD " +
+			"l'identité du writer est PROUVÉE, jamais déclarée par chaîne : owner_agent/owner n'est pas un champ " +
+			"que l'appelant remplit, il est DÉRIVÉ d'un token content-hash que la boucle présente et que le " +
+			"serveur re-dérive puis vérifie. Un token absent, malformé, ou émis pour une AUTRE identité (un autre " +
+			"LayerRef) est refusé ici, fail-closed — le serveur ne fait jamais confiance à un owner auto-déclaré.",
+		HowToFix: []string{
+			"present_token : la boucle (agentloop) présente le token de capacité = content-hash de son AgentImplementation (agentimpl.MintToken) à CHAQUE appel MCP — pas d'appel sans token.",
+			"bind_the_process : le token doit lier le process appelant à exactement ce CoucheAgent@version ; un token pour une autre identité (un autre LayerRef) est refusé, ce n'est pas une élévation possible.",
+			"verify_server_side : le serveur MCP re-dérive le token attendu (agentimpl.VerifyToken) et le compare au token présenté — il ne lit jamais un owner_agent auto-déclaré dans la requête.",
+			"rerun aidos check : le blocage se lève dès que le token présenté lie le process à l'identité attendue (preuve, pas déclaration).",
+		},
+	},
+	CodeAgentLeaseFenced: {
+		Code:     CodeAgentLeaseFenced,
+		Severity: SeverityBlocking,
+		Explanation: "Refus du FENCING au write-path (ordonnanceur, BA22, gap E2) : l'écriture porte un " +
+			"LeaseEpoch PÉRIMÉ — l'item visé a été re-leasé depuis (son lease_epoch courant est " +
+			"strictement supérieur à l'epoch de l'écriture). L'agent a été réveillé tard, après " +
+			"l'expiration de son lease, alors qu'un autre agent avait déjà repris l'item au tick " +
+			"suivant. Accepter l'écriture serait un lost-update : deux agents écriraient le même item. " +
+			"Le fence est une comparaison déterministe (epoch == lease_epoch courant ⇒ vivant ; " +
+			"epoch < lease_epoch ⇒ périmé, refusé ; un epoch futur est impossible, refusé aussi) — " +
+			"jamais un jugement LLM (§8).",
+		HowToFix: []string{
+			"re_lease_before_writing : ne réécrivez pas avec un epoch périmé — re-claimez l'item (l'ordonnanceur émet un nouveau lease_epoch monotone) puis écrivez sous ce nouvel epoch.",
+			"check_assignment_is_live : vérifiez que votre AgentAssignment est encore `leased|running` et non `expired|released` avant d'écrire ; un lease expiré ne donne aucun droit d'écriture.",
+			"let_the_tick_reclaim : si vous étiez en pause, le tick driver a déjà récupéré l'item (claimed→open→re-claimed) sans action humaine ; reprenez le travail via un nouveau lease.",
+			"rerun aidos check : le blocage se lève dès que l'écriture porte l'epoch courant de l'item (la preuve que le lease est vivant).",
+		},
+	},
+	CodeProposalNotAdmitted: {
+		Code:     CodeProposalNotAdmitted,
+		Severity: SeverityBlocking,
+		Explanation: "Refus de la porte d'apply BA31 (back/runtime/agentloop, applygate.go) : une " +
+			"Proposal dont le champ Status affiche « admitted » mais SANS enregistrement d'autorité S16 " +
+			"correspondant qui l'admette réellement. La transition proposed→admitted vit en S16 " +
+			"(authority.Decide) ; l'apply la RÉ-ASSERTE à la couture : l'agent construit des structs " +
+			"LIBREMENT (une boucle bugguée/malveillante peut fabriquer Proposal{Status:\"admitted\"} en " +
+			"mémoire), donc l'apply ne fait JAMAIS confiance au champ auto-déclaré — il RE-DÉRIVE le " +
+			"verdict d'admission depuis le graphe d'autorité + les rôles réellement accordés, et n'admet " +
+			"que si authority.Decide renvoie « admitted ». Un « admitted » forgé sans autorité admettante " +
+			"est refusé ici, fail-closed — le mur tient (l'on-ramp réalité PROPOSE une idée DRAFT ; il " +
+			"n'applique jamais une vérité).",
+		HowToFix: []string{
+			"obtain_a_real_admission : ne forgez pas Status:\"admitted\" ; faites passer la proposition par S16 — l'autorité (approbateurs requis, aucun veto) doit réellement l'admettre (authority.Decide ⇒ admitted).",
+			"propose_only_path : l'on-ramp réalité (RunToSignal → Observe → Learn → ToIdea) ne produit qu'une idée DRAFT ; pour la figer, écrivez son miroir au /goal puis obtenez l'approbation — il n'existe aucune porte directe vers une vérité admise.",
+			"rerun aidos check : le blocage se lève dès qu'un enregistrement d'autorité S16 admet réellement la proposition (le champ Status n'est jamais cru, seul le verdict re-dérivé compte).",
+		},
+	},
 }
 
 // codeOrder is the canonical enumeration order of the Code enum. Declared, never
@@ -390,6 +760,19 @@ var codeOrder = []Code{
 	CodeSandboxWriteEscapesZone,
 	CodeSandboxCannotGovern,
 	CodeRealityCannotDeclareTruth,
+	CodeAgentToolNotBound,
+	CodeAgentSkillNotBound,
+	CodeAgentPathNotAllowed,
+	CodeAgentEgressNotAllowed,
+	CodeAgentExecNotAllowed,
+	CodeAgentMandatoryHookSkipped,
+	CodeAgentMandatoryHookRed,
+	CodeAgentBudgetExceeded,
+	CodeAgentDeterminismGap,
+	CodeAgentPostCheckFailed,
+	CodeAgentIdentityUnverified,
+	CodeAgentLeaseFenced,
+	CodeProposalNotAdmitted,
 }
 
 // Codes returns every Code in the closed enum, in canonical order.

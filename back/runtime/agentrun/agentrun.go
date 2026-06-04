@@ -84,6 +84,16 @@ type AgentRun struct {
 	Result      Result        `json:"result"`     // green | still_red | blocked | abandoned
 	StartedAt   string        `json:"started_at"` // RFC3339, SUPPLIED (no arg-less clock)
 	EndedAt     string        `json:"ended_at"`   // RFC3339, SUPPLIED
+
+	// ── BA26 — the REPLAY extension (gap A2; supersede-via-version, anti-overwrite §9) ──
+	// These three fields widen the content-address into a NEW @version of the run body.
+	// They are append-only additive: a run recorded WITHOUT them (a legacy run) hashes
+	// EXACTLY as before (canonicalBody omits an empty replay field), so the legacy hash is
+	// never mutated in passing — LegacyID reconstructs that pre-BA26 body byte-for-byte.
+	// `omitempty` is load-bearing: it keeps the legacy JSON shape and the legacy hash stable.
+	Impl               string `json:"impl,omitempty"`                // content-hash of the AgentImplementation (agentimpl.Hash)
+	Seed               string `json:"seed,omitempty"`                // declared (BA01) or derived Hash(impl‖pack‖item) — what replay re-injects
+	ProviderTranscript string `json:"provider_transcript,omitempty"` // ref to the (redacted, BA28) provider transcript replay re-feeds
 }
 
 // AgentAssignment leases a red work item to an agent for a bounded window. BELOW the
@@ -135,6 +145,20 @@ func canonicalBody(r AgentRun) ([]byte, error) {
 		"started_at":    r.StartedAt,
 		"ended_at":      r.EndedAt,
 	}
+	// BA26 — the replay fields enter the address ONLY when present. A legacy (seedless)
+	// run omits all three, so its canonical body is byte-identical to the pre-BA26 shape
+	// and its content-hash is UNCHANGED (anti-overwrite §9: the legacy hash is never
+	// mutated by the extension). A replay-bearing run adds exactly the non-empty keys —
+	// each one genuinely widens the content-address (the property mirror pins it).
+	if r.Impl != "" {
+		body["impl"] = r.Impl
+	}
+	if r.Seed != "" {
+		body["seed"] = r.Seed
+	}
+	if r.ProviderTranscript != "" {
+		body["provider_transcript"] = r.ProviderTranscript
+	}
 	raw, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -160,4 +184,66 @@ func Record(r AgentRun) (AgentRun, error) {
 	}
 	r.ID = records.Hash(canon)
 	return r, nil
+}
+
+// ── BA26 — replay-extension helpers (deterministic, total, pure) ────────────────────
+
+// LegacyID reconstructs the content-address a run would have had under the PRE-BA26 body
+// (the eight fields the pre-extension recorder hashed), independent of any replay field on
+// r. It is the proof that the extension is supersede-via-version, not a silent hash
+// mutation (anti-overwrite §9): for a seedless run, Record(r).ID == LegacyID(r). Pure,
+// total, no clock, no I/O.
+func LegacyID(r AgentRun) string {
+	body := map[string]any{
+		"agent":         r.Agent,
+		"goal":          r.Goal,
+		"red_work_item": r.RedWorkItem,
+		"context_pack":  r.ContextPack,
+		"actions":       r.Actions,
+		"result":        string(r.Result),
+		"started_at":    r.StartedAt,
+		"ended_at":      r.EndedAt,
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		return ""
+	}
+	canon, err := records.Canonicalize(raw)
+	if err != nil {
+		return ""
+	}
+	return records.Hash(canon)
+}
+
+// DeriveSeed derives a deterministic seed for a run from the trio (impl, pack, item) —
+// the content-hash Hash(Canonicalize({impl, pack, item})) over the S01/S02 scheme, REUSED
+// not forked. It is the seed a NEW run carries when the layer declared none (BA01). Pure,
+// total, deterministic: same trio ⇒ same seed; a different impl/pack/item ⇒ a different
+// seed (the property mirror pins it). Non-empty for any non-empty input.
+func DeriveSeed(impl, pack, item string) string {
+	body := map[string]any{
+		"impl": impl,
+		"pack": pack,
+		"item": item,
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		return ""
+	}
+	canon, err := records.Canonicalize(raw)
+	if err != nil {
+		return ""
+	}
+	return records.Hash(canon)
+}
+
+// SeedFor returns the seed a new run carries: the DECLARED seed verbatim when the layer
+// declared one (BA01), else the DERIVED seed DeriveSeed(impl, pack, item). This is the
+// single source of "what seed does this run get?" — declared-wins, derive-as-fallback.
+// Pure, total, deterministic.
+func SeedFor(declared, impl, pack, item string) string {
+	if declared != "" {
+		return declared
+	}
+	return DeriveSeed(impl, pack, item)
 }
