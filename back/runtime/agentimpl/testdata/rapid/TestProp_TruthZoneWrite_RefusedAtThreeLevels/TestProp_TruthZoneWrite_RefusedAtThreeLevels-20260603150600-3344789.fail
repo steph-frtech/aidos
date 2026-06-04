@@ -1,0 +1,13 @@
+# 2026/06/03 15:06:00.996670 [TestProp_TruthZoneWrite_RefusedAtThreeLevels] [rapid] draw zoneIdx: 0
+# 2026/06/03 15:06:00.996676 [TestProp_TruthZoneWrite_RefusedAtThreeLevels] [rapid] draw suffix: "A"
+# 2026/06/03 15:06:00.996679 [TestProp_TruthZoneWrite_RefusedAtThreeLevels] level 3 (GRANT) must deny truth-zone target "kernelA"
+# 
+v0.4.8#7775692220503020912
+0x0
+0x0
+0x0
+0x5555555555555
+0x0
+0x0
+0x0
+0x0

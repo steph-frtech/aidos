@@ -1,0 +1,13 @@
+{
+  "$comment": "BA14 — arch-fitness invariant 'one single LLM function'. The DECLARED policy (above-the-line intent) the deterministic rule back/runtime/agentloop.CheckLLMIsolation enforces: ONLY allowed_importers may import an llm_sdk_prefix; any other package importing one flips the rule red at build time. This is the depguard/go-arch-lint config equivalent, kept in sync with agentloop.DefaultPolicy() (a property test pins the parity). Widening allowed_importers is a truth change (idée → miroir → /goal), never a silent edit.",
+  "rule": "LLM_SDK_IMPORT_OUTSIDE_PROVIDER",
+  "llm_sdk_prefixes": [
+    "github.com/anthropics/anthropic-sdk-go",
+    "github.com/openai/openai-go",
+    "google.golang.org/genai",
+    "github.com/sashabaranov/go-openai"
+  ],
+  "allowed_importers": [
+    "github.com/steph-frtech/aidos/back/runtime/agentloop/provider"
+  ]
+}

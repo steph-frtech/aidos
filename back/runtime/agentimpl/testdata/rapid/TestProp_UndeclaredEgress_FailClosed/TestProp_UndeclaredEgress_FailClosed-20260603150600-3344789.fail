@@ -1,0 +1,5 @@
+# 2026/06/03 15:06:00.997203 [TestProp_UndeclaredEgress_FailClosed] [rapid] draw host: ""
+# 2026/06/03 15:06:00.997205 [TestProp_UndeclaredEgress_FailClosed] undeclared host "" must be refused at the gate
+# 
+v0.4.8#3789188938809452475
+0x0

@@ -1,0 +1,37 @@
+# 2026/06/03 08:48:08.423210 [TestProp_Validate_Deterministic] [rapid] draw layerref: "A"
+# 2026/06/03 08:48:08.423219 [TestProp_Validate_Deterministic] [rapid] draw provider: 0
+# 2026/06/03 08:48:08.423221 [TestProp_Validate_Deterministic] [rapid] draw model: " "
+# 2026/06/03 08:48:08.423222 [TestProp_Validate_Deterministic] [rapid] draw temp: 1
+# 2026/06/03 08:48:08.423223 [TestProp_Validate_Deterministic] [rapid] draw turns: 0
+# 2026/06/03 08:48:08.423224 [TestProp_Validate_Deterministic] [rapid] draw seed: ""
+# 2026/06/03 08:48:08.423225 [TestProp_Validate_Deterministic] [rapid] draw conc: 0
+# 2026/06/03 08:48:08.423225 [TestProp_Validate_Deterministic] a well-formed drawn impl must validate: agentimpl: model must be non-empty
+# 
+v0.4.8#12469769089393284610
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x24
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

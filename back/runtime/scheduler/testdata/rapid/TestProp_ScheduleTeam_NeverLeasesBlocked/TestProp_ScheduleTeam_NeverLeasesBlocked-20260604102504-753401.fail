@@ -1,0 +1,65 @@
+# 2026/06/04 10:25:04.615435 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw n: 2
+# 2026/06/04 10:25:04.615440 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw id: "A"
+# 2026/06/04 10:25:04.615443 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw id: "A"
+# 2026/06/04 10:25:04.615444 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw st: 1
+# 2026/06/04 10:25:04.615445 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw epoch: 0
+# 2026/06/04 10:25:04.615445 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw live: false
+# 2026/06/04 10:25:04.615446 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw layer: 0
+# 2026/06/04 10:25:04.615447 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw st: 1
+# 2026/06/04 10:25:04.615448 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw hasdep: true
+# 2026/06/04 10:25:04.615449 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw dep: 0
+# 2026/06/04 10:25:04.615450 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw epoch: 0
+# 2026/06/04 10:25:04.615451 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw live: false
+# 2026/06/04 10:25:04.615451 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw layer: 0
+# 2026/06/04 10:25:04.615452 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw liveTeam: false
+# 2026/06/04 10:25:04.615453 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw liveTeam: true
+# 2026/06/04 10:25:04.615454 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw n: 0
+# 2026/06/04 10:25:04.615454 [TestProp_ScheduleTeam_NeverLeasesBlocked] [rapid] draw maxConcurrency: 0
+# 2026/06/04 10:25:04.615458 [TestProp_ScheduleTeam_NeverLeasesBlocked] item "iAx" claimed with unresolved dep "iA"
+# 
+v0.4.8#6583534684300177696
+0x0
+0x38e38e38e38e4
+0x2
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

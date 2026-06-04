@@ -1,0 +1,37 @@
+# 2026/06/03 08:48:08.433655 [TestProp_Validate_EmptyConfinementDefault] [rapid] draw layerref: "A"
+# 2026/06/03 08:48:08.433660 [TestProp_Validate_EmptyConfinementDefault] [rapid] draw provider: 0
+# 2026/06/03 08:48:08.433662 [TestProp_Validate_EmptyConfinementDefault] [rapid] draw model: "\v"
+# 2026/06/03 08:48:08.433664 [TestProp_Validate_EmptyConfinementDefault] [rapid] draw temp: 1
+# 2026/06/03 08:48:08.433666 [TestProp_Validate_EmptyConfinementDefault] [rapid] draw turns: 0
+# 2026/06/03 08:48:08.433668 [TestProp_Validate_EmptyConfinementDefault] [rapid] draw seed: ""
+# 2026/06/03 08:48:08.433669 [TestProp_Validate_EmptyConfinementDefault] [rapid] draw conc: 0
+# 2026/06/03 08:48:08.433670 [TestProp_Validate_EmptyConfinementDefault] empty allow-lists (max confinement) must be valid: agentimpl: model must be non-empty
+# 
+v0.4.8#10746498863082830591
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0xe3e05a098777c
+0x23
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

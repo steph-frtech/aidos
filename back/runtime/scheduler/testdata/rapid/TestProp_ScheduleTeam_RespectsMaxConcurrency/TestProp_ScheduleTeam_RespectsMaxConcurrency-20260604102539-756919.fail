@@ -1,0 +1,133 @@
+# 2026/06/04 10:25:39.758213 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw n: 5
+# 2026/06/04 10:25:39.758217 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw id: "A"
+# 2026/06/04 10:25:39.758219 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw id: "A"
+# 2026/06/04 10:25:39.758220 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw id: "A"
+# 2026/06/04 10:25:39.758221 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw id: "A"
+# 2026/06/04 10:25:39.758222 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw id: "A"
+# 2026/06/04 10:25:39.758223 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw st: 1
+# 2026/06/04 10:25:39.758224 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw epoch: 0
+# 2026/06/04 10:25:39.758224 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw live: false
+# 2026/06/04 10:25:39.758226 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw layer: 0
+# 2026/06/04 10:25:39.758227 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw st: 0
+# 2026/06/04 10:25:39.758227 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw hasdep: false
+# 2026/06/04 10:25:39.758228 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw epoch: 0
+# 2026/06/04 10:25:39.758228 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw layer: 0
+# 2026/06/04 10:25:39.758229 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw st: 1
+# 2026/06/04 10:25:39.758229 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw hasdep: false
+# 2026/06/04 10:25:39.758230 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw epoch: 0
+# 2026/06/04 10:25:39.758230 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw live: false
+# 2026/06/04 10:25:39.758231 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw layer: 0
+# 2026/06/04 10:25:39.758232 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw st: 0
+# 2026/06/04 10:25:39.758232 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw hasdep: false
+# 2026/06/04 10:25:39.758232 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw epoch: 0
+# 2026/06/04 10:25:39.758233 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw layer: 0
+# 2026/06/04 10:25:39.758234 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw st: 0
+# 2026/06/04 10:25:39.758234 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw hasdep: false
+# 2026/06/04 10:25:39.758234 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw epoch: 0
+# 2026/06/04 10:25:39.758235 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw layer: 0
+# 2026/06/04 10:25:39.758235 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw liveTeam: true
+# 2026/06/04 10:25:39.758236 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw target: 0
+# 2026/06/04 10:25:39.758236 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw liveTeam: true
+# 2026/06/04 10:25:39.758237 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw target: 0
+# 2026/06/04 10:25:39.758237 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw target: 0
+# 2026/06/04 10:25:39.758239 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw n: 0
+# 2026/06/04 10:25:39.758240 [TestProp_ScheduleTeam_RespectsMaxConcurrency] [rapid] draw maxConcurrency: 1
+# 2026/06/04 10:25:39.758243 [TestProp_ScheduleTeam_RespectsMaxConcurrency] live leases 2 exceed MaxConcurrency 1
+# 
+v0.4.8#13162127541777240756
+0x0
+0x1f2b5a0e61c3a6
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
