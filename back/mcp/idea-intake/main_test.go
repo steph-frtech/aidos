@@ -12,10 +12,12 @@ package main
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/steph-frtech/aidos/back/runtime/markitdown"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -60,7 +62,7 @@ func startServer(t *testing.T) *server {
 		}
 	}
 	t.Cleanup(pool.Close)
-	return &server{store: NewStoreFromPool(pool)}
+	return &server{store: NewStoreFromPool(pool), converter: markitdown.HTMLConverter{}}
 }
 
 func TestIdeaIntakeLifecycleEndToEnd(t *testing.T) {
@@ -126,5 +128,84 @@ func TestIdeaIntakeLifecycleEndToEnd(t *testing.T) {
 	_, rejected, err := s.list(ctx, nil, listInput{Status: "rejected"})
 	if err != nil || len(rejected.Ideas) != 1 {
 		t.Fatalf("rejected lane: %v count=%d", err, len(rejected.Ideas))
+	}
+}
+
+// TestConvertToMarkdownCapturesIdeaWithProvenance is the MK03 integration mirror: reflects=
+// mcp.idea-intake.convert_to_markdown, test_kind=integration, liveness=live. It drives the
+// ingestion door end-to-end through the REAL ideas Store (Testcontainers Postgres): a fixture HTML
+// document → markdown → a persisted idea draft with provenance, readable back via idea_status and
+// the idea_list triage queue. THE WALL: the only schema touched is `ideas` (INSERT) — no kernel
+// write exists anywhere on this path (there is no kernel grant on this server).
+func TestConvertToMarkdownCapturesIdeaWithProvenance(t *testing.T) {
+	s := startServer(t)
+	ctx := context.Background()
+
+	const fixture = `<html><head><title>Checkout Spec</title><style>x{}</style></head><body>
+<nav>Home &gt; Specs</nav>
+<h1>Checkout Service Specification</h1>
+<p>The <strong>checkout</strong> behaviour.</p>
+<ul><li>A cart line quantity is always strictly positive.</li></ul>
+<footer>(c) 2026</footer>
+</body></html>`
+
+	_, out, err := s.convertToMarkdown(ctx, nil, convertInput{
+		Content: fixture, Mime: "text/html", Source: "checkout-spec.html", Proposes: "policy",
+	})
+	if err != nil {
+		t.Fatalf("convert_to_markdown: %v", err)
+	}
+
+	// The conversion did real work: the document's H1 survived as a markdown heading, chrome dropped.
+	if !strings.Contains(out.Markdown, "# Checkout Service Specification") {
+		t.Fatalf("markdown missing heading:\n%s", out.Markdown)
+	}
+	if strings.Contains(out.Markdown, "<script") || strings.Contains(out.Markdown, "Home &gt;") {
+		t.Fatalf("chrome not stripped:\n%s", out.Markdown)
+	}
+
+	// The captured idea is a DRAFT (ingestion freezes nothing — the wall), with NO mirror.
+	if out.Idea.Status != "draft" {
+		t.Fatalf("idea status = %q, want draft", out.Idea.Status)
+	}
+	if out.Idea.HasMirror {
+		t.Fatal("an ingested idea must have no mirror (the wall)")
+	}
+	// Provenance is PRESERVED: the source filename is kept verbatim, on the human on-ramp.
+	if !strings.Contains(out.Idea.Detail, "checkout-spec.html") {
+		t.Fatalf("provenance %q does not preserve the source", out.Idea.Detail)
+	}
+	if out.Idea.Source != "human" {
+		t.Fatalf("provenance source = %q, want human", out.Idea.Source)
+	}
+	// The idea's intent IS the converted markdown (the document's substance becomes the candidate).
+	if out.Idea.Intent != out.Markdown {
+		t.Fatal("idea intent must be the converted markdown")
+	}
+
+	// It is PERSISTED and readable back via idea_status (round-trips through the real store).
+	_, st, err := s.statusTool(ctx, nil, idInput{ID: out.Idea.ID})
+	if err != nil {
+		t.Fatalf("idea_status: %v", err)
+	}
+	if st.Status != "draft" || st.Detail != out.Idea.Detail {
+		t.Fatalf("round-trip mismatch: %+v", st)
+	}
+
+	// It shows up in the draft lane of the triage queue.
+	_, drafts, err := s.list(ctx, nil, listInput{Status: "draft"})
+	if err != nil || len(drafts.Ideas) != 1 {
+		t.Fatalf("draft lane: %v count=%d", err, len(drafts.Ideas))
+	}
+
+	// Re-ingesting the SAME document lands at the SAME id (content-addressed, idempotent door).
+	_, out2, err := s.convertToMarkdown(ctx, nil, convertInput{
+		Content: fixture, Mime: "text/html", Source: "checkout-spec.html", Proposes: "policy",
+	})
+	if err != nil {
+		t.Fatalf("re-ingest: %v", err)
+	}
+	if out2.Idea.ID != out.Idea.ID {
+		t.Fatalf("re-ingestion drifted: %q != %q", out2.Idea.ID, out.Idea.ID)
 	}
 }

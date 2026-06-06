@@ -76,14 +76,17 @@ func fromRow(id string, body []byte) (ideas.Idea, error) {
 	}, nil
 }
 
-// Insert persists a freshly captured idea (INSERT — capture above the wall).
+// Insert persists a freshly captured idea (INSERT — capture above the wall). The id is the content
+// hash of the sketch, so capturing the SAME sketch twice (e.g. re-ingesting the same document
+// through MK03's idempotent door) is a NO-OP, not a duplicate-key error: ON CONFLICT DO NOTHING
+// keeps the first capture untouched (append-only — never overwrites a staged idea, never deletes).
 func (s *Store) Insert(ctx context.Context, i ideas.Idea) error {
 	body, err := toBody(i)
 	if err != nil {
 		return err
 	}
 	_, err = s.pool.Exec(ctx,
-		"INSERT INTO ideas.idea (id, body, version) VALUES ($1, $2::jsonb, $3)",
+		"INSERT INTO ideas.idea (id, body, version) VALUES ($1, $2::jsonb, $3) ON CONFLICT (id) DO NOTHING",
 		i.ID, string(body), i.ID)
 	return err
 }

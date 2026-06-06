@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Checkout Service — Functional Specification v1.2</title>
+  <style>body { font-family: sans-serif; }</style>
+  <script>console.log("nav analytics");</script>
+</head>
+<body>
+  <nav class="breadcrumbs">Home &gt; Specs &gt; Checkout</nav>
+  <h1>Checkout Service Specification</h1>
+  <p>This document specifies the <strong>checkout</strong> behaviour for the
+     storefront. It is the <em>authoritative</em> functional contract for the
+     order-placement flow.</p>
+
+  <h2>1. Cart Invariants</h2>
+  <p>The cart MUST satisfy the following invariants at all times:</p>
+  <ul>
+    <li>A cart line quantity is always strictly positive.</li>
+    <li>The cart total equals the sum of <code>line.qty * line.unit_price</code>.</li>
+    <li>An empty cart cannot be checked out.</li>
+  </ul>
+
+  <h2>2. Place-Order Workflow</h2>
+  <ol>
+    <li>Validate the cart is non-empty.</li>
+    <li>Reserve stock for every line.</li>
+    <li>Authorise payment for the cart total.</li>
+    <li>On success, emit <code>OrderPlaced</code>; on decline, emit <code>PaymentDeclined</code>.</li>
+  </ol>
+
+  <h2>3. Pricing Table</h2>
+  <table>
+    <thead>
+      <tr><th>SKU</th><th>Unit price (EUR)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>SKU-001</td><td>19.90</td></tr>
+      <tr><td>SKU-002</td><td>4.50</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. References</h2>
+  <p>See the <a href="https://example.com/payment-gateway">PaymentGateway contract</a>
+     for the authorisation protocol.</p>
+
+  <footer>(c) 2026 Storefront Inc. — internal</footer>
+</body>
+</html>

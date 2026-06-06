@@ -1,0 +1,43 @@
+# 2026/06/06 09:13:30.289160 [TestLedger_Delete_TurnsRed] [rapid] draw n: 2
+# 2026/06/06 09:13:30.289164 [TestLedger_Delete_TurnsRed] [rapid] draw agent: "A"
+# 2026/06/06 09:13:30.289165 [TestLedger_Delete_TurnsRed] [rapid] draw goal: ""
+# 2026/06/06 09:13:30.289166 [TestLedger_Delete_TurnsRed] [rapid] draw rwi: ""
+# 2026/06/06 09:13:30.289167 [TestLedger_Delete_TurnsRed] [rapid] draw pack: ""
+# 2026/06/06 09:13:30.289169 [TestLedger_Delete_TurnsRed] [rapid] draw result: 0
+# 2026/06/06 09:13:30.289181 [TestLedger_Delete_TurnsRed] [rapid] draw agent: "A"
+# 2026/06/06 09:13:30.289182 [TestLedger_Delete_TurnsRed] [rapid] draw goal: ""
+# 2026/06/06 09:13:30.289182 [TestLedger_Delete_TurnsRed] [rapid] draw rwi: ""
+# 2026/06/06 09:13:30.289184 [TestLedger_Delete_TurnsRed] [rapid] draw pack: ""
+# 2026/06/06 09:13:30.289184 [TestLedger_Delete_TurnsRed] [rapid] draw result: 0
+# 2026/06/06 09:13:30.289224 [TestLedger_Delete_TurnsRed] [rapid] draw i: 1
+# 2026/06/06 09:13:30.289237 [TestLedger_Delete_TurnsRed] deleting row 1 must fail verification
+# 
+v0.4.8#3726575851500932848
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1

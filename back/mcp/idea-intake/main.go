@@ -38,6 +38,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/steph-frtech/aidos/back/kernel/ideas"
+	"github.com/steph-frtech/aidos/back/runtime/markitdown"
 )
 
 // ── Tool I/O types ──
@@ -91,9 +92,14 @@ func toOutput(i ideas.Idea) ideaOutput {
 	}
 }
 
-// server wires the MCP tools to one idea-intake Store.
+// server wires the MCP tools to one idea-intake Store and the MK02 DocConverter port (replaceable,
+// ADR 0039) — the MK03 ingestion door uses the converter to turn a document into the markdown it
+// captures as an idea. The converter is an interface: the in-process HTMLConverter is the default
+// reference adapter; the real microsoft/markitdown is swapped in behind the same port by an ADR,
+// never touching this server.
 type server struct {
-	store *Store
+	store     *Store
+	converter markitdown.DocConverter
 }
 
 func (s *server) capture(ctx context.Context, _ *mcp.CallToolRequest, in captureInput) (*mcp.CallToolResult, ideaOutput, error) {
@@ -173,6 +179,7 @@ func (s *server) list(ctx context.Context, _ *mcp.CallToolRequest, in listInput)
 // There is deliberately NO promote-to-kernel tool: promotion is the /goal flow.
 func newMCPServer(s *server) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "aidos-idea-intake", Version: "v0.1.0"}, nil)
+	mcp.AddTool(srv, &mcp.Tool{Name: "convert_to_markdown", Description: "MK03: convert a document (DocConverter port, ADR 0039) → markdown → capture it as an idea draft with provenance. Deterministic; never writes the kernel (the wall)."}, s.convertToMarkdown)
 	mcp.AddTool(srv, &mcp.Tool{Name: "idea_capture", Description: "Capture a candidate-truth (human|incident) with provenance → draft. Never writes the kernel."}, s.capture)
 	mcp.AddTool(srv, &mcp.Tool{Name: "idea_grill", Description: "Advance an idea draft → grilled."}, s.grill)
 	mcp.AddTool(srv, &mcp.Tool{Name: "idea_spike", Description: "Advance an idea grilled → spiking (exploration, ratchet OFF)."}, s.spike)
@@ -195,7 +202,7 @@ func main() {
 	}
 	defer st.Close()
 
-	srv := newMCPServer(&server{store: st})
+	srv := newMCPServer(&server{store: st, converter: markitdown.HTMLConverter{}})
 	if err := srv.Run(ctx, &mcp.StdioTransport{}); err != nil {
 		log.Fatalf("idea-intake: run: %v", err)
 	}

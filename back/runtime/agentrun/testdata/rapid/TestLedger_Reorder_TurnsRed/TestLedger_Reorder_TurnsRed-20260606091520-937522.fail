@@ -1,0 +1,39 @@
+# 2026/06/06 09:15:20.510400 [TestLedger_Reorder_TurnsRed] [rapid] draw n: 2
+# 2026/06/06 09:15:20.510404 [TestLedger_Reorder_TurnsRed] [rapid] draw agent: "A"
+# 2026/06/06 09:15:20.510406 [TestLedger_Reorder_TurnsRed] [rapid] draw goal: ""
+# 2026/06/06 09:15:20.510406 [TestLedger_Reorder_TurnsRed] [rapid] draw rwi: ""
+# 2026/06/06 09:15:20.510407 [TestLedger_Reorder_TurnsRed] [rapid] draw pack: ""
+# 2026/06/06 09:15:20.510408 [TestLedger_Reorder_TurnsRed] [rapid] draw result: 0
+# 2026/06/06 09:15:20.510420 [TestLedger_Reorder_TurnsRed] [rapid] draw agent: "a"
+# 2026/06/06 09:15:20.510420 [TestLedger_Reorder_TurnsRed] [rapid] draw goal: ""
+# 2026/06/06 09:15:20.510421 [TestLedger_Reorder_TurnsRed] [rapid] draw rwi: ""
+# 2026/06/06 09:15:20.510422 [TestLedger_Reorder_TurnsRed] [rapid] draw pack: ""
+# 2026/06/06 09:15:20.510423 [TestLedger_Reorder_TurnsRed] [rapid] draw result: 0
+# 2026/06/06 09:15:20.510474 [TestLedger_Reorder_TurnsRed] reordering rows 0/1 must fail verification
+# 
+v0.4.8#10002660470005708313
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

@@ -1,9 +1,11 @@
-# MCP server: `idea-intake` — ACTIVE (S27)
+# MCP server: `idea-intake` — ACTIVE (S27 ; MK03 added the ingestion door)
 
-> **Status: active** (activated at S27). The working server is
-> [`main.go`](./main.go) + [`store.go`](./store.go), with the end-to-end smoke
-> mirror [`main_test.go`](./main_test.go) (Testcontainers). Reference:
-> [`back/mcp/store/main.go`](../store/main.go).
+> **Status: active** (activated at S27 ; the `convert_to_markdown` ingestion door
+> added at MK03). The working server is [`main.go`](./main.go) + [`store.go`](./store.go)
+> + [`convert.go`](./convert.go), with the end-to-end smoke mirror
+> [`main_test.go`](./main_test.go) (Testcontainers) and the MK03 reproducibility
+> mirror [`convert_property_test.go`](./convert_property_test.go) (rapid).
+> Reference: [`back/mcp/store/main.go`](../store/main.go).
 
 ## Purpose
 
@@ -23,6 +25,7 @@ role, never this server.
 
 | Tool | Op | Direction |
 |---|---|---|
+| `convert_to_markdown` | **MK03**: a document → markdown (DocConverter port, ADR 0039) → an idea draft, provenance preserved (deterministic, idempotent) | write `ideas` |
 | `idea_capture` | human\|incident → draft (records a candidate-truth + provenance) | write `ideas` |
 | `idea_grill` | draft → grilled | write `ideas` |
 | `idea_spike` | grilled → spiking (exploration, ratchet OFF) | write `ideas` |

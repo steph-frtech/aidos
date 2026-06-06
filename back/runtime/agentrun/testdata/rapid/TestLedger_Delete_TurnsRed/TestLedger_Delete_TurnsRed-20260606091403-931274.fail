@@ -1,0 +1,43 @@
+# 2026/06/06 09:14:03.520472 [TestLedger_Delete_TurnsRed] [rapid] draw n: 2
+# 2026/06/06 09:14:03.520475 [TestLedger_Delete_TurnsRed] [rapid] draw agent: "A"
+# 2026/06/06 09:14:03.520477 [TestLedger_Delete_TurnsRed] [rapid] draw goal: ""
+# 2026/06/06 09:14:03.520478 [TestLedger_Delete_TurnsRed] [rapid] draw rwi: ""
+# 2026/06/06 09:14:03.520478 [TestLedger_Delete_TurnsRed] [rapid] draw pack: ""
+# 2026/06/06 09:14:03.520479 [TestLedger_Delete_TurnsRed] [rapid] draw result: 0
+# 2026/06/06 09:14:03.520491 [TestLedger_Delete_TurnsRed] [rapid] draw agent: "A"
+# 2026/06/06 09:14:03.520492 [TestLedger_Delete_TurnsRed] [rapid] draw goal: ""
+# 2026/06/06 09:14:03.520493 [TestLedger_Delete_TurnsRed] [rapid] draw rwi: ""
+# 2026/06/06 09:14:03.520494 [TestLedger_Delete_TurnsRed] [rapid] draw pack: ""
+# 2026/06/06 09:14:03.520495 [TestLedger_Delete_TurnsRed] [rapid] draw result: 0
+# 2026/06/06 09:14:03.520533 [TestLedger_Delete_TurnsRed] [rapid] draw i: 0
+# 2026/06/06 09:14:03.520533 [TestLedger_Delete_TurnsRed] deleting row 0 must change the tip root (vs the trusted anchor)
+# 
+v0.4.8#15459241122174326488
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
