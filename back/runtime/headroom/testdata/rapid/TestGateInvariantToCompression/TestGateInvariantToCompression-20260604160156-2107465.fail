@@ -1,0 +1,36 @@
+# 2026/06/04 16:01:56.834625 [TestGateInvariantToCompression] [rapid] draw target: "app/main.go"
+# 2026/06/04 16:01:56.834630 [TestGateInvariantToCompression] [rapid] draw tool: "evil/exfiltrate"
+# 2026/06/04 16:01:56.834631 [TestGateInvariantToCompression] [rapid] draw skill: ""
+# 2026/06/04 16:01:56.834632 [TestGateInvariantToCompression] [rapid] draw n: 4
+# 2026/06/04 16:01:56.834633 [TestGateInvariantToCompression] [rapid] draw w: 1
+# 2026/06/04 16:01:56.834634 [TestGateInvariantToCompression] [rapid] draw w: 5
+# 2026/06/04 16:01:56.834635 [TestGateInvariantToCompression] [rapid] draw w: 0
+# 2026/06/04 16:01:56.834635 [TestGateInvariantToCompression] [rapid] draw w: 6
+# 2026/06/04 16:01:56.834681 [TestGateInvariantToCompression] GATE NOT INVARIANT to compression:
+#   original   = {Allowed:false DeniedAxis:capacity BlockReason:0xc000152a00}
+#   compressed = {Allowed:true DeniedAxis: BlockReason:<nil>}
+#   prompt="# CONTEXT PACK\nwall stop the condition\n## Boundaries (THE WALL)\nallowed_paths: app/main.go\ntool: evil/exfiltrate\nforbidden_paths: /kernel/**, /mirror/**\nwall stop the condition\n"
+#   restored="# CONTEXT PACK wall stop the condition ## Boundaries (THE WALL) allowed_paths: app/main.go tool: evil/exfiltrate forbidden_paths: /kernel/**, /mirror/** wall stop the condition"
+# 
+v0.4.8#17476881265745554823
+0xf125db18ba1cf
+0x0
+0x16e64543af86e9
+0x1
+0x1412acab458a99
+0x2
+0xaca462beb225b
+0x733982332d091
+0x4
+0xd772b1f0b6fa
+0xca7f7276cac1
+0x1
+0x12662797610a8f
+0x1496e9a7da2777
+0x5
+0x1769b8c98ce9d8
+0x1629f21930d532
+0x0
+0x65a5f15922734
+0xede573723e021
+0x6

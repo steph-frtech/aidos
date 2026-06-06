@@ -1,0 +1,18 @@
+# 2026/06/04 16:01:56.836547 [TestDerivedActionInvariantToCompression] [rapid] draw target: "app/main.go"
+# 2026/06/04 16:01:56.836549 [TestDerivedActionInvariantToCompression] [rapid] draw tool: "store/read"
+# 2026/06/04 16:01:56.836550 [TestDerivedActionInvariantToCompression] [rapid] draw skill: "tdd"
+# 2026/06/04 16:01:56.836551 [TestDerivedActionInvariantToCompression] [rapid] draw n: 0
+# 2026/06/04 16:01:56.836578 [TestDerivedActionInvariantToCompression] derived action not invariant under retrieve∘compress:
+#   from prompt   = {Target:app/main.go Server:store Tool:read Skill:tdd Host: Exec:}
+#   from restored = {Target: Server: Tool: Skill: Host: Exec:}
+# 
+v0.4.8#2860235512616057942
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

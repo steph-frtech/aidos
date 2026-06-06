@@ -1,0 +1,35 @@
+# 2026/06/04 15:48:48.405149 [TestHandleIdempotent] [rapid] draw n: 7
+# 2026/06/04 15:48:48.405153 [TestHandleIdempotent] [rapid] draw w: 1
+# 2026/06/04 15:48:48.405154 [TestHandleIdempotent] [rapid] draw w: 10
+# 2026/06/04 15:48:48.405155 [TestHandleIdempotent] [rapid] draw w: 7
+# 2026/06/04 15:48:48.405155 [TestHandleIdempotent] [rapid] draw w: 10
+# 2026/06/04 15:48:48.405157 [TestHandleIdempotent] [rapid] draw w: 7
+# 2026/06/04 15:48:48.405157 [TestHandleIdempotent] [rapid] draw w: 1
+# 2026/06/04 15:48:48.405158 [TestHandleIdempotent] [rapid] draw w: 10
+# 2026/06/04 15:48:48.405170 [TestHandleIdempotent] Compress not idempotent on compacted text: "promo-field stop red stop red §0" -> "promo-field stop red §0 §0"
+# 
+v0.4.8#11982375279206349728
+0x0
+0x6b74f03291620
+0x7
+0x0
+0x0
+0x1
+0x0
+0x9867f1f40f739
+0xa
+0x0
+0x6b74f03291620
+0x7
+0x0
+0x9867f1f40f739
+0xa
+0x0
+0x6b74f03291620
+0x7
+0x0
+0x0
+0x1
+0x0
+0x9867f1f40f739
+0xa

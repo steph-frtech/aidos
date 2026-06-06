@@ -40,6 +40,7 @@ package agentloop
 import (
 	"github.com/steph-frtech/aidos/back/runtime/agentimpl"
 	"github.com/steph-frtech/aidos/back/runtime/agentrun"
+	rctx "github.com/steph-frtech/aidos/back/runtime/context"
 	"github.com/steph-frtech/aidos/back/runtime/economics"
 	"github.com/steph-frtech/aidos/back/runtime/goal"
 )
@@ -80,6 +81,15 @@ type ScriptedTurn struct {
 	// green while the mirror still reads red — the claim is REJECTED and the effect never
 	// lands. For propose/read turns Observed is unused (no flip to confirm).
 	Observed []SensorEffect
+
+	// Prompt is the LLM-INPUT this turn would feed to GenerateAction (the rendered ContextPack
+	// + transcript). HR04 wires the ContextCompressor in FRONT of generation: when a compressor
+	// is set on the DriveInput AND this Prompt is non-empty, the loop COMPRESSES the prompt
+	// before generation and CHARGES the meter the MEASURED token count of the (compressed)
+	// prompt — the margin under the cap is extended, the cap is never relieved. The gate verdict
+	// is invariant to this (HR03): the action the loop derives survives retrieve∘compress. An
+	// empty Prompt falls back to the declared Cost.Tokens (the pre-HR04 behaviour, preserved).
+	Prompt string
 }
 
 // ActionGenerator is the SEAM the LLM hides behind (modelled on evolve.Sampler): given
@@ -145,6 +155,15 @@ type DriveInput struct {
 	// Generator is the action source — the MOCK (a ScriptedGenerator) in tests, a real
 	// provider-backed generator in production (BA17). Injected so Drive stays pure.
 	Generator ActionGenerator
+
+	// Compressor is the OPTIONAL HR02/HR03 ContextCompressor wired in FRONT of GenerateAction
+	// (HR04). nil ⇒ no compression (the pre-HR04 behaviour, every existing fixture preserved).
+	// Non-nil ⇒ each turn's Prompt is compressed before generation and the meter is charged the
+	// MEASURED token count of the compressed prompt (the margin under the cap is extended). It
+	// is REPLACEABLE (CLAUDE.md §3) and the GATED determinism-first exception (§6/§8): it is
+	// never authoritative — the gate verdict is invariant to it (HR03), it only lowers the
+	// tokens measured. It NEVER relieves the cap (the EffectiveTokensCap is unchanged).
+	Compressor rctx.ContextCompressor
 
 	// StartedAt / EndedAt are the run's timestamps, SUPPLIED (no arg-less clock — the
 	// determinism rule). They feed the recorded AgentRun verbatim.
@@ -271,13 +290,18 @@ func DriveWithEconomics(in DriveInput) (agentrun.AgentRun, agentimpl.RunMeter, e
 			break
 		}
 
-		// Terminal #2 — PRE-CALL BUDGET HALT (gap G3). PROJECT the turn's declared cost onto
-		// the meter WITHOUT committing it, then check the budget. A turn that WOULD push the
-		// run past the cap is refused BEFORE it starts: its cost never lands (the committed
-		// meter stays AT/below the cap) and its effect never fires. The gate's budget axis
-		// (min() of the two caps, BA11) is authoritative. We record the breach against this
-		// turn's body so the abandoned run names the would-be action and its BlockReason.
-		projected := meter.Tally(turn.Cost)
+		// Terminal #2 — PRE-CALL BUDGET HALT (gap G3) with HR04 COMPRESSION in front. PROJECT
+		// the turn's cost onto the meter WITHOUT committing it, then check the budget. The TOKEN
+		// axis of that cost is MEASURED through the (optional) ContextCompressor (turnDelta /
+		// turnTokenCost): when a compressor is wired and the turn carries a Prompt, the loop
+		// compresses the LLM-input BEFORE generation and charges the meter the SMALLER compacted
+		// token count — the margin under the cap is extended, the cap is NEVER raised. A turn
+		// that WOULD push the run past the cap is refused BEFORE it starts: its cost never lands
+		// (the committed meter stays AT/below the cap) and its effect never fires. The gate's
+		// budget axis (min() of the two caps, BA11) is authoritative. We record the breach
+		// against this turn's body so the abandoned run names the would-be action and its
+		// BlockReason. The gate verdict itself is INVARIANT to compression (HR03).
+		projected := meter.Tally(turnDelta(in.Compressor, turn))
 		if bv := agentimpl.CheckBudget(projected, in.HarnessBudget, in.Goal.Budgets, in.RatePerToken); !bv.WithinBudget {
 			actions = append(actions, agentrun.AgentAction{
 				Type:          turn.Body.Type,
