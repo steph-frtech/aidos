@@ -61,7 +61,7 @@ export function anchorsAbove(nodes: CascadeNode[], level: Level): Anchor[] {
 	for (const l of levels()) {
 		if (sourceIndex(l) >= idx) break; // strictly above.
 		const n = nodes.find((x) => x.level === l);
-		if (!n || n.status !== "resolved") continue; // only FROZEN rungs.
+		if (n?.status !== "resolved") continue; // only FROZEN rungs.
 		out.push({ level: l, body: n.body });
 	}
 	return out;
@@ -183,7 +183,7 @@ export function shrinkOptionSpaceCascade(
 	}
 	cs.next = next;
 	const os = optionSpaceFor(level, next);
-	if (!os || !os.enumerable) {
+	if (!os?.enumerable) {
 		cs.openQuestion =
 			os?.openQuestion ??
 			`no declared OptionSpace for ${level}→${next} (not a consecutive descent pair).`;
@@ -192,7 +192,7 @@ export function shrinkOptionSpaceCascade(
 	cs.enumerable = true;
 	cs.before = os.choices.length;
 	const node = nodes.find((x) => x.level === level);
-	if (!node || node.status !== "resolved") {
+	if (node?.status !== "resolved") {
 		cs.after = cs.before;
 		cs.shrink = 0;
 		return cs;
