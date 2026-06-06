@@ -41,6 +41,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/compound-besoin-grammar", k: "besoinGrammar" },
 			{ href: "/compound-besoin-graph", k: "besoinGraph" },
 			{ href: "/compound-besoin-metadata", k: "besoinMetadata" },
+			{ href: "/compound-besoin-proposes", k: "besoinProposes" },
 		],
 	},
 	{

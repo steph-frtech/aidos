@@ -74,7 +74,8 @@
 		"besoinNecessity": "Nécessité du besoin",
 		"besoinGrammar": "Grammaire du besoin",
 		"besoinGraph": "Graphe du besoin",
-		"besoinMetadata": "Métadonnées du besoin"
+		"besoinMetadata": "Métadonnées du besoin",
+		"besoinProposes": "Table LevelToProposes"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3088,5 +3089,34 @@
 		"pending": "En attente d'une action.",
 		"none": "—",
 		"footer": "EL04 — au-dessus du mur, lecture seule contre la vérité. Les métadonnées qualifient un besoin (jamais de champ Version ni Mirror). Déterministe : mêmes métadonnées → même verdict."
+	},
+	"besoinProposes": {
+		"eyebrow": "EL05 · Table LevelToProposes",
+		"title": "La table LevelToProposes",
+		"subtitle": "niveau → ProposesKind | NoEmit",
+		"intro": "EL05 déclare la jointure honnête entre la grammaire du BesoinGraph (9 niveaux) et le closed set existant ideas.ProposesKinds() (control · policy · operation · action · entity · product). control/action/operation/entity/product et la bande policy se mappent vers eux-mêmes — le self-map est la seule émission légale. journey, view et invariant sont NoEmit : aucune cible Proposes légale ; ils seedent les ancres au lieu d'émettre. Aucun alias silencieux (journey→product est interdit, view→view* impossible). Table close = fonction pure déterministe, jamais un choix LLM, au-dessus du mur.",
+		"tutorialHeading": "Essayez la table",
+		"tutorialBody": "Choisissez un niveau puis cliquez « Mapper le niveau » : la table renvoie Emit<kind> ou NoEmit. « Prouver la jointure honnête » vérifie que chaque cible Emit appartient au closed set ideas.ProposesKinds() ET qu'aucun niveau n'aliase un autre. « Tester un niveau hors-grammaire » prouve qu'une chaîne hors grammaire (saga, temporal…) est une erreur dure, jamais un alias.",
+		"levelLabel": "Niveau du BesoinGraph",
+		"mapCta": "Mapper le niveau",
+		"joinCta": "Prouver la jointure honnête",
+		"checkCta": "Tester un niveau hors-grammaire",
+		"rawLabel": "Niveau hors-grammaire (saga, temporal…)",
+		"resetCta": "Réinitialiser",
+		"tableHeading": "La table déclarée (close, totale)",
+		"colLevel": "Niveau",
+		"colMapping": "Mapping",
+		"emit": "Émet",
+		"noEmit": "NoEmit (seede les ancres)",
+		"verdictHeading": "Verdict du mapping",
+		"joinHeading": "Jointure honnête",
+		"joinOk": "Honnête — chaque Emit ∈ closed set, aucun alias silencieux",
+		"joinFail": "Échec — un alias ou une cible hors closed set",
+		"checkHeading": "Niveau hors-grammaire",
+		"checkHardError": "Erreur dure — hors grammaire, aucun mapping (jamais un alias)",
+		"checkValid": "Niveau valide — possède un mapping déclaré",
+		"pending": "En attente d'une action.",
+		"closedSetHeading": "Closed set ideas.ProposesKinds()",
+		"footer": "EL05 — au-dessus du mur, lecture seule contre la vérité. La table décide seulement la cible Proposes ; elle n'émet aucune Idea (EL16 le fait via la porte idea-intake) et n'écrit aucune vérité. Déterministe : même niveau → même mapping."
 	}
 }

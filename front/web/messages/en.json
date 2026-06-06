@@ -74,7 +74,8 @@
 		"besoinNecessity": "Need necessity",
 		"besoinGrammar": "Need grammar",
 		"besoinGraph": "Need graph",
-		"besoinMetadata": "Need metadata"
+		"besoinMetadata": "Need metadata",
+		"besoinProposes": "LevelToProposes table"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3088,5 +3089,34 @@
 		"pending": "Waiting for an action.",
 		"none": "—",
 		"footer": "EL04 — above the wall, read-only against truth. The metadata qualify a need (never a Version or Mirror field). Deterministic: same metadata → same verdict."
+	},
+	"besoinProposes": {
+		"eyebrow": "EL05 · LevelToProposes table",
+		"title": "The LevelToProposes table",
+		"subtitle": "level → ProposesKind | NoEmit",
+		"intro": "EL05 declares the honest join between the BesoinGraph grammar (9 levels) and the EXISTING closed set ideas.ProposesKinds() (control · policy · operation · action · entity · product). control/action/operation/entity/product and the policy band self-map — self-mapping is the only legal emission. journey, view and invariant are NoEmit: they have no legal Proposes target; they seed anchors instead of emitting. No silent alias (journey→product is forbidden, view→view* impossible). A closed table is a pure deterministic function, never an LLM choice, above the wall.",
+		"tutorialHeading": "Try the table",
+		"tutorialBody": "Pick a level then click “Map the level”: the table returns Emit<kind> or NoEmit. “Prove the honest join” checks that every Emit target is a member of the closed set ideas.ProposesKinds() AND that no level aliases another. “Test an out-of-grammar level” proves an out-of-grammar string (saga, temporal…) is a hard error, never an alias.",
+		"levelLabel": "BesoinGraph level",
+		"mapCta": "Map the level",
+		"joinCta": "Prove the honest join",
+		"checkCta": "Test an out-of-grammar level",
+		"rawLabel": "Out-of-grammar level (saga, temporal…)",
+		"resetCta": "Reset",
+		"tableHeading": "The declared table (closed, total)",
+		"colLevel": "Level",
+		"colMapping": "Mapping",
+		"emit": "Emits",
+		"noEmit": "NoEmit (seeds anchors)",
+		"verdictHeading": "Mapping verdict",
+		"joinHeading": "Honest join",
+		"joinOk": "Honest — every Emit ∈ closed set, no silent alias",
+		"joinFail": "Failed — an alias or a target outside the closed set",
+		"checkHeading": "Out-of-grammar level",
+		"checkHardError": "Hard error — out of grammar, no mapping (never an alias)",
+		"checkValid": "Valid level — carries a declared mapping",
+		"pending": "Waiting for an action.",
+		"closedSetHeading": "Closed set ideas.ProposesKinds()",
+		"footer": "EL05 — above the wall, read-only against truth. The table decides only the Proposes target; it emits no Idea (EL16 does, via the idea-intake door) and writes no truth. Deterministic: same level → same mapping."
 	}
 }
