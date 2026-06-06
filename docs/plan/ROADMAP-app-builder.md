@@ -272,7 +272,7 @@ Le frontload est délibéré sur les **deux bloqueurs structurels transverses** 
 
 ## Impacts — ADR 0040 / EL00 (app émise = Hono + TypeScript fonctionnel)
 
-> Décision EL00 / ADR 0040. Le **concept Kernel** et la **logique d'ordre** des étapes sont inchangés ; seule la **cible d'émission** bascule Go→Hono/TS pour l'app *construite*. Inchangés : datastore dialecte Postgres + Atlas (ADR 0006), contrats Pact/OpenAPI, le déterminisme byte-identique de l'émission. **Seule décision forcée : S90** (où l'Operation-DSL s'exécute — ré-émission TS vs callback service Go, OpenQuestion).
+> Décision EL00 / ADR 0040. Le **concept Kernel** et la **logique d'ordre** des étapes sont inchangés ; seule la **cible d'émission** bascule Go→Hono/TS pour l'app *construite*. Inchangés : datastore dialecte Postgres + Atlas (ADR 0006), contrats Pact/OpenAPI, le déterminisme byte-identique de l'émission. **Décision S90 TRANCHÉE (ADR 0040 Déc. 7) = callback vers un service-interpréteur Go** (l'interpréteur reste Go gouvernable, exposé en service/MCP ; les handlers Hono/TS l'appellent ; sidecar Go dans le déploiement émis).
 
 | Étape | Delta (cible émise → Hono/TS) |
 |---|---|

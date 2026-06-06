@@ -1,10 +1,10 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # ADR 0040 — Stack de l'app ÉMISE : Hono + TypeScript fonctionnel (distinct du Go gouvernable d'AIDOS)
 
-- Status: **Proposed**
+- Status: **Accepted** (OQ-0040-interpréteur tranchée → **callback vers un service-interpréteur Go**, Décision 7)
 - Date: 2026-06-06
 - Step: EL00 (Runtime — aucun package : une cible gravée, comme le mandat FN02/ADR 0036)
 - KRD: §S34 (déterminisme d'émission : même source → mêmes octets), §S46 (slice checkout / composition-acceptance), CLAUDE.md §2 (le mur), §3 (stack figée : « Emitted-app datastore… reuses sqlc/pgx » ; « Shared source schema → emits Go + TS »), §6/§8 (determinism-first)
@@ -37,6 +37,8 @@ La **seule décision structurelle forcée** (au-delà d'un changement de templat
 
 6. **CLAUDE.md §3 et ADR 0003/0010 sont amendés par renvoi.** Les slots Go-back **`mandatory`** d'ADR 0003 (Operation-DSL-interprété-en-Go, `go test`, sqlc, pgx) restent `mandatory` **pour AIDOS la constructrice** ; ils **ne s'appliquent plus à l'app émise**, dont la cible est régie par cette ADR. La ligne « Shared source schema → emits Go + TS » se lit désormais : **une source → Go pour AIDOS, TS pour l'app émise** (DDL partagé). ADR 0010 « emitted web apps inherit [Next/Tailwind/shadcn] » : le **thème + i18n** (tokens, FR-default) restent hérités ; le **framework front** de l'app émise devient Hono (JSX/SSR ou client `hc`) — décision de S93. Tout élargissement/assouplissement est un **changement de VÉRITÉ** (idée → miroir → /goal), épinglé par un property test de parité (cette liste ≡ la config FN04/S84).
 
+7. **L'Operation-DSL s'exécute via un CALLBACK vers un service-interpréteur Go (OQ-0040-interpréteur TRANCHÉE).** L'interpréteur `operation.Interpret` reste **en Go, gouvernable, non dupliqué** ; il est exposé comme un **service interne** (HTTP/gRPC — un outil MCP par ADR 0009) que les handlers **Hono/TS** de l'app émise appellent à l'exécution via un **client typé**. On **NE ré-émet PAS** l'interpréteur en TS : pas de duplication d'une logique gouvernée, **une seule source d'interprétation autoritaire**, déterminisme + parité de comportement préservés (même AST → même résultat, prouvé une fois en Go — determinism-first : une implémentation, pas deux). Le handler Hono **valide/route** (TS pur-fonctionnel — « functional core, imperative shell »), **délègue** l'exécution de l'op au service Go, **projette** le résultat. **Déploiement de l'app émise** = bundle **Hono/TS** (front + routing back) **+ un sidecar interpréteur Go** — la seule dépendance Go de l'app émise, **partagée, gouvernée, versionnée avec le Kernel**. Trade-off **accepté** : un composant Go dans le déploiement émis, justifié car l'interpréteur EST une vérité gouvernée qu'on ne duplique jamais. **Le code que l'utilisateur possède** (handlers/UI/entités) reste **pur TS fonctionnel** ; l'interpréteur est de l'**infra AIDOS**, pas du code utilisateur. (Option de ré-émission TS via une lib d'éval Expr — ADR 0007 — **rejetée** : duplication d'une vérité gouvernée + risque de dérive de parité.)
+
 ## Conséquences
 
 - **EL00** écrit cette ADR (décision + provenance), pas de package — comme FN02. Sa preuve est le **property test de parité** cible-déclarée ≡ config enforce-cée (`gen/`).
@@ -44,7 +46,7 @@ La **seule décision structurelle forcée** (au-delà d'un changement de templat
 - **FN04** bascule l'enforcement des trois règles vers `dependency-cruiser` + linter de pureté TS sur `gen/`, avec fault-injection (injecter un `let` mutable de module / un cycle d'import → rouge).
 - **S87** émet une **app Hono bootable** (router + middleware + `/healthz` + handlers par operation, sync ET async), entrypoint Node/Bun/edge, « compile » = `tsc`.
 - **S88** re-mesure les caveats Doltgres contre le **driver TS** (le #2581 pgx-spécifique change de forme) ; **S89** provisionne le même datastore (Postgres défaut / Doltgres opt-in) + Atlas, **client TS** au lieu de sqlc/pgx.
-- **S90/S77** tranchent l'**OpenQuestion-interpréteur** : ré-émission TS de l'Operation-DSL (réutilisant une lib d'éval Expr TS, ADR 0007) **ou** callback Go-service. C'est le seul point où le pivot dépasse le changement de template.
+- **S90/S77** **réalisent la Décision 7** : le handler Hono appelle le **service-interpréteur Go** (client typé, un outil MCP) ; **aucun port TS** de l'Operation-DSL. Le miroir de S90 prouve que `handler Hono → service Go → résultat` est équivalent (parité) à l'exécution Go in-process, et que le service Go reste la seule source d'interprétation.
 - **S93** tranche le **framework front** de l'app émise (Hono JSX/SSR vs client `hc` typé) ; thème ccup + i18n inchangés ; le type-sharing front↔back de Hono (`hc`) est un gain net.
 - **S82** sandbox = toolchain Node/Bun + tsc/Vitest ; **S84** arch-fitness émis = `dependency-cruiser` exclusivement ; **S92** observabilité émise = **JS/TS OTel SDK** ; **S94/S96/S98** preview/deploy/rollback = bundle Node/Bun/edge (Atlas inchangé) ; **S114** webhooks async = worker TS ; **S117** limites honnêtes re-formulées contre le driver TS.
 - **L'app émise gagne ses propres MCP + Skills** (ADR 0009). Le mur, le mirror-first, le déterminisme et les neuf `phases` du contrat de step restent **intacts** (garde ajoutée, jamais retirée).
@@ -58,7 +60,7 @@ La **seule décision structurelle forcée** (au-delà d'un changement de templat
 
 ## OpenQuestions
 
-- **OQ-0040-interpréteur** : où l'Operation DSL s'exécute dans l'app émise — **port/ré-émission TS** de `operation.Interpret` (réutilisant une lib d'éval Expr TS, ADR 0007) **vs** callback vers un **service-interpréteur Go**. À trancher en **FN03/S90**, pas ici. C'est la seule conséquence non-mécanique du pivot.
+- **OQ-0040-interpréteur** : ✅ **TRANCHÉE (Décision 7) = callback vers un service-interpréteur Go.** L'interpréteur reste Go gouvernable, exposé en service (outil MCP) ; les handlers Hono/TS l'appellent via un client typé ; pas de ré-émission TS. Réalisée en S90/S77. (Conséquence assumée : un sidecar Go dans le déploiement de l'app émise.)
 - **OQ-0040-front** : framework front exact de l'app émise (Hono JSX/SSR vs Hono comme API + client `hc` séparé) — tranché en **S93**. Thème/i18n inchangés.
 - **OQ-0040-driver** : choix du client Postgres TS (postgres.js / Drizzle / Kysely) et re-mesure des caveats Doltgres beta contre lui — tranché par le spike **S88** (slot `replaceable`, ADR au step).
 - **OQ-0040-linear** : l'issue `EL00 · …` (projet AIDOS `aidos-2a9085453be8`, label `adr`) à créer/déplacer en `Done` au prochain run authentifié (CLAUDE.md §11, best-effort, ne bloque pas le step).
