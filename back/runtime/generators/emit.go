@@ -21,12 +21,40 @@ type typeBinding struct {
 	ts  string // TypeScript field type
 }
 
-var typeMap = map[string]typeBinding{
-	"text":        {ddl: "TEXT", gos: "string", ts: "string"},
-	"numeric":     {ddl: "NUMERIC", gos: "pgtype.Numeric", ts: "string"},
-	"int":         {ddl: "BIGINT", gos: "int64", ts: "number"},
-	"bool":        {ddl: "BOOLEAN", gos: "bool", ts: "boolean"},
-	"timestamptz": {ddl: "TIMESTAMPTZ", gos: "pgtype.Timestamptz", ts: "string"},
+// typeBindings is the PURE constructor that RETURNS the closed binding table by value
+// (FN03 / ADR 0036 — the determinism-first reform proven by the FN01 spike). It is the
+// functional substitute for the former `var typeMap` package global: no module-level
+// mutable state, no shared aliasing. Calling it yields a fresh, equal table the pipeline
+// threads explicitly through the renderers — so the emitter has no hidden state and its
+// output is a function of its input alone (EMITTED_FUNCTION_PURE). The set stays CLOSED:
+// a field type absent here is a BlockReason, never a guessed mapping (honesty).
+func typeBindings() map[string]typeBinding {
+	return map[string]typeBinding{
+		"text":        {ddl: "TEXT", gos: "string", ts: "string"},
+		"numeric":     {ddl: "NUMERIC", gos: "pgtype.Numeric", ts: "string"},
+		"int":         {ddl: "BIGINT", gos: "int64", ts: "number"},
+		"bool":        {ddl: "BOOLEAN", gos: "bool", ts: "boolean"},
+		"timestamptz": {ddl: "TIMESTAMPTZ", gos: "pgtype.Timestamptz", ts: "string"},
+	}
+}
+
+// knownType reports whether a field type is in the closed binding set, without
+// materialising the table at a call site that only needs membership (validateSource).
+func knownType(typ string) bool {
+	_, ok := typeBindings()[typ]
+	return ok
+}
+
+// mapFields is the functional core: a PURE map over fields → rendered lines, with no
+// accumulator mutation (the explicit-composition substitute for the imperative
+// `for { b.WriteString(...) }`). It takes the per-field renderer as a parameter (a
+// higher-order function); each line is a fresh value, no shared mutable state.
+func mapFields(fields []Field, renderLine func(Field) string) []string {
+	out := make([]string, len(fields))
+	for i, f := range fields {
+		out[i] = renderLine(f)
+	}
+	return out
 }
 
 // header renders the protected file header for a target. It is the SAME marker on
@@ -49,24 +77,20 @@ func goName(s string) string {
 // renderPgDDL renders the Postgres DDL projection: a CREATE TABLE with one column
 // per pinned field, fields in stable (sorted) order, normalized "\n" newlines. This
 // IS the sqlc schema input, so the go-sqlc projection cannot drift from it.
-func renderPgDDL(s EntitySource, sourceHash string) []byte {
-	var b strings.Builder
-	b.WriteString(header("--", sourceHash))
+func renderPgDDL(s EntitySource, tb map[string]typeBinding, sourceHash string) []byte {
 	// Quote the table + column identifiers so a reserved word (e.g. "order") is valid
 	// DDL and a safe sqlc schema input. Deterministic: identifiers come verbatim from
-	// the pinned AST, lower-cased for the table, in stable (sorted) field order.
-	fmt.Fprintf(&b, "CREATE TABLE %q (\n", strings.ToLower(s.Name))
-	fields := sortedFields(s)
-	for i, f := range fields {
-		col := typeMap[f.Type].ddl
-		comma := ","
-		if i == len(fields)-1 {
-			comma = ""
-		}
-		fmt.Fprintf(&b, "    %q %s NOT NULL%s\n", f.Name, col, comma)
-	}
-	b.WriteString(");\n")
-	return []byte(b.String())
+	// the pinned AST, lower-cased for the table, in stable (sorted) field order. The
+	// binding table is THREADED in (no global); rendering is a pure map + fold (no
+	// strings.Builder mutation) — FN03 functional reform (EMITTED_FUNCTION_PURE).
+	lines := mapFields(sortedFields(s), func(f Field) string {
+		return fmt.Sprintf("    %q %s NOT NULL", f.Name, tb[f.Type].ddl)
+	})
+	out := header("--", sourceHash) +
+		fmt.Sprintf("CREATE TABLE %q (\n", strings.ToLower(s.Name)) +
+		strings.Join(lines, ",\n") + "\n" +
+		");\n"
+	return []byte(out)
 }
 
 // renderGoSqlc renders the typed Go struct sqlc emits from the DDL projection: one
@@ -76,33 +100,38 @@ func renderPgDDL(s EntitySource, sourceHash string) []byte {
 // slot (sqlc, never substituted): the renderer is the deterministic twin of `sqlc
 // generate` over the same DDL, used by the pure Emit; the /project gesture also runs
 // `sqlc generate` to keep the slot honest end-to-end.
-func renderGoSqlc(s EntitySource, sourceHash string) []byte {
+func renderGoSqlc(s EntitySource, tb map[string]typeBinding, sourceHash string) []byte {
 	fields := sortedFields(s)
 	needsPgtype := false
 	for _, f := range fields {
-		if strings.HasPrefix(typeMap[f.Type].gos, "pgtype.") {
+		if strings.HasPrefix(tb[f.Type].gos, "pgtype.") {
 			needsPgtype = true
 		}
 	}
-	var b strings.Builder
-	b.WriteString(header("//", sourceHash))
-	fmt.Fprintf(&b, "package %sgen\n\n", strings.ToLower(s.Name))
+	// Pure map over fields → struct-field lines, then fold with strings.Join (no Builder
+	// mutation, no global): the binding table is threaded in by value. FN03 functional
+	// reform — same bytes as before, but the emitter holds no hidden state.
+	lines := mapFields(fields, func(f Field) string {
+		return "\t" + goName(f.Name) + " " + tb[f.Type].gos
+	})
+	imports := ""
 	if needsPgtype {
-		b.WriteString("import (\n\t\"github.com/jackc/pgx/v5/pgtype\"\n)\n\n")
+		imports = "import (\n\t\"github.com/jackc/pgx/v5/pgtype\"\n)\n\n"
 	}
-	fmt.Fprintf(&b, "type %s struct {\n", goName(s.Name))
-	for _, f := range fields {
-		fmt.Fprintf(&b, "\t%s %s\n", goName(f.Name), typeMap[f.Type].gos)
-	}
-	b.WriteString("}\n")
+	src := header("//", sourceHash) +
+		"package " + strings.ToLower(s.Name) + "gen\n\n" +
+		imports +
+		"type " + goName(s.Name) + " struct {\n" +
+		strings.Join(lines, "\n") + "\n" +
+		"}\n"
 	// go/format is the canonical, deterministic gofmt — reuse it so the emitted Go is
 	// already gofmt-clean (aligned fields, gofmt'd imports). format.Source is a pure
-	// function of its input, so byte-stability holds. The hand-rolled string above is
+	// function of its input, so byte-stability holds. The composed string above is
 	// always well-formed Go; a format error would be a programming bug, so we fall
 	// back to the unformatted bytes (Validate-equivalent: never a silent panic).
-	formatted, err := format.Source([]byte(b.String()))
+	formatted, err := format.Source([]byte(src))
 	if err != nil {
-		return []byte(b.String())
+		return []byte(src)
 	}
 	return formatted
 }
@@ -111,15 +140,16 @@ func renderGoSqlc(s EntitySource, sourceHash string) []byte {
 // field per pinned column, fields in stable (sorted) order, normalized "\n". It is
 // rendered from the SAME AST as Go/DDL so the three agree on every field — one
 // source, never double-typed (CONTEXT-MAP).
-func renderTSTypes(s EntitySource, sourceHash string) []byte {
-	var b strings.Builder
-	b.WriteString(header("//", sourceHash))
-	fmt.Fprintf(&b, "export interface %s {\n", goName(s.Name))
-	for _, f := range sortedFields(s) {
-		fmt.Fprintf(&b, "\t%s: %s;\n", f.Name, typeMap[f.Type].ts)
-	}
-	b.WriteString("}\n")
-	return []byte(b.String())
+func renderTSTypes(s EntitySource, tb map[string]typeBinding, sourceHash string) []byte {
+	// Pure map + fold (no Builder, no global), binding table threaded in by value.
+	lines := mapFields(sortedFields(s), func(f Field) string {
+		return "\t" + f.Name + ": " + tb[f.Type].ts + ";"
+	})
+	out := header("//", sourceHash) +
+		"export interface " + goName(s.Name) + " {\n" +
+		strings.Join(lines, "\n") + "\n" +
+		"}\n"
+	return []byte(out)
 }
 
 // artifactPath returns the RELATIVE projection path for a target (no absolute paths
@@ -142,13 +172,18 @@ func artifactPath(s EntitySource, t Target) string {
 // render dispatches to the per-target renderer. Closed switch; an unknown target is
 // caught upstream in Emit (BlockReason), never reached here with a guess.
 func render(s EntitySource, t Target, sourceHash string) []byte {
+	// Construct the binding table once and thread it explicitly into the renderer —
+	// the functional substitute for the former package global. The call graph is
+	// explicit and acyclic: render → typeBindings, render → renderGoSqlc/DDL/TS
+	// (EMITTED_CALL_GRAPH_ACYCLIC).
+	tb := typeBindings()
 	switch t {
 	case TargetGoSqlc:
-		return renderGoSqlc(s, sourceHash)
+		return renderGoSqlc(s, tb, sourceHash)
 	case TargetPgDDL:
-		return renderPgDDL(s, sourceHash)
+		return renderPgDDL(s, tb, sourceHash)
 	case TargetTSTypes:
-		return renderTSTypes(s, sourceHash)
+		return renderTSTypes(s, tb, sourceHash)
 	default:
 		return nil
 	}

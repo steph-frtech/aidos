@@ -182,7 +182,7 @@ func validateSource(s EntitySource) error {
 		if f.Name == "" {
 			return ErrNoFields
 		}
-		if _, ok := typeMap[f.Type]; !ok {
+		if !knownType(f.Type) {
 			return fmt.Errorf("%w: %q", ErrUnknownType, f.Type)
 		}
 	}
