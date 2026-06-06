@@ -72,7 +72,8 @@
 		"ingestion": "Ingestion",
 		"compound": "Compound",
 		"besoinNecessity": "Need necessity",
-		"besoinGrammar": "Need grammar"
+		"besoinGrammar": "Need grammar",
+		"besoinGraph": "Need graph"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3018,5 +3019,40 @@
 		"parseUnknown": "Hard refusal — out of grammar (unknown)",
 		"parseOutOfScope": "Refused — out of scope v1 (declared OpenQuestion)",
 		"footer": "EL02 — CLOSED grammar, total order, pure functions (determinism §6/§8). invariant/policy are transversal bands (never vertical rungs). saga/temporal/globalinvariant out-of-grammar-v1 (declared OpenQuestion). No kernel/mirrors/fitness write (the wall); EL03+ builds the graph on top of this grammar."
+	},
+	"besoinGraph": {
+		"eyebrow": "The BesoinGraph record",
+		"title": "Need graph — ordered, append-only, content-addressed record",
+		"subtitle": "EL03 · runtime/besoin",
+		"intro": "EL03 freezes the BesoinGraph record: an ORDERED, append-only set of LevelNodes (one per rung) + constrains(L→L+1)/seeds(L names a deeper need) edges, content-addressed via records.Hash(Canonicalize(graph)) — NEVER a forked hash, the same S01/S02 scheme as the kernel. By construction NO Version field, NO Mirror field: that double absence IS what makes it a need above the wall, never a truth. Everything is a pure function (determinism §6/§8): same answers → same graph_hash regardless of order.",
+		"tutorialHeading": "How to read and drive the screen",
+		"tutorialBody": "Add nodes (a rung + a body + a status) with \"Add node\": the panel runs the pure twin (identical to the Go authority back/runtime/besoin/graph.go) and recomputes the graph_hash. Click \"Compute graph_hash\": a 64-char SHA-256 hex. Click \"Re-sort (reverse order)\": the hash DOES NOT CHANGE — the address is insertion-order-independent. Change the project and click \"Compare projects\": two distinct projects have DISJOINT hashes. The \"Double absence\" panel proves no version/mirror key ever appears in the canonical body (the wall).",
+		"projectLabel": "Project",
+		"levelLabel": "Rung",
+		"statusLabel": "Status",
+		"intentLabel": "Body (intent)",
+		"addNodeCta": "Add node",
+		"hashCta": "Compute graph_hash",
+		"reorderCta": "Re-sort (reverse order)",
+		"compareCta": "Compare projects",
+		"clearCta": "Clear graph",
+		"nodesHeading": "Graph nodes (canonical order §23)",
+		"hashHeading": "graph_hash (content-addressing)",
+		"reorderHeading": "Insertion-order independence",
+		"compareHeading": "Project disjointness",
+		"absenceHeading": "Double absence (the wall) — no Version/Mirror field",
+		"colLevel": "Rung",
+		"colStatus": "Status",
+		"colRefs": "Outgoing refs",
+		"empty": "No node yet. Add a rung to build the graph.",
+		"pending": "Add ≥1 node then compute the graph_hash.",
+		"reorderSame": "Identical hash after reverse re-insertion — addressing is order-independent (determinism).",
+		"reorderDiff": "FAIL — the hash changed with order (should never happen).",
+		"compareDisjoint": "DISJOINT hashes — two distinct projects never collide (isolation).",
+		"compareCollide": "FAIL — hash collision between distinct projects (should never happen).",
+		"absenceOk": "The canonical body carries NO version/mirror key — it is a need, not a truth (the wall).",
+		"absenceFail": "FAIL — a version/mirror key is present (wall violation).",
+		"dupRefused": "Refused — a node already exists for that rung (overwrite goes through a ChangeSet, §9).",
+		"footer": "EL03 — content-addressed record (records.Hash reused, never forked), append-only, non-destructive (§9), no Version nor Mirror (double absence = the wall). Same answers → same graph_hash; projects disjoint. Above the idea-intake door, never a kernel/mirrors/fitness write. EL15 persists it as JSONB in the besoin schema; EL19 drives it as a wizard."
 	}
 }

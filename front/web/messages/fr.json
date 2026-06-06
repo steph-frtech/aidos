@@ -72,7 +72,8 @@
 		"ingestion": "Ingestion",
 		"compound": "Compound",
 		"besoinNecessity": "Nécessité du besoin",
-		"besoinGrammar": "Grammaire du besoin"
+		"besoinGrammar": "Grammaire du besoin",
+		"besoinGraph": "Graphe du besoin"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3018,5 +3019,40 @@
 		"parseUnknown": "Refus dur — hors-grammaire (inconnu)",
 		"parseOutOfScope": "Refus — hors-scope v1 (OpenQuestion déclarée)",
 		"footer": "EL02 — grammaire CLOSE, ordre total, fonctions pures (déterminisme §6/§8). Bandes invariant/policy transversales (jamais des rungs verticaux). saga/temporal/globalinvariant hors-grammaire-v1 (OpenQuestion déclarée). Aucune écriture kernel/mirrors/fitness (le mur) ; EL03+ construit le graphe au-dessus de cette grammaire."
+	},
+	"besoinGraph": {
+		"eyebrow": "Le record BesoinGraph",
+		"title": "Graphe du besoin — record ordonné, append-only, content-adressé",
+		"subtitle": "EL03 · runtime/besoin",
+		"intro": "EL03 fige le record BesoinGraph : un ensemble ORDONNÉ et append-only de nœuds LevelNode (un par rung) + arêtes constrains(L→L+1)/seeds(L nomme un besoin plus profond), content-adressé via records.Hash(Canonicalize(graphe)) — JAMAIS un hash forké, c'est le même schéma S01/S02 que le kernel. Par construction AUCUN champ Version, AUCUN champ Mirror : cette double absence EST ce qui en fait un besoin au-dessus du mur, jamais une vérité. Tout est fonction pure (déterminisme §6/§8) : mêmes réponses → même graph_hash quel que soit l'ordre.",
+		"tutorialHeading": "Comment lire et piloter l'écran",
+		"tutorialBody": "Ajoutez des nœuds (un rung + un corps + un statut) avec « Ajouter le nœud » : le panneau lance le jumeau pur (identique à l'autorité Go back/runtime/besoin/graph.go) et recalcule le graph_hash. Cliquez « Calculer le graph_hash » : un SHA-256 hex de 64 caractères. Cliquez « Re-trier (ordre inverse) » : le hash NE CHANGE PAS — l'adresse est indépendante de l'ordre d'insertion. Changez le projet et cliquez « Comparer les projets » : deux projets distincts ont des hash DISJOINTS. Le panneau « Double absence » prouve qu'aucune clé version/mirror n'apparaît jamais dans le corps canonique (le mur).",
+		"projectLabel": "Projet",
+		"levelLabel": "Rung",
+		"statusLabel": "Statut",
+		"intentLabel": "Corps (intent)",
+		"addNodeCta": "Ajouter le nœud",
+		"hashCta": "Calculer le graph_hash",
+		"reorderCta": "Re-trier (ordre inverse)",
+		"compareCta": "Comparer les projets",
+		"clearCta": "Vider le graphe",
+		"nodesHeading": "Nœuds du graphe (ordre canonique §23)",
+		"hashHeading": "graph_hash (content-adressage)",
+		"reorderHeading": "Indépendance à l'ordre d'insertion",
+		"compareHeading": "Disjonction des projets",
+		"absenceHeading": "Double absence (le mur) — aucun champ Version/Mirror",
+		"colLevel": "Rung",
+		"colStatus": "Statut",
+		"colRefs": "Réfs sortantes",
+		"empty": "Aucun nœud. Ajoutez un rung pour construire le graphe.",
+		"pending": "Ajoutez ≥1 nœud puis calculez le graph_hash.",
+		"reorderSame": "Hash identique après ré-insertion en ordre inverse — l'adressage est indépendant de l'ordre (déterminisme).",
+		"reorderDiff": "ÉCHEC — le hash a changé avec l'ordre (ne devrait jamais arriver).",
+		"compareDisjoint": "Hash DISJOINTS — deux projets distincts ne collisionnent jamais (isolation).",
+		"compareCollide": "ÉCHEC — collision de hash entre projets distincts (ne devrait jamais arriver).",
+		"absenceOk": "Le corps canonique ne porte AUCUNE clé version/mirror — c'est un besoin, pas une vérité (le mur).",
+		"absenceFail": "ÉCHEC — une clé version/mirror est présente (violation du mur).",
+		"dupRefused": "Refusé — un nœud existe déjà pour ce rung (l'écrasement passe par un ChangeSet, §9).",
+		"footer": "EL03 — record content-adressé (records.Hash réutilisé, jamais forké), append-only, non-destructif (§9), aucune Version ni Mirror (double absence = le mur). Mêmes réponses → même graph_hash ; projets disjoints. Au-dessus de la porte idea-intake, jamais une écriture kernel/mirrors/fitness. EL15 le persiste en JSONB dans le schéma besoin ; EL19 le pilote en wizard."
 	}
 }
