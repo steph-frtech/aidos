@@ -80,7 +80,8 @@
 		"besoinCanDescend": "CanDescend (forçage)",
 		"besoinCascade": "Cascade des ancres",
 		"besoinCompleteness": "Complétude du besoin",
-		"besoinMirrorform": "Forme de miroir par niveau"
+		"besoinMirrorform": "Forme de miroir par niveau",
+		"besoinGate": "Porte Stop:besoin-gate"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3270,5 +3271,35 @@
 		"invalid": "Invalide — le schéma échoue",
 		"pending": "En attente d’une validation…",
 		"footer": "EL10 : la table LevelMirrorForm + les validateurs view/journey sont des fonctions pures ; pour les 5 rungs couverts, la sortie ≡ derive-mirror (pas de fork) ; aucun miroir n’est écrit — above-the-wall. Le jumeau TypeScript (lib/besoin-completeness.ts) est byte-équivalent à l’autorité Go (back/runtime/besoin/{mirrorform,validators}.go)."
+	},
+	"besoinGate": {
+		"eyebrow": "EL11 · Hook Stop:besoin-gate — le forçage de descente",
+		"title": "Porte Stop:besoin-gate — le forçage de descente",
+		"subtitle": "un OU entre ¬enough et monstre, scopé aux sessions BesoinGraph",
+		"intro": "EL11 livre le hook Stop:besoin-gate, un binaire Go DISTINCT du back/hooks/stop existant (qui lit la complétude kernel sur le schéma mirrors). À la fin d’un tour, il refuse la DESCENTE d’un niveau (ou la promotion en Idea) ssi, pour le rung courant, le niveau n’est PAS right-sized (¬CanDescend.enough, EL07) OU porte un monstre de complétude-du-besoin (EL09). C’est un OU, pas un ET : les deux modes d’échec sont indépendants, chacun bloque seul. Le hook est SCOPÉ aux sessions avec un BesoinGraph ouvert — sans BesoinGraph, c’est un no-op (un hook qui tire sur chaque session serait le hook mort/sur-tirant, §5). Le verdict est CALCULÉ depuis EL07 + EL09, jamais un jugement LLM ; le hook RENFORCE le mur (il ajoute une garde, n’en retire jamais — méta-loop §5).",
+		"tutorialHeading": "Comment lire ce panneau",
+		"tutorialBody": "L’état montre la session courante (BesoinGraph attaché ? niveau courant, métadonnées complètes ?, miroir-de-niveau présent ?). Cliquez « Évaluer la porte » : le jumeau déterministe calcule le verdict (no-op, autorisé, ou bloqué) et affiche les deux drapeaux du OU. « Casser le right-sizing » supprime les métadonnées du rung courant → ¬enough (disjonct 1). « Casser le miroir-de-niveau » retire le miroir du rung resolved → monstre (disjonct 2). « Détacher le BesoinGraph » abandonne la session → no-op (le scoping §5). « Réinitialiser » rétablit une session right-sized et sans monstre. Chaque verdict est calculé ; rien n’est jugé par un LLM.",
+		"stateHeading": "État de la session",
+		"sessionAttached": "BesoinGraph attaché",
+		"sessionDetached": "détaché",
+		"currentLevel": "Niveau courant",
+		"metaComplete": "Métadonnées complètes (EL04)",
+		"mirrorPresent": "Miroir-de-niveau présent (EL09)",
+		"yes": "oui",
+		"no": "non",
+		"evaluateCta": "Évaluer la porte",
+		"breakRightSizingCta": "Casser le right-sizing",
+		"breakMirrorCta": "Casser le miroir-de-niveau",
+		"detachCta": "Détacher le BesoinGraph",
+		"resetCta": "Réinitialiser",
+		"verdictHeading": "Verdict de la porte",
+		"verdictNoOp": "No-op — aucun BesoinGraph ouvert (le hook ne tire pas, §5)",
+		"verdictAllow": "Autorisé — le rung courant est right-sized ET sans monstre",
+		"verdictBlock": "Bloqué — la descente est refusée (le OU a tiré)",
+		"notEnoughLabel": "¬enough (EL07)",
+		"hasMonsterLabel": "monstre (EL09)",
+		"reasonsHeading": "BlockReasons actionnables",
+		"pending": "En attente d’une évaluation…",
+		"footer": "EL11 : le verdict du hook est calculé par les fonctions pures CanDescend (EL07) + BesoinCompleteness (EL09), jamais un LLM ; un OU (pas un ET) entre ¬enough et monstre ; no-op sans BesoinGraph (anti-sur-tirage §5) ; le hook renforce le mur — il lit le BesoinGraph above-the-line et n’écrit aucune vérité (§2). Le jumeau TypeScript (lib/besoin-gate.ts) compose les jumeaux EL07/EL09 et est byte-équivalent à l’autorité Go (back/hooks/stop/besoin-gate/gate.go)."
 	}
 }

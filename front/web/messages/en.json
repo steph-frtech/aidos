@@ -80,7 +80,8 @@
 		"besoinCanDescend": "CanDescend (forcing)",
 		"besoinCascade": "Anchor cascade",
 		"besoinCompleteness": "Need completeness",
-		"besoinMirrorform": "Mirror form per level"
+		"besoinMirrorform": "Mirror form per level",
+		"besoinGate": "Stop:besoin-gate"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3270,5 +3271,35 @@
 		"invalid": "Invalid — the schema fails",
 		"pending": "Waiting for a validation…",
 		"footer": "EL10: the LevelMirrorForm table + the view/journey validators are pure functions; for the 5 covered rungs, the output ≡ derive-mirror (no fork); no mirror is written — above the wall. The TypeScript twin (lib/besoin-completeness.ts) is byte-equivalent to the Go authority (back/runtime/besoin/{mirrorform,validators}.go)."
+	},
+	"besoinGate": {
+		"eyebrow": "EL11 · Stop:besoin-gate hook — the descent gate",
+		"title": "Stop:besoin-gate — the descent forcing gate",
+		"subtitle": "an OR between ¬enough and monster, scoped to BesoinGraph sessions",
+		"intro": "EL11 ships the Stop:besoin-gate hook, a Go binary DISTINCT from the existing back/hooks/stop (which reads kernel completeness over the mirrors schema). At turn close it refuses a level's DESCENT (or its promotion to an Idea) iff, for the current rung, the level is NOT right-sized (¬CanDescend.enough, EL07) OR carries a need-completeness monster (EL09). It is an OR, not an AND: the two failure modes are independent, each blocks on its own. The hook is SCOPED to sessions with an OPEN BesoinGraph — without one it is a no-op (a hook that fired on every session would be the dead/over-firing hook, §5). The verdict is COMPUTED from EL07 + EL09, never an LLM judgment; the hook REINFORCES the wall (it adds a guard, never removes one — meta-loop §5).",
+		"tutorialHeading": "How to read this panel",
+		"tutorialBody": "The state shows the current session (BesoinGraph attached? current level, metadata complete?, level-mirror present?). Click \"Evaluate the gate\": the deterministic twin computes the verdict (no-op, allow, or block) and shows the two OR flags. \"Break right-sizing\" drops the current rung's metadata → ¬enough (disjunct 1). \"Break the level-mirror\" removes the resolved rung's mirror → monster (disjunct 2). \"Detach the BesoinGraph\" drops the session → no-op (the §5 scoping). \"Reset\" restores a right-sized, monster-free session. Every verdict is computed; nothing is judged by an LLM.",
+		"stateHeading": "Session state",
+		"sessionAttached": "BesoinGraph attached",
+		"sessionDetached": "detached",
+		"currentLevel": "Current level",
+		"metaComplete": "Metadata complete (EL04)",
+		"mirrorPresent": "Level-mirror present (EL09)",
+		"yes": "yes",
+		"no": "no",
+		"evaluateCta": "Evaluate the gate",
+		"breakRightSizingCta": "Break right-sizing",
+		"breakMirrorCta": "Break the level-mirror",
+		"detachCta": "Detach the BesoinGraph",
+		"resetCta": "Reset",
+		"verdictHeading": "Gate verdict",
+		"verdictNoOp": "No-op — no open BesoinGraph (the hook does not fire, §5)",
+		"verdictAllow": "Allowed — the current rung is right-sized AND monster-free",
+		"verdictBlock": "Blocked — the descent is refused (the OR fired)",
+		"notEnoughLabel": "¬enough (EL07)",
+		"hasMonsterLabel": "monster (EL09)",
+		"reasonsHeading": "Actionable BlockReasons",
+		"pending": "Waiting for an evaluation…",
+		"footer": "EL11: the hook verdict is computed by the pure functions CanDescend (EL07) + BesoinCompleteness (EL09), never an LLM; an OR (not an AND) between ¬enough and monster; no-op without a BesoinGraph (anti-over-firing §5); the hook reinforces the wall — it reads the BesoinGraph above the line and writes no truth (§2). The TypeScript twin (lib/besoin-gate.ts) composes the EL07/EL09 twins and is byte-equivalent to the Go authority (back/hooks/stop/besoin-gate/gate.go)."
 	}
 }
