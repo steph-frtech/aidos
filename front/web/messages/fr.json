@@ -76,7 +76,8 @@
 		"besoinGraph": "Graphe du besoin",
 		"besoinMetadata": "Métadonnées du besoin",
 		"besoinProposes": "Table LevelToProposes",
-		"besoinThresholds": "Seuils & OptionSpace"
+		"besoinThresholds": "Seuils & OptionSpace",
+		"besoinCanDescend": "CanDescend (forçage)"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3152,5 +3153,35 @@
 		"countOpenQuestion": "OpenQuestion — non-énumérable, taille -1 (jamais fabriquée à 0)",
 		"pending": "En attente d'une action.",
 		"footer": "EL06 — config au-dessus du mur, lecture seule contre la vérité. Seuils déclarés, jamais appris (§8) ; OptionSpace = comptage pur sur un set clos. EL07/EL11 lisent le même record ; EL08 compte ShrinkOptionSpace sur ce set. Aucune écriture vérité. Déterministe : mêmes entrées → mêmes sorties (hash byte-identique côté Go et TS)."
+	},
+	"besoinCanDescend": {
+		"eyebrow": "EL07 · CanDescend (la fonction de forçage)",
+		"title": "CanDescend — la gate de forçage par niveau",
+		"subtitle": "enough est CALCULÉ, jamais déclaré",
+		"intro": "EL07 est la fonction de forçage PURE CanDescend(graph, level) → Verdict{enough, missing, openQuestions, blockReasons}. Un niveau est franchissable ssi : (a) son corps est énonçable ET non-vacant (les champs requis du rung + ses règles de parse), (b) ses quatre métadonnées sont présentes/certifiables (EL04), (c) sa référence sortante résout @version, et (e) ANTI-VACUITÉ : ShrinkOptionSpace(graph, level) > 0 — un niveau parsable qui ne rétrécit RIEN est not_enough (anti-gaming). Un manque vers un niveau plus profond pas encore existant est une OpenQuestion portée avec enough=true (bootstrap §6), jamais un résiduel bloquant. enough est CALCULÉ par le code, jamais déclaré par l'utilisateur ni le LLM (anti-Goodhart §8).",
+		"tutorialHeading": "Essayez la gate de forçage",
+		"tutorialBody": "Choisissez une forme de corps et lancez « Calculer le verdict » : un corps right-sized qui contraint est enough ; un corps parsable-mais-non-contraignant est not_enough (anti-vacuité). « Compter le rétrécissement » affiche le |OptionSpace| élagué par les `selects` du corps — 0 = il ne contraint rien. Le cas operation→entity montre une dépendance avant : une OpenQuestion portée, enough=true. Chaque verdict est calculé par le twin déterministe, jamais un LLM.",
+		"verdictCta": "Calculer le verdict",
+		"shrinkCta": "Compter le rétrécissement",
+		"resetCta": "Réinitialiser",
+		"caseLabel": "Fixture de corps",
+		"caseRightSized": "product · right-sized, rétrécit journey (enough)",
+		"caseVacant": "product · parse mais ne sélectionne rien (anti-vacuité → not_enough)",
+		"caseTooMany": "product · au-delà de maxScenarios (not_enough)",
+		"caseMetaIncomplete": "product · métadonnées incomplètes (not_enough)",
+		"caseForwardDep": "operation · entity pas encore déclarée (dép. avant → OpenQuestion portée)",
+		"verdictHeading": "Verdict",
+		"enoughTrue": "enough = true — le niveau est right-sized ; la descente est autorisée",
+		"enoughFalse": "enough = false — not_enough ; le niveau est bloqué jusqu'à la résolution",
+		"missingHeading": "Missing (gates non satisfaites)",
+		"openQuestionsHeading": "OpenQuestions portées (dépendances avant, non bloquantes)",
+		"blockReasonsHeading": "BlockReasons (refus actionnables)",
+		"shrinkHeading": "ShrinkOptionSpace (comptage anti-vacuité)",
+		"shrinkValue": "shrink",
+		"shrinkZero": "0 — ne rétrécit rien (vacant) → not_enough",
+		"shrinkPositive": "> 0 — rétrécit l'OptionSpace du niveau inférieur (anti-vacuité satisfaite)",
+		"none": "aucun",
+		"pending": "En attente d'une action.",
+		"footer": "EL07 — la gate ne lit que le BesoinGraph (le mur) ; elle n'écrit aucune vérité. enough est CALCULÉ depuis les cinq gates, jamais déclaré (anti-Goodhart §8). Elle consomme ShrinkOptionSpace (EL06/EL08) comme condition de gate anti-vacuité, pas comme simple affichage. Déterministe : mêmes (graph, level, metadata) → même verdict (lib/besoin-candescend.ts est le twin byte-équivalent de back/runtime/besoin/candescend.go)."
 	}
 }

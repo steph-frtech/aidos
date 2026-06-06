@@ -76,7 +76,8 @@
 		"besoinGraph": "Need graph",
 		"besoinMetadata": "Need metadata",
 		"besoinProposes": "LevelToProposes table",
-		"besoinThresholds": "Thresholds & OptionSpace"
+		"besoinThresholds": "Thresholds & OptionSpace",
+		"besoinCanDescend": "CanDescend (forcing)"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3152,5 +3153,35 @@
 		"countOpenQuestion": "OpenQuestion — non-enumerable, size -1 (never fabricated to 0)",
 		"pending": "Awaiting an action.",
 		"footer": "EL06 — above-the-wall config, read-only against truth. Thresholds declared, never learned (§8); OptionSpace = a pure count over a closed set. EL07/EL11 read the same record; EL08 counts ShrinkOptionSpace over this set. No truth write. Deterministic: same inputs → same outputs (byte-identical hash on the Go and TS sides)."
+	},
+	"besoinCanDescend": {
+		"eyebrow": "EL07 · CanDescend (the forcing function)",
+		"title": "CanDescend — the per-level forcing gate",
+		"subtitle": "enough is COMPUTED, never declared",
+		"intro": "EL07 is the PURE forcing function CanDescend(graph, level) → Verdict{enough, missing, openQuestions, blockReasons}. A level is descendable iff: (a) its body is statable AND non-vacant (the rung's required fields + parse rules), (b) its four metadata are present/certifiable (EL04), (c) its outgoing ref resolves @version, and (e) ANTI-VACUITY: ShrinkOptionSpace(graph, level) > 0 — a parsable level that narrows nothing is not_enough (anti-gaming). A gap toward a deeper, not-yet-existing rung is a carried OpenQuestion with enough=true (bootstrap §6), never a blocking residual. enough is COMPUTED by the code, never declared by the user or the LLM (anti-Goodhart §8).",
+		"tutorialHeading": "Try the forcing gate",
+		"tutorialBody": "Pick a body shape and run \"Compute the verdict\": a right-sized, narrowing body is enough; a parsable-but-non-constraining body is not_enough (anti-vacuity). \"Count the shrink\" shows |OptionSpace| pruned by the body's selects — 0 means it constrains nothing. The operation→entity case shows a forward dependency: a carried OpenQuestion, enough=true. Every verdict is computed by the deterministic twin, never an LLM.",
+		"verdictCta": "Compute the verdict",
+		"shrinkCta": "Count the shrink",
+		"resetCta": "Reset",
+		"caseLabel": "Body fixture",
+		"caseRightSized": "product · right-sized, narrows journey (enough)",
+		"caseVacant": "product · parses but selects nothing (anti-vacuity → not_enough)",
+		"caseTooMany": "product · over maxScenarios (not_enough)",
+		"caseMetaIncomplete": "product · incomplete metadata (not_enough)",
+		"caseForwardDep": "operation · entity not yet declared (forward dep → carried OpenQuestion)",
+		"verdictHeading": "Verdict",
+		"enoughTrue": "enough = true — the level is right-sized; descent is allowed",
+		"enoughFalse": "enough = false — not_enough; the level is held until the fix path is walked",
+		"missingHeading": "Missing (unsatisfied gates)",
+		"openQuestionsHeading": "Carried OpenQuestions (forward dependencies, non-blocking)",
+		"blockReasonsHeading": "BlockReasons (actionable refusals)",
+		"shrinkHeading": "ShrinkOptionSpace (anti-vacuity count)",
+		"shrinkValue": "shrink",
+		"shrinkZero": "0 — narrows nothing (vacant) → not_enough",
+		"shrinkPositive": "> 0 — narrows the lower rung's OptionSpace (anti-vacuity satisfied)",
+		"none": "none",
+		"pending": "Awaiting an action.",
+		"footer": "EL07 — the gate reads only the BesoinGraph (the wall); it writes no truth. enough is COMPUTED from the five gates, never declared (anti-Goodhart §8). It consumes ShrinkOptionSpace (EL06/EL08) as the anti-vacuity gate condition, not as mere display. Deterministic: same (graph, level, metadata) → same verdict (lib/besoin-candescend.ts is the byte-equivalent twin of back/runtime/besoin/candescend.go)."
 	}
 }
