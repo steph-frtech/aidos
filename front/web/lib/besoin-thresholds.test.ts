@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { allLevels, nextLevel } from "./besoin-grammar";
+import { allLevels, nextLevel, specOf } from "./besoin-grammar";
 import {
 	defaultThresholds,
 	enumerableOptionSpacePairs,
@@ -38,8 +38,10 @@ describe("BesoinThresholds", () => {
 		for (const l of allLevels()) {
 			const fromThresholds = requiredFieldsFor(l);
 			expect(fromThresholds).not.toBeNull();
-			// specOf is the single source; requiredFieldsFor must equal it exactly.
-			expect(fromThresholds).toEqual(requiredFieldsFor(l));
+			// specOf is the single source; requiredFieldsFor must equal it exactly (no second,
+			// drifting copy). Compare the two DISTINCT accessors, not the function against itself.
+			const fromSpec = specOf(l)?.requiredFields ?? null;
+			expect(fromThresholds).toEqual(fromSpec);
 		}
 	});
 

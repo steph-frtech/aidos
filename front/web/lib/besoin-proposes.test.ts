@@ -45,7 +45,10 @@ describe("EL05 LevelToProposes — closed: every Emit target ∈ ProposesKinds()
 		const closed = new Set<string>(PROPOSES_KINDS);
 		for (const l of allLevels()) {
 			const m = levelToProposes(l);
-			if (m.kind === "emit") expect(closed.has(m.proposes!)).toBe(true);
+			if (m.kind === "emit") {
+				expect(m.proposes).toBeDefined();
+				expect(closed.has(m.proposes as string)).toBe(true);
+			}
 		}
 	});
 

@@ -78,7 +78,8 @@
 		"besoinProposes": "Table LevelToProposes",
 		"besoinThresholds": "Seuils & OptionSpace",
 		"besoinCanDescend": "CanDescend (forçage)",
-		"besoinCascade": "Cascade des ancres"
+		"besoinCascade": "Cascade des ancres",
+		"besoinCompleteness": "Complétude du besoin"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3221,5 +3222,27 @@
 		"none": "aucune",
 		"pending": "En attente d'une action.",
 		"footer": "EL08 — la cascade ne lit que le BesoinGraph (le mur) ; elle n'écrit aucune vérité. La descente est gated par le verdict CALCULÉ EL07 ; |OptionSpace| sous une ancre figée est un entier compté, jamais un jugement LLM ; rouvrir une ancre exige un ChangeSet (anti-overwrite §9). Déterministe : mêmes nœuds → même cascade (lib/besoin-cascade.ts est le twin byte-équivalent de back/runtime/besoin/cascade.go)."
+	},
+	"besoinCompleteness": {
+		"eyebrow": "EL09 · Complétude du besoin (la loi de complétude)",
+		"title": "Complétude du besoin — la loi de complétude appliquée au BESOIN",
+		"subtitle": "un niveau resolved sans son miroir-de-niveau = monstre",
+		"intro": "EL09 applique la loi de complétude (S06) au BESOIN. BesoinCompleteness(graph, mirrors) → { complete, monsters[] } : tout nœud `resolved` doit porter son miroir-de-niveau de la bonne forme (LevelMirrorForm) ET ses quatre métadonnées vivantes ; aucun miroir-de-niveau ne peut être orphelin. Casser le lien nœud↔miroir-de-niveau dans un sens (retirer le miroir) fait apparaître NEED_LEVEL_WITHOUT_MIRROR ; dans l’autre (un miroir qui ne reflète aucun nœud résolu) fait apparaître ORPHAN_NEED_MIRROR. La détection est une FONCTION PURE (comptage + appariement), jamais un LLM. Aucun miroir réel n’est écrit (ils le seront sous le mur par l’app-builder via /goal) — above-the-wall.",
+		"tutorialHeading": "Comment lire ce panneau",
+		"tutorialBody": "Cliquez « Vérifier la complétude » : le lien intact est complet (aucun monstre). « Casser le lien (retirer le miroir) » retire le miroir du nœud résolu → NEED_LEVEL_WITHOUT_MIRROR. « Casser le lien (miroir orphelin) » ajoute un miroir qui ne reflète aucun nœud résolu → ORPHAN_NEED_MIRROR. « Réinitialiser » rétablit le lien intact. Chaque verdict est calculé par le jumeau déterministe ; rien n’est jugé par un LLM.",
+		"checkCta": "Vérifier la complétude",
+		"breakMirrorCta": "Casser le lien (retirer le miroir)",
+		"orphanCta": "Casser le lien (miroir orphelin)",
+		"resetCta": "Réinitialiser",
+		"caseLabel": "État du lien nœud↔miroir",
+		"caseIntact": "Lien intact (complet)",
+		"mirrorsHeading": "Les miroirs-de-niveau déclarés (côté besoin)",
+		"verdictHeading": "Verdict de complétude",
+		"complete": "Complet — aucun monstre",
+		"incomplete": "Incomplet — monstre détecté",
+		"monstersHeading": "Monstres",
+		"none": "aucun",
+		"pending": "En attente d’une action…",
+		"footer": "EL09 : la détection de monstre est une fonction pure (comptage + appariement) ; aucun miroir réel n’est écrit ; tout reste au-dessus du mur. Le jumeau TypeScript (lib/besoin-completeness.ts) est byte-équivalent à l’autorité Go (back/runtime/besoin/completeness.go)."
 	}
 }

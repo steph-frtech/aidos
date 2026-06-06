@@ -71,7 +71,7 @@ export function shrinkOptionSpace(node: NodeInput, level: Level): number {
 	const refTo = nextLevel(level);
 	if (!refTo) return FORWARD_DEP_SHRINK; // entity leaf — vacuously satisfied.
 	const os = optionSpaceFor(level, refTo);
-	if (!os || !os.enumerable) return FORWARD_DEP_SHRINK; // declared OpenQuestion (operation→entity).
+	if (!os?.enumerable) return FORWARD_DEP_SHRINK; // declared OpenQuestion (operation→entity).
 	if (!node.present) return 0;
 	const selected = stringSet(node.body.selects);
 	if (selected.size === 0) return 0;

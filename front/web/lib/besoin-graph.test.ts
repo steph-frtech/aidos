@@ -189,7 +189,6 @@ function reconstruct(
 	project: string,
 ): ReturnType<typeof newGraph> {
 	const o = parsed as { nodes?: unknown[]; edges?: unknown[] };
-	const g = newGraph(project);
 	const nodes = (o.nodes ?? []).map((raw) => {
 		const n = raw as {
 			level: Level;

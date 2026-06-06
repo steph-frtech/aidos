@@ -45,6 +45,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/compound-besoin-thresholds", k: "besoinThresholds" },
 			{ href: "/compound-besoin-candescend", k: "besoinCanDescend" },
 			{ href: "/compound-besoin-cascade", k: "besoinCascade" },
+			{ href: "/compound-besoin-completeness", k: "besoinCompleteness" },
 		],
 	},
 	{

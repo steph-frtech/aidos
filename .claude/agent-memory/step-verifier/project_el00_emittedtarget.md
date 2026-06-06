@@ -1,0 +1,14 @@
+---
+name: el00-emittedtarget
+description: EL00 verification — emitted-app target (Hono/TS) engraved as a Go truth pinned ≡ arch-fitness.json by a parity property test; ADR-only above-the-wall
+metadata:
+  type: project
+---
+
+EL00 (first of the EL compound-du-besoin series) is ADR-ONLY (ADR 0040): it engraves the TARGET of the EMITTED app — exactly like FN02/ADR 0036 engraved the functional mandate — as a single Go-source truth `back/runtime/agentloop.EmittedTargetEL00()` (record: Constructrice{go, rewritten_in_ts:false, emits_go_for_user_app:false} + Construite{backend/frontend:hono, typescript, datastore:postgres, own_mcp/own_skills:true, operation_interpreter:go-service-callback} + functional_invariants = EmittedInvariantCodes() verbatim + writes_truth:false), PINNED ≡ the `emitted_target` block of arch-fitness.json by a reflect.DeepEqual parity test. Reuses FN04 (EmittedInvariantCodes, arch-fitness.json) + ADR 0006 (datastore Postgres unchanged) — NO new package.
+
+Done-criteria all MET: parity test green (TestEmittedTarget_ParityWithConfig/_InvariantsAreLanguageNeutral/_FrontierIsTrenched + reproducibility rapid mirror) ; above-the-wall (commit touched ONLY arch-fitness.json config, NO migrations/kernel/mirrors/fitness, WritesTruth=false asserted) ; deterministic byte-identical emission (rapid N-call + fast-check) ; constructrice≠construite frontier trenched. TS twin front/web/lib/emitted-target.ts byte-identical (reads SAME arch-fitness.json), vitest 5/5 incl. drift-detection. Action-capable /emitted-target (EmittedTargetPanel + "Vérifier la parité" button runs verifyParity from screen), e2e 2/2 asserting parityOk + wall strings.
+
+**SCAR (i18n keys missing — recurred AGAIN, see [[feedback-i18n-keys-missing]]):** page.tsx called `t("declaredTitle")` and `t("enforcedTitle")` (both declared in the panel's Labels interface) but BOTH keys were ABSENT from messages/fr.json AND en.json — next-intl getTranslations would throw MISSING_MESSAGE and crash the server component at render. The 12 OTHER keys were present; testid-based e2e + vitest (twin doesn't render labels) would NOT catch it. FIXED by adding declaredTitle/enforcedTitle to both locales. NOTE: the panel doesn't currently render those two keys nor `frontier`, but getTranslations is eager so the missing key still throws. Lesson holds: cross-check EVERY t() key in BOTH locales, not just the ones e2e asserts.
+
+gofmt/vet clean, tsc clean, biome clean, full agentloop package + go build ./... green. mint validate passed, both EL00 doc pages (concept + internals 3 layers) registered in docs.json, HEAD==origin/main 9072133. Linear MCP unauth (only authenticate/complete_authentication exposed) = OQ-0040-linear, non-blocking. Forward-deps (real Hono/TS emitters FN03/S87, TS enforcement of FN04, Go interpreter sidecar S90/S77, front framework S93, TS Postgres client spike S88) = by-design OpenQuestions, NOT residual. verified-green after i18n fix.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { allLevels } from "@/lib/besoin-grammar";
+import { allLevels, specOf } from "@/lib/besoin-grammar";
 import {
 	type BesoinThresholds,
 	defaultThresholds,
@@ -79,11 +79,13 @@ export function BesoinThresholdsPanel({ labels }: { labels: Labels }) {
 	}
 
 	function runSource() {
-		// Single source: the record's required fields must equal the grammar's, for every level.
+		// Single source: the thresholds record's accessor (requiredFieldsFor) must equal the grammar's
+		// raw spec (specOf().requiredFields) for every level — proving there is no second, drifting copy
+		// (the anti magic-number guard, the byte-for-byte twin of the Go property RequiredFieldsHaveNoSecondCopy).
 		let ok = true;
 		for (const l of levels) {
 			const fromThresholds = requiredFieldsFor(l) ?? [];
-			const fromSpec = requiredFieldsFor(l) ?? [];
+			const fromSpec = specOf(l)?.requiredFields ?? [];
 			if (fromThresholds.join(",") !== fromSpec.join(",")) ok = false;
 		}
 		setSourceOk(ok);

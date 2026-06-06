@@ -78,7 +78,8 @@
 		"besoinProposes": "LevelToProposes table",
 		"besoinThresholds": "Thresholds & OptionSpace",
 		"besoinCanDescend": "CanDescend (forcing)",
-		"besoinCascade": "Anchor cascade"
+		"besoinCascade": "Anchor cascade",
+		"besoinCompleteness": "Need completeness"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3221,5 +3222,27 @@
 		"none": "none",
 		"pending": "Awaiting an action.",
 		"footer": "EL08 — the cascade reads only the BesoinGraph (the wall); it writes no truth. Descent is gated by the COMPUTED EL07 verdict; |OptionSpace| under a frozen anchor is a counted integer, never an LLM judgment; reopening an anchor requires a ChangeSet (anti-overwrite §9). Deterministic: same nodes → same cascade (lib/besoin-cascade.ts is the byte-equivalent twin of back/runtime/besoin/cascade.go)."
+	},
+	"besoinCompleteness": {
+		"eyebrow": "EL09 · Need completeness (the completeness law)",
+		"title": "Need completeness — the completeness law applied to the NEED",
+		"subtitle": "a resolved level without its level-mirror = monster",
+		"intro": "EL09 applies the completeness law (S06) to the NEED. BesoinCompleteness(graph, mirrors) → { complete, monsters[] }: every `resolved` node must carry its right-form level-mirror (LevelMirrorForm) AND its four live metadata; no level-mirror may be an orphan. Breaking the node↔level-mirror link one way (removing the mirror) raises NEED_LEVEL_WITHOUT_MIRROR; the other way (a mirror reflecting no resolved node) raises ORPHAN_NEED_MIRROR. Detection is a PURE FUNCTION (counting + matching), never an LLM. No real mirror is written (those are written below the wall by the app-builder via /goal) — above-the-wall.",
+		"tutorialHeading": "How to read this panel",
+		"tutorialBody": "Click “Check completeness”: the intact link is complete (no monster). “Break link (remove mirror)” removes the resolved node’s mirror → NEED_LEVEL_WITHOUT_MIRROR. “Break link (orphan mirror)” adds a mirror reflecting no resolved node → ORPHAN_NEED_MIRROR. “Reset” restores the intact link. Every verdict is computed by the deterministic twin; nothing is judged by an LLM.",
+		"checkCta": "Check completeness",
+		"breakMirrorCta": "Break link (remove mirror)",
+		"orphanCta": "Break link (orphan mirror)",
+		"resetCta": "Reset",
+		"caseLabel": "node↔mirror link state",
+		"caseIntact": "Intact link (complete)",
+		"mirrorsHeading": "Declared level-mirrors (need side)",
+		"verdictHeading": "Completeness verdict",
+		"complete": "Complete — no monster",
+		"incomplete": "Incomplete — monster detected",
+		"monstersHeading": "Monsters",
+		"none": "none",
+		"pending": "Waiting for an action…",
+		"footer": "EL09: monster detection is a pure function (counting + matching); no real mirror is written; everything stays above the wall. The TypeScript twin (lib/besoin-completeness.ts) is byte-equivalent to the Go authority (back/runtime/besoin/completeness.go)."
 	}
 }
