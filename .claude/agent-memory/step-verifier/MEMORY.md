@@ -1,5 +1,7 @@
 # Step-Verifier Memory Index
 
+- [HR01 spike headroom](project_hr01_spike_headroom.md) — SPIKE step (KRD §84): verify spike-criteria NOT normal gates (no permanent route/e2e/Postgres-mirror); confined /spike/ module, verdict GO computed, repro mirror; gofmt slip recurred; Linear unauth=OQ; verified-green
+
 - [BA16 postcheck](project_ba16_postcheck.md) — deterministic POST-CHECK (dual of BA13 gate); re-checks EVERY action AFTER exec per nature, mirror is the judge, new S13 AGENT_POSTCHECK_FAILED; SCAR: report claimed formatters clean, biome+gofmt both dirty; verified-green
 - [BA21 role-matching](project_ba21_rolematching.md) — deterministic MatchRole (lex-smallest free agent of layer's declared role, never wrong-role fallback) + HeadOf mirror-first + DetectStarvation still_red (gap E3, ticks SUPPLIED no clock); SCAR: report "biome clean" but test had noNonNullAssertion h1! warning, biome autofix h1?. semantically WRONG → explicit guard; e2e 6/6 on :3000; verified-green
 - [BA22 lease-engine](project_ba22_leaseengine.md) — lease/expire ENGINE (pure Schedule: expire-keeps-epoch/dep-gate/mirror-first greedy lease) + single impure Tick Driver (Clock seam, time.NewTicker OK in runtime daemon ≠ §7 long-run ban) + Fence(write==current OK, else AGENT_LEASE_FENCED); reclaim keeps epoch N, re-lease bumps N→N+1; no SQL in pure files (UPDATE=BA23); Go fixture4+rapid6+fast-check17+e2e5/5; Linear unauth=OQ; verified-green
