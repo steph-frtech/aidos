@@ -72,6 +72,110 @@ export function levelMirrorForm(l: string): MirrorForm | null {
 	return LEVEL_MIRROR_FORMS[l] ?? null;
 }
 
+// --- EL10 view/journey schema validators (the TWIN of back/runtime/besoin/validators.go) -----------
+// The two above-the-wall rungs with NO Go backing pkg (view/journey) get a dedicated DETERMINISTIC
+// schema validator. PURE/TOTAL of the body alone — a structural check, never an LLM judgment. Same body
+// → same verdict. THE WALL: reads a body, writes nothing.
+
+export interface SchemaResult {
+	valid: boolean;
+	field?: string;
+	reason?: string;
+}
+
+function namedList(v: unknown): string[] {
+	if (!Array.isArray(v)) return [];
+	const out: string[] = [];
+	for (const e of v) {
+		if (typeof e === "string") {
+			const s = e.trim();
+			if (s !== "") out.push(s);
+		} else if (e && typeof e === "object" && "name" in e) {
+			const name = String((e as { name?: unknown }).name ?? "").trim();
+			if (name !== "") out.push(name);
+		}
+	}
+	return out;
+}
+
+function isEmptyStr(v: unknown): boolean {
+	return (
+		v === undefined || v === null || (typeof v === "string" && v.trim() === "")
+	);
+}
+
+// validateViewSchema — a view body MUST carry a non-empty goal + ≥1 named zone + ≥1 named datum. A body
+// that parses but lists no zones FAILS. Byte-equivalent to Go ValidateViewSchema. Pure, total.
+export function validateViewSchema(
+	body: Record<string, unknown>,
+): SchemaResult {
+	if (isEmptyStr(body.goal)) {
+		return {
+			valid: false,
+			field: "body:goal",
+			reason: "Le view doit déclarer un `goal` (le but de l'écran) non vide.",
+		};
+	}
+	if (namedList(body.zones).length === 0) {
+		return {
+			valid: false,
+			field: "body:zones",
+			reason:
+				"Le view doit déclarer au moins une `zone` nommée (un écran sans zone n'est pas un écran).",
+		};
+	}
+	if (namedList(body.data).length === 0) {
+		return {
+			valid: false,
+			field: "body:data",
+			reason:
+				"Le view doit déclarer au moins une donnée affichée nommée (`data`).",
+		};
+	}
+	return { valid: true };
+}
+
+// isParsableGherkin — ≥1 Given AND When AND Then (case-insensitive). Byte-equivalent to the Go rule.
+function isParsableGherkin(g: string): boolean {
+	const low = g.toLowerCase();
+	return low.includes("given") && low.includes("when") && low.includes("then");
+}
+
+// validateJourneySchema — a journey body MUST carry a parseable Gherkin (≥1 Given/When/Then). A
+// free-text blob FAILS. Byte-equivalent to Go ValidateJourneySchema. Pure, total.
+export function validateJourneySchema(
+	body: Record<string, unknown>,
+): SchemaResult {
+	const g = typeof body.gherkin === "string" ? body.gherkin : "";
+	if (g.trim() === "") {
+		return {
+			valid: false,
+			field: "body:gherkin",
+			reason: "Le journey doit déclarer un champ `gherkin` non vide.",
+		};
+	}
+	if (!isParsableGherkin(g)) {
+		return {
+			valid: false,
+			field: "body:gherkin",
+			reason:
+				"Le Gherkin du journey n'est pas parsable (il faut au moins un Given/When/Then).",
+		};
+	}
+	return { valid: true };
+}
+
+// validateLevelSchema dispatches to the dedicated EL10 validator for view/journey only (the rungs with
+// no Go backing pkg). Returns null for any other rung. Pure, total.
+export function validateLevelSchema(
+	level: Level,
+	body: Record<string, unknown>,
+): SchemaResult | null {
+	if (level === "view") return validateViewSchema(body);
+	if (level === "journey") return validateJourneySchema(body);
+	return null;
+}
+
 // MonsterCode — the closed besoin-local set of completeness-violation codes (mirrors the Go enum).
 export type MonsterCode =
 	| "NEED_LEVEL_WITHOUT_MIRROR"

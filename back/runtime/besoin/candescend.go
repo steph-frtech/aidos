@@ -170,10 +170,18 @@ func checkBody(level Level, node LevelNode) (missing string, code BesoinBlockCod
 				[]string{"right_size_scenarios", fmt.Sprintf("réduisez à ≤ %d scénarios", th.MaxScenarios)}, false
 		}
 	case LevelJourney:
-		if !isParsableGherkin(asString(body["gherkin"])) {
-			return "body:gherkin", CodeBodyVacantOrMalformed,
-				"Le Gherkin du journey n'est pas parsable (il faut au moins un Given/When/Then).",
+		// Delegate to the dedicated EL10 validator (single source of truth — one journey rule).
+		if r := ValidateJourneySchema(node.Body); !r.Valid {
+			return r.Field, CodeBodyVacantOrMalformed,
+				r.Reason,
 				[]string{"write_parsable_gherkin", "rédigez un scénario Given/When/Then"}, false
+		}
+	case LevelView:
+		// Delegate to the dedicated EL10 validator (single source of truth — one view-schema rule).
+		if r := ValidateViewSchema(node.Body); !r.Valid {
+			return r.Field, CodeBodyVacantOrMalformed,
+				r.Reason,
+				[]string{"name_zones_and_data", "déclarez un but, au moins une zone nommée et une donnée nommée"}, false
 		}
 	case LevelControl:
 		if !isBool(body["visible_when"]) || !isBool(body["enabled_when"]) {

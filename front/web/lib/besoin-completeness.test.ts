@@ -8,8 +8,101 @@ import {
 	isMirrorForm,
 	isMonsterCode,
 	levelMirrorForm,
+	mirrorForms,
+	validateJourneySchema,
+	validateLevelSchema,
+	validateViewSchema,
 } from "./besoin-completeness";
 import { allLevels, outOfScopeLevels } from "./besoin-grammar";
+
+// EL10 — derive-mirror oracle for the 5 covered rungs (the twin of deriveMirrorOracle in Go). The TS
+// levelMirrorForm MUST agree with this for the covered rungs (no fork).
+const DERIVE_MIRROR_ORACLE: Record<string, string> = {
+	entity: "property_n1",
+	policy: "fixture_n2",
+	operation: "fixture_n2",
+	control: "fixture_n2",
+	action: "fixture_n2",
+};
+
+describe("EL10 — LevelMirrorForm table (TS twin)", () => {
+	it("is total over the 9 grammar levels and yields a known form", () => {
+		for (const l of allLevels()) {
+			const f = levelMirrorForm(l);
+			expect(f).not.toBeNull();
+			expect(mirrorForms()).toContain(f);
+		}
+	});
+	it("agrees with the derive-mirror oracle for the 5 covered rungs (no fork)", () => {
+		let covered = 0;
+		for (const l of allLevels()) {
+			const want = DERIVE_MIRROR_ORACLE[l];
+			expect(derivedMirrorCovers(l)).toBe(want !== undefined);
+			if (want === undefined) continue;
+			covered += 1;
+			expect(levelMirrorForm(l)).toBe(want);
+		}
+		expect(covered).toBe(5);
+	});
+	it("yields null for an out-of-grammar level (no fabrication)", () => {
+		for (const bad of outOfScopeLevels()) {
+			expect(levelMirrorForm(bad)).toBeNull();
+		}
+		expect(levelMirrorForm("nope")).toBeNull();
+	});
+});
+
+describe("EL10 — view/journey schema validators (TS twin)", () => {
+	it("validates a well-formed view and rejects a zone-less or goal-less one", () => {
+		expect(
+			validateViewSchema({ goal: "g", zones: ["z"], data: ["d"] }).valid,
+		).toBe(true);
+		expect(
+			validateViewSchema({
+				goal: "g",
+				zones: [{ name: "entête" }],
+				data: [{ name: "total" }],
+			}).valid,
+		).toBe(true);
+		expect(
+			validateViewSchema({ goal: "g", zones: [], data: ["d"] }).valid,
+		).toBe(false);
+		expect(
+			validateViewSchema({ goal: "", zones: ["z"], data: ["d"] }).valid,
+		).toBe(false);
+	});
+	it("validates a parseable Gherkin journey and rejects free text", () => {
+		expect(
+			validateJourneySchema({
+				gherkin: "Given un panier\nWhen je paie\nThen la commande existe",
+			}).valid,
+		).toBe(true);
+		expect(
+			validateJourneySchema({ gherkin: "je veux payer sans étapes" }).valid,
+		).toBe(false);
+		expect(validateJourneySchema({ gherkin: "" }).valid).toBe(false);
+	});
+	it("dispatch owns exactly view+journey", () => {
+		for (const l of allLevels()) {
+			const owned = l === "view" || l === "journey";
+			expect(validateLevelSchema(l, {}) !== null).toBe(owned);
+		}
+	});
+	it("is deterministic — same body → same verdict", () => {
+		fc.assert(
+			fc.property(fc.boolean(), fc.boolean(), (hasGoal, hasZone) => {
+				const body = {
+					goal: hasGoal ? "g" : "",
+					zones: hasZone ? ["z"] : [],
+					data: ["d"],
+				};
+				expect(validateViewSchema(body).valid).toBe(
+					validateViewSchema(body).valid,
+				);
+			}),
+		);
+	});
+});
 
 // besoin-completeness.test.ts — the EL09 TS twin mirror (vitest + fast-check). Proves byte-equivalence
 // with the Go authority: the completeness law, the fault-injection both directions, monster detection

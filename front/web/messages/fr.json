@@ -79,7 +79,8 @@
 		"besoinThresholds": "Seuils & OptionSpace",
 		"besoinCanDescend": "CanDescend (forçage)",
 		"besoinCascade": "Cascade des ancres",
-		"besoinCompleteness": "Complétude du besoin"
+		"besoinCompleteness": "Complétude du besoin",
+		"besoinMirrorform": "Forme de miroir par niveau"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3244,5 +3245,30 @@
 		"none": "aucun",
 		"pending": "En attente d’une action…",
 		"footer": "EL09 : la détection de monstre est une fonction pure (comptage + appariement) ; aucun miroir réel n’est écrit ; tout reste au-dessus du mur. Le jumeau TypeScript (lib/besoin-completeness.ts) est byte-équivalent à l’autorité Go (back/runtime/besoin/completeness.go)."
+	},
+	"besoinMirrorform": {
+		"eyebrow": "EL10 · Forme de miroir par niveau + validateurs view/journey",
+		"title": "Forme de miroir par niveau — LevelMirrorForm + validateurs view/journey",
+		"subtitle": "la forme attendue par rung, pour les rungs que derive-mirror ne couvre pas",
+		"intro": "EL10 construit la table neuve LevelMirrorForm(level) → MirrorForm : la forme de miroir attendue pour CHAQUE rung. Pour les 5 rungs que la skill derive-mirror couvre déjà (entity/policy/operation/control/action), la table DÉLÈGUE (forme identique, zéro fork — une property pin l’accord). Pour les 3 rungs above-the-wall que derive-mirror ne connaît PAS (product/journey/view), elle porte la forme fraîchement déclarée. En plus, EL10 livre les validateurs déterministes NEUFS pour view (but + zones nommées + données nommées) et journey (Gherkin parsable) — car aucun package Go ne backe view/journey (les skills view/action assistent le dialogue, elles ne fournissent PAS le validateur). Tout est fonction pure ; aucun miroir n’est écrit — above-the-wall.",
+		"tutorialHeading": "Comment lire ce panneau",
+		"tutorialBody": "La table montre la forme de miroir attendue de chaque rung ; le badge « delegated » marque les 5 rungs couverts par derive-mirror, « declared » les 3 rungs above-the-wall. Éditez le corps d’un view ou d’un journey, puis cliquez « Valider » : le validateur déterministe rend valide/invalide. « Casser les zones » vide les zones du view (un écran sans zone échoue) ; « Casser le Gherkin » remplace le scénario par du texte libre (sans Given/When/Then il échoue). « Réinitialiser » rétablit un corps bien formé. Chaque verdict est calculé par le jumeau déterministe ; rien n’est jugé par un LLM.",
+		"tableHeading": "La table LevelMirrorForm (les 9 rungs de la grammaire)",
+		"rungCol": "Rung",
+		"formCol": "Forme de miroir",
+		"sourceCol": "Source",
+		"derived": "delegated (derive-mirror)",
+		"declared": "declared (EL10)",
+		"viewHeading": "Validateur de vue (neuf) — but + zones nommées + données",
+		"journeyHeading": "Validateur de journey (neuf) — Gherkin parsable",
+		"validateViewCta": "Valider la vue",
+		"validateJourneyCta": "Valider le journey",
+		"breakZonesCta": "Casser les zones",
+		"breakGherkinCta": "Casser le Gherkin",
+		"resetCta": "Réinitialiser",
+		"valid": "Valide — le schéma est satisfait",
+		"invalid": "Invalide — le schéma échoue",
+		"pending": "En attente d’une validation…",
+		"footer": "EL10 : la table LevelMirrorForm + les validateurs view/journey sont des fonctions pures ; pour les 5 rungs couverts, la sortie ≡ derive-mirror (pas de fork) ; aucun miroir n’est écrit — above-the-wall. Le jumeau TypeScript (lib/besoin-completeness.ts) est byte-équivalent à l’autorité Go (back/runtime/besoin/{mirrorform,validators}.go)."
 	}
 }

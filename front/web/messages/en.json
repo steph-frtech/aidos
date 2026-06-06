@@ -79,7 +79,8 @@
 		"besoinThresholds": "Thresholds & OptionSpace",
 		"besoinCanDescend": "CanDescend (forcing)",
 		"besoinCascade": "Anchor cascade",
-		"besoinCompleteness": "Need completeness"
+		"besoinCompleteness": "Need completeness",
+		"besoinMirrorform": "Mirror form per level"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3244,5 +3245,30 @@
 		"none": "none",
 		"pending": "Waiting for an action…",
 		"footer": "EL09: monster detection is a pure function (counting + matching); no real mirror is written; everything stays above the wall. The TypeScript twin (lib/besoin-completeness.ts) is byte-equivalent to the Go authority (back/runtime/besoin/completeness.go)."
+	},
+	"besoinMirrorform": {
+		"eyebrow": "EL10 · Mirror form per level + view/journey validators",
+		"title": "Mirror form per level — LevelMirrorForm + view/journey validators",
+		"subtitle": "the expected form per rung, for the rungs derive-mirror does not cover",
+		"intro": "EL10 builds the new table LevelMirrorForm(level) → MirrorForm: the expected mirror form for EVERY rung. For the 5 rungs the derive-mirror skill already covers (entity/policy/operation/control/action) the table DELEGATES (same form, zero fork — a property pins the agreement). For the 3 above-the-wall rungs derive-mirror does NOT know (product/journey/view) it carries the freshly-declared form. EL10 also ships the NEW deterministic validators for view (goal + named zones + named data) and journey (parseable Gherkin) — because no Go package backs view/journey (the view/action skills assist the dialogue, they do NOT provide the validator). Everything is a pure function; no mirror is written — above the wall.",
+		"tutorialHeading": "How to read this panel",
+		"tutorialBody": "The table shows the expected mirror form of each rung; the \"delegated\" badge marks the 5 rungs derive-mirror covers, \"declared\" the 3 above-the-wall rungs. Edit a view or journey body, then click \"Validate\": the deterministic validator returns valid/invalid. \"Break zones\" empties the view's zones (a screen with no zone fails); \"Break Gherkin\" replaces the scenario with free text (without Given/When/Then it fails). \"Reset\" restores a well-formed body. Each verdict is computed by the deterministic twin; nothing is judged by an LLM.",
+		"tableHeading": "The LevelMirrorForm table (the 9 grammar rungs)",
+		"rungCol": "Rung",
+		"formCol": "Mirror form",
+		"sourceCol": "Source",
+		"derived": "delegated (derive-mirror)",
+		"declared": "declared (EL10)",
+		"viewHeading": "View validator (new) — goal + named zones + data",
+		"journeyHeading": "Journey validator (new) — parseable Gherkin",
+		"validateViewCta": "Validate view",
+		"validateJourneyCta": "Validate journey",
+		"breakZonesCta": "Break zones",
+		"breakGherkinCta": "Break Gherkin",
+		"resetCta": "Reset",
+		"valid": "Valid — the schema is satisfied",
+		"invalid": "Invalid — the schema fails",
+		"pending": "Waiting for a validation…",
+		"footer": "EL10: the LevelMirrorForm table + the view/journey validators are pure functions; for the 5 covered rungs, the output ≡ derive-mirror (no fork); no mirror is written — above the wall. The TypeScript twin (lib/besoin-completeness.ts) is byte-equivalent to the Go authority (back/runtime/besoin/{mirrorform,validators}.go)."
 	}
 }
