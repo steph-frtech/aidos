@@ -1825,3 +1825,63 @@ test.describe("BA31 — the /agents « Learnings » controls (run → DRAFT idea
 		await expect(verdict).toHaveAttribute("data-admitted", "true");
 	});
 });
+
+/**
+ * HR05 Playwright e2e — the « Compression / économie » section of /agents.
+ * mirror record: reflects=HR05-compression-economy, test_kind=e2e, cert_language=gherkin,
+ *               liveness=alive, authority=above
+ *
+ * Scenario: the panel renders the per-run economy (tokens before/after) — action-capable
+ *   Given the Workbench is running and I am on /agents
+ *   Then the « Compression / économie » section is present
+ *   When I click « Mesurer l'économie par run »
+ *   Then one row per recorded run shows tokens BEFORE > AFTER (compression saves)
+ *   And every row carries data-cap-raised="false" (the cap is never raised)
+ *   And the aggregate total shows before > after with the savings
+ *   And the report is verdict-invariant (the gate is unchanged by compression)
+ */
+test.describe("HR05 — /agents « Compression / économie » section", () => {
+	test.beforeEach(async ({ page }) => {
+		await page.goto("/agents");
+		await expect(page.getByTestId("compression-economy")).toBeVisible({
+			timeout: 5000,
+		});
+	});
+
+	test("the section is present and action-capable (a measure control, not read-only)", async ({
+		page,
+	}) => {
+		await expect(page.getByTestId("economy-measure")).toBeVisible();
+		// read-only until the control executes (no headless capability).
+		await expect(page.getByTestId("economy-report")).toHaveCount(0);
+	});
+
+	test("measuring renders tokens before/after PER run with savings + cap never raised", async ({
+		page,
+	}) => {
+		await page.getByTestId("economy-measure").click();
+
+		const report = page.getByTestId("economy-report");
+		await expect(report).toBeVisible();
+		// verdict-invariant across all runs (the gate is unchanged by compression).
+		await expect(report).toHaveAttribute("data-all-invariant", "true");
+
+		// each recorded run is a row: before > after, and the cap is never raised.
+		for (const id of ["run:checkout", "run:promo"]) {
+			const row = page.getByTestId(`economy-row-${id}`);
+			await expect(row).toBeVisible();
+			await expect(row).toHaveAttribute("data-cap-raised", "false");
+			const before = Number(await row.getAttribute("data-before"));
+			const after = Number(await row.getAttribute("data-after"));
+			expect(before).toBeGreaterThan(after);
+		}
+
+		// the aggregate: total before > total after.
+		const total = page.getByTestId("economy-total");
+		await expect(total).toBeVisible();
+		const tBefore = Number(await total.getAttribute("data-total-before"));
+		const tAfter = Number(await total.getAttribute("data-total-after"));
+		expect(tBefore).toBeGreaterThan(tAfter);
+		await expect(page.getByTestId("economy-cap-never-raised")).toBeVisible();
+	});
+});

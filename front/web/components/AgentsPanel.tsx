@@ -86,6 +86,11 @@ import {
 	type TranscriptTs,
 } from "@/lib/agentrun-redact";
 import type { AuthorityGraph, Role } from "@/lib/authority";
+import {
+	type PerRunEconomy,
+	perRunEconomy,
+	type RunPrompts,
+} from "@/lib/context-compressor";
 import type { EconomicsDecision } from "@/lib/economics";
 
 // BA11 — the demo DECLARED budgets the panel checks a run against. goal.Budgets (S29) and
@@ -511,6 +516,21 @@ interface Labels {
 	ba31RefusedTag: string;
 	ba31AdmittedTag: string;
 	ba31WallNote: string;
+	// HR05 — « Compression / économie » section (tokens before/after per run)
+	economyHeading: string;
+	economyBody: string;
+	economyButton: string;
+	economyRunCol: string;
+	economyBeforeCol: string;
+	economyAfterCol: string;
+	economySavedCol: string;
+	economyVerdictCol: string;
+	economyInvariantTag: string;
+	economyDivergentTag: string;
+	economyCapNeverRaisedTag: string;
+	economyTotalLabel: string;
+	economySavedLabel: string;
+	economyWallNote: string;
 }
 
 function boolBadge(value: boolean, locked: boolean, lockedTag: string) {
@@ -2028,6 +2048,13 @@ export function AgentsPanel({ labels }: { labels: Labels }) {
 	// gate (gap J1) — a FORGED Status:"admitted" with no admitting authority record is refused.
 	const [learnings, setLearnings] = useState<LearningView | null>(null);
 	const [applyVerdict, setApplyVerdict] = useState<ApplyDecision | null>(null);
+
+	// HR05 — the « Compression / économie » section: tokens before/after PER recorded run, computed
+	// by the pure perRunEconomy projection (lib/context-compressor) from the SCREEN. null until the
+	// human clicks "Mesurer l'économie par run" (action-capable, no headless capability).
+	const [economyReport, setEconomyReport] = useState<PerRunEconomy | null>(
+		null,
+	);
 
 	const run = RECENT_RUN;
 
@@ -4697,6 +4724,143 @@ export function AgentsPanel({ labels }: { labels: Labels }) {
 				</div>
 				<p className="mt-3 text-[0.7rem] text-muted-foreground">
 					{labels.ba31WallNote}
+				</p>
+			</section>
+
+			{/* HR05 — « Compression / économie ». Action-capable: the human clicks "Mesurer
+			    l'économie par run" and the pure perRunEconomy projection (the HR04 loop-economy twin,
+			    fanned per run) renders tokens BEFORE/AFTER for each recorded run + the aggregate. The
+			    wall: read-only, below the line — the compressor extends the margin UNDER the cap, it
+			    NEVER raises the cap (data-cap-raised=false per row). No headless capability. */}
+			<section
+				data-testid="compression-economy"
+				className="rounded-xl border border-border bg-card p-5"
+			>
+				<h2 className="text-sm font-semibold tracking-tight text-foreground">
+					{labels.economyHeading}
+				</h2>
+				<p className="mt-1 text-xs text-muted-foreground">
+					{labels.economyBody}
+				</p>
+				<button
+					type="button"
+					data-testid="economy-measure"
+					onClick={() => {
+						// Each run's LLM input: a repetition-prone ContextPack (the wall recited, the
+						// boundaries) — the shape the reference-compressor collapses. Per-turn prompts +
+						// the run's own declared token cap. Same twin the /context-compression panel runs.
+						const pack = (target: string): string => {
+							const wall =
+								"respect the wall respect the wall respect the wall ";
+							return `# CONTEXT PACK\n${wall}${wall}${wall}\n## Boundaries (THE WALL)\nallowed_paths: ${target}\nforbidden_paths: /kernel/**, /mirror/**\ntool: store/read\nskill: tdd\n${wall}${wall}${wall}\n`;
+						};
+						const runs: RunPrompts[] = [
+							{
+								id: "run:checkout",
+								prompts: [pack("app/checkout.go")],
+								cap: 60,
+							},
+							{
+								id: "run:promo",
+								prompts: [pack("app/promo.go"), pack("app/cart.go")],
+								cap: 120,
+							},
+						];
+						setEconomyReport(perRunEconomy(runs));
+					}}
+					className="mt-3 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+				>
+					{labels.economyButton}
+				</button>
+				{economyReport ? (
+					<div
+						data-testid="economy-report"
+						data-all-invariant={
+							economyReport.allVerdictsSame ? "true" : "false"
+						}
+						className="mt-3 space-y-3"
+					>
+						<table className="w-full text-left text-[0.7rem]">
+							<thead className="text-muted-foreground">
+								<tr className="border-b border-border">
+									<th className="py-1 pr-3 font-medium">
+										{labels.economyRunCol}
+									</th>
+									<th className="py-1 pr-3 font-medium">
+										{labels.economyBeforeCol}
+									</th>
+									<th className="py-1 pr-3 font-medium">
+										{labels.economyAfterCol}
+									</th>
+									<th className="py-1 pr-3 font-medium">
+										{labels.economySavedCol}
+									</th>
+									<th className="py-1 font-medium">
+										{labels.economyVerdictCol}
+									</th>
+								</tr>
+							</thead>
+							<tbody className="text-foreground">
+								{economyReport.rows.map((row) => (
+									<tr
+										key={row.id}
+										data-testid={`economy-row-${row.id}`}
+										data-cap-raised={row.economy.capRaised ? "true" : "false"}
+										data-before={row.economy.tokensPlain}
+										data-after={row.economy.tokensCompressed}
+										className="border-b border-border/50"
+									>
+										<td className="py-1 pr-3 font-mono">{row.id}</td>
+										<td className="py-1 pr-3 font-mono">
+											{row.economy.tokensPlain} tok
+										</td>
+										<td className="py-1 pr-3 font-mono">
+											{row.economy.tokensCompressed} tok
+										</td>
+										<td className="py-1 pr-3 font-mono text-primary">
+											−{row.economy.tokensSaved} tok
+										</td>
+										<td className="py-1">
+											{row.economy.verdictsSame ? (
+												<span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
+													{labels.economyInvariantTag}
+												</span>
+											) : (
+												<span className="rounded-full bg-destructive/10 px-2 py-0.5 text-destructive">
+													{labels.economyDivergentTag}
+												</span>
+											)}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+						<div
+							data-testid="economy-total"
+							data-total-before={economyReport.totalPlain}
+							data-total-after={economyReport.totalCompressed}
+							className="flex flex-wrap items-center gap-2 text-[0.7rem]"
+						>
+							<span className="font-medium text-foreground">
+								{labels.economyTotalLabel}:
+							</span>
+							<code className="font-mono">
+								{economyReport.totalPlain} → {economyReport.totalCompressed} tok
+							</code>
+							<span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
+								{labels.economySavedLabel}: −{economyReport.totalSaved} tok
+							</span>
+							<span
+								data-testid="economy-cap-never-raised"
+								className="rounded-full border border-border bg-muted px-2 py-0.5 text-muted-foreground"
+							>
+								{labels.economyCapNeverRaisedTag}
+							</span>
+						</div>
+					</div>
+				) : null}
+				<p className="mt-3 text-[0.7rem] text-muted-foreground">
+					{labels.economyWallNote}
 				</p>
 			</section>
 		</div>

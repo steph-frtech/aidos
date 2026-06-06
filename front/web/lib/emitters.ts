@@ -284,3 +284,428 @@ export function stale(
 ): boolean {
 	return artifactSourceHash !== headSourceHash;
 }
+
+/** PurityReport — the FN03 EMITTED_FUNCTION_PURE proof for one target, computed (never declared). */
+export interface PurityReport {
+	target: Target;
+	rounds: number;
+	/** true iff all `rounds` re-emissions are byte-identical to the first (pure ⇒ reproducible). */
+	byteIdentical: boolean;
+	/** the single output_hash shared by every round when pure (the byte-identity witness). */
+	outputHash: string;
+}
+
+/**
+ * proveEmittedPurity — FN03's EMITTED_FUNCTION_PURE made action-capable: re-emit the SAME source
+ * `rounds` times and confirm every round is byte-identical (a pure emitter has no hidden state, so
+ * its output is a function of its input alone — the S34 determinism rejoué N fois). DETERMINISTIC,
+ * never an LLM "is this functional?" judgement (CLAUDE.md §8 determinism-first); the byte-identical
+ * twin of back/runtime/generators' purity property mirror (emitters_purity_property_test.go P1).
+ * Fail-closed: a blocked emission or any byte divergence yields byteIdentical=false.
+ */
+export function proveEmittedPurity(
+	s: EntitySource,
+	t: Target,
+	rounds = 16,
+): PurityReport {
+	const first = emit(s, t);
+	if (isBlocked(first)) {
+		return { target: t, rounds, byteIdentical: false, outputHash: "" };
+	}
+	for (let r = 0; r < rounds; r++) {
+		const again = emit(s, t);
+		if (isBlocked(again) || again.bytes !== first.bytes) {
+			return {
+				target: t,
+				rounds,
+				byteIdentical: false,
+				outputHash: first.output_hash,
+			};
+		}
+	}
+	return {
+		target: t,
+		rounds,
+		byteIdentical: true,
+		outputHash: first.output_hash,
+	};
+}
+
+/** The three FN04 EMITTED-functional invariant codes (ADR 0036 §2), declared once. */
+export const EMITTED_INVARIANTS = [
+	"EMITTED_NO_GLOBAL_MUTABLE",
+	"EMITTED_FUNCTION_PURE",
+	"EMITTED_CALL_GRAPH_ACYCLIC",
+] as const;
+
+export type EmittedInvariant = (typeof EMITTED_INVARIANTS)[number];
+
+/** One arch-fitness violation found in emitted Go (the front twin of agentloop.Violation). */
+export interface EmittedViolation {
+	code: EmittedInvariant | "EMITTED_UNPARSEABLE";
+	symbol: string;
+}
+
+/** ArchFitnessReport — the FN04 verdict for one emitted Go artifact (computed, never declared). */
+export interface ArchFitnessReport {
+	green: boolean;
+	violations: EmittedViolation[];
+}
+
+/**
+ * checkEmittedFunctional — FN04's three EMITTED arch-fitness rules made action-capable, the
+ * deterministic twin of back/runtime/agentloop.CheckEmittedFunctional (ADR 0036). Over emitted Go
+ * source carrying the AIDOS marker it reports:
+ *   - EMITTED_NO_GLOBAL_MUTABLE  — a package-level `var` (a `var _ …` blank assertion is exempt);
+ *   - EMITTED_FUNCTION_PURE      — a top-level `func init()`;
+ *   - EMITTED_CALL_GRAPH_ACYCLIC — a self/mutual recursion cycle among same-file functions.
+ * DETERMINISTIC, fail-closed, never an LLM "is this functional?" judgement (CLAUDE.md §8). Source
+ * NOT carrying the marker is OUT of scope (ADR 0036 §3) → green with no violations. This is a source
+ * scan (the front has no Go parser); the Go AST walk is the AUTHORITATIVE check — this twin reports
+ * the same verdict for the screen.
+ */
+export function checkEmittedFunctional(goSource: string): ArchFitnessReport {
+	if (!goSource.includes(PROTECTED_MARKER.split(" — ")[0])) {
+		return { green: true, violations: [] }; // out of scope: not an AIDOS-marked projection
+	}
+	const violations: EmittedViolation[] = [];
+	const lines = goSource.split("\n");
+
+	// Rule 1 + 2 — top-level `var` (non-blank) and `func init()`. Top-level = column 0.
+	for (const line of lines) {
+		const varMatch = /^var\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(line);
+		if (varMatch && varMatch[1] !== "_") {
+			violations.push({
+				code: "EMITTED_NO_GLOBAL_MUTABLE",
+				symbol: varMatch[1],
+			});
+		}
+		if (/^func\s+init\s*\(\s*\)/.test(line)) {
+			violations.push({ code: "EMITTED_FUNCTION_PURE", symbol: "init" });
+		}
+	}
+
+	// Rule 3 — call-graph acyclicity over top-level funcs defined in this source.
+	const cycleNode = firstCallCycleNode(goSource);
+	if (cycleNode) {
+		violations.push({
+			code: "EMITTED_CALL_GRAPH_ACYCLIC",
+			symbol: cycleNode,
+		});
+	}
+	return { green: violations.length === 0, violations };
+}
+
+/** One node of the FN05 call-graph index: an emitted function and its sorted same-file callees. */
+export interface CallNode {
+	name: string;
+	calls: string[];
+}
+
+/** CallGraph — the FN05 Understand-Anything index of one emitted file (the front twin of
+ *  back/runtime/agentloop.CallGraph). Content-addressed: same code → same nodes → same hash. */
+export interface CallGraph {
+	package: string;
+	nodes: CallNode[];
+	hash: string;
+}
+
+/**
+ * callGraphIndex — FN05's call-graph index made action-capable, the deterministic twin of
+ * back/runtime/agentloop.CallGraphIndex (ADR 0036). Over emitted Go source carrying the AIDOS marker
+ * it returns the per-function nodes + their same-file callees (sorted) + a content hash — the
+ * Understand-Anything view the ContextRouter (S33) consumes. Source NOT carrying the marker, or that
+ * fails the (line-based) scan, yields the empty index (ADR 0036 §3 scope; the honesty rule — never
+ * invent a node). DETERMINISTIC, never an LLM "read the code" judgement (CLAUDE.md §8); the Go AST
+ * walk is the AUTHORITATIVE index — this twin reproduces it for the screen.
+ */
+export function callGraphIndex(goSource: string): CallGraph {
+	if (!goSource.includes(PROTECTED_MARKER.split(" — ")[0])) {
+		return { package: "", nodes: [], hash: "" }; // out of scope: not an AIDOS projection
+	}
+	const lines = goSource.split("\n");
+	const pkgMatch = lines
+		.map((l) => /^package\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(l))
+		.find((m) => m !== null);
+	const pkg = pkgMatch ? pkgMatch[1] : "";
+
+	const funcRe = /^func\s+(?:\([^)]*\)\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(/;
+	const defined = new Set<string>();
+	for (const line of lines) {
+		const m = funcRe.exec(line);
+		if (m) defined.add(m[1]);
+	}
+	const calls = new Map<string, Set<string>>();
+	let current = "";
+	for (const line of lines) {
+		const m = funcRe.exec(line);
+		let scan = line;
+		if (m) {
+			current = m[1];
+			if (!calls.has(current)) calls.set(current, new Set());
+			const brace = line.indexOf("{");
+			scan = brace >= 0 ? line.slice(brace + 1) : "";
+		}
+		if (!current) continue;
+		const callRe = /\b([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+		let c: RegExpExecArray | null;
+		// biome-ignore lint/suspicious/noAssignInExpressions: standard regex global-exec loop
+		while ((c = callRe.exec(scan)) !== null) {
+			const callee = c[1];
+			if (defined.has(callee) && callee !== "func") {
+				calls.get(current)?.add(callee);
+			}
+		}
+	}
+
+	const nodes: CallNode[] = [...defined].sort().map((name) => ({
+		name,
+		calls: [...(calls.get(name) ?? [])].sort(),
+	}));
+	const graph: CallGraph = { package: pkg, nodes, hash: "" };
+	graph.hash = hashCallGraph(graph);
+	return graph;
+}
+
+/** Content-address the index over its canonical (key-sorted) JSON — the front twin of the Go
+ *  records.Hash(Canonicalize(...)) scheme. The hash field is zeroed before hashing. Pure. */
+function hashCallGraph(g: CallGraph): string {
+	const canonical = JSON.stringify({
+		hash: "",
+		nodes: g.nodes.map((n) => ({ calls: n.calls, name: n.name })),
+		package: g.package,
+	});
+	return createHash("sha256").update(canonical).digest("hex");
+}
+
+/**
+ * affectedSubgraph — what the ContextRouter (S33) consumes: given the index and the changed symbols,
+ * return the changed symbols PLUS every node that transitively DEPENDS ON them (everyone who calls a
+ * changed function, directly or through a chain) — the sub-graph the agent must reload. Sorted,
+ * deduped, pure; unknown symbols are ignored (never invent a target). The byte-twin of
+ * back/runtime/agentloop.AffectedSubgraph.
+ */
+export function affectedSubgraph(g: CallGraph, changed: string[]): string[] {
+	const dependents = new Map<string, string[]>();
+	for (const n of g.nodes) {
+		for (const callee of n.calls) {
+			const arr = dependents.get(callee) ?? [];
+			arr.push(n.name);
+			dependents.set(callee, arr);
+		}
+	}
+	const known = new Set(g.nodes.map((n) => n.name));
+	const seen = new Set<string>();
+	const stack: string[] = [];
+	for (const c of changed) {
+		if (known.has(c) && !seen.has(c)) {
+			seen.add(c);
+			stack.push(c);
+		}
+	}
+	while (stack.length > 0) {
+		const cur = stack.pop() as string;
+		for (const caller of dependents.get(cur) ?? []) {
+			if (!seen.has(caller)) {
+				seen.add(caller);
+				stack.push(caller);
+			}
+		}
+	}
+	return [...seen].sort();
+}
+
+/** A node placed on the FN06 graph canvas: its name, its callees, its (x,y) centre and whether it
+ *  is in the affected sub-graph (the ContextRouter selection, drawn highlighted). */
+export interface LaidOutNode {
+	name: string;
+	calls: string[];
+	x: number;
+	y: number;
+	affected: boolean;
+}
+
+/** A directed edge of the FN06 graph: caller → callee, with both endpoints' centres. */
+export interface LaidOutEdge {
+	from: string;
+	to: string;
+	x1: number;
+	y1: number;
+	x2: number;
+	y2: number;
+}
+
+/** The laid-out functional graph the /emitters panel renders as an SVG (FN06): nodes positioned
+ *  by depth, edges between them, and the canvas size. A pure function of the index + affected set. */
+export interface LaidOutGraph {
+	nodes: LaidOutNode[];
+	edges: LaidOutEdge[];
+	width: number;
+	height: number;
+}
+
+/** Geometry constants for the deterministic layout (no clock, no randomness, no measurement). */
+const LAYOUT = {
+	colWidth: 200,
+	rowHeight: 110,
+	marginX: 90,
+	marginY: 50,
+} as const;
+
+/**
+ * layoutCallGraph — FN06's deterministic layout of the Understand-Anything graph for the screen.
+ * It is a PURE function of the CallGraph index (S01/S02-content-addressed, FN05) and the affected
+ * sub-graph (the ContextRouter S33 selection): each node is assigned a DEPTH (the longest call path
+ * to a leaf — leaves at depth 0, callers above), nodes at the same depth are placed in a sorted
+ * column, and one edge is drawn per (function → callee) pair. The layout is the AUTHORITATIVE
+ * geometry — same graph + same affected set → byte-identical positions — never an LLM "draw the
+ * graph" judgement (determinism-first, CLAUDE.md §8). TOTAL: an empty index yields an empty,
+ * well-formed canvas (never throws, never invents a node). Because FN04 guarantees the emitted graph
+ * acyclic, the depth recursion terminates.
+ */
+export function layoutCallGraph(
+	g: CallGraph,
+	affected: string[],
+): LaidOutGraph {
+	if (g.nodes.length === 0) {
+		return { nodes: [], edges: [], width: 0, height: 0 };
+	}
+	const known = new Set(g.nodes.map((n) => n.name));
+	const callsOf = new Map<string, string[]>(
+		g.nodes.map((n) => [n.name, n.calls.filter((c) => known.has(c))]),
+	);
+
+	// Depth = longest call chain to a leaf. Leaves (no in-scope callees) are at depth 0; a caller is
+	// one deeper than its deepest callee. The graph is acyclic (FN04) → this memoised DFS terminates.
+	const depth = new Map<string, number>();
+	const computeDepth = (name: string, onPath: Set<string>): number => {
+		const cached = depth.get(name);
+		if (cached !== undefined) return cached;
+		if (onPath.has(name)) return 0; // defensive (acyclic by FN04) — never recurse a cycle
+		onPath.add(name);
+		const callees = callsOf.get(name) ?? [];
+		let d = 0;
+		for (const c of callees) {
+			d = Math.max(d, computeDepth(c, onPath) + 1);
+		}
+		onPath.delete(name);
+		depth.set(name, d);
+		return d;
+	};
+	for (const n of g.nodes) computeDepth(n.name, new Set());
+
+	// Group node names by depth (callers on top: highest depth = row 0), each column sorted.
+	const maxDepth = Math.max(...[...depth.values()]);
+	const byRow = new Map<number, string[]>();
+	for (const n of g.nodes) {
+		const row = maxDepth - (depth.get(n.name) ?? 0);
+		const arr = byRow.get(row) ?? [];
+		arr.push(n.name);
+		byRow.set(row, arr);
+	}
+	const affectedSet = new Set(affected);
+	const centre = new Map<string, { x: number; y: number }>();
+	const nodes: LaidOutNode[] = [];
+	const rows = [...byRow.keys()].sort((a, b) => a - b);
+	for (const row of rows) {
+		const names = (byRow.get(row) ?? []).slice().sort();
+		names.forEach((name, col) => {
+			const x = LAYOUT.marginX + col * LAYOUT.colWidth;
+			const y = LAYOUT.marginY + row * LAYOUT.rowHeight;
+			centre.set(name, { x, y });
+			nodes.push({
+				name,
+				calls: callsOf.get(name) ?? [],
+				x,
+				y,
+				affected: affectedSet.has(name),
+			});
+		});
+	}
+	nodes.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+	const edges: LaidOutEdge[] = [];
+	for (const n of g.nodes) {
+		for (const callee of callsOf.get(n.name) ?? []) {
+			const from = centre.get(n.name);
+			const to = centre.get(callee);
+			if (from && to) {
+				edges.push({
+					from: n.name,
+					to: callee,
+					x1: from.x,
+					y1: from.y,
+					x2: to.x,
+					y2: to.y,
+				});
+			}
+		}
+	}
+	edges.sort((a, b) => (`${a.from}->${a.to}` < `${b.from}->${b.to}` ? -1 : 1));
+
+	const maxCol = Math.max(...[...byRow.values()].map((a) => a.length));
+	const width = LAYOUT.marginX * 2 + Math.max(0, maxCol - 1) * LAYOUT.colWidth;
+	const height = LAYOUT.marginY * 2 + maxDepth * LAYOUT.rowHeight;
+	return { nodes, edges, width, height };
+}
+
+/** Build the intra-file func call graph (top-level funcs only) and return the first node in a
+ *  cycle (sorted, deterministic three-colour DFS), or "" if acyclic. Pure. */
+function firstCallCycleNode(goSource: string): string {
+	const defined = new Set<string>();
+	const funcRe = /^func\s+(?:\([^)]*\)\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(/;
+	for (const line of goSource.split("\n")) {
+		const m = funcRe.exec(line);
+		if (m) defined.add(m[1]);
+	}
+	// Collect callees per function by scanning each function's body span. We approximate the
+	// body as the lines from a func header to the next top-level `func`/EOF — sufficient for the
+	// emitted, flat projections (no nested func decls). Calls = identifier immediately before "(".
+	const lines = goSource.split("\n");
+	const graph = new Map<string, Set<string>>();
+	let current = "";
+	for (const line of lines) {
+		const m = funcRe.exec(line);
+		let scan = line;
+		if (m) {
+			current = m[1];
+			graph.set(current, new Set());
+			// On a header line the func name + signature precede the body; scan only the
+			// part after the opening brace so the declaration is not read as a self-call.
+			const brace = line.indexOf("{");
+			scan = brace >= 0 ? line.slice(brace + 1) : "";
+		}
+		if (!current) continue;
+		const callRe = /\b([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+		let c: RegExpExecArray | null;
+		// biome-ignore lint/suspicious/noAssignInExpressions: standard regex global-exec loop
+		while ((c = callRe.exec(scan)) !== null) {
+			const callee = c[1];
+			// A self-call IS a cycle (direct recursion) — keep self-edges.
+			if (defined.has(callee) && callee !== "func") {
+				graph.get(current)?.add(callee);
+			}
+		}
+	}
+
+	const color = new Map<string, number>(); // 0 white, 1 gray, 2 black
+	let cycleNode = "";
+	const nodes = [...defined].sort();
+	const visit = (n: string): boolean => {
+		color.set(n, 1);
+		for (const m of [...(graph.get(n) ?? [])].sort()) {
+			const cm = color.get(m) ?? 0;
+			if (cm === 1) {
+				cycleNode = m;
+				return true;
+			}
+			if (cm === 0 && visit(m)) return true;
+		}
+		color.set(n, 2);
+		return false;
+	};
+	for (const n of nodes) {
+		if ((color.get(n) ?? 0) === 0 && visit(n)) return cycleNode;
+	}
+	return "";
+}

@@ -34,6 +34,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/memory-backends", k: "memoryBackends" },
 			{ href: "/decision-reuse", k: "decisionReuse" },
 			{ href: "/context-pack", k: "contextPack" },
+			{ href: "/context-compression", k: "contextCompression" },
 		],
 	},
 	{

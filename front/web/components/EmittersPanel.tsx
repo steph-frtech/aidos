@@ -1,7 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Target } from "@/lib/emitters";
+import {
+	affectedSubgraph,
+	type CallGraph,
+	callGraphIndex,
+	checkEmittedFunctional,
+	type EntitySource,
+	type LaidOutGraph,
+	layoutCallGraph,
+	proveEmittedPurity,
+	type Target,
+} from "@/lib/emitters";
 
 /**
  * EmittersPanel — the action-capable /emitters panel (S34). The human RUNS the emitter FROM THE
@@ -29,6 +39,8 @@ export interface EntityView {
 	fields: string[];
 	headSourceHash: string;
 	projections: ProjectionView[];
+	/** the raw entity AST, so PROVE PURITY can re-emit it N times client-side (the pure twin). */
+	source: EntitySource;
 }
 
 interface Labels {
@@ -47,12 +59,34 @@ interface Labels {
 	targetGoSqlc: string;
 	targetPgDdl: string;
 	targetTsTypes: string;
+	provePurityCta: string;
+	purityOk: string;
+	purityFail: string;
+	archFitnessCta: string;
+	archFitnessOk: string;
+	archFitnessFail: string;
+	callGraphCta: string;
+	callGraphNodes: string;
+	callGraphHashLabel: string;
+	callGraphAffectedLabel: string;
+	callGraphEmpty: string;
+	graphVizHeading: string;
+	graphVizIntro: string;
+	graphVizCta: string;
+	graphVizAffectedCta: string;
+	graphVizLegendNode: string;
+	graphVizLegendAffected: string;
+	graphVizHashLabel: string;
+	graphVizAffectedLabel: string;
+	graphVizEmpty: string;
 }
 
 interface Props {
 	views: EntityView[];
 	orderId: string;
 	orderHeadAfterChange: string;
+	/** FN06 — the EMITTED APP's functional Go source the panel VISUALISES as a graph. */
+	functionalGo: string;
 	labels: Labels;
 }
 
@@ -64,6 +98,7 @@ export function EmittersPanel({
 	views,
 	orderId,
 	orderHeadAfterChange,
+	functionalGo,
 	labels,
 }: Props) {
 	const [selectedId, setSelectedId] = useState(views[0]?.id ?? "");
@@ -73,6 +108,28 @@ export function EmittersPanel({
 	const [headOverride, setHeadOverride] = useState<Record<string, string>>({});
 	// The byte-identical confirmation per (entity,target): set when RE-EMIT reproduces the same hash.
 	const [reemitOk, setReemitOk] = useState<Record<string, boolean>>({});
+	// The EMITTED_FUNCTION_PURE verdict per (entity,target): true/false from proveEmittedPurity (FN03).
+	const [purity, setPurity] = useState<Record<string, boolean>>({});
+	// The FN04 arch-fitness verdict per (entity,target): green + the violation codes (if any).
+	const [archFitness, setArchFitness] = useState<
+		Record<string, { green: boolean; codes: string[] }>
+	>({});
+	// The FN05 call-graph index per (entity,target): the computed Understand-Anything graph + the
+	// affected sub-graph of a change to the first node (what the ContextRouter consumes).
+	const [callGraph, setCallGraph] = useState<
+		Record<string, { graph: CallGraph; affected: string[] }>
+	>({});
+	// FN06 — the functional graph of the EMITTED APP. The index is computed once (pure, from the
+	// emitted Go bytes); the laid-out visualisation is rendered when the human clicks VISUALISE, and
+	// the affected sub-graph (ContextRouter selection) is highlighted when they click HIGHLIGHT.
+	const functionalGraph = useMemo(
+		() => callGraphIndex(functionalGo),
+		[functionalGo],
+	);
+	const [graphViz, setGraphViz] = useState<{
+		laid: LaidOutGraph;
+		affected: string[];
+	} | null>(null);
 
 	const selected = useMemo(
 		() => views.find((v) => v.id === selectedId) ?? views[0],
@@ -94,6 +151,59 @@ export function EmittersPanel({
 		// the SAME output_hash. We confirm equality against the server-computed value (no recompute
 		// needed — determinism is the contract). This makes the done criterion action-capable.
 		setReemitOk((prev) => ({ ...prev, [`${entityId}:${p.target}`]: true }));
+	};
+
+	const provePurity = (entity: EntityView, p: ProjectionView) => {
+		// FN03 EMITTED_FUNCTION_PURE made action-capable: re-emit the SAME source N rounds via the
+		// deterministic twin and confirm every round is byte-identical (pure ⇒ reproducible). No LLM,
+		// no I/O — the verdict is COMPUTED (CLAUDE.md §8), the byte-twin of the Go purity mirror.
+		const report = proveEmittedPurity(entity.source, p.target);
+		setPurity((prev) => ({
+			...prev,
+			[`${entity.id}:${p.target}`]: report.byteIdentical,
+		}));
+	};
+
+	const verifyArchFitness = (entityId: string, p: ProjectionView) => {
+		// FN04 — the three EMITTED arch-fitness rules made action-capable: run the deterministic
+		// twin checkEmittedFunctional over the emitted Go bytes (no global mutable / no init / acyclic
+		// call graph). No LLM, fail-closed — the byte-twin of back/runtime/agentloop.CheckEmittedFunctional.
+		const report = checkEmittedFunctional(p.body);
+		setArchFitness((prev) => ({
+			...prev,
+			[`${entityId}:${p.target}`]: {
+				green: report.green,
+				codes: report.violations.map((v) => v.code),
+			},
+		}));
+	};
+
+	const indexCallGraph = (entityId: string, p: ProjectionView) => {
+		// FN05 — the call-graph index made action-capable: run the deterministic twin callGraphIndex
+		// over the emitted Go bytes (the Understand-Anything view), then compute affectedSubgraph for a
+		// change to the first node — exactly what the ContextRouter (S33) consumes to target the touched
+		// layers. No LLM, pure — the byte-twin of back/runtime/agentloop.CallGraphIndex/AffectedSubgraph.
+		const graph = callGraphIndex(p.body);
+		const first = graph.nodes[0]?.name;
+		const affected = first ? affectedSubgraph(graph, [first]) : [];
+		setCallGraph((prev) => ({
+			...prev,
+			[`${entityId}:${p.target}`]: { graph, affected },
+		}));
+	};
+
+	const visualiseGraph = (affectChanged: string[]) => {
+		// FN06 — VISUALISE the emitted app's functional graph: layoutCallGraph is the deterministic,
+		// LLM-free geometry (same graph + same affected → byte-identical layout). With no changed
+		// symbols it shows the plain graph; with the first node changed it highlights the affected
+		// sub-graph (the ContextRouter S33 selection) — what the agent would reload.
+		const affected = affectChanged.length
+			? affectedSubgraph(functionalGraph, affectChanged)
+			: [];
+		setGraphViz({
+			laid: layoutCallGraph(functionalGraph, affected),
+			affected,
+		});
 	};
 
 	if (!selected) return null;
@@ -146,6 +256,8 @@ export function EmittersPanel({
 									return next;
 								});
 								setReemitOk({});
+								setPurity({});
+								setArchFitness({});
 							}}
 							className="rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
 						>
@@ -257,10 +369,272 @@ export function EmittersPanel({
 									{labels.byteIdenticalOk}
 								</p>
 							)}
+
+							<button
+								type="button"
+								data-testid={`prove-purity-${p.target}`}
+								onClick={() => provePurity(selected, p)}
+								className="mt-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+							>
+								{labels.provePurityCta}
+							</button>
+							{purity[okKey] !== undefined && (
+								<p
+									data-testid={`purity-verdict-${p.target}`}
+									data-pure={purity[okKey] ? "true" : "false"}
+									className={
+										purity[okKey]
+											? "mt-2 text-xs font-medium text-primary"
+											: "mt-2 text-xs font-medium text-destructive"
+									}
+								>
+									{purity[okKey] ? labels.purityOk : labels.purityFail}
+								</p>
+							)}
+
+							{p.target === "go-sqlc" && (
+								<>
+									<button
+										type="button"
+										data-testid={`arch-fitness-${p.target}`}
+										onClick={() => verifyArchFitness(selected.id, p)}
+										className="mt-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+									>
+										{labels.archFitnessCta}
+									</button>
+									{archFitness[okKey] !== undefined && (
+										<p
+											data-testid={`arch-fitness-verdict-${p.target}`}
+											data-archfitness={
+												archFitness[okKey].green ? "true" : "false"
+											}
+											className={
+												archFitness[okKey].green
+													? "mt-2 text-xs font-medium text-primary"
+													: "mt-2 text-xs font-medium text-destructive"
+											}
+										>
+											{archFitness[okKey].green
+												? labels.archFitnessOk
+												: `${labels.archFitnessFail} (${archFitness[okKey].codes.join(", ")})`}
+										</p>
+									)}
+
+									<button
+										type="button"
+										data-testid={`call-graph-${p.target}`}
+										onClick={() => indexCallGraph(selected.id, p)}
+										className="mt-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+									>
+										{labels.callGraphCta}
+									</button>
+									{callGraph[okKey] !== undefined && (
+										<div
+											data-testid={`call-graph-index-${p.target}`}
+											data-callgraph-hash={callGraph[okKey].graph.hash}
+											data-callgraph-nodes={callGraph[okKey].graph.nodes.length}
+											className="mt-2 rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
+										>
+											{callGraph[okKey].graph.nodes.length === 0 ? (
+												<p>{labels.callGraphEmpty}</p>
+											) : (
+												<>
+													<p className="font-medium text-foreground">
+														{labels.callGraphNodes}
+													</p>
+													<ul className="mt-1 space-y-0.5">
+														{callGraph[okKey].graph.nodes.map((n) => (
+															<li key={n.name}>
+																<span className="font-mono">{n.name}</span>
+																{" → "}
+																<span className="font-mono">
+																	{n.calls.length > 0
+																		? n.calls.join(", ")
+																		: "∅"}
+																</span>
+															</li>
+														))}
+													</ul>
+													<p className="mt-2">
+														{labels.callGraphHashLabel}:{" "}
+														<span className="font-mono">
+															{short(callGraph[okKey].graph.hash)}
+														</span>
+													</p>
+													<p
+														className="mt-1"
+														data-testid={`call-graph-affected-${p.target}`}
+														data-callgraph-affected={callGraph[
+															okKey
+														].affected.join(",")}
+													>
+														{labels.callGraphAffectedLabel}:{" "}
+														<span className="font-mono">
+															{callGraph[okKey].affected.join(", ") || "∅"}
+														</span>
+													</p>
+												</>
+											)}
+										</div>
+									)}
+								</>
+							)}
 						</article>
 					);
 				})}
 			</div>
+
+			{/* FN06 — the functional graph visualisation of the EMITTED APP (the "code émis"): each
+			    function is a node, each call an edge; the agent's affected sub-graph (ContextRouter
+			    S33) is highlighted. The layout is the pure, deterministic layoutCallGraph (no LLM). */}
+			<section
+				data-testid="functional-graph"
+				className="mt-8 rounded-lg border border-border bg-card p-5"
+			>
+				<h2 className="text-sm font-semibold text-card-foreground">
+					{labels.graphVizHeading}
+				</h2>
+				<p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+					{labels.graphVizIntro}
+				</p>
+				<div className="mt-3 flex flex-wrap gap-2">
+					<button
+						type="button"
+						data-testid="visualise-graph"
+						onClick={() => visualiseGraph([])}
+						className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+					>
+						{labels.graphVizCta}
+					</button>
+					<button
+						type="button"
+						data-testid="visualise-graph-affected"
+						onClick={() => {
+							const first = functionalGraph.nodes[0]?.name;
+							visualiseGraph(first ? [first] : []);
+						}}
+						className="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+					>
+						{labels.graphVizAffectedCta}
+					</button>
+				</div>
+
+				{graphViz !== null &&
+					(graphViz.laid.nodes.length === 0 ? (
+						<p
+							data-testid="functional-graph-empty"
+							className="mt-3 text-xs text-muted-foreground"
+						>
+							{labels.graphVizEmpty}
+						</p>
+					) : (
+						<div className="mt-4">
+							<div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+								<span className="inline-flex items-center gap-1.5">
+									<span className="inline-block h-3 w-3 rounded-sm border border-border bg-muted" />
+									{labels.graphVizLegendNode}
+								</span>
+								<span className="inline-flex items-center gap-1.5">
+									<span className="inline-block h-3 w-3 rounded-sm border border-primary bg-primary/20" />
+									{labels.graphVizLegendAffected}
+								</span>
+							</div>
+							<div className="overflow-x-auto rounded-md border border-border bg-muted/30 p-2">
+								<svg
+									data-testid="functional-graph-svg"
+									data-graph-hash={functionalGraph.hash}
+									data-graph-nodes={graphViz.laid.nodes.length}
+									data-graph-edges={graphViz.laid.edges.length}
+									width={graphViz.laid.width}
+									height={graphViz.laid.height}
+									viewBox={`0 0 ${graphViz.laid.width} ${graphViz.laid.height}`}
+									role="img"
+									aria-label={labels.graphVizHeading}
+								>
+									<title>{labels.graphVizHeading}</title>
+									<defs>
+										<marker
+											id="fn06-arrow"
+											viewBox="0 0 10 10"
+											refX="9"
+											refY="5"
+											markerWidth="6"
+											markerHeight="6"
+											orient="auto-start-reverse"
+										>
+											<path
+												d="M 0 0 L 10 5 L 0 10 z"
+												className="fill-muted-foreground"
+											/>
+										</marker>
+									</defs>
+									{graphViz.laid.edges.map((e) => (
+										<line
+											key={`${e.from}->${e.to}`}
+											data-testid={`graph-edge-${e.from}-${e.to}`}
+											x1={e.x1}
+											y1={e.y1}
+											x2={e.x2}
+											y2={e.y2}
+											className="stroke-muted-foreground"
+											strokeWidth={1.5}
+											markerEnd="url(#fn06-arrow)"
+										/>
+									))}
+									{graphViz.laid.nodes.map((n) => (
+										<g
+											key={n.name}
+											data-testid={`graph-node-${n.name}`}
+											data-affected={n.affected ? "true" : "false"}
+										>
+											<rect
+												x={n.x - 65}
+												y={n.y - 16}
+												width={130}
+												height={32}
+												rx={6}
+												className={
+													n.affected
+														? "fill-primary/20 stroke-primary"
+														: "fill-card stroke-border"
+												}
+												strokeWidth={1.5}
+											/>
+											<text
+												x={n.x}
+												y={n.y + 4}
+												textAnchor="middle"
+												className={
+													n.affected
+														? "fill-primary text-[11px] font-mono font-medium"
+														: "fill-foreground text-[11px] font-mono"
+												}
+											>
+												{n.name}
+											</text>
+										</g>
+									))}
+								</svg>
+							</div>
+							<p className="mt-2 text-xs text-muted-foreground">
+								{labels.graphVizHashLabel}:{" "}
+								<span className="font-mono">{short(functionalGraph.hash)}</span>
+							</p>
+							{graphViz.affected.length > 0 && (
+								<p
+									data-testid="functional-graph-affected"
+									data-graph-affected={graphViz.affected.join(",")}
+									className="mt-1 text-xs text-muted-foreground"
+								>
+									{labels.graphVizAffectedLabel}:{" "}
+									<span className="font-mono">
+										{graphViz.affected.join(", ")}
+									</span>
+								</p>
+							)}
+						</div>
+					))}
+			</section>
 		</div>
 	);
 }

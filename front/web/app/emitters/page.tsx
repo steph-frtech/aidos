@@ -10,6 +10,7 @@ import {
 	TARGETS,
 } from "@/lib/emitters";
 import {
+	EMITTED_FUNCTIONAL_GO,
 	ENTITIES,
 	ENTITY_ORDER,
 	ENTITY_ORDER_CHANGED,
@@ -40,6 +41,7 @@ function entityView(entity: (typeof ENTITIES)[number]): EntityView {
 		name: entity.name,
 		fields: entity.fields.map((f) => `${f.name}: ${f.type}`),
 		headSourceHash: sourceHash(entity),
+		source: entity,
 		projections: projections.map((a) => ({
 			target: a.target,
 			path: a.path,
@@ -84,6 +86,26 @@ export default async function EmittersPage() {
 		targetGoSqlc: t("targetGoSqlc"),
 		targetPgDdl: t("targetPgDdl"),
 		targetTsTypes: t("targetTsTypes"),
+		provePurityCta: t("provePurityCta"),
+		purityOk: t("purityOk"),
+		purityFail: t("purityFail"),
+		archFitnessCta: t("archFitnessCta"),
+		archFitnessOk: t("archFitnessOk"),
+		archFitnessFail: t("archFitnessFail"),
+		callGraphCta: t("callGraphCta"),
+		callGraphNodes: t("callGraphNodes"),
+		callGraphHashLabel: t("callGraphHashLabel"),
+		callGraphAffectedLabel: t("callGraphAffectedLabel"),
+		callGraphEmpty: t("callGraphEmpty"),
+		graphVizHeading: t("graphVizHeading"),
+		graphVizIntro: t("graphVizIntro"),
+		graphVizCta: t("graphVizCta"),
+		graphVizAffectedCta: t("graphVizAffectedCta"),
+		graphVizLegendNode: t("graphVizLegendNode"),
+		graphVizLegendAffected: t("graphVizLegendAffected"),
+		graphVizHashLabel: t("graphVizHashLabel"),
+		graphVizAffectedLabel: t("graphVizAffectedLabel"),
+		graphVizEmpty: t("graphVizEmpty"),
 	};
 
 	return (
@@ -123,6 +145,7 @@ export default async function EmittersPage() {
 						views={views}
 						orderId={ENTITY_ORDER.id}
 						orderHeadAfterChange={orderHeadAfterChange}
+						functionalGo={EMITTED_FUNCTIONAL_GO}
 						labels={labels}
 					/>
 				</div>

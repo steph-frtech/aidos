@@ -366,6 +366,20 @@ export default async function AgentsPage() {
 		ba31RefusedTag: t("ba31RefusedTag"),
 		ba31AdmittedTag: t("ba31AdmittedTag"),
 		ba31WallNote: t("ba31WallNote"),
+		economyHeading: t("economyHeading"),
+		economyBody: t("economyBody"),
+		economyButton: t("economyButton"),
+		economyRunCol: t("economyRunCol"),
+		economyBeforeCol: t("economyBeforeCol"),
+		economyAfterCol: t("economyAfterCol"),
+		economySavedCol: t("economySavedCol"),
+		economyVerdictCol: t("economyVerdictCol"),
+		economyInvariantTag: t("economyInvariantTag"),
+		economyDivergentTag: t("economyDivergentTag"),
+		economyCapNeverRaisedTag: t("economyCapNeverRaisedTag"),
+		economyTotalLabel: t("economyTotalLabel"),
+		economySavedLabel: t("economySavedLabel"),
+		economyWallNote: t("economyWallNote"),
 	};
 
 	return (
