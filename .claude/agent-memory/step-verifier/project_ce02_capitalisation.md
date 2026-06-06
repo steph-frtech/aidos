@@ -1,0 +1,16 @@
+---
+name: ce02-capitalisation
+description: CE02 = the COMPOUND-track DECISION step — an Accepted ADR (0038) pinned to code by a parity mirror stating the capitalisation frontier; no truth written, no new enforcer.
+metadata:
+  type: project
+---
+
+CE02 (runtime/compound, follows [[ce01-compound-spike]]). Done-criteria: ADR accepté + frontière claire (capitalisation ≠ apprentissage de critères ; tout via /goal) ∧ tracké Linear. CE02 ships NO functional runtime loop (capture=CE03, expansion=CE04, reuse/router=CE05) — it GRAVES the decision as ACCEPTED ADR 0038 and PINS it to code via a parity mirror.
+
+**Shape**: single authoritative `capitalisationTable` (5 subjects) in capitalisation.go — 2 CAPITALISE (gesture_pattern→procedural_memory S31; spec_pattern→behavior_macro §24.6; both ViaWall=true, TouchesFitness=false) / 3 FORBIDDEN frontiers (intrinsic_substance, fitness_weights_criteria[TouchesFitness=true], direct_kernel_write). `Compute()` derives the 2 load-bearing invariants `AllCapitaliseViaWall ∧ NoCapitaliseTouchesFitness`. capitalisation_adr.go projects the table into ADRParity/ADRSummary; the RED-FIRST parity mirror capitalisation_adr_test.go is the deterministic JUDGE — it reads docs/adr/0038-*.md on disk and asserts Status: Accepted + every subject/disposition + frontier verbatim ("/goal","fitness","firewall.ViaIdea","mur","apprentissage de critères"). So the ADR document can never drift from code.
+
+**How to apply (a DECISION/ADR step, not a normal capability step)**: (1) the deliverable is an Accepted ADR file proven by a mirror that READS THE FILE (Accepted + subjects + frontier strings) — a Proposed/missing/incomplete ADR goes red; (2) determinism-first = declared table not LLM, repro mirrors both planes (rapid TestADRParity_Reproducible + TS fast-check); (3) ui-completeness is on the ACTION-path (action-capable /compound BoundaryPanel "Afficher la frontière" runs the pure TS twin boundary()) and VACUOUS on the write-path (panel writes no truth, read-only — no propose needed since nothing is written); (4) wall holds trivially: package returns VALUES only, no SQL, no migration, no kernel/mirrors/fitness file touched (grep status confirmed); (5) Linear unauth (only authenticate exposed) = OQ-CE02-linear, NOT a failure per §11.
+
+**SCAR recurred (gofmt comment alignment)**: report claimed "biome clean / go test green" but `gofmt -l runtime/compound/` flagged capitalisation_adr_test.go — a `[]string{ "/goal", // c \n "fitness", // c }` block where gofmt collapses the over-aligned trailing comments. SAME scar as HR01/BA20/BA16/CE01-area. Fixed: realign comment to single space. ALWAYS run `gofmt -l <pkg>` myself; never trust "formatters clean" in the report. (Go aligns trailing line-comments within a contiguous block — multi-space before `//` is a frequent slip.)
+
+TS twin lib/compound.ts BOUNDARY_ROWS is a faithful mirror of the Go table (5 subjects, same dispositions/channels/viaWall/touchesFitness). All 28 page t() keys + 10 boundary.* sub-keys present in BOTH fr+en (i18n scar [[feedback_i18n_keys_missing]] checked, clean). tsc clean, vitest 11/11, biome clean, e2e 2/2 (CE01+CE02) on :3000 (:3100/:3200 dead). mint validate success. docs e90a9a1 on origin/main, internals has the 3 layers. back go build ./... clean. Verified-green after the gofmt fix.

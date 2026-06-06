@@ -1,0 +1,15 @@
+---
+name: mk01-spike-markitdown
+description: MK01 is the first MARKITDOWN-track spike (KRD §84) — verify spike-criteria (confined module, computed verdict, repro mirror), not normal-step gates (no Workbench route/e2e/Postgres-mirror).
+metadata:
+  type: project
+---
+
+MK01 = first MARKITDOWN (document-ingestion) track spike. Confined Go module `aidos.spike/markitdown` at /data/dev/aidos/spike/markitdown/ (go.mod = `module aidos.spike/markitdown`, stdlib-only, never imports back/). MODELS the microsoft/markitdown ingestion frontier with a deterministic stdlib HTML->markdown converter (ToMarkdown: dropElements→convertInline-FIRST→headings/lists/tables→strip→unescape). Measures TWO properties on a REAL fixture (testdata/checkout-spec.html, 49-line checkout spec): FIDELITY (13 hand-declared carrier facts all survive, floor 1.0) + IDEMPOTENCE in two senses (byte-determinism md1==md2, hash dfac5f5321beda3a; AND re-ingestion stability — rewrap md as html, re-convert, carriers don't erode). Verdict GO COMPUTED (faithful ∧ idempotent ∧ reproducible ∧ wallRespected), never declared. NO-LLM, pure functions.
+
+**Why:** spike rules differ from normal steps ([[hr01-spike-headroom]], [[ce01-compound-spike]]).
+**How to apply:** for a /spike step verify spike-criteria not normal gates — (1) writes confined to /spike/ only (wall: zero kernel/mirrors/fitness; grep `back/kernel|back/mirror|fitness` matched only an UNRELATED `back/kernel/behavior/` = CE04, timestamped 11:03 BEFORE MK01 at 11:56 — distinguish by mtime/step, not the bare grep), (2) deterministic measure = pure code + reproducibility mirror (TestReproducible replays Decide() 100×, asserts same Go/hash/fidelity) — [[project_determinism_repro_mirror]], (3) go/no-go COMPUTED (verdict.go Decide: v.Go = faithful && idempotent && Reproducible && WallRespected), (4) OpenQuestions for fwd-deps: OQ-MK01-1 (load-bearing) the REAL Python markitdown is NOT called — OFFLINE env, pip times out; probe MODELS the frontier shape, real adapter wired behind DocConverter port at MK02 + re-measures idempotence; OQ-MK01-2 only HTML proven (PDF/DOCX/OCR/audio = MK02); OQ-MK01-3 carriers hand-declared; OQ-MK01-4 wall enforced at MK03 via idea-intake no-GRANT; OQ-MK01-5 Linear unauth, (5) two Mintlify « Pour moi » pages (concept + internals w/ 3 layers Implémentation·Méta·Méta-méta) shipped, mint validate success, commit 9c329f7 on steph-frtech/docs origin/main.
+
+NO Workbench route / Playwright e2e — correct for a confined throwaway spike (matches HR01/CE01-spike pattern; UI+e2e+idea-intake wiring lands at MK03, the user-facing MCP step). The executable test IS the red→green falsifiability proof (obs 4142: first run failed TestMarkdownStructure — real bug, code spans inside <li> flattened because tag-stripping ran before inline conversion; fixed by moving convertInline FIRST).
+
+gofmt -l CLEAN this time (the struct-alignment scar from HR01/BA20/BA16 did NOT recur — report's "gofmt clean" was ACCURATE, re-verified). go vet clean, go test -count=1 all 8 PASS (fresh, not cached). Verdict output: 13/13 carriers 100%, deterministic, reingest 100%, reproducible, wall respected, GO. Verified-green.

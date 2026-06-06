@@ -1,0 +1,15 @@
+---
+name: mk02-docconverter
+description: MK02 graduates the MK01 spike's HTML→markdown into a replaceable DocConverter PORT in back/ with the idempotence contract graven by a rapid mirror; SCAR — TS twin's regex `s` flag broke tsc under ES2017 while vitest stayed green.
+metadata:
+  type: project
+---
+
+MK02 = the runtime INGESTION FRONTIER. The MK01 spike ([[mk01-spike-markitdown]]) is NOT graduated; its HTML→markdown converter is rebuilt cleanly in `back/runtime/markitdown/` behind a replaceable `DocConverter` interface (`ToMarkdown(raw []byte, mime Mime) string`), default adapter `HTMLConverter` (the real microsoft/markitdown wired at MK03 behind the SAME port — OQ-MK02-real-adapter, load-bearing fwd-dep ← OQ-MK01-1). Pure, total (unsupported mime→""), below-line: no DB/clock/rng/LLM, zero kernel/mirrors/fitness write (wall holds — only a comment mentions those schemas).
+
+Done-criteria all met: (1) miroir ROUGE d'abord — `markitdown_property_test.go` (rapid) NAMES DocConverter/HTMLConverter/MimeHTML before the pkg compiled (compile-failure = red), then green; idempotence pinned in 3 senses (TestIdempotent_SameFileSameMarkdown byte-determinism, TestReproducible 100× no drift, TestReingestionIsAFixedPoint). (2) ADR 0039 « frontière d'ingestion replaceable » Accepted. (3) skill `.claude/skills/markitdown/SKILL.md` house format (frontmatter+Purpose/When/Inputs/Outputs/Determinism-first/Replaceable-port/Procedure/Guardrails+wall callout). Plus determinism-first TS twin `front/web/lib/markitdown.ts` (mirrors Go pipeline order EXACTLY) + fast-check `markitdown.test.ts` 6/6; action-capable `/ingestion` (convert→idempotent-badge, propose→status=draft idea draft) e2e 2/2 on :3000; two Mintlify pages pushed (7386f82, HEAD==origin/main, mint validate success, internals 3 layers).
+
+**SCAR (tsc-vs-vitest blind spot, [[feedback_tsc_vs_vitest]]):** report claimed sensors pass, but `tsc --noEmit` gave 12 errors TS1501 — the TS twin's regexes used the `s` (dotAll) flag (`gis`), only available targeting es2018+, and this repo's `front/web/tsconfig.json` target is **ES2017**. **vitest stayed GREEN** (esbuild ignores the unsupported flag), masking it — exactly the documented blind spot. Fix: dropped the `s` flag (kept `gi`) on all 12 literal regexes + the `new RegExp(...,"gis")` in dropElements; the `s` flag was REDUNDANT anyway because every body capture already uses `[\s\S]*?` not `.`. tsc clean after, vitest still 6/6, e2e still 2/2 (behavior-preserving). 
+**How to apply:** any step shipping a TS twin with regex literals → run `tsc --noEmit` (NOT just vitest); watch for the `s`/dotAll flag under the ES2017 target. The fix is mechanical and behavior-neutral when `[\s\S]` is already used.
+
+gofmt/go vet/go test all clean (the alignment scar did NOT recur — report accurate on Go). biome 1 warning = PRE-EXISTING WorkbenchHeader line-256 a11y suppression (MK02 diff to that file is only +3 nav-link lines, untouched). Linear unauth=OQ-MK02-linear. Verified-green after the tsc fix.
