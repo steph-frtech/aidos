@@ -10,13 +10,13 @@
 // (the hook does not over-fire — §5). DETERMINISTIC: pure function of the input.
 
 import { canDescend, type NodeInput, type Verdict } from "./besoin-candescend";
-import type { Level } from "./besoin-grammar";
 import {
 	type BesoinLevelMirror,
 	besoinCompleteness,
 	type CompletenessNode,
 	type Monster,
 } from "./besoin-completeness";
+import type { Level } from "./besoin-grammar";
 
 export type GateVerdict = "no_op" | "allow" | "block";
 
