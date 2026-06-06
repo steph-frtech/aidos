@@ -50,6 +50,10 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/compound-besoin-mirrorform", k: "besoinMirrorform" },
 			{ href: "/compound-besoin-gate", k: "besoinGate" },
 			{ href: "/compound-besoin", k: "besoinInterview" },
+			{ href: "/besoin-invariant", k: "besoinInvariant" },
+			{ href: "/besoin-intake", k: "besoinIntake" },
+			{ href: "/emit-ideas", k: "emitIdeas" },
+			{ href: "/red-backlog", k: "redBacklog" },
 		],
 	},
 	{
