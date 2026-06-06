@@ -257,8 +257,7 @@ export function CompoundBesoinWizard({ labels }: { labels: WizardLabels }) {
 	function project() {
 		const { nodes, edges } = buildDocInputs();
 		try {
-			const graphHash =
-				"g" + completedCount + "x" + rungs.filter((r) => r.vacant).length;
+			const graphHash = `g${completedCount}x${rungs.filter((r) => r.vacant).length}`;
 			setDoc(emitRequirementsDoc(nodes, edges, graphHash));
 		} catch {
 			setDoc(null);
