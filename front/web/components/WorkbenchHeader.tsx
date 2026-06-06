@@ -44,10 +44,12 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/compound-besoin-proposes", k: "besoinProposes" },
 			{ href: "/compound-besoin-thresholds", k: "besoinThresholds" },
 			{ href: "/compound-besoin-candescend", k: "besoinCanDescend" },
+			{ href: "/compound-besoin-branchtree", k: "besoinBranchTree" },
 			{ href: "/compound-besoin-cascade", k: "besoinCascade" },
 			{ href: "/compound-besoin-completeness", k: "besoinCompleteness" },
 			{ href: "/compound-besoin-mirrorform", k: "besoinMirrorform" },
 			{ href: "/compound-besoin-gate", k: "besoinGate" },
+			{ href: "/compound-besoin", k: "besoinInterview" },
 		],
 	},
 	{
