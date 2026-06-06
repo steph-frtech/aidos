@@ -70,7 +70,8 @@
 		"proofLevels": "Proof levels",
 		"contextCompression": "Compression",
 		"ingestion": "Ingestion",
-		"compound": "Compound"
+		"compound": "Compound",
+		"besoinNecessity": "Need necessity"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -1363,7 +1364,9 @@
 		"parityFail": "Parity red — drift detected",
 		"fieldCol": "Field",
 		"declaredCol": "Declared (EL00 target)",
-		"enforcedCol": "Enforced (arch-fitness.json)"
+		"enforcedCol": "Enforced (arch-fitness.json)",
+		"declaredTitle": "Declared target (EL00)",
+		"enforcedTitle": "Enforced config (arch-fitness.json)"
 	},
 	"emitters": {
 		"heading": "Emitters — one deterministic projection per kind × target",
@@ -2950,5 +2953,43 @@
 		"draftWallNote": "The wall: ingestion proposes a candidate-truth (status=draft); it never freezes. The only door to truth stays idea → mirror → /goal → human approval.",
 		"pending": "No markdown yet. Click CONVERT to run the DocConverter port.",
 		"footer": "MK02 · DocConverter — replaceable ingestion frontier (ADR 0039), deterministic & idempotent. The port reads the document, writes no truth (the wall)."
+	},
+	"besoinNecessity": {
+		"eyebrow": "Need necessity spike",
+		"title": "Necessity — must the need follow the architecture?",
+		"subtitle": "EL01 spike · go/no-go",
+		"spikeBadge": "/spike · ratchet OFF · T0",
+		"intro": "The EL01 spike PROVES a free-text box (today's S64 \"capture your idea\") is insufficient. The SAME need — the S46 demo checkout, \"a customer places an order from their cart\" — is captured TWO ways: a top-down rung-by-rung BesoinGraph (product→journey→view→control→action→operation→entity) with a forcing gate, vs a flat prompt. Is the graph's emitted Idea backlog STRICTLY richer/ordered than the flat prompt? The verdict is COMPUTED (never declared), reproducible (pure function, no LLM).",
+		"tutorialHeading": "How to read & drive this screen",
+		"tutorialBody": "Click \"Compare both captures\": the panel runs the pure decide() twin (identical to the Go probe spike/besoin) and shows a GO/NO-GO badge, a side-by-side richness table (BesoinGraph vs flat prompt), the strict-dominance deltas, the computed rationale, and the HARVESTED anchor Idea as a DRAFT (no mirror, no frozen version — the wall). Nothing is written: confined spike, read-only.",
+		"runCta": "Compare both captures",
+		"goBadge": "GO — the need MUST follow the architecture",
+		"noGoBadge": "NO-GO — the track stops",
+		"pending": "No comparison run yet. Click \"Compare both captures\" to run the pure twin.",
+		"tableHeading": "Backlog richness: BesoinGraph vs free-text box",
+		"colMetric": "Metric",
+		"colGraph": "BesoinGraph",
+		"colFlat": "Flat prompt",
+		"colDelta": "Δ",
+		"rowIdeas": "Ideas emitted (mapping rungs)",
+		"rowResolved": "with resolving outgoing ref",
+		"rowTyped": "carrying all 4 metadata",
+		"rowAnchored": "carrying anchors_above",
+		"rowOrdered": "backlog ordered (topological)",
+		"rowNoEmit": "NoEmit rungs seeding anchors",
+		"yes": "yes",
+		"no": "no",
+		"floor": "declared floor (Idea gain)",
+		"rationaleLabel": "Verdict:",
+		"harvestHeading": "HARVESTED anchor Idea (DRAFT candidate)",
+		"harvestProposes": "proposes",
+		"harvestStatus": "status",
+		"harvestNoMirror": "no mirror",
+		"harvestNoVersion": "no frozen version",
+		"harvestIntentLabel": "Durable lesson:",
+		"harvestOqLabel": "OpenQuestions",
+		"exampleHeading": "The worked example — the S46 demo checkout",
+		"exampleBody": "On \"a customer places an order from their cart\", the BesoinGraph emits 5 ordered Ideas (product→control→action→operation→entity), refs resolving @rung, each typed with the 4 metadata and carrying its anchors; journey/view are 2 NoEmit nodes seeding anchors without emitting an Idea (never a silent journey→product cast). The flat prompt yields just 1 undifferentiated, untyped candidate with no order and no edge — everything else the agent would have to guess (a prompt→code shortcut the wall forbids).",
+		"footer": "EL01 spike — /spike confined, ratchet OFF, T0, throwaway. No kernel/mirrors/fitness write (the wall). The lesson is harvested as a DRAFT Idea (no mirror, no version) — promotion is /goal later. EL02+ builds the real back/runtime/besoin package."
 	}
 }

@@ -37,6 +37,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/context-compression", k: "contextCompression" },
 			{ href: "/ingestion", k: "ingestion" },
 			{ href: "/compound", k: "compound" },
+			{ href: "/besoin-necessity", k: "besoinNecessity" },
 		],
 	},
 	{

@@ -70,7 +70,8 @@
 		"proofLevels": "Couches de preuve",
 		"contextCompression": "Compression",
 		"ingestion": "Ingestion",
-		"compound": "Compound"
+		"compound": "Compound",
+		"besoinNecessity": "Nécessité du besoin"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -1363,7 +1364,9 @@
 		"parityFail": "Parité rouge — dérive détectée",
 		"fieldCol": "Champ",
 		"declaredCol": "Déclaré (cible EL00)",
-		"enforcedCol": "Enforce-cé (arch-fitness.json)"
+		"enforcedCol": "Enforce-cé (arch-fitness.json)",
+		"declaredTitle": "Cible déclarée (EL00)",
+		"enforcedTitle": "Config enforce-cée (arch-fitness.json)"
 	},
 	"emitters": {
 		"heading": "Emitters — une projection déterministe par kind × target",
@@ -2950,5 +2953,43 @@
 		"draftWallNote": "Le mur : l'ingestion propose une candidate-vérité (status=draft) ; elle ne fige jamais. La seule porte vers la vérité reste idée → miroir → /goal → approbation humaine.",
 		"pending": "Aucun markdown encore. Cliquez CONVERTIR pour exécuter le port DocConverter.",
 		"footer": "MK02 · DocConverter — frontière d'ingestion replaceable (ADR 0039), déterministe & idempotente. Le port lit le document, n'écrit aucune vérité (le mur)."
+	},
+	"besoinNecessity": {
+		"eyebrow": "Spike de nécessité du besoin",
+		"title": "Nécessité — le besoin doit-il suivre l'architecture ?",
+		"subtitle": "spike EL01 · go/no-go",
+		"spikeBadge": "/spike · cliquet OFF · T0",
+		"intro": "Le spike EL01 PROUVE qu'une boîte texte-libre (la S64 « capturez votre idée » actuelle) est insuffisante. Le MÊME besoin — la demo checkout S46, « a customer places an order from their cart » — est capturé DEUX façons : un BesoinGraph top-down rung-par-rung (product→journey→view→control→action→operation→entity) avec porte de forçage, vs un prompt plat. Le backlog d'Ideas produit par le graphe est-il STRICTEMENT plus riche/ordonné qu'un prompt plat ? Verdict CALCULÉ (jamais déclaré), reproductible (fonction pure, sans LLM).",
+		"tutorialHeading": "Comment lire & piloter cet écran",
+		"tutorialBody": "Cliquez « Comparer les deux captures » : le panneau lance le jumeau pur decide() (identique à la sonde Go spike/besoin) et affiche un badge GO/NO-GO, un tableau de richesse côte à côte (BesoinGraph vs prompt plat), les deltas de dominance stricte, la justification calculée, puis l'Idea-ancre HARVESTÉE en DRAFT (sans miroir, sans version figée — le mur). Rien n'est écrit : spike confiné, lecture seule.",
+		"runCta": "Comparer les deux captures",
+		"goBadge": "GO — le besoin DOIT suivre l'architecture",
+		"noGoBadge": "NO-GO — le track s'arrête",
+		"pending": "Aucune comparaison lancée. Cliquez « Comparer les deux captures » pour exécuter le jumeau pur.",
+		"tableHeading": "Richesse du backlog : BesoinGraph vs boîte texte-libre",
+		"colMetric": "Métrique",
+		"colGraph": "BesoinGraph",
+		"colFlat": "Prompt plat",
+		"colDelta": "Δ",
+		"rowIdeas": "Ideas émises (rungs mappants)",
+		"rowResolved": "à ref sortante résolue",
+		"rowTyped": "portant les 4 métadonnées",
+		"rowAnchored": "portant des anchors_above",
+		"rowOrdered": "backlog ordonné (topologique)",
+		"rowNoEmit": "rungs NoEmit seedant les ancres",
+		"yes": "oui",
+		"no": "non",
+		"floor": "plancher déclaré (gain d'Ideas)",
+		"rationaleLabel": "Verdict :",
+		"harvestHeading": "Idea-ancre HARVESTÉE (candidate DRAFT)",
+		"harvestProposes": "propose",
+		"harvestStatus": "statut",
+		"harvestNoMirror": "aucun miroir",
+		"harvestNoVersion": "aucune version figée",
+		"harvestIntentLabel": "Leçon durable :",
+		"harvestOqLabel": "OpenQuestions",
+		"exampleHeading": "L'exemple travaillé — la demo checkout S46",
+		"exampleBody": "Sur « a customer places an order from their cart », le BesoinGraph émet 5 Ideas ordonnées (product→control→action→operation→entity), dépendances résolues @rung, chacune typée des 4 métadonnées et portant ses ancres ; journey/view sont 2 nœuds NoEmit qui seedent les ancres sans émettre d'Idea (jamais un cast silencieux journey→product). Le prompt plat ne donne qu'1 candidate indifférenciée, non typée, sans ordre ni arête — tout le reste, l'agent devrait le deviner (un raccourci prompt→code que le mur interdit).",
+		"footer": "Spike EL01 — /spike confiné, cliquet OFF, T0, jetable. Aucune écriture kernel/mirrors/fitness (le mur). La leçon est harvestée en Idea DRAFT (sans miroir, sans version) — promotion = /goal plus tard. EL02+ construit le vrai paquet back/runtime/besoin."
 	}
 }
