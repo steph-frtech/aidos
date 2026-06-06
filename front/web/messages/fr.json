@@ -73,7 +73,8 @@
 		"compound": "Compound",
 		"besoinNecessity": "Nécessité du besoin",
 		"besoinGrammar": "Grammaire du besoin",
-		"besoinGraph": "Graphe du besoin"
+		"besoinGraph": "Graphe du besoin",
+		"besoinMetadata": "Métadonnées du besoin"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3054,5 +3055,38 @@
 		"absenceFail": "ÉCHEC — une clé version/mirror est présente (violation du mur).",
 		"dupRefused": "Refusé — un nœud existe déjà pour ce rung (l'écrasement passe par un ChangeSet, §9).",
 		"footer": "EL03 — record content-adressé (records.Hash réutilisé, jamais forké), append-only, non-destructif (§9), aucune Version ni Mirror (double absence = le mur). Mêmes réponses → même graph_hash ; projets disjoints. Au-dessus de la porte idea-intake, jamais une écriture kernel/mirrors/fitness. EL15 le persiste en JSONB dans le schéma besoin ; EL19 le pilote en wizard."
+	},
+	"besoinMetadata": {
+		"eyebrow": "EL04 · Métadonnées par-vérité",
+		"title": "Métadonnées du besoin",
+		"subtitle": "truthtyping · scope · authority",
+		"intro": "EL04 attache les quatre métadonnées par-vérité à chaque nœud du BesoinGraph, en réutilisant les trois packages distincts qui les portent : truth_kind + verifiability (truthtyping), scope (scope), authority (authority). Le truth_kind canonique est celui de truthtyping — une seule source d'enum, dont authority hérite la connaissance. Tout reste au-dessus du mur : ces métadonnées qualifient un besoin, elles ne le figent jamais en vérité.",
+		"tutorialHeading": "Essayez la certification",
+		"tutorialBody": "Choisissez le statut du nœud puis ses quatre métadonnées et cliquez « Certifier ». Un nœud sans truth_kind est incomplet ; une vérifiabilité « unverifiable » route vers /spike (idea_capture → idea_grill → idea_spike) ; un nœud actif sans scope (ni global « * ») est incomplet ; un nœud réglementaire sans approbation juridique est incomplet (le done-case authority). « Prouver la source unique d'enum » montre que truthtyping et authority partagent le même enum truth_kind.",
+		"statusLabel": "Statut du nœud",
+		"truthKindLabel": "truth_kind (truthtyping §13.4)",
+		"verifiabilityLabel": "verifiability (§13.5)",
+		"regionLabel": "scope · region (§13.7)",
+		"authorityLabel": "authority (§13.8)",
+		"authNone": "Aucune autorité assignée",
+		"authMissingGrant": "Autorité juridique, sans approbation accordée",
+		"authGranted": "Autorité juridique, approbation accordée",
+		"certifyCta": "Certifier les métadonnées",
+		"coherenceCta": "Prouver la source unique d'enum",
+		"resetCta": "Réinitialiser",
+		"verdictHeading": "Verdict de certification",
+		"complete": "Complet — les quatre métadonnées sont présentes et certifiables",
+		"incomplete": "Incomplet — au moins une métadonnée manque ou est non certifiable",
+		"gapsHeading": "Manques (un par métadonnée)",
+		"routingHeading": "Routage de vérifiabilité",
+		"routeSpike": "Routé vers /spike (via idea_capture → idea_grill → idea_spike)",
+		"routeKernel": "Zone kernel (figeable plus tard, via /goal sous le mur)",
+		"routeOther": "Routé hors-kernel (expériment / revue humaine)",
+		"coherenceHeading": "Cohérence du truth_kind (une seule source d'enum)",
+		"coherenceOk": "Cohérent — truthtyping et authority partagent l'enum, aucun fork",
+		"coherenceFail": "Incohérent — deux sources d'enum divergent",
+		"pending": "En attente d'une action.",
+		"none": "—",
+		"footer": "EL04 — au-dessus du mur, lecture seule contre la vérité. Les métadonnées qualifient un besoin (jamais de champ Version ni Mirror). Déterministe : mêmes métadonnées → même verdict."
 	}
 }

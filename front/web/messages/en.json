@@ -73,7 +73,8 @@
 		"compound": "Compound",
 		"besoinNecessity": "Need necessity",
 		"besoinGrammar": "Need grammar",
-		"besoinGraph": "Need graph"
+		"besoinGraph": "Need graph",
+		"besoinMetadata": "Need metadata"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3054,5 +3055,38 @@
 		"absenceFail": "FAIL — a version/mirror key is present (wall violation).",
 		"dupRefused": "Refused — a node already exists for that rung (overwrite goes through a ChangeSet, §9).",
 		"footer": "EL03 — content-addressed record (records.Hash reused, never forked), append-only, non-destructive (§9), no Version nor Mirror (double absence = the wall). Same answers → same graph_hash; projects disjoint. Above the idea-intake door, never a kernel/mirrors/fitness write. EL15 persists it as JSONB in the besoin schema; EL19 drives it as a wizard."
+	},
+	"besoinMetadata": {
+		"eyebrow": "EL04 · Per-truth metadata",
+		"title": "Need metadata",
+		"subtitle": "truthtyping · scope · authority",
+		"intro": "EL04 attaches the four per-truth metadata to every BesoinGraph node, reusing the three distinct packages that carry them: truth_kind + verifiability (truthtyping), scope (scope), authority (authority). The canonical truth_kind is truthtyping's — a single enum source, which authority delegates to. Everything stays above the wall: these metadata qualify a need, they never freeze it into a truth.",
+		"tutorialHeading": "Try the certification",
+		"tutorialBody": "Choose the node status then its four metadata and click \"Certify\". A node with no truth_kind is incomplete; an \"unverifiable\" verifiability routes to /spike (idea_capture → idea_grill → idea_spike); an active node with no scope (nor global \"*\") is incomplete; a regulatory node with no legal approval is incomplete (authority's done case). \"Prove the single enum source\" shows truthtyping and authority share the same truth_kind enum.",
+		"statusLabel": "Node status",
+		"truthKindLabel": "truth_kind (truthtyping §13.4)",
+		"verifiabilityLabel": "verifiability (§13.5)",
+		"regionLabel": "scope · region (§13.7)",
+		"authorityLabel": "authority (§13.8)",
+		"authNone": "No authority assigned",
+		"authMissingGrant": "Legal authority, no approval granted",
+		"authGranted": "Legal authority, approval granted",
+		"certifyCta": "Certify the metadata",
+		"coherenceCta": "Prove the single enum source",
+		"resetCta": "Reset",
+		"verdictHeading": "Certification verdict",
+		"complete": "Complete — all four metadata present and certifiable",
+		"incomplete": "Incomplete — at least one metadata is missing or not certifiable",
+		"gapsHeading": "Gaps (one per metadata)",
+		"routingHeading": "Verifiability routing",
+		"routeSpike": "Routed to /spike (via idea_capture → idea_grill → idea_spike)",
+		"routeKernel": "Kernel zone (freezable later, via /goal below the wall)",
+		"routeOther": "Routed off-kernel (experiment / manual review)",
+		"coherenceHeading": "truth_kind coherence (single enum source)",
+		"coherenceOk": "Coherent — truthtyping and authority share the enum, no fork",
+		"coherenceFail": "Incoherent — two enum sources disagree",
+		"pending": "Waiting for an action.",
+		"none": "—",
+		"footer": "EL04 — above the wall, read-only against truth. The metadata qualify a need (never a Version or Mirror field). Deterministic: same metadata → same verdict."
 	}
 }
