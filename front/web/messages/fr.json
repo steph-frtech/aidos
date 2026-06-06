@@ -77,7 +77,8 @@
 		"besoinMetadata": "Métadonnées du besoin",
 		"besoinProposes": "Table LevelToProposes",
 		"besoinThresholds": "Seuils & OptionSpace",
-		"besoinCanDescend": "CanDescend (forçage)"
+		"besoinCanDescend": "CanDescend (forçage)",
+		"besoinCascade": "Cascade des ancres"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3183,5 +3184,42 @@
 		"none": "aucun",
 		"pending": "En attente d'une action.",
 		"footer": "EL07 — la gate ne lit que le BesoinGraph (le mur) ; elle n'écrit aucune vérité. enough est CALCULÉ depuis les cinq gates, jamais déclaré (anti-Goodhart §8). Elle consomme ShrinkOptionSpace (EL06/EL08) comme condition de gate anti-vacuité, pas comme simple affichage. Déterministe : mêmes (graph, level, metadata) → même verdict (lib/besoin-candescend.ts est le twin byte-équivalent de back/runtime/besoin/candescend.go)."
+	},
+	"besoinCascade": {
+		"eyebrow": "EL08 · Cascade des ancres (le compound prouvé)",
+		"title": "Cascade des ancres — l'héritage de contrainte mesuré",
+		"subtitle": "|OptionSpace| strictement plus petit sous une ancre figée",
+		"intro": "EL08 ajoute les trois pièces qui font du verdict EL07 le COMPOUND. AnchorsAbove(graph, level) = la liste FIGÉE des rungs `resolved` strictement au-dessus (le seul grounding lisible que le rung d'en dessous lit). Descend(graph, fromLevel) n'ouvre L+1 que si CanDescend(fromLevel).enough — une descente prématurée est REFUSÉE (CANNOT_DESCEND_LEVEL_NOT_RIGHTSIZED), jamais une opinion. ShrinkOptionSpaceCascade(graph, level) mesure |OptionSpace| AVANT vs APRÈS les ancres figées : sous une ancre figée le compte est STRICTEMENT plus petit (le compounding) ; sans ancre figée il ne rétrécit pas (Shrink 0 — le compounding a échoué). Rouvrir une ancre figée n'est PAS une édition : c'est une DÉCISION enregistrée (ChangeSet) ; une réécriture silencieuse est refusée (BESOIN_ANCHOR_OVERWRITE, anti-overwrite §9).",
+		"tutorialHeading": "Essayez la cascade",
+		"tutorialBody": "Choisissez un jeu de nœuds, puis : « Lister les ancres » montre le grounding figé au-dessus ; « Descendre » ouvre le rung inférieur quand le niveau est right-sized, REFUSE sinon ; « Mesurer le rétrécissement » affiche Before/After/Shrink — sous une ancre figée After < Before (strictement) ; « Rouvrir l'ancre » exige un jeton ChangeSet — sans lui, la réouverture est refusée. Chaque verdict est calculé par le twin déterministe, jamais un LLM.",
+		"anchorsCta": "Lister les ancres",
+		"descendCta": "Descendre",
+		"shrinkCta": "Mesurer le rétrécissement",
+		"reopenCta": "Rouvrir l'ancre",
+		"resetCta": "Réinitialiser",
+		"caseLabel": "Jeu de nœuds",
+		"caseFrozenNarrowing": "product figé, rétrécit journey (descente autorisée)",
+		"caseFrozenVacant": "product figé mais ne sélectionne rien (descente refusée)",
+		"caseDraftingProduct": "product en cours (non figé → ne rétrécit pas)",
+		"caseOperationLeaf": "operation → entity (paire non énumérable, sentinelle)",
+		"anchorsHeading": "AnchorsAbove (le grounding figé)",
+		"descendHeading": "Descend (descente prématurée refusée)",
+		"descendOk": "OK — le niveau est right-sized ; le rung inférieur est ouvert",
+		"descendRefused": "Refusé — descente prématurée (CANNOT_DESCEND_LEVEL_NOT_RIGHTSIZED)",
+		"openedLabel": "Rung ouvert",
+		"shrinkHeading": "ShrinkOptionSpaceCascade (le compound mesuré)",
+		"beforeLabel": "Before (sans ancre)",
+		"afterLabel": "After (sous l'ancre figée)",
+		"shrinkLabel": "Shrink",
+		"shrinkStrict": "> 0 — |OptionSpace| STRICTEMENT plus petit sous l'ancre figée (le compounding)",
+		"shrinkNone": "0 — non rétréci (pas d'ancre figée : le compounding n'a pas eu lieu)",
+		"shrinkSentinel": "sentinelle positive — paire non énumérable / feuille (satisfaite-par-OpenQuestion)",
+		"reopenHeading": "ReopenAnchor (anti-overwrite §9)",
+		"changeSetLabel": "Jeton ChangeSet",
+		"reopenOk": "OK — réouverture enregistrée (décision tracée, corps figé préservé)",
+		"reopenRefused": "Refusé — réécriture silencieuse interdite (BESOIN_ANCHOR_OVERWRITE)",
+		"none": "aucune",
+		"pending": "En attente d'une action.",
+		"footer": "EL08 — la cascade ne lit que le BesoinGraph (le mur) ; elle n'écrit aucune vérité. La descente est gated par le verdict CALCULÉ EL07 ; |OptionSpace| sous une ancre figée est un entier compté, jamais un jugement LLM ; rouvrir une ancre exige un ChangeSet (anti-overwrite §9). Déterministe : mêmes nœuds → même cascade (lib/besoin-cascade.ts est le twin byte-équivalent de back/runtime/besoin/cascade.go)."
 	}
 }

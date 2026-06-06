@@ -77,7 +77,8 @@
 		"besoinMetadata": "Need metadata",
 		"besoinProposes": "LevelToProposes table",
 		"besoinThresholds": "Thresholds & OptionSpace",
-		"besoinCanDescend": "CanDescend (forcing)"
+		"besoinCanDescend": "CanDescend (forcing)",
+		"besoinCascade": "Anchor cascade"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3183,5 +3184,42 @@
 		"none": "none",
 		"pending": "Awaiting an action.",
 		"footer": "EL07 — the gate reads only the BesoinGraph (the wall); it writes no truth. enough is COMPUTED from the five gates, never declared (anti-Goodhart §8). It consumes ShrinkOptionSpace (EL06/EL08) as the anti-vacuity gate condition, not as mere display. Deterministic: same (graph, level, metadata) → same verdict (lib/besoin-candescend.ts is the byte-equivalent twin of back/runtime/besoin/candescend.go)."
+	},
+	"besoinCascade": {
+		"eyebrow": "EL08 · Anchor cascade (the compound proven)",
+		"title": "Anchor cascade — the measured constraint inheritance",
+		"subtitle": "|OptionSpace| strictly smaller under a frozen anchor",
+		"intro": "EL08 adds the three pieces that turn the EL07 verdict into the COMPOUND. AnchorsAbove(graph, level) = the FROZEN list of `resolved` rungs strictly above (the single readable grounding the rung below reads). Descend(graph, fromLevel) opens L+1 only when CanDescend(fromLevel).enough — a premature descent is REFUSED (CANNOT_DESCEND_LEVEL_NOT_RIGHTSIZED), never an opinion. ShrinkOptionSpaceCascade(graph, level) measures |OptionSpace| BEFORE vs AFTER the frozen anchors: under a frozen anchor the count is STRICTLY smaller (the compounding); with no frozen anchor it does not narrow (Shrink 0 — the compounding failed). Re-opening a frozen anchor is NOT an edit: it is a recorded DECISION (ChangeSet); a silent rewrite is refused (BESOIN_ANCHOR_OVERWRITE, anti-overwrite §9).",
+		"tutorialHeading": "Try the cascade",
+		"tutorialBody": "Pick a node set, then: \"List the anchors\" shows the frozen grounding above; \"Descend\" opens the lower rung when right-sized, REFUSES otherwise; \"Measure the shrink\" shows Before/After/Shrink — under a frozen anchor After < Before (strictly); \"Reopen the anchor\" requires a ChangeSet token — without it the reopen is refused. Every verdict is computed by the deterministic twin, never an LLM.",
+		"anchorsCta": "List the anchors",
+		"descendCta": "Descend",
+		"shrinkCta": "Measure the shrink",
+		"reopenCta": "Reopen the anchor",
+		"resetCta": "Reset",
+		"caseLabel": "Node set",
+		"caseFrozenNarrowing": "frozen product, narrows journey (descent allowed)",
+		"caseFrozenVacant": "frozen product but selects nothing (descent refused)",
+		"caseDraftingProduct": "drafting product (not frozen → does not narrow)",
+		"caseOperationLeaf": "operation → entity (non-enumerable pair, sentinel)",
+		"anchorsHeading": "AnchorsAbove (the frozen grounding)",
+		"descendHeading": "Descend (premature descent refused)",
+		"descendOk": "OK — the level is right-sized; the lower rung is opened",
+		"descendRefused": "Refused — premature descent (CANNOT_DESCEND_LEVEL_NOT_RIGHTSIZED)",
+		"openedLabel": "Opened rung",
+		"shrinkHeading": "ShrinkOptionSpaceCascade (the compound measured)",
+		"beforeLabel": "Before (no anchor)",
+		"afterLabel": "After (under the frozen anchor)",
+		"shrinkLabel": "Shrink",
+		"shrinkStrict": "> 0 — |OptionSpace| STRICTLY smaller under the frozen anchor (the compounding)",
+		"shrinkNone": "0 — not narrowed (no frozen anchor: the compounding did not happen)",
+		"shrinkSentinel": "positive sentinel — non-enumerable pair / leaf (satisfied-by-OpenQuestion)",
+		"reopenHeading": "ReopenAnchor (anti-overwrite §9)",
+		"changeSetLabel": "ChangeSet token",
+		"reopenOk": "OK — reopen recorded (decision traced, frozen body preserved)",
+		"reopenRefused": "Refused — silent rewrite forbidden (BESOIN_ANCHOR_OVERWRITE)",
+		"none": "none",
+		"pending": "Awaiting an action.",
+		"footer": "EL08 — the cascade reads only the BesoinGraph (the wall); it writes no truth. Descent is gated by the COMPUTED EL07 verdict; |OptionSpace| under a frozen anchor is a counted integer, never an LLM judgment; reopening an anchor requires a ChangeSet (anti-overwrite §9). Deterministic: same nodes → same cascade (lib/besoin-cascade.ts is the byte-equivalent twin of back/runtime/besoin/cascade.go)."
 	}
 }
