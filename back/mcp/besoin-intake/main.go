@@ -234,6 +234,52 @@ type backlogOutput struct {
 	Backlog   []backlogItemOutput `json:"backlog,omitempty"`
 }
 
+// capitaliseInput is the EL18 turn: at a FULLY-RESOLVED BesoinGraph, capitalise the need — capture
+// its reusable anchor + the resolution motif (procedural memory) + a candidate besoin-behaviour idea,
+// strictly via firewall.ViaIdea (never ToKernel, never fitness). READ-ONLY w.r.t. truth — it persists
+// no kernel/mirror/Idea (the behaviour candidate is a VALUE the client may later /goal). An optional
+// reuse_against project routes a SECOND resolved need's units against this anchor (CE05 name-match on
+// canonicalised keys) to show the compound-in-time.
+type capitaliseInput struct {
+	Project      string `json:"project" jsonschema:"the project key scoping the resolved BesoinGraph (RLS)"`
+	ReuseAgainst string `json:"reuse_against,omitempty" jsonschema:"an OPTIONAL second project to route against this anchor (CE05 reuse preview); empty to skip"`
+}
+
+// anchorUnitOutput is one canonicalised reusable unit (level, canonical key, verbatim intent).
+type anchorUnitOutput struct {
+	Level  string `json:"level"`
+	Key    string `json:"key"`
+	Intent string `json:"intent"`
+}
+
+// reuseOutput is the optional CE05 reuse preview of a second need routed against this anchor.
+type reuseOutput struct {
+	Goal             string `json:"goal"`
+	SourceGoal       string `json:"source_goal"`
+	ReusedProcedural int    `json:"reused_procedural"`
+	ReusedBehavior   int    `json:"reused_behavior"`
+	DerivedFresh     int    `json:"derived_fresh"`
+	EffortBefore     int    `json:"effort_before"`
+	EffortAfter      int    `json:"effort_after"`
+	SavedTokens      int    `json:"saved_tokens"`
+	WroteKernel      bool   `json:"wrote_kernel"`
+}
+
+// capitaliseOutput is the EL18 result: whether the need was fully resolved (only then it capitalises),
+// the reusable anchor (graph_hash + canonical units), the candidate besoin-behaviour idea (a DRAFT via
+// the wall, its provenance reconstructing to the graph_hash), the always-false WroteKernel proof, and
+// an optional reuse preview. NO truth is written.
+type capitaliseOutput struct {
+	Project       string             `json:"project"`
+	FullyResolved bool               `json:"fully_resolved"`
+	GraphHash     string             `json:"graph_hash"`
+	AnchorUnits   []anchorUnitOutput `json:"anchor_units,omitempty"`
+	BehaviorIdea  *ideaOutput        `json:"behavior_idea,omitempty"`
+	MemoryProv    string             `json:"memory_provenance,omitempty"`
+	WroteKernel   bool               `json:"wrote_kernel"`
+	Reuse         *reuseOutput       `json:"reuse,omitempty"`
+}
+
 // ── the server ──
 
 // server wires the MCP tools to the besoin Store (the need graph) and an idea-capture Store (the legal
@@ -607,6 +653,64 @@ func (s *server) redBacklog(ctx context.Context, _ *mcp.CallToolRequest, in back
 	return nil, out, nil
 }
 
+// capitalise — EL18: at a FULLY-RESOLVED BesoinGraph, capitalise the need via the wall. The PURE
+// besoin.CapitaliseBesoin is the AUTHORITY (no LLM): it returns the reusable anchor + the resolution
+// motif (procedural memory) + a candidate besoin-behaviour idea proposed STRICTLY via firewall.ViaIdea
+// (never ToKernel, never fitness). WroteKernel is always false. An unresolved need capitalises NOTHING.
+// The behaviour idea's provenance reconstructs to the graph_hash (carried in the memory's free text).
+// READ-ONLY w.r.t. truth — it persists no kernel/mirror/Idea here.
+func (s *server) capitalise(ctx context.Context, _ *mcp.CallToolRequest, in capitaliseInput) (*mcp.CallToolResult, capitaliseOutput, error) {
+	g, _, err := s.store.LoadGraph(ctx, in.Project)
+	if err != nil {
+		return nil, capitaliseOutput{}, err
+	}
+	g.Project = in.Project
+	resolve := besoin.BesoinResolve{Graph: g, Branch: in.Project}
+	cap, err := besoin.CapitaliseBesoin(resolve)
+	if err != nil {
+		return nil, capitaliseOutput{}, err
+	}
+	out := capitaliseOutput{
+		Project:       in.Project,
+		FullyResolved: resolve.IsFullyResolved(),
+		GraphHash:     cap.Anchor.GraphHash,
+		WroteKernel:   cap.WroteKernel(), // always false — the wall.
+	}
+	for _, u := range cap.Anchor.Units {
+		out.AnchorUnits = append(out.AnchorUnits, anchorUnitOutput{Level: string(u.Level), Key: u.Key, Intent: u.Intent})
+	}
+	if len(cap.BehaviorCandidates) == 1 {
+		idea := cap.BehaviorCandidates[0].Idea
+		out.BehaviorIdea = &ideaOutput{
+			ID: idea.ID, Proposes: string(idea.Proposes), Intent: idea.Intent,
+			Source: string(idea.Provenance.Source), Detail: idea.Provenance.Detail, Status: string(idea.Status),
+		}
+	}
+	if len(cap.ProceduralWrites) == 1 {
+		out.MemoryProv = cap.ProceduralWrites[0].Provenance
+	}
+	// Optional CE05 reuse preview: route a SECOND resolved need against this anchor (name-match on
+	// canonicalised keys). It WRITES NOTHING — purely a compound-in-time preview.
+	if in.ReuseAgainst != "" && out.FullyResolved {
+		g2, _, err := s.store.LoadGraph(ctx, in.ReuseAgainst)
+		if err != nil {
+			return nil, capitaliseOutput{}, err
+		}
+		g2.Project = in.ReuseAgainst
+		plan, err := cap.Anchor.ReuseFor(besoin.BesoinResolve{Graph: g2, Branch: in.ReuseAgainst})
+		if err != nil {
+			return nil, capitaliseOutput{}, err
+		}
+		out.Reuse = &reuseOutput{
+			Goal: plan.Goal, SourceGoal: plan.SourceGoal,
+			ReusedProcedural: plan.ReusedProcedural, ReusedBehavior: plan.ReusedBehavior, DerivedFresh: plan.DerivedFresh,
+			EffortBefore: plan.EffortBefore, EffortAfter: plan.EffortAfter, SavedTokens: plan.SavedTokens,
+			WroteKernel: plan.WroteKernel,
+		}
+	}
+	return nil, out, nil
+}
+
 // list — READ: the project's captured node-row count (the append-only history depth), RLS-scoped.
 func (s *server) list(ctx context.Context, _ *mcp.CallToolRequest, in listInput) (*mcp.CallToolResult, listOutput, error) {
 	count, err := s.store.CountNodes(ctx, in.Project)
@@ -636,6 +740,7 @@ func newMCPServer(s *server) *mcp.Server {
 	mcp.AddTool(srv, &mcp.Tool{Name: "besoin_classify", Description: "Classify a level's four metadata (EL04, wraps classify-truth): completeness + /spike routing."}, s.classify)
 	mcp.AddTool(srv, &mcp.Tool{Name: "besoin_emit_ideas", Description: "EL16: project the whole BesoinGraph into the backlog of draft Ideas (one per resolved MAPPING rung, NoEmit rungs excluded), governed by LevelToProposes (EL05). dry_run previews; otherwise persists via idea_capture (idempotent). Writes no kernel/mirror — promotion is /goal (S64)."}, s.emitIdeas)
 	mcp.AddTool(srv, &mcp.Tool{Name: "besoin_red_backlog", Description: "EL17: topo-sort the BesoinGraph's emitted Ideas (mapping rungs) along constrains/seeds → the architectural promotion order S64 opens its /goal in. Each item carries its expected mirror FORM (LevelMirrorForm, EL10) ANNEXED, its anchors_above (NoEmit journey/view included), and its @version ref resolution. A cycle is refused (BESOIN_CYCLE). READ-ONLY — writes no kernel/mirror/Idea."}, s.redBacklog)
+	mcp.AddTool(srv, &mcp.Tool{Name: "besoin_capitalise", Description: "EL18: at a FULLY-RESOLVED BesoinGraph, capitalise the need — its reusable anchor (graph_hash + canonicalised (level,intent) keys) + the resolution motif + a candidate besoin-behaviour idea, STRICTLY via firewall.ViaIdea (never ToKernel, never fitness). WroteKernel always false; the idea's provenance reconstructs to the graph_hash. An unresolved need capitalises NOTHING. Optional reuse_against routes a second resolved need against this anchor (CE05 name-match on canonical keys). Persists no kernel/mirror/Idea."}, s.capitalise)
 	return srv
 }
 

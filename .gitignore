@@ -46,3 +46,40 @@ next-env.d.ts
 
 # Mintlify docs working clone (deploys steph-frtech/docs → aidos.mintlify.app)
 /.aidos-docs/
+
+# Stray Go binaries: `go build ./mcp/<x>` etc. drops an ELF named after the main
+# package's leaf dir directly under back/. Legit content lives in subdirs; ignore
+# these extensionless binaries at back/ root (regenerable, never committed).
+/back/agentimpl
+/back/agentloop
+/back/aidos
+/back/backtester
+/back/besoin-gate
+/back/besoin-intake
+/back/changeset
+/back/ci-ratchet
+/back/commit-gate
+/back/context
+/back/dag
+/back/evolve
+/back/goal-check
+/back/headroom
+/back/idea-intake
+/back/materialize
+/back/materialize-api
+/back/materialize-db
+/back/memory
+/back/memory-firewall
+/back/mutation-runner
+/back/pact-verifier
+/back/postkernelchange
+/back/posttooluse
+/back/pretooluse
+/back/promotion-gate
+/back/sandbox-confinement
+/back/scheduler
+/back/sessionstart
+/back/spike-confinement
+/back/stop
+/back/store
+/back/telemetry-reader
