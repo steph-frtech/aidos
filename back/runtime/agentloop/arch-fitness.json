@@ -19,5 +19,29 @@
       "EMITTED_FUNCTION_PURE",
       "EMITTED_CALL_GRAPH_ACYCLIC"
     ]
+  },
+  "emitted_target": {
+    "$comment": "EL00 — the DECLARED target of the EMITTED app (ADR 0040). The constructrice≠construite frontier: AIDOS la constructrice stays governable Go (never rewritten in TS, never emits Go for the user app); la construite (the gen/ tree) is Hono front+back, pure-functional TypeScript, with its own MCP+Skills, datastore = Postgres dialect (ADR 0006 unchanged) via a TS client, Operation-DSL via a Go interpreter-service callback (Décision 7). The FN02 invariants are LANGUAGE-NEUTRAL — the exact EmittedInvariantCodes() list, no fork on the Go→TS pivot. EL00 is ADR-only, above-the-wall: writes_truth=false. Kept in sync with agentloop.EmittedTargetEL00() (the parity test pins it). Widening/softening the frontier is a truth change (idée → miroir → /goal), never a silent edit.",
+    "adr": "0040",
+    "constructrice": {
+      "language": "go",
+      "rewritten_in_ts": false,
+      "emits_go_for_user_app": false
+    },
+    "construite": {
+      "backend": "hono",
+      "frontend": "hono",
+      "language": "typescript",
+      "datastore_dialect": "postgres",
+      "own_mcp": true,
+      "own_skills": true,
+      "operation_interpreter": "go-service-callback"
+    },
+    "functional_invariants": [
+      "EMITTED_NO_GLOBAL_MUTABLE",
+      "EMITTED_FUNCTION_PURE",
+      "EMITTED_CALL_GRAPH_ACYCLIC"
+    ],
+    "writes_truth": false
   }
 }

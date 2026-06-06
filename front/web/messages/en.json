@@ -46,6 +46,7 @@
 		"memoryBackends": "Memory backends",
 		"decisionReuse": "Reuse",
 		"contextPack": "ContextPack",
+		"emittedTarget": "Emitted-app target",
 		"emitters": "Emitters",
 		"entityMap": "Entity Map",
 		"apiProjection": "API Projection",
@@ -1349,6 +1350,20 @@
 		"reasonOutOfScope": "out-of-scope",
 		"reasonUnapproved": "unapproved",
 		"reasonCosmetic": "cosmetic below threshold"
+	},
+	"emittedTarget": {
+		"heading": "Target of the EMITTED app — Hono + functional TypeScript",
+		"intro": "EL00 (ADR 0040) engraves the target of the app AIDOS EMITS: Hono front+back, pure-functional TypeScript, its own MCP + Skills, a Postgres-dialect datastore via a TS client, and the Operation-DSL run by a callback to a Go interpreter service. The constructrice≠construite frontier is trenched: AIDOS stays governable Go — never rewritten in TS, never emits Go for the user app. EL00 is ADR-only: it writes no truth. The “Verify parity” button replays the pure verdict — the declared target ≡ the arch-fitness config FN04/S84 enforces.",
+		"constructrice": "La constructrice — AIDOS (governable Go)",
+		"construite": "La construite — the emitted app (Hono/TS)",
+		"frontier": "Frontier constructrice ≠ construite",
+		"wall": "The wall (CLAUDE.md §2): EL00 is ADR-only, above the line — this screen reads a decision and computes a deterministic verdict; it writes NO truth. Promotion to truth stays the mirror write via /goal.",
+		"verifyCta": "Verify parity",
+		"parityOk": "Parity green — declared target ≡ enforced config",
+		"parityFail": "Parity red — drift detected",
+		"fieldCol": "Field",
+		"declaredCol": "Declared (EL00 target)",
+		"enforcedCol": "Enforced (arch-fitness.json)"
 	},
 	"emitters": {
 		"heading": "Emitters — one deterministic projection per kind × target",

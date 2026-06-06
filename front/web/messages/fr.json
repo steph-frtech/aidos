@@ -46,6 +46,7 @@
 		"memoryBackends": "Memory backends",
 		"decisionReuse": "Réutilisation",
 		"contextPack": "ContextPack",
+		"emittedTarget": "Cible de l'app émise",
 		"emitters": "Emitters",
 		"entityMap": "Entity Map",
 		"apiProjection": "API Projection",
@@ -1349,6 +1350,20 @@
 		"reasonOutOfScope": "hors-scope",
 		"reasonUnapproved": "non approuvé",
 		"reasonCosmetic": "cosmétique sous le seuil"
+	},
+	"emittedTarget": {
+		"heading": "Cible de l'app ÉMISE — Hono + TypeScript fonctionnel",
+		"intro": "EL00 (ADR 0040) grave la cible de l'app que AIDOS ÉMET : Hono front+back, TypeScript pur-fonctionnel, ses propres MCP + Skills, datastore dialecte Postgres via un client TS, et l'Operation-DSL exécuté par un callback vers un service-interpréteur Go. La frontière constructrice≠construite est tranchée : AIDOS reste Go gouvernable — jamais réécrit en TS, n'émet jamais de Go pour l'app utilisateur. EL00 est ADR-only : aucune écriture de vérité. Le bouton « Vérifier la parité » rejoue le verdict pur — la cible déclarée ≡ la config arch-fitness que FN04/S84 enforce.",
+		"constructrice": "La constructrice — AIDOS (Go gouvernable)",
+		"construite": "La construite — l'app émise (Hono/TS)",
+		"frontier": "Frontière constructrice ≠ construite",
+		"wall": "Le mur (CLAUDE.md §2) : EL00 est ADR-only, au-dessus de la ligne — cet écran lit une décision et calcule un verdict déterministe ; il n'écrit AUCUNE vérité. La promotion en vérité reste l'écriture du miroir via /goal.",
+		"verifyCta": "Vérifier la parité",
+		"parityOk": "Parité verte — cible déclarée ≡ config enforce-cée",
+		"parityFail": "Parité rouge — dérive détectée",
+		"fieldCol": "Champ",
+		"declaredCol": "Déclaré (cible EL00)",
+		"enforcedCol": "Enforce-cé (arch-fitness.json)"
 	},
 	"emitters": {
 		"heading": "Emitters — une projection déterministe par kind × target",

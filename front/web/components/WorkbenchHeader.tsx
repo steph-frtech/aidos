@@ -93,6 +93,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 		items: [
 			{ href: "/goal", k: "goal" },
 			{ href: "/exploration", k: "exploration" },
+			{ href: "/emitted-target", k: "emittedTarget" },
 			{ href: "/emitters", k: "emitters" },
 			{ href: "/entity-map", k: "entityMap" },
 			{ href: "/api-projection", k: "apiProjection" },
