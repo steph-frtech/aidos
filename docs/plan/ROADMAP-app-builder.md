@@ -297,3 +297,26 @@ Le frontload est délibéré sur les **deux bloqueurs structurels transverses** 
 | **S114 (EPIC 14 — billing webhooks)** | Hérite la cible async S73/S74 → **handler de webhook TS**, pas Go. Pact-avec-provider neutre. Le métrage déterministe depuis les AgentRun (comptage) inchangé. Delta conséquentiel mineur. |
 | **S117 (EPIC 14 — release v0 + limites honnêtes)** | L'inventaire des limites honnêtes re-formule les caveats contre le **driver TS** (le cadre #2581 pgx-spécifique change). Delta de **documentation** uniquement. |
 | **Note de dépendances + table « Ce qui change » (lignes 111, 134, 140)** | Les artefacts gatés (serveur+API+workers) deviennent TS/Hono ; la logique d'ordre **inchangée**. « serveur bootable » = Hono Node/edge ; datastore/OpenAPI/Pact survivent. La liste de nouveaux ADR (L.140) doit **inclure ADR 0040** (cible langage de l'app émise) — amende ADR 0003 « reuses sqlc/pgx » et ADR 0010 « emitted web apps inherit [Next] » ; ADR 0009 → l'app émise reçoit **ses propres MCP + Skills** (additif). |
+
+---
+
+## Appendice — Concrétisation provisioning/déploiement (renvoi DPxx → Sxx)
+
+> Voir **`docs/plan/ROADMAP-provisioning-deploy.md`** (piste `DP01–DP33`). DP est une **couche de concrétisation parallèle, référencée** — pas un renumérotage Sxx, pas une supersession (anti-overwrite §9). Les steps E9/E10 ci-dessous restent agnostiques du mécanisme ; DP y branche le `StackManifest` (source content-adressée), l'émetteur compose (contrat de sortie /data/dockers), le modèle d'environnements, le bootstrap déterministe, le substrat par profile, et la couche connecteurs gouvernée.
+
+| Step (E9/E10) | Concrétisé par | Note |
+|---|---|---|
+| **S87** scaffold serveur émis | **DP03/DP05** | nouveau target clos `TargetComposeManifest` (additif à `targetOrder`), byte-stable, reproduit /data/dockers ; entrypoint Hono. |
+| **S89** provisioning datastore | **DP15** | datastore = service du compose ; provision **au deploy** (pre-deploy : DDL → Atlas → start). |
+| **S90** API émise + interpréteur | **DP05/DP16** | Décision 7 (0040) = **sidecar interpréteur Go** déclaré comme service substrat (`role=interpreter`). |
+| **S91** secrets | **DP32** | injection `.env` au deploy (ordre de merge /data/dockers), chmod 600, hors git ; jamais dans source émis. |
+| **S92** observabilité expl. | **DP17** | OTel JS → SigNoz/GlitchTip émis par profile `observability`. |
+| **S94** preview éphémère | **DP25** | `docker compose up` du manifest émis, keyé phase, profile sélectionnable. |
+| **S95** migration breaking | **DP15/DP26** | consommée comme étape « apply Atlas » du pipeline. |
+| **S96** pipeline deploy | **DP26** | exécuteur « Phase-as-Unit » : ré-projeter → provisionner datastore → Atlas → start app+sidecar ; **deploy = ré-projection**, jamais deploy.sh procédural. |
+| **S97** domaines/TLS | **DP27** | labels Traefik émis (DP03) ; certresolver ACME comme /data/dockers. |
+| **S98** rollback-to-phase | **DP28** | ré-projection d'une phase antérieure (jamais artefact stale). |
+| **S99** cockpit déploiement | **DP29** | surface phases/env/domaines/profiles + statut compose/sidecar/datastore. |
+| **Capacité NOUVELLE** : couche connecteurs (Connector/Skill/MCP-server gouvernés) | **DP19–DP24** | dépend de la passerelle **S58** (E2) + **GV** (S15 scope + S16 authority) + secrets **S91** ; dépendance vers l'arrière, ne perturbe pas l'ordre. |
+
+**Nouveaux ADR (déploiement) :** table frozen-stack **séparée** du substrat de l'app émise (≠ stack Go d'AIDOS) ; couche connecteurs gouvernée (approbation RW **runtime, hors `authority.Decide`**) ; modèle emit-output-contract/bootstrap déterministe ; **addendum ADR 0006** « Doltgres non-prod uniquement » (couplé à l'élargissement `scope.Environment` +`local`+`future_cloud`) ; fork StackManifest **record-kind vs `kind:layer`**.
