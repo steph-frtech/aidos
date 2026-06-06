@@ -38,6 +38,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/ingestion", k: "ingestion" },
 			{ href: "/compound", k: "compound" },
 			{ href: "/besoin-necessity", k: "besoinNecessity" },
+			{ href: "/compound-besoin-grammar", k: "besoinGrammar" },
 		],
 	},
 	{

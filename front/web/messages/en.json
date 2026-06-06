@@ -71,7 +71,8 @@
 		"contextCompression": "Compression",
 		"ingestion": "Ingestion",
 		"compound": "Compound",
-		"besoinNecessity": "Need necessity"
+		"besoinNecessity": "Need necessity",
+		"besoinGrammar": "Need grammar"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -2991,5 +2992,31 @@
 		"exampleHeading": "The worked example — the S46 demo checkout",
 		"exampleBody": "On \"a customer places an order from their cart\", the BesoinGraph emits 5 ordered Ideas (product→control→action→operation→entity), refs resolving @rung, each typed with the 4 metadata and carrying its anchors; journey/view are 2 NoEmit nodes seeding anchors without emitting an Idea (never a silent journey→product cast). The flat prompt yields just 1 undifferentiated, untyped candidate with no order and no edge — everything else the agent would have to guess (a prompt→code shortcut the wall forbids).",
 		"footer": "EL01 spike — /spike confined, ratchet OFF, T0, throwaway. No kernel/mirrors/fitness write (the wall). The lesson is harvested as a DRAFT Idea (no mirror, no version) — promotion is /goal later. EL02+ builds the real back/runtime/besoin package."
+	},
+	"besoinGrammar": {
+		"eyebrow": "The closed need grammar",
+		"title": "BesoinLevel grammar — the 7 SOURCE rungs + transversal bands",
+		"subtitle": "EL02 · runtime/besoin",
+		"intro": "EL02 freezes the CLOSED BesoinLevel grammar: the 7 SOURCE rungs of the KRD §23 verticale (product→journey→view→control→action→operation→entity) in TOTAL order, plus the 2 transversal bands (invariant ∀, policy attached to operation/entity — settled in EL02: policy is a band, not a vertical rung). Each rung names its required fields and its outgoing reference. Everything is a pure function (determinism); an out-of-grammar level is a HARD refusal. Above the wall: no truth write.",
+		"tutorialHeading": "How to read and drive the screen",
+		"tutorialBody": "Click \"List the grammar\": the panel runs the pure twin (identical to the Go authority back/runtime/besoin) and renders the total order of the 7 SOURCE rungs (with NextLevel + outgoing reference + required fields), the 2 transversal bands, and the 3 layers DELIBERATELY out-of-grammar-v1 (saga/temporal/globalinvariant — a declared OpenQuestion, never aliased). Then type a level and click \"Parse the level\": a valid level resolves; an out-of-grammar string is refused HARD; saga/temporal/globalinvariant are refused as out-of-scope.",
+		"listCta": "List the grammar",
+		"parseCta": "Parse the level",
+		"parsePlaceholder": "e.g. control, saga, foo",
+		"pending": "Click \"List the grammar\" to compute the closed order.",
+		"orderHeading": "The 7 SOURCE rungs (total order, KRD §23)",
+		"bandsHeading": "Transversal bands (never traversed by NextLevel)",
+		"oosHeading": "Out-of-grammar v1 (declared OpenQuestion — refused, never aliased)",
+		"colRung": "Rung",
+		"colNext": "NextLevel",
+		"colRef": "Outgoing reference",
+		"colFields": "Required fields",
+		"leaf": "— (leaf)",
+		"none": "—",
+		"parseHeading": "Parse a level (hard refusal of out-of-grammar)",
+		"parseOk": "Valid level",
+		"parseUnknown": "Hard refusal — out of grammar (unknown)",
+		"parseOutOfScope": "Refused — out of scope v1 (declared OpenQuestion)",
+		"footer": "EL02 — CLOSED grammar, total order, pure functions (determinism §6/§8). invariant/policy are transversal bands (never vertical rungs). saga/temporal/globalinvariant out-of-grammar-v1 (declared OpenQuestion). No kernel/mirrors/fitness write (the wall); EL03+ builds the graph on top of this grammar."
 	}
 }

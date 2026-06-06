@@ -71,7 +71,8 @@
 		"contextCompression": "Compression",
 		"ingestion": "Ingestion",
 		"compound": "Compound",
-		"besoinNecessity": "Nécessité du besoin"
+		"besoinNecessity": "Nécessité du besoin",
+		"besoinGrammar": "Grammaire du besoin"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -2991,5 +2992,31 @@
 		"exampleHeading": "L'exemple travaillé — la demo checkout S46",
 		"exampleBody": "Sur « a customer places an order from their cart », le BesoinGraph émet 5 Ideas ordonnées (product→control→action→operation→entity), dépendances résolues @rung, chacune typée des 4 métadonnées et portant ses ancres ; journey/view sont 2 nœuds NoEmit qui seedent les ancres sans émettre d'Idea (jamais un cast silencieux journey→product). Le prompt plat ne donne qu'1 candidate indifférenciée, non typée, sans ordre ni arête — tout le reste, l'agent devrait le deviner (un raccourci prompt→code que le mur interdit).",
 		"footer": "Spike EL01 — /spike confiné, cliquet OFF, T0, jetable. Aucune écriture kernel/mirrors/fitness (le mur). La leçon est harvestée en Idea DRAFT (sans miroir, sans version) — promotion = /goal plus tard. EL02+ construit le vrai paquet back/runtime/besoin."
+	},
+	"besoinGrammar": {
+		"eyebrow": "Grammaire close du besoin",
+		"title": "Grammaire BesoinLevel — les 7 rungs SOURCE + bandes transversales",
+		"subtitle": "EL02 · runtime/besoin",
+		"intro": "EL02 fige la grammaire CLOSE BesoinLevel : les 7 rungs SOURCE de la verticale KRD §23 (product→journey→view→control→action→operation→entity) en ordre TOTAL, plus les 2 bandes transversales (invariant ∀, policy attachée à operation/entity — décision tranchée en EL02 : policy est une bande, pas un rung vertical). Chaque rung nomme ses champs requis et sa référence sortante. Tout est fonction pure (déterminisme) ; un niveau hors-grammaire est un refus DUR. Au-dessus du mur : aucune écriture vérité.",
+		"tutorialHeading": "Comment lire et piloter l'écran",
+		"tutorialBody": "Cliquez « Lister la grammaire » : le panneau lance le jumeau pur (identique à l'autorité Go back/runtime/besoin) et affiche l'ordre total des 7 rungs SOURCE (avec NextLevel + référence sortante + champs requis), les 2 bandes transversales, et les 3 couches DÉLIBÉRÉMENT hors-grammaire-v1 (saga/temporal/globalinvariant — OpenQuestion déclarée, jamais aliasées). Puis tapez un niveau et cliquez « Analyser le niveau » : un niveau valide se résout ; une chaîne hors-grammaire est refusée DUREMENT ; saga/temporal/globalinvariant sont refusés comme hors-scope.",
+		"listCta": "Lister la grammaire",
+		"parseCta": "Analyser le niveau",
+		"parsePlaceholder": "ex. control, saga, foo",
+		"pending": "Cliquez « Lister la grammaire » pour calculer l'ordre clos.",
+		"orderHeading": "Les 7 rungs SOURCE (ordre total, KRD §23)",
+		"bandsHeading": "Bandes transversales (jamais traversées par NextLevel)",
+		"oosHeading": "Hors-grammaire v1 (OpenQuestion déclarée — refusées, jamais aliasées)",
+		"colRung": "Rung",
+		"colNext": "NextLevel",
+		"colRef": "Référence sortante",
+		"colFields": "Champs requis",
+		"leaf": "— (feuille)",
+		"none": "—",
+		"parseHeading": "Analyser un niveau (refus dur du hors-grammaire)",
+		"parseOk": "Niveau valide",
+		"parseUnknown": "Refus dur — hors-grammaire (inconnu)",
+		"parseOutOfScope": "Refus — hors-scope v1 (OpenQuestion déclarée)",
+		"footer": "EL02 — grammaire CLOSE, ordre total, fonctions pures (déterminisme §6/§8). Bandes invariant/policy transversales (jamais des rungs verticaux). saga/temporal/globalinvariant hors-grammaire-v1 (OpenQuestion déclarée). Aucune écriture kernel/mirrors/fitness (le mur) ; EL03+ construit le graphe au-dessus de cette grammaire."
 	}
 }
