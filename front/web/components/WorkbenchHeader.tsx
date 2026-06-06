@@ -42,6 +42,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/compound-besoin-graph", k: "besoinGraph" },
 			{ href: "/compound-besoin-metadata", k: "besoinMetadata" },
 			{ href: "/compound-besoin-proposes", k: "besoinProposes" },
+			{ href: "/compound-besoin-thresholds", k: "besoinThresholds" },
 		],
 	},
 	{

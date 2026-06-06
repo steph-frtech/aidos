@@ -75,7 +75,8 @@
 		"besoinGrammar": "Need grammar",
 		"besoinGraph": "Need graph",
 		"besoinMetadata": "Need metadata",
-		"besoinProposes": "LevelToProposes table"
+		"besoinProposes": "LevelToProposes table",
+		"besoinThresholds": "Thresholds & OptionSpace"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3118,5 +3119,38 @@
 		"pending": "Waiting for an action.",
 		"closedSetHeading": "Closed set ideas.ProposesKinds()",
 		"footer": "EL05 — above the wall, read-only against truth. The table decides only the Proposes target; it emits no Idea (EL16 does, via the idea-intake door) and writes no truth. Deterministic: same level → same mapping."
+	},
+	"besoinThresholds": {
+		"eyebrow": "EL06 · Thresholds & OptionSpace",
+		"title": "BesoinThresholds & OptionSpace",
+		"subtitle": "declared thresholds · enumerable metric",
+		"intro": "EL06 declares TWO above-the-wall capabilities, never learned (§8). (1) BesoinThresholds: ONE content-addressed record holding every gate threshold (the product's ≤5 scenarios; the per-rung required fields, sourced from the grammar, never a second copy). EL07 (CanDescend) and EL11 (the Stop hook) read the SAME record — no threshold inlined twice, no drift. (2) OptionSpace(L, L+1): the declared enumerable metric per adjacent rung pair — the CLOSED countable set of choices the lower rung admits. |OptionSpace| is an integer computed by a pure function (never an LLM judgment). A non-enumerable pair is a DECLARED OpenQuestion (size -1), never fabricated to 0.",
+		"tutorialHeading": "Try the thresholds and the metric",
+		"tutorialBody": "\"Load thresholds\" shows the declared record (max_scenarios + per-level required fields) and its content-addressed hash. \"Prove the single source\" checks the record's required fields == the grammar's (no second copy). \"Count the OptionSpace\" computes |OptionSpace(L→L+1)| for the chosen pair: a positive integer for an enumerable pair, the sentinel -1 (OpenQuestion) for a non-enumerable pair — never a fabricated 0.",
+		"loadCta": "Load thresholds",
+		"sourceCta": "Prove the single source",
+		"countCta": "Count the OptionSpace",
+		"resetCta": "Reset",
+		"pairLabel": "Rung pair (L → L+1)",
+		"thresholdsHeading": "BesoinThresholds (declared record)",
+		"maxScenariosLabel": "max_scenarios (product's ≤ scenarios)",
+		"hashLabel": "Content-addressed hash",
+		"requiredHeading": "Required fields per level",
+		"colLevel": "Level",
+		"colFields": "Required fields",
+		"sourceHeading": "Single source of thresholds",
+		"sourceOk": "Single source — the record's required fields == the grammar, no second copy",
+		"sourceFail": "Drift detected — a second copy diverges",
+		"optionSpaceHeading": "OptionSpace per pair (enumerable | OpenQuestion)",
+		"colPair": "Pair",
+		"colSize": "|OptionSpace|",
+		"colChoices": "Declared choices",
+		"enumerable": "Enumerable",
+		"openQuestion": "OpenQuestion (non-enumerable)",
+		"countHeading": "OptionSpace count",
+		"countEnumerable": "Enumerable — a positive integer counted over the declared set",
+		"countOpenQuestion": "OpenQuestion — non-enumerable, size -1 (never fabricated to 0)",
+		"pending": "Awaiting an action.",
+		"footer": "EL06 — above-the-wall config, read-only against truth. Thresholds declared, never learned (§8); OptionSpace = a pure count over a closed set. EL07/EL11 read the same record; EL08 counts ShrinkOptionSpace over this set. No truth write. Deterministic: same inputs → same outputs (byte-identical hash on the Go and TS sides)."
 	}
 }

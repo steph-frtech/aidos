@@ -75,7 +75,8 @@
 		"besoinGrammar": "Grammaire du besoin",
 		"besoinGraph": "Graphe du besoin",
 		"besoinMetadata": "Métadonnées du besoin",
-		"besoinProposes": "Table LevelToProposes"
+		"besoinProposes": "Table LevelToProposes",
+		"besoinThresholds": "Seuils & OptionSpace"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3118,5 +3119,38 @@
 		"pending": "En attente d'une action.",
 		"closedSetHeading": "Closed set ideas.ProposesKinds()",
 		"footer": "EL05 — au-dessus du mur, lecture seule contre la vérité. La table décide seulement la cible Proposes ; elle n'émet aucune Idea (EL16 le fait via la porte idea-intake) et n'écrit aucune vérité. Déterministe : même niveau → même mapping."
+	},
+	"besoinThresholds": {
+		"eyebrow": "EL06 · Seuils & OptionSpace",
+		"title": "BesoinThresholds & OptionSpace",
+		"subtitle": "seuils déclarés · métrique énumérable",
+		"intro": "EL06 déclare DEUX capacités au-dessus du mur, jamais apprises (§8). (1) BesoinThresholds : UN record content-adressé portant tous les seuils de gate (le ≤5 scénarios du product ; les champs requis par rung, sourcés de la grammaire, jamais une seconde copie). EL07 (CanDescend) et EL11 (le hook Stop) lisent le MÊME record — aucun seuil inliné en double, aucune dérive. (2) OptionSpace(L, L+1) : la métrique énumérable déclarée par paire de rungs adjacents — l'ensemble CLOS comptable des choix que le rung inférieur admet. |OptionSpace| est un entier calculé par fonction pure (jamais un jugement LLM). Une paire non-énumérable est une OpenQuestion DÉCLARÉE (taille -1), jamais fabriquée à 0.",
+		"tutorialHeading": "Essayez les seuils et la métrique",
+		"tutorialBody": "« Charger les seuils » affiche le record déclaré (max_scenarios + champs requis par niveau) et son hash content-adressé. « Prouver la source unique » vérifie que les champs requis du record == ceux de la grammaire (aucune seconde copie). « Compter l'OptionSpace » calcule |OptionSpace(L→L+1)| pour la paire choisie : un entier positif pour une paire énumérable, le sentinel -1 (OpenQuestion) pour une paire non-énumérable — jamais 0 fabriqué.",
+		"loadCta": "Charger les seuils",
+		"sourceCta": "Prouver la source unique",
+		"countCta": "Compter l'OptionSpace",
+		"resetCta": "Réinitialiser",
+		"pairLabel": "Paire de rungs (L → L+1)",
+		"thresholdsHeading": "BesoinThresholds (record déclaré)",
+		"maxScenariosLabel": "max_scenarios (≤ scénarios du product)",
+		"hashLabel": "Hash content-adressé",
+		"requiredHeading": "Champs requis par niveau",
+		"colLevel": "Niveau",
+		"colFields": "Champs requis",
+		"sourceHeading": "Source unique des seuils",
+		"sourceOk": "Source unique — les champs requis du record == la grammaire, aucune seconde copie",
+		"sourceFail": "Dérive détectée — une seconde copie diverge",
+		"optionSpaceHeading": "OptionSpace par paire (énumérable | OpenQuestion)",
+		"colPair": "Paire",
+		"colSize": "|OptionSpace|",
+		"colChoices": "Choix déclarés",
+		"enumerable": "Énumérable",
+		"openQuestion": "OpenQuestion (non-énumérable)",
+		"countHeading": "Comptage OptionSpace",
+		"countEnumerable": "Énumérable — entier positif compté sur le set déclaré",
+		"countOpenQuestion": "OpenQuestion — non-énumérable, taille -1 (jamais fabriquée à 0)",
+		"pending": "En attente d'une action.",
+		"footer": "EL06 — config au-dessus du mur, lecture seule contre la vérité. Seuils déclarés, jamais appris (§8) ; OptionSpace = comptage pur sur un set clos. EL07/EL11 lisent le même record ; EL08 compte ShrinkOptionSpace sur ce set. Aucune écriture vérité. Déterministe : mêmes entrées → mêmes sorties (hash byte-identique côté Go et TS)."
 	}
 }
