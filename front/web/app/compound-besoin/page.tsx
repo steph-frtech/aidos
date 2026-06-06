@@ -2,60 +2,100 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { BesoinInterviewPanel } from "@/components/BesoinInterviewPanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import {
+	CompoundBesoinWizard,
+	type WizardLabels,
+} from "./CompoundBesoinWizard";
 
-// Determinism-first: EL13 is the umbrella skill /compound-besoin — the level-by-level FORCED interview
-// where the LLM LEADS the dialogue but the CODE JUDGES. Every verdict is a pure function, the LLM
-// excluded: enterableLevel (which rung to work), dispatchOf (which gesture), recordAnswer (the routing
-// record / off_altitude / spike + the COMPUTED resolved verdict — never declared by the LLM). The
-// verdicts are computed by lib/besoin-interview.ts (the byte-equivalent twin of
-// back/runtime/besoin/interview.go), covered by lib/besoin-interview.test.ts (vitest + fast-check).
-// ABOVE the wall: the interview writes no truth — its output is the BesoinGraph to be appended via the
-// EL15 MCP. A fuzzy answer routes to /spike (idea_capture → idea_grill → idea_spike), never a descent;
-// an off-altitude answer is rejected by SCHEMA, never by an LLM opinion of altitude.
+// EL19 — the route /compound-besoin: the level-by-level FORCED tunnel (vertical staircase). The user
+// EXPLAINS their app rung by rung; step N+1 is LOCKED until canDescend(N).enough (the EL07 gate made
+// visible). It RÉUTILISE the /first-app wizard shell idiom, drives the pure TS twins (the byte-
+// equivalent authority of back/runtime/besoin), surfaces the ShrinkOptionSpace compounding integer
+// (EL08), and at the bottom PROJECTS the Ideas (EmitRequirementsDoc → EL16/EL17) — the wall: PROPOSE,
+// never write the kernel (HasMirror false). The EL13 interview panel is kept below (non-destructive).
+// Determinism-first: the step lock reads the pure verdict; the doc render is a pure function, never an
+// LLM. Themed (ADR 0010), bilingual FR-default (ADR 0011).
 
 export const metadata: Metadata = {
 	title:
-		"/compound-besoin — l'interview forcée niveau par niveau (AIDOS Workbench)",
+		"/compound-besoin — le wizard tunnel niveau par niveau (AIDOS Workbench)",
 	description:
-		"EL13 : l'interview forcée du besoin niveau par niveau. Le LLM mène le dialogue, le code juge : enterableLevel (le niveau entrable), dispatchOf (le geste), recordAnswer (le routage record/off_altitude/spike + le verdict resolved CALCULÉ, jamais déclaré). Une réponse floue route vers /spike via idea_capture → idea_grill → idea_spike, jamais une descente ; une réponse off-altitude est rejetée par schéma. Above le mur : n'écrit aucune vérité.",
+		"EL19 : le wizard tunnel du besoin niveau par niveau. Une étape N+1 est verrouillée tant que CanDescend(N) n'est pas enough (la gate EL07 rendue visible) ; un niveau qui parse mais ne contraint rien (anti-vacuité) ne débloque pas. « Projeter vers idea-intake » fait surgir les vraies Ideas (ordre topologique, NoEmit exclus) ; « Ouvrir comme goals » est refusé tant que le graphe n'est pas complet (gate EL09). Above le mur : PROPOSE, n'écrit jamais le Kernel.",
 };
 
-/**
- * /compound-besoin — the EL13 panel. The human DRIVES the level-by-level forced interview FROM THE
- * SCREEN: pick a (level, answer) fixture, "Enregistrer la réponse" (runs recordAnswer → the routing +
- * the COMPUTED resolved verdict + the open branches + the legal /spike gate when fuzzy), "Niveau
- * entrable" (runs enterableLevel + dispatchOf). resolved is COMPUTED, never declared by the LLM.
- * ui-completeness (CLAUDE.md §7): no headless capability. ABOVE the wall, writes no truth. Themed
- * (ADR 0010), bilingual (ADR 0011).
- */
-export default async function BesoinInterviewPage() {
-	const t = await getTranslations("besoinInterview");
+export default async function CompoundBesoinWizardPage() {
+	const t = await getTranslations("besoinWizard");
+	const ti = await getTranslations("besoinInterview");
 
-	const labels = {
-		recordCta: t("recordCta"),
-		enterableCta: t("enterableCta"),
+	const labels: WizardLabels = {
+		intentionLabel: t("intentionLabel"),
+		intention: t("intention"),
+		progress: t("progress"),
+		completeStep: t("completeStep"),
+		makeVacant: t("makeVacant"),
 		resetCta: t("resetCta"),
-		caseLabel: t("caseLabel"),
-		caseProductSharp: t("caseProductSharp"),
-		caseProductFuzzy: t("caseProductFuzzy"),
-		caseEntityAtProduct: t("caseEntityAtProduct"),
-		caseProductVacant: t("caseProductVacant"),
-		routingHeading: t("routingHeading"),
-		routingRecord: t("routingRecord"),
-		routingOffAltitude: t("routingOffAltitude"),
-		routingSpike: t("routingSpike"),
-		resolvedTrue: t("resolvedTrue"),
-		resolvedFalse: t("resolvedFalse"),
-		spikeRouteHeading: t("spikeRouteHeading"),
-		blockReasonHeading: t("blockReasonHeading"),
-		openBranchesHeading: t("openBranchesHeading"),
-		branchClosed: t("branchClosed"),
-		branchOpen: t("branchOpen"),
-		enterableHeading: t("enterableHeading"),
-		enterableLabel: t("enterableLabel"),
-		gestureLabel: t("gestureLabel"),
-		dispatchHeading: t("dispatchHeading"),
-		pending: t("pending"),
+		lockedNote: t("lockedNote"),
+		enoughNote: t("enoughNote"),
+		notEnoughNote: t("notEnoughNote"),
+		missingHeading: t("missingHeading"),
+		openQuestionsHeading: t("openQuestionsHeading"),
+		blockReasonsHeading: t("blockReasonsHeading"),
+		anchorsHeading: t("anchorsHeading"),
+		noEmitAnchorNote: t("noEmitAnchorNote"),
+		metadataHeading: t("metadataHeading"),
+		metadataComplete: t("metadataComplete"),
+		metadataIncomplete: t("metadataIncomplete"),
+		compoundingHeading: t("compoundingHeading"),
+		shrinkLabel: t("shrinkLabel"),
+		reuseHeading: t("reuseHeading"),
+		reuseOpenQuestion: t("reuseOpenQuestion"),
+		projectCta: t("projectCta"),
+		openGoalsCta: t("openGoalsCta"),
+		openGoalsRefused: t("openGoalsRefused"),
+		openGoalsOk: t("openGoalsOk"),
+		ideasHeading: t("ideasHeading"),
+		ideaCountLabel: t("ideaCountLabel"),
+		docHeading: t("docHeading"),
+		docLink: t("docLink"),
+		wallNote: t("wallNote"),
+		rungNames: {
+			product: t("rungNames.product"),
+			journey: t("rungNames.journey"),
+			view: t("rungNames.view"),
+			control: t("rungNames.control"),
+			action: t("rungNames.action"),
+			operation: t("rungNames.operation"),
+			entity: t("rungNames.entity"),
+			invariant: t("rungNames.invariant"),
+			policy: t("rungNames.policy"),
+		},
+	};
+
+	const interviewLabels = {
+		recordCta: ti("recordCta"),
+		enterableCta: ti("enterableCta"),
+		resetCta: ti("resetCta"),
+		caseLabel: ti("caseLabel"),
+		caseProductSharp: ti("caseProductSharp"),
+		caseProductFuzzy: ti("caseProductFuzzy"),
+		caseEntityAtProduct: ti("caseEntityAtProduct"),
+		caseProductVacant: ti("caseProductVacant"),
+		routingHeading: ti("routingHeading"),
+		routingRecord: ti("routingRecord"),
+		routingOffAltitude: ti("routingOffAltitude"),
+		routingSpike: ti("routingSpike"),
+		resolvedTrue: ti("resolvedTrue"),
+		resolvedFalse: ti("resolvedFalse"),
+		spikeRouteHeading: ti("spikeRouteHeading"),
+		blockReasonHeading: ti("blockReasonHeading"),
+		openBranchesHeading: ti("openBranchesHeading"),
+		branchClosed: ti("branchClosed"),
+		branchOpen: ti("branchOpen"),
+		enterableHeading: ti("enterableHeading"),
+		enterableLabel: ti("enterableLabel"),
+		gestureLabel: ti("gestureLabel"),
+		dispatchHeading: ti("dispatchHeading"),
+		pending: ti("pending"),
 	};
 
 	return (
@@ -94,8 +134,24 @@ export default async function BesoinInterviewPage() {
 				</section>
 
 				<div className="mt-10">
-					<BesoinInterviewPanel labels={labels} />
+					<CompoundBesoinWizard labels={labels} />
 				</div>
+
+				{/* The EL13 interview panel, kept below (non-destructive, additive). */}
+				<section
+					aria-label="interview"
+					className="mt-16 border-t border-border pt-10"
+				>
+					<h2 className="text-lg font-semibold tracking-tight text-foreground">
+						{ti("title")}
+					</h2>
+					<p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+						{ti("intro")}
+					</p>
+					<div className="mt-6">
+						<BesoinInterviewPanel labels={interviewLabels} />
+					</div>
+				</section>
 
 				<footer className="mt-12 border-t border-border pt-6 text-xs leading-relaxed text-muted-foreground">
 					{t("footer")}
