@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { AgentsPanel } from "@/components/AgentsPanel";
+import { CompoundingSection } from "@/components/CompoundingSection";
 import { SchedulerSection } from "@/components/SchedulerSection";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 
@@ -429,6 +430,7 @@ export default async function AgentsPage() {
 				<div className="mt-10">
 					<AgentsPanel labels={labels} />
 					<SchedulerSection />
+					<CompoundingSection />
 				</div>
 
 				<footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">

@@ -35,6 +35,8 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/decision-reuse", k: "decisionReuse" },
 			{ href: "/context-pack", k: "contextPack" },
 			{ href: "/context-compression", k: "contextCompression" },
+			{ href: "/ingestion", k: "ingestion" },
+			{ href: "/compound", k: "compound" },
 		],
 	},
 	{
@@ -108,6 +110,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/evolution-sandbox", k: "evolutionSandbox" },
 			{ href: "/incidents-to-ideas", k: "incidentsToIdeas" },
 			{ href: "/adoption", k: "adoption" },
+			{ href: "/governance", k: "governance" },
 		],
 	},
 	{

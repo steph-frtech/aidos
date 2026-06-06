@@ -1885,3 +1885,82 @@ test.describe("HR05 — /agents « Compression / économie » section", () => {
 		await expect(page.getByTestId("economy-cap-never-raised")).toBeVisible();
 	});
 });
+
+/**
+ * CE05 Playwright e2e — the « Compounding » section on /agents (the capitalisation loop CLOSES).
+ * mirror record: reflects=CE05-reuse-router, test_kind=e2e, cert_language=gherkin,
+ *               liveness=alive, authority=above
+ *
+ * Scenario: A subsequent similar goal reuses what an earlier goal capitalised
+ *   Given the Workbench is running and I am on /agents
+ *   When I click « Router le goal suivant (similaire) »
+ *   Then the capitalisation history renders 9 routed units (5 procedural recall + 3 behavior expand + 1 fresh)
+ *   And the effort drops (effort-after < effort-before, tokens saved > 0)
+ *   And a behavior-reuse unit is marked « via le mur » and the wall note carries data-wrote-kernel=false
+ *   When I click the dissimilar control
+ *   Then nothing is reused (no-drop badge, effort unchanged)
+ */
+test.describe("CE05 — the « Compounding » section (reuse router)", () => {
+	test.beforeEach(async ({ page }) => {
+		await page.goto("/agents");
+		await expect(page.getByTestId("compounding-section")).toBeVisible({
+			timeout: 5000,
+		});
+	});
+
+	test("a SIMILAR next goal reuses captured units and effort drops", async ({
+		page,
+	}) => {
+		await page.getByTestId("compounding-run-similar").click();
+		const verdict = page.getByTestId("compounding-verdict");
+		await expect(verdict).toBeVisible();
+		await expect(verdict).toHaveAttribute("data-mode", "similar");
+		await expect(verdict).toHaveAttribute("data-reused", "8");
+
+		// Effort dropped: after < before, tokens saved.
+		const before = Number(await verdict.getAttribute("data-effort-before"));
+		const after = Number(await verdict.getAttribute("data-effort-after"));
+		expect(after).toBeLessThan(before);
+		const saved = Number(await verdict.getAttribute("data-saved"));
+		expect(saved).toBeGreaterThan(0);
+
+		// The capitalisation history renders 9 routed units.
+		const routes = page.getByTestId("compounding-routes").locator("li");
+		await expect(routes).toHaveCount(9);
+
+		// The drop badge is visible; the intrinsic unit derives fresh.
+		await expect(page.getByTestId("compounding-drop-badge")).toBeVisible();
+		await expect(
+			page.getByTestId("compounding-route-invoice_specific_rule"),
+		).toHaveAttribute("data-origin", "derived_fresh");
+		await expect(
+			page.getByTestId("compounding-route-load_context_pack"),
+		).toHaveAttribute("data-origin", "reused_procedural");
+	});
+
+	test("a behavior reuse is « via le mur » and the router writes no kernel truth", async ({
+		page,
+	}) => {
+		await page.getByTestId("compounding-run-similar").click();
+		// A captured behavior unit carries the via-le-mur badge.
+		await expect(
+			page.getByTestId("compounding-viawall-derive_mirror"),
+		).toBeVisible();
+		// The wall note proves no kernel write.
+		await expect(page.getByTestId("compounding-wall-note")).toHaveAttribute(
+			"data-wrote-kernel",
+			"false",
+		);
+	});
+
+	test("a DISSIMILAR next goal reuses nothing (anti-false-positive)", async ({
+		page,
+	}) => {
+		await page.getByTestId("compounding-run-dissimilar").click();
+		const verdict = page.getByTestId("compounding-verdict");
+		await expect(verdict).toHaveAttribute("data-mode", "dissimilar");
+		await expect(verdict).toHaveAttribute("data-reused", "0");
+		await expect(verdict).toHaveAttribute("data-saved", "0");
+		await expect(page.getByTestId("compounding-nodrop-badge")).toBeVisible();
+	});
+});
