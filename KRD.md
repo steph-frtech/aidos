@@ -3719,6 +3719,37 @@ La symétrie vaut aussi pour les **facettes transversales** : la sécurité (§8
 
 **Décisions actées (grill 2026-06-07, ADR 0044) :** (a) le **juge des doc-miroirs** (s2↔s9, s1↔s10) est une **comparaison structurelle ensembliste** — s9/s10 dérivées déterministiquement du code/AST ; divergence **structurelle** (concepts du lexique présents/absents, behaviors énumérés, erreurs couvertes) = **bloquante** ; divergence de **prose** = **advisory** (un LLM peut la signaler, jamais l'arbitrer) ; (b) le minimum **incompressible** d'un kernel effondré = **s1 (l'intention, même une ligne) + la paire de preuve s4↔s5/s6** — jamais de vérité sans preuve, jamais de taxe ×10 sur une fonction de trois lignes.
 
+### 1.4 LES DEUX AXES — la facette (orthogonale) × la verticale (latérale)
+
+Tout le travail sur les facettes a empilé **un seul axe** : la **NATURE** de la vérité (F/I/S/B/V/M) — des lentilles **orthogonales** (indépendantes) qui **séparent** les préoccupations *dans* un kernel. Mais une vérité a une **seconde coordonnée**, et c'est **« l'autre qu'orthogonale »** (la ligne qu'on avait laissée implicite) : son **NIVEAU dans la verticale** — `produit → parcours → vue → contrôle → action → opération → entité`.
+
+**Une vérité vit donc à l'INTERSECTION d'un niveau et d'une facette** — une *cellule* d'une grille :
+
+```
+                         NATURE (facettes, orthogonales →)
+                 F        I        S        B        V        M
+   produit    [F·prod] [I·prod] [S·prod] [B·prod] …
+N  parcours   [F·parc] …
+I  vue        …
+V  contrôle   …                ◀── chaque cellule = un kernel + son anatomie
+E  action     …                    (6 lignes × mur × la facette de la colonne)
+A  opération  [F·op]   [I·op]   [S·op]   …
+U  entité     [F·ent]  [I·ent]  …
+ (↑ verticale, latérale)
+```
+
+« l'invariant ∀ (facette I) de l'opération checkout (niveau opération) » · « le contrat de performance (B) de la vue panier » : chaque vérité a **ses deux coordonnées**.
+
+**Pourquoi la verticale est « l'autre qu'orthogonale ».** Les facettes sont orthogonales : régler la sécurité d'un kernel ne touche pas sa performance — elles n'interagissent pas. La verticale, elle, **n'est pas orthogonale : elle COUPLE.** Une vérité posée à un rung bas **contraint tous les rungs SOURCE au-dessus** qui la composent (le **cross-produit latéral**, §EL14 : un invariant attaché à l'entité contraint l'opération, l'action, le contrôle, la vue qui l'utilisent). Et quand elle change, le **red wave (§42) REMONTE cette ligne** : il rougit les consommateurs en amont. **Les facettes isolent ; la verticale relie et propage.** C'est exactement la ligne « non-orthogonale » : ses cellules sont *couplées par composition*, pas indépendantes.
+
+**Le système de coordonnées complet d'une vérité FKE — quatre nombres :**
+1. **Niveau** (verticale : produit…entité) — *où, dans l'abstraction.* **Axe latéral, couplant.**
+2. **Facette** (nature : F/I/S/B/V/M) — *quelle question.* **Axe orthogonal, séparant.**
+3. **Côté du mur** (dessus déclaré / dessous prouvé) — *déclaré ou prouvé.* **Le plan de symétrie.**
+4. **Échelle fractale** (projet ⊃ feature ⊃ fonction…) — *à quel grain.* **L'axe de zoom (§FKE-23).**
+
+La **conscience** compare les paires *dans* une cellule (axe facette × mur) ; le **red wave** propage *le long* de la verticale (axe latéral) ; le **kernel effondré** vit sur l'axe d'échelle. Trois mécaniques, trois axes — et le mur traverse les quatre. **C'était la ligne manquante : la verticale n'est pas une facette de plus, c'est l'axe perpendiculaire aux facettes, celui qui porte la propagation.**
+
 ---
 
 ## FKE-2 · PRINCIPES FONDATEURS — les 25 lois
