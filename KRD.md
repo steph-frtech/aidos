@@ -3441,7 +3441,7 @@ La revue DTFS avait pointé le danger du double-typage. v8.1 ajoute une règle s
 | **FKE** | Fractal Kernel Vibing, FKV | `FKE` est le nom acté de la discipline (Livre XXX) ; « vibing » ne désigne que la phase Vibe Lab |
 | **conscience** | Alignment Governor, réconciliateur | `conscience` = l'agrégateur déterministe des verdicts des juges existants — jamais un second juge |
 | **paire-miroir** | doc-miroir, data-miroir, spec-miroir | `paire-miroir` nomme une paire déclaré↔prouvé du squelette à 6 paires ; les noms composés en sont des instances |
-| **facette** | lentille, colonne, dimension de vérité | `facette` = une lecture du squelette à 6 paires ; 4 lentilles canoniques (fonctionnel F · invariants ∀ I · sécurité S · performance/budgets B), effondrables |
+| **facette** | lentille, colonne, dimension de vérité | `facette` = une lentille INTRINSÈQUE sur le squelette à 6 paires ; 5 canoniques (fonctionnel F · invariants ∀ I · sécurité S · performance/budgets B · évolutivité/migration V), effondrables. À distinguer des **dimensions latérales** (arêtes : contrats/Pact, composition) et des **sous-lentilles** (conformité⊂S, UX⊂F, opérabilité⊂B) |
 | **kernel effondré** | collapsed kernel | le gabarit minimal d'un kernel-feuille ; incompressible = s1 + paire de preuve |
 | **Vibe Lab** | zone /spike, bac à vibe | `Vibe Lab` est le concept FKE ; `/spike` est son implémentation AIDOS |
 | **Promotion Gate** | harvest+grill+goal | le gate FKE — UN concept, DEUX portes (entrée vibe→kernel ; sortie artefact→stable) ; les trois gestes AIDOS restent ses alias opérationnels |
@@ -3639,7 +3639,18 @@ C'est le cœur structurel de FKE. L'anatomie canonique d'un kernel est **symétr
 | **B5** | Budgets (HarnessCostBudget : caps déclarés, jamais appris) | ↔ | Enforcement de budget (disjoncteur, rate-limit, BlockReason over-budget) | dessous = machine |
 | **B6** | Evidence perf attendue (E5/E6) | ↔ | Evidence perf observée (benchmark vert, OTel runtime, SLO tenu) | oui |
 
-**L'unification — N facettes, UN squelette, N lentilles.** Les quatre facettes ne sont pas quatre anatomies différentes : c'est **le même squelette de six paires** (Spec → Comportement → Scénarios → Modèle/Domaine → Contrat → Evidence ↔ leurs reflets), **lu à travers une lentille** :
+**Facette ÉVOLUTIVITÉ / MIGRATION — 6 paires (le squelette lu en « la vérité tient-elle dans le TEMPS, sur de vraies données ? ») :**
+
+| # | AU-DESSUS (déclaré) | ↔ | EN-DESSOUS (prouvé) | ubiq. |
+|---|---|---|---|---|
+| **V1** | Spec d'évolution (cycle de vie de la donnée, rétention) | ↔ | Doc de migration / changelog de données | oui |
+| **V2** | Comportement dans le temps (compat. ascendante/descendante) | ↔ | Résultats de migration (zéro perte, zéro ligne orpheline observée) | oui |
+| **V3** | Scénarios de changement (rename+backfill, split d'entité, cardinalité 1-N→N-N) | ↔ | Tests de migration + restore tests | oui |
+| **V4** | Modèle dans le temps (versions de schéma, `as-of`) | ↔ | Migration expand-contract (Atlas) + données historiques | oui |
+| **V5** | Contrat d'évolution (invariants de donnée préservés, DataTruthScope §13.10) | ↔ | Backfill enforcé + garde de migration breaking (`BREAKING_MIGRATION_NO_BACKFILL`) | dessous = machine |
+| **V6** | Evidence d'évolution attendue | ↔ | Evidence observée (intégrité post-migration, rollback de donnée prouvé) | oui |
+
+**L'unification — N facettes, UN squelette, N lentilles.** Les facettes ne sont pas des anatomies différentes : c'est **le même squelette de six paires** (Spec → Comportement → Scénarios → Modèle/Domaine → Contrat → Evidence ↔ leurs reflets), **lu à travers une lentille intrinsèque** (une question sur les internals DU kernel). **Cinq lentilles canoniques :**
 
 | Lentille | La question qu'elle pose | Niveau de preuve dominant |
 |---|---|---|
@@ -3647,10 +3658,16 @@ C'est le cœur structurel de FKE. L'anatomie canonique d'un kernel est **symétr
 | **Invariants ∀** (I) | est-ce vrai sur TOUS les chemins ? | N1 → E5 |
 | **Sécurité** (S) | résiste-t-il aux attaques ? | → E4 |
 | **Performance / Budgets** (B) | assez rapide, pas trop cher, assez fiable ? | → E5/E6 |
+| **Évolutivité / Migration** (V) | la vérité tient-elle dans le temps, sur de vraies données ? | → E3/E6 |
 
-**Facettes effondrables (anti-explosion, même règle que le kernel effondré).** Un kernel n'instancie une facette **que s'il porte cette nature de vérité**. La facette **fonctionnelle est toujours présente** (incompressible : F1 + sa paire de preuve). Une fonction pure de tri porte F + I (invariants), pas forcément S ni B. Un endpoint qui expose des données PII porte F + S + B. Un kernel-vue déclaratif peut n'avoir que F. On n'instancie jamais une facette vide : « le plus petit cliquet qui clique ».
+**Le modèle se ferme à cinq — et voici POURQUOI (le test de décision).** Une « couche » candidate est :
+- une **facette intrinsèque** (une nouvelle lentille) **ssi** elle pose une question **orthogonale** sur les *internals du kernel lui-même* — on peut passer toutes les autres et échouer celle-ci. Les cinq répondent au quintet fondamental : **correct par l'exemple · vrai partout · sûr · viable · durable dans le temps.** Au-delà, les candidates échouent l'un des deux tests suivants :
+- une **dimension latérale** (une **arête** du graphe, pas une lentille sur le nœud) si elle concerne la **relation à d'AUTRES kernels** : **Contrats / Interopérabilité** (Pact avec les voisins, §17 `contracts_with`) et **Composition** (`composes`) — déjà modélisées comme **liens KRD versionnés** avec leur propre miroir (Pact provider-verification, coherence-test). Ce ne sont pas des facettes du kernel : ce sont les arêtes entre kernels.
+- une **sous-lentille** (un raffinement DANS une facette) si elle se loge sous une lentille existante : **Conformité / Vie privée (GDPR)** ⊂ Sécurité (la classification des données S1 + S116) ; **UX / ExperienceClaim (§13.6) / Accessibilité / i18n** ⊂ Fonctionnel (vérité molle, typée à part) ; **Réversibilité / Opérabilité (rollback, kill-switch, runbook)** ⊂ Performance/Budgets ; **Éthique / alignement d'agent** ⊂ Sécurité (l'agentlayer). Une sous-lentille n'ouvre pas de colonne propre : elle ajoute des paires *dans* sa facette parente.
 
-**Les opérateurs de la traversée** (la mécanique, pas du contenu, communs à TOUTES les facettes) : **Validation** = la porte du MUR D'INTENTION (la moitié dessus est-elle acceptée ? — Decision Card) ; **Exécution** = l'acte (Evidence Runner) qui produit Résultats + Evidence observée de toutes les facettes instanciées ; **Conscience** = compare **toutes les paires instanciées** une à une (jusqu'à 6 × 4 = 24, en pratique les facettes effondrées) ; **Loopback ciblé** = sur divergence d'une paire (quelle que soit la lentille), un red wave **ciblé** qui remonte exactement au slot dessus concerné. **Une paire qui diverge bloque, quelle que soit sa lentille** — une régression de perf ou une faille de sécurité non reflétée est un monstre, au même titre qu'un test fonctionnel manquant.
+**Facettes effondrables (anti-explosion, même règle que le kernel effondré).** Un kernel n'instancie une facette **que s'il porte cette nature de vérité**. La facette **fonctionnelle est toujours présente** (incompressible : F1 + sa paire de preuve). Une fonction pure de tri porte F + I (invariants), pas S/B/V. Un endpoint qui expose des données PII porte F + S + B + V. Un kernel-vue déclaratif peut n'avoir que F. On n'instancie jamais une facette vide : « le plus petit cliquet qui clique ».
+
+**Les opérateurs de la traversée** (la mécanique, pas du contenu, communs à TOUTES les facettes) : **Validation** = la porte du MUR D'INTENTION (la moitié dessus est-elle acceptée ? — Decision Card) ; **Exécution** = l'acte (Evidence Runner) qui produit Résultats + Evidence observée de toutes les facettes instanciées ; **Conscience** = compare **toutes les paires instanciées** une à une (jusqu'à 6 × 5 = 30, en pratique bien moins, facettes effondrées) ; **Loopback ciblé** = sur divergence d'une paire (quelle que soit la lentille), un red wave **ciblé** qui remonte exactement au slot dessus concerné. **Une paire qui diverge bloque, quelle que soit sa lentille** — une régression de perf, une faille de sécurité ou une migration qui perd de la donnée, non reflétée, est un monstre, au même titre qu'un test fonctionnel manquant.
 
 *(Vue effondrée à 10 slots — le raccourci historique : s1=F1↑, s10=F1↓ ; s2=F2↑ ; s3=F4↑, s7=F4↓ ; s4=F3↑+F6↑, s5=F3↓, s6=F2↓+F6↓ ; s8=F5↓ ; la facette sécurité S1-S6 y était compressée en « consigne sécurité » — la forme complète la déplie.)*
 
