@@ -47,6 +47,13 @@
 **Objectif:** Bascule du schéma `mirrors`/`cert_language`/panneaux (`/proof-levels` devient E0-E7)/docs vers E ; N déprécié via lifecycle, jamais supprimé (append-only) ; migration expand-contract gated DataTruthScope.
 **Criteres de done:** zéro perte (chaque miroir N porte son E) ; les panels rendent E ; `aidos check` vert sur tout le corpus re-étiqueté ; docs Mintlify mises à jour.
 
+## FK11 — L'écran AI Lab : le cockpit trialogue (chat ↔ couche navigable ↔ impacts à valider)
+**Sous-systeme:** Workbench / Runtime
+**Objectif:** Route `/ai-lab` — trois zones (§FKE-38) : GAUCHE chat/vibe scopé au nœud sélectionné (cerveau gauche → slots proposés, jamais de vérité) ; CENTRE la couche navigable = le kernel courant + son anatomie 1-pour-1, le mur dessiné, chaque paire avec son voyant 🟢/🔴/🟡 (conscience live) ; DROITE les decision cards + blast radius + red wave + promotion gate. Deux modes (conversationnel/navigationnel) = même écran à zoom différent. Compose S58 (passerelle) + S60 (streaming) + E4 (capture→grill→goal→miroir) + E5 (autorat miroirs) + FK05 (conscience) + §FKE-31 (decision cards).
+**Detail:** `KRD.md` FKE-38. Évolution du GraphCockpit (route `/`) vers une route active. Aucun nouveau pouvoir : chat = signaux bruts + slots proposés ; mutation de vérité UNIQUEMENT par clic decision card → ChangeSet → approbation ; bas du mur read-only ; écarts CALCULÉS (SemanticDiff/blast radius), jamais avis LLM. Thémé ccup + bilingue.
+**Inputs:** S58, S60, S64-S66 (E4), S68-S70 (E5), FK05 (conscience), FK01 (truth_level), §FKE-31.
+**Criteres de done:** Playwright e2e — chatter une intention → voir un slot proposé (amber, dessus) → valider une decision card → voir la paire passer 🔴→🟢 ; un essai d'écriture-vérité directe depuis le chat est refusé (le chat ne propose que) ; le bas du mur est non-éditable ; cliquer une paire scope la gauche + la droite (mode navigationnel). Property — les écarts affichés = sortie déterministe (SemanticDiff/blast), jamais un LLM.
+
 ## FK10 — Projections d'outillage : CLAUDE.md/AGENTS.md générés
 **Sous-systeme:** Generators
 **Objectif:** `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, memory-bank émis depuis les kernels (policy/memory/style/architecture/agent-profile) — jamais hand-édités (hash-protégés, drift par source-hash).

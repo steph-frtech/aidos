@@ -4481,6 +4481,49 @@ kernel rollback
 
 **IDE** : afficher le kernel d'une fonction, son contrat, ses preuves, ses policies, sa mémoire, ses agent runs, ses drifts, son blast radius. **Dashboard** : kernels par statut, drifts ouverts, evidence gaps, security gaps, contradictions mémoire, agents overpowered, MCP risqués, reviewability des PR, kernel debt, couverture sémantique, couverture sécurité.
 
+### L'écran AI Lab — le cockpit du pipeline (trialogue)
+
+La surface principale de FKE n'est ni un chat, ni un éditeur de code : c'est un **trialogue** à trois zones qui rend le pipeline (§FKE-3) et l'anatomie 1-pour-1 (§FKE-1.3) **directement manipulables**. Le mur y est **visible** (une ligne horizontale au centre) et **infranchissable au clic** (on ne franchit que par une décision).
+
+```
+┌──────────────────┬─────────────────────────────────────────┬──────────────────────┐
+│  GAUCHE — VIBE   │  CENTRE — LA COUCHE NAVIGABLE            │  DROITE — À VALIDER  │
+│  (cerveau gauche)│  (le kernel courant + son anatomie)     │  (conscience + cards)│
+│                  │                                          │                      │
+│  chat / discuter │  fil d'ariane : produit › parcours ›    │  DECISION CARDS      │
+│  ───────────────  │   vue › contrôle › … › entité           │  ┌────────────────┐  │
+│  ▸ toggle:        │                                          │  │ P2 diverge      │  │
+│    Vibe Lab  ⟂    │   ┌─ DESSUS (déclaré) ───── proposé(▲)─┐ │  │ comportement    │  │
+│    Intent    ✓    │   │ Spec  Comportement  Scénarios       │ │  │ ↔ résultats     │  │
+│                  │   │ Scé.séc  Modèle  Contrat  Sécu  Evi. │ │  │ [accept][amend] │  │
+│  vous écrivez en │   ├────────── MUR D'INTENTION ──────────┤ │  │ [reject][defer] │  │
+│  LANGUE du       │   │ Doc  Résultats  Tests  Tests-séc     │ │  └────────────────┘  │
+│  domaine ; le    │   │ Projection  Code  Sécu-impl  Evi-obs │ │  blast radius: ●●○○  │
+│  cerveau gauche  │   └─ DESSOUS (prouvé) ── 🟢🟢🔴🟢🟢🟡🟢🟢 ─┘ │  red wave: 2 cellules │
+│  COMPILE en      │                                          │  ──────────────────  │
+│  slots proposés  │   chaque paire = un voyant :             │  CONSCIENCE          │
+│  (jamais en      │   🟢 aligné  🔴 diverge  🟡 sous-prouvé  │  7/8 paires alignées │
+│  vérité)         │                                          │  evidence: E3/E4     │
+│                  │   ▸ clic sur une paire → la GAUCHE se    │  ──────────────────  │
+│  [Envoyer]       │     scope dessus, la DROITE montre ses   │  PROMOTION GATE      │
+│                  │     impacts (chatter SUR la couche)      │  ⛔ 1 paire rouge     │
+└──────────────────┴─────────────────────────────────────────┴──────────────────────┘
+       RAW SIGNAL ───▶ LEFT BRAIN ───▶ [VALIDATION] ══MUR══ RIGHT BRAIN ───▶ CONSCIENCE ───▶ [PROMOTION]
+```
+
+**Les deux modes que l'utilisateur a nommés sont le MÊME écran, à zoom différent :**
+
+- **Mode conversationnel** (« à gauche on chate, à droite les impacts à valider ») : zoom arrière, on parle, le cerveau gauche compile, les decision cards arrivent à droite. C'est l'entrée — souvent en **Vibe Lab** (jetable) jusqu'à ce qu'une intention mérite le Promotion Gate.
+- **Mode navigationnel** (« on navigue sur une couche et on peut chater dessus ») : on sélectionne un kernel ou une **paire** au centre ; **la gauche se scope à ce nœud** (son ContextPack devient le contexte du chat) et la droite montre **ses** impacts. Chatter « sur » la couche = parler au cerveau gauche **avec le nœud comme contexte**.
+
+Le chat n'est jamais juste un chat : c'est l'entrée du **Raw Signal Store** + le dialogue du **cerveau gauche**. La règle d'or : **le chat ne change jamais une vérité**. Il produit des signaux bruts puis des **slots proposés** (amber, au-dessus du mur). La seule façon de muter la vérité est un **clic dans la zone droite** (decision card → ChangeSet → approbation). Les écarts montrés à droite sont **calculés** (SemanticDiff, blast radius, red wave), jamais l'avis d'un LLM.
+
+**Le mur, à l'écran.** Le centre est coupé en deux par le **Mur d'Intention** : au-dessus, les slots **déclarés** (éditables via proposition) ; en-dessous, les **reflets prouvés** (lecture seule — émis/écrits par l'agent ; on ne hand-édite jamais le code ni les tests depuis l'écran, on change la vérité d'au-dessus qu'ils reflètent). Chaque paire porte son **voyant** (🟢 aligné / 🔴 diverge / 🟡 sous-prouvé) — la conscience (§FKE-6.3) en direct. Le **mur Sécurité/Police** est la porte de toute action (allow/block/audit/approval), ambiante.
+
+**Ce que l'écran montre toujours d'un coup d'œil :** OÙ vous êtes (le fil d'ariane de la verticale), CE QUI est proposé (amber, dessus), CE QUI est prouvé (🟢) ou diverge (🔴), CE QUI attend votre décision (la file de droite), et la **position dans le macro pipeline** (la bande du bas). Le **Loopback ciblé** s'y voit : une paire 🔴 surligne exactement le slot d'au-dessus à reconsidérer.
+
+**Mapping AIDOS / atterrissage.** C'est l'évolution du `GraphCockpit` actuel (`front/web`, route `/`, aujourd'hui lecture seule) vers une route **`/ai-lab`** active. Il **compose** des briques déjà au plan : la passerelle MCP-over-HTTP (S58) + le streaming red-set/BlockReason (S60) + la boucle KRD par écran (E4 : capture → grill → goal → miroir, S64-S66) + l'autorat de miroirs (E5) + la conscience (FK05) + les decision cards (§FKE-31). Il **n'introduit aucun nouveau pouvoir** : tout passe par le mur existant. À construire comme **route Workbench dédiée** (step FK ou épic E4 étendu), thémée + bilingue, avec son e2e Playwright (chatter → voir un slot proposé → valider une card → voir la paire passer 🔴→🟢).
+
 ---
 
 ## FKE-39 · KERNEL DEBT
