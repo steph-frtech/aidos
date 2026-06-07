@@ -3764,6 +3764,58 @@ Le flux de bout en bout de FKE tient en un dessin — **le pipeline VIBE AI LAB*
 
 **Mapping AIDOS étage par étage :** Vibe Lab=`/spike` · Raw Signal Store=`ideas`+signaux bruts · Memory Police=memory-firewall · Left Brain=`/grill`+interview EL · Decision Cards=approbation ChangeSet · Accepted Kernel Store=schéma `kernel` · Context Pack Builder=ContextRouter · Right Brain=boucle-build (S83) · Evidence Runner=mirror-runner+senseurs · Policy Engine/Police=hook+enforcers+ledger Merkle · Consciousness=l'agrégateur (FK05) · Promotion Gate=stop-gate `goal-check`+promotion-gate · Kernel Graph/Memory/Registry=links+DAG+brain.
 
+### Le même pipeline, à l'échelle d'UN kernel — le cœur fractal
+
+Le pipeline ci-dessus n'est pas réservé au projet : c'est **l'anatomie d'un seul kernel (§FKE-1.3) déroulée comme une traversée**. Une **entrée textuelle** (un besoin, une ligne de chat, un ticket, un incident) **s'éclate** (fan-out, par le cerveau gauche) en les slots du dessus ; chaque slot a son **reflet** en dessous (par le cerveau droit) ; la conscience **compare les paires** ; puis on promeut — ou la divergence **remonte** au-dessus du mur. **Le macro pipeline EST ce micro pipeline à l'échelle du projet.**
+
+```
+ENTRÉE (textuelle) — besoin · chat · ticket · incident · erreur
+        │  (le cerveau gauche éclate l'entrée en slots du dessus)
+        ├─▶ SPEC                (s1)   intention, buts, non-buts, hypothèses, risques
+        ├─▶ COMPORTEMENT        (s2)   use cases / BDD                    — ubiquitaire
+        ├─▶ MODÈLE              (s3)   modèle de donnée au sens humain     — ubiquitaire
+        ├─▶ SCÉNARIO            (s4)   scénarios + preuves attendues       — ubiquitaire
+        └─▶ CONSIGNE SÉCURITÉ          permissions, effets de bord, threat model
+        ↓
+DECISION CARD — accept · reject · amend · defer
+══════════════════════ MUR D'INTENTION ══════════════════════
+        │  (le cerveau droit reflète CHAQUE slot du dessus)
+        ├─▶ TEST                (s5)   le code du test            ◀ reflète s4
+        ├─▶ CODE                (s8)   le code lui-même — OPTIONNEL (absent si kernel déclaratif : vue, policy, doc)
+        ├─▶ PROJECTION DONNÉES  (s7)   schéma + données réelles   ◀ reflète s3
+        ├─▶ RÉSULTAT            (s6)   le résultat observé        ◀ reflète s4
+        ├─▶ DOC DÉRIVÉE         (s9)   doc issue du code          ◀ reflète s2 — ubiquitaire
+        ├─▶ DOC FINALE          (s10)  documentation              ◀ reflète s1
+        └─▶ SÉCURITÉ IMPLÉMENTÉE       authz, allowlist, redaction, scans  ◀ reflète la consigne sécurité
+        ↓
+═══════════════════ MUR SÉCURITÉ / POLICE ═══════════════════
+        ↓
+POLICE — allow · block · audit · approval (ambiante : intercepte chaque action)
+        ↓
+CONSCIENCE — compare chaque PAIRE : s1↔s10 · s2↔s9 · s3↔s7 · s4↔s5/s6 · sécu↑↔sécu↓
+        ↓
+        ├─ aligné ──────────▶ PROMOTION : le kernel devient vérité stable, entre au Kernel Graph
+        └─ divergence ─────▶ DECISION CARD qui REMONTE au-dessus du mur ─┐
+                              « l'implémentation a-t-elle changé s1/s2/s3/s4 ? »
+        ┌──────────────── la boucle (lois 24-25) ◀───────────────────────┘
+```
+
+**L'isomorphisme exact (micro ↔ macro) :**
+
+| Macro (pipeline VIBE AI LAB) | Micro (un kernel) | Slot / porte |
+|---|---|---|
+| RAW SIGNAL STORE | l'entrée textuelle | — |
+| LEFT BRAIN | le fan-out spec / comportement / modèle / scénario / sécurité | s1-s4 + sécu↑ |
+| DECISION CARDS | la decision card d'acceptation | **porte du mur d'intention** |
+| RIGHT BRAIN | le reflet test / code / projection / doc | s5-s10 + sécu↓ |
+| EVIDENCE RUNNER | le résultat observé | s6 |
+| POLICE | la police (allow/block/audit) | **porte du mur sécurité** |
+| CONSCIOUSNESS | la comparaison des paires | — |
+| PROMOTION GATE | promotion ∨ remontée (loop-back) | **porte de sortie** |
+| KERNEL GRAPH | le kernel promu, relié | — |
+
+**Conséquence (lois de composition, §FKE-23) :** chaque **étage du macro pipeline est lui-même un kernel** avec son micro pipeline ; les couches hautes **composent**, les basses **exécutent**, les invariants **remontent**, les preuves **réconcilient**. C'est la même structure à toutes les échelles ET à travers les plans (constructrice/construite) — la fractalité au sens plein. Et la règle anti-explosion tient : un **kernel effondré** (§FKE-1.3) garde l'entrée + la paire de preuve, et **dérive** le reste (s2/s3 fusionnés dans s1 ; s9/s10 générés ; s8 absent) — le micro pipeline se contracte sans jamais perdre sa colonne intention→preuve.
+
 ---
 
 ## FKE-4 · VIBE-TO-KERNEL PROMOTION GATE
