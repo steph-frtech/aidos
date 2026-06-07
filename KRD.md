@@ -3446,6 +3446,9 @@ La revue DTFS avait pointé le danger du double-typage. v8.1 ajoute une règle s
 | **Vibe Lab** | zone /spike, bac à vibe | `Vibe Lab` est le concept FKE ; `/spike` est son implémentation AIDOS |
 | **Promotion Gate** | harvest+grill+goal | le gate FKE — UN concept, DEUX portes (entrée vibe→kernel ; sortie artefact→stable) ; les trois gestes AIDOS restent ses alias opérationnels |
 | **pipeline VIBE AI LAB** | la traversée canonique, le pipeline FKE | le flux de bout en bout (Vibe Lab → … → Kernel Graph), treize étages, deux traversées de mur — Livre XXX, §FKE-3 |
+| **WhyTree** | 5-pourquoi, cause racine, RCA, arbre d'Ishikawa | la causalité ARRIÈRE (effet→cause), arbre fishbone, cause vérifiée, finit en miroir — geste `/why`, §FKE-35.1 ; jamais une facette |
+| **caused_by** | lien causal, arête de cause | l'arête causale arrière du graphe (§17), inverse de `impacts` ; porte la remontée racine du WhyTree |
+| **les deux axes** | facette × verticale, orthogonal × latéral | une vérité = (niveau verticale [latéral, couplant] × facette [orthogonal, séparant]) ; §FKE-1.4 |
 
 ## 162. Règle de placement : où ajouter un futur concept
 
@@ -4592,6 +4595,18 @@ L'autonomie augmente avec : risk level, réversibilité, blast radius, historiqu
 Après déploiement, **le kernel continue de vivre**. Observations runtime : logs, metrics, traces, audit, erreurs, latence, denial rate, tool calls, confiance agent, corrections utilisateur, blocages policy, incidents.
 
 La conscience runtime peut **rouvrir un kernel** : contract gap, unexpected input, performance drift, security denial spike, agent misbehavior, documentation gap. **C'est la boucle au-dessus du mur** : ce qui a été implémenté/observé peut révéler que s1/s2/s3/s4 doivent changer — et cette traversée passe TOUJOURS par la porte légale (proposition → décision humaine), jamais en douce. Le monde enseigne ; l'agent ne s'enseigne pas lui-même.
+
+### 35.1 La causalité ARRIÈRE — `caused_by`, le WhyTree, le geste `/why` (le 5-pourquoi, redressé)
+
+Le red wave (§42) propage la causalité **AVANT** (une vérité change → ses conséquences rougissent : cause→effets). Il manquait le **sens ARRIÈRE** : d'un symptôme observé, **remonter à la cause racine** (effet→cause). C'est le **5-pourquoi** de la pensée lean — mais la version naïve (chaîne linéaire de 5 « pourquoi » dictés par jugement) viole determinism-first, simplifie un **arbre** de causes en une ligne, et laisse un LLM **confabuler** une cause plausible-mais-fausse. FKE le **redresse** :
+
+- **Pas une facette** (test de décision §1.3) : c'est un **processus déclenché par un échec**, pas une propriété d'un kernel en régime. C'est un **geste du loopback / de la boucle de réalité**, transversal aux 8 facettes (on remonte la racine d'un bug fonctionnel, d'une régression perf, d'un incident sécu…).
+- **Déterministe d'abord** : là où le graphe **connaît** la cause, on remonte les liens — un nouveau type de lien **`caused_by`** (l'arête causale arrière, à côté de `composes`/`contracts_with`/`impacts`, §17) + l'inverse de l'`impacts` : si le miroir rouge dépend de l'opération X qui dépend de l'entité Y, la chaîne est **calculée**, pas devinée.
+- **LLM gaté + VÉRIFIÉ** pour le « pourquoi » irréductible (cause hors-graphe) : chaque cause proposée est **reproduite** ou **rejetée** (anti-confabulation — une cause non reproductible n'entre pas).
+- **Un ARBRE, pas une ligne** : le `WhyTree` (Ishikawa/fishbone) admet plusieurs causes contributives ; record **content-adressé, append-only, provenancé**.
+- **Terminaison obligatoire en MIROIR** (la signature KRD) : un WhyTree qui ne finit **pas** par un nouveau miroir rouge→vert à la racine n'est que du **storytelling causal**. La racine → draft Idea (`/learn`) → grill → goal → **miroir d'anti-récurrence**. C'est ce qui transforme « on a compris » en « ça ne peut plus revenir ».
+
+Geste : **`/why`** (construire le WhyTree, extension de `/diagnose`) **+ `/learn`** (racine → miroir). Le red wave est l'avant ; le WhyTree est l'arrière ; ensemble ils ferment la causalité du graphe dans les deux sens.
 
 ---
 
