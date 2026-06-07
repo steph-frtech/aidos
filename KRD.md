@@ -3441,7 +3441,7 @@ La revue DTFS avait pointé le danger du double-typage. v8.1 ajoute une règle s
 | **FKE** | Fractal Kernel Vibing, FKV | `FKE` est le nom acté de la discipline (Livre XXX) ; « vibing » ne désigne que la phase Vibe Lab |
 | **conscience** | Alignment Governor, réconciliateur | `conscience` = l'agrégateur déterministe des verdicts des juges existants — jamais un second juge |
 | **paire-miroir** | doc-miroir, data-miroir, spec-miroir | `paire-miroir` nomme une paire déclaré↔prouvé du squelette à 6 paires ; les noms composés en sont des instances |
-| **facette** | lentille, colonne, dimension de vérité | `facette` = une lentille INTRINSÈQUE sur le squelette à 6 paires ; **6 canoniques** (fonctionnel F · invariants ∀ I · sécurité S · performance/budgets B · évolutivité/migration V · maintenabilité/structure M = le second cliquet §47), effondrables. À distinguer des **dimensions latérales** (arêtes : contrats/Pact, composition) et des **sous-lentilles** (conformité/déterminisme/concurrence/observabilité/UX/opérabilité, logées dans une facette parente) |
+| **facette** | lentille, colonne, dimension de vérité | `facette` = une lentille INTRINSÈQUE sur le squelette à 6 paires ; **8 canoniques** (fonctionnel F · invariants ∀ I · sécurité S · performance/budgets B · fiabilité/résilience R · évolutivité/migration V · maintenabilité/structure M · expérience/utilisabilité X soft §13.6), effondrables ; croisées ISO 25010. À distinguer des **dimensions latérales** (arêtes : contrats/Pact, composition) et des **sous-lentilles** (conformité⊂S, déterminisme/concurrence⊂I, a11y/i18n⊂X, rollback/recovery⊂R, observabilité⊂R/B, logées dans une facette parente) |
 | **kernel effondré** | collapsed kernel | le gabarit minimal d'un kernel-feuille ; incompressible = s1 + paire de preuve |
 | **Vibe Lab** | zone /spike, bac à vibe | `Vibe Lab` est le concept FKE ; `/spike` est son implémentation AIDOS |
 | **Promotion Gate** | harvest+grill+goal | le gate FKE — UN concept, DEUX portes (entrée vibe→kernel ; sortie artefact→stable) ; les trois gestes AIDOS restent ses alias opérationnels |
@@ -3661,21 +3661,49 @@ C'est le cœur structurel de FKE. L'anatomie canonique d'un kernel est **symétr
 | **M5** | Contrat structurel (le cliquet : la santé ne peut que TENIR ou s'AMÉLIORER) | ↔ | Ratchet structurel enforcé (nouvelle violation/cycle → rouge, bloque la coupe) | dessous = machine |
 | **M6** | Evidence structurelle attendue | ↔ | Evidence observée (fitness verte, zéro nouvelle violation, mutation non dégradée) | oui |
 
-**L'unification — N facettes, UN squelette, N lentilles.** Les facettes ne sont pas des anatomies différentes : c'est **le même squelette de six paires** (Spec → Comportement → Scénarios → Modèle/Domaine → Contrat → Evidence ↔ leurs reflets), **lu à travers une lentille intrinsèque** (une question sur les internals DU kernel). **Six lentilles canoniques :**
+**Facette FIABILITÉ / RÉSILIENCE — 6 paires (le squelette lu en « survit-il aux PANNES, pas seulement à la charge ? ») :**
+
+| # | AU-DESSUS (déclaré) | ↔ | EN-DESSOUS (prouvé) | ubiq. |
+|---|---|---|---|---|
+| **R1** | Spec de fiabilité (SLA de dispo, modes de dégradation acceptables) | ↔ | Doc de résilience (runbook de panne, postmortem) | oui |
+| **R2** | Comportement sous panne (dégradation gracieuse, fallback) | ↔ | Résultats observés sous panne (le système tient, ne s'effondre pas) | oui |
+| **R3** | Scénarios de panne (dépendance morte, timeout, partition réseau, crash) | ↔ | Tests de fault-injection / chaos / failover / restore | oui |
+| **R4** | Modèle de défaillance (trust boundaries de panne, points de défaillance) | ↔ | Disjoncteurs, retries, bulkheads, outbox (exactly-once) émis | dessous = machine |
+| **R5** | Contrat de récupération (RTO/RPO, idempotence du rejeu, kill-switch) | ↔ | Recovery enforcé (restore prouvé, rejeu sans doublon, rollback) | dessous = machine |
+| **R6** | Evidence de fiabilité attendue (E6) | ↔ | Evidence observée (chaos vert, dispo tenue, MTTR mesuré) | oui |
+
+**Facette EXPÉRIENCE / UTILISABILITÉ — 6 paires (la VÉRITÉ MOLLE, §13.6 ExperienceClaim) :**
+
+| # | AU-DESSUS (déclaré) | ↔ | EN-DESSOUS (prouvé — régime EXPÉRIENTIEL, pas hard) | ubiq. |
+|---|---|---|---|---|
+| **X1** | Spec d'expérience (à qui, dans quel but, quelle promesse d'usage) | ↔ | Doc d'usage / guide | oui |
+| **X2** | Comportement d'usage attendu (parcours fluide, ≤ N gestes) | ↔ | Résultats d'usage observés (réussite de tâche, temps, abandon) | oui |
+| **X3** | Scénarios d'utilisabilité (+ accessibilité a11y, i18n) | ↔ | Tests d'usabilité / audit a11y / A/B / heuristiques | oui |
+| **X4** | Modèle mental de l'utilisateur (le vocabulaire, les attentes) | ↔ | Surface rendue (libellés, états vides, erreurs lisibles) | oui |
+| **X5** | Contrat d'expérience (ExperienceClaim : hypothèse typée, falsifiable) | ↔ | Mesure terrain (la prod confirme ou RÉFUTE l'hypothèse) | oui |
+| **X6** | Evidence d'expérience attendue | ↔ | Evidence observée (métriques d'usage, satisfaction, télémétrie réelle) | oui |
+
+> **Régime spécial de X (soft truth).** L'expérience ne se prouve pas comme un contrat de paiement (§13.6) : c'est une **hypothèse typée** (ExperienceClaim), prouvée **expérientiellement** (A/B, usabilité, télémétrie) et **falsifiable par la réalité** — elle ne **cliquette pas dur** comme F/I/S. Le cliquet ne mord pas une vérité molle (§13.5 VerifiabilityLevel) : X **informe** la décision, ne la **bloque** pas. La modéliser en facette force à la **rendre explicite et mesurée** au lieu de la laisser implicite — mais sans la traiter en invariant dur (ce serait sur-contraindre l'UX, l'erreur symétrique du §13.4).
+
+**L'unification — N facettes, UN squelette, N lentilles.** Les facettes ne sont pas des anatomies différentes : c'est **le même squelette de six paires** (Spec → Comportement → Scénarios → Modèle/Domaine → Contrat → Evidence ↔ leurs reflets), **lu à travers une lentille intrinsèque** (une question sur les internals DU kernel). **Huit lentilles canoniques :**
 
 | Lentille | La question qu'elle pose | Niveau de preuve dominant |
 |---|---|---|
 | **Fonctionnel** (F) | fait-il ce qu'on veut ? (par l'exemple, ∃) | N0/N2/N4 → E1-E3 |
 | **Invariants ∀** (I) | est-ce vrai sur TOUS les chemins ? | N1 → E5 |
 | **Sécurité** (S) | résiste-t-il aux attaques ? | → E4 |
-| **Performance / Budgets** (B) | assez rapide, pas trop cher, assez fiable ? | → E5/E6 |
+| **Performance / Budgets** (B) | assez rapide, pas trop cher (sous charge normale) ? | → E5/E6 |
+| **Fiabilité / Résilience** (R) | survit-il aux **pannes** (dégradation, reprise) ? | chaos / fault-injection → E6 |
 | **Évolutivité / Migration** (V) | la vérité tient-elle dans le temps, sur de vraies données ? | → E3/E6 |
 | **Maintenabilité / Structure** (M) | reste-t-il sain — pas « vert dehors, pourri dedans » ? | structural ratchet §47 → E1/E5 |
+| **Expérience / Utilisabilité** (X) | est-il **bon à utiliser** ? (vérité molle, falsifiable) | ExperienceClaim §13.6 → expérientiel |
 
-> **Honnêteté (j'avais raté la 6ᵉ).** KRD pose explicitement **DEUX cliquets** (§47) : le comportemental (F/I/S/B/V) et le **structurel** (M). En m'arrêtant à 5 j'avais oublié le second cliquet — c'est lui qui attrape le « tests verts, système pourri ». Six répond au sextet : **correct-par-l'exemple · vrai-partout · sûr · viable · durable · sain.**
+> **Comment je l'ai vérifié (et ce que j'avais raté).** Croisé au modèle de qualité canonique **ISO 25010** (8 caractéristiques produit) : il **valide** F (functional suitability), S (security), B (performance efficiency), M (maintainability) ; sa **Compatibility/Interoperability** = nos **arêtes** (Pact, §17) — correctement hors-facette ; sa **Portability** ⊂ V. Et il révèle **deux oublis** que j'avais repliés à tort : **Usability → Expérience (X)** (j'en avais fait un sous-cas du fonctionnel ; KRD l'avait déjà typée en ExperienceClaim §13.6) et **Reliability → Fiabilité/Résilience (R)** (j'avais dilué la résilience dans B et V ; la tolérance aux pannes est orthogonale à l'efficacité). Note de structure : notre **I (Invariants ∀) n'est pas une caractéristique ISO** — c'est un axe de **rigueur de preuve** (∃ exemple vs ∀ universel) que FKE ajoute et qui se lit *dans* chaque facette ; on le garde listé comme facette (load-bearing, voulu), en sachant qu'il est d'une autre **nature** que les 7 attributs de qualité.
 
-**Le modèle se ferme à six — et voici POURQUOI (le test de décision).** Une « couche » candidate est :
-- une **facette intrinsèque** (une nouvelle lentille) **ssi** elle pose une question **orthogonale** sur les *internals du kernel lui-même* — on peut passer toutes les autres et échouer celle-ci. Les six répondent au sextet fondamental : **correct par l'exemple · vrai partout · sûr · viable · durable · sain.** Au-delà, les candidates échouent l'un des deux tests suivants :
+> **Honnêteté (les facettes ratées, trouvées en re-poussant).** KRD pose explicitement **DEUX cliquets** (§47) : le comportemental et le **structurel** — j'avais oublié le second (→ M). Puis le croisement **ISO 25010** a révélé deux autres oublis repliés à tort : l'**Expérience/Utilisabilité** (→ X, déjà typée ExperienceClaim §13.6) et la **Fiabilité/Résilience** (→ R, diluée dans B/V). D'où **huit**, l'octuor : **correct-par-l'exemple · vrai-partout · sûr · viable · résilient · durable · sain · utilisable.**
+
+**Le modèle se ferme à huit — et voici POURQUOI (le test de décision).** Une « couche » candidate est :
+- une **facette intrinsèque** (une nouvelle lentille) **ssi** elle pose une question **orthogonale** sur les *internals du kernel lui-même* — on peut passer toutes les autres et échouer celle-ci. Les huit répondent à l'octuor fondamental : **correct par l'exemple · vrai partout · sûr · viable · résilient · durable · sain · utilisable.** Au-delà, les candidates échouent l'un des deux tests suivants :
 - une **dimension latérale** (une **arête** du graphe, pas une lentille sur le nœud) si elle concerne la **relation à d'AUTRES kernels** : **Contrats / Interopérabilité** (Pact avec les voisins, §17 `contracts_with`) et **Composition** (`composes`) — déjà modélisées comme **liens KRD versionnés** avec leur propre miroir (Pact provider-verification, coherence-test). Ce ne sont pas des facettes du kernel : ce sont les arêtes entre kernels.
 - une **sous-lentille** (un raffinement DANS une facette) si elle se loge sous une lentille existante (elle n'ouvre pas de colonne, elle ajoute des paires *dans* sa facette parente).
 
@@ -3685,10 +3713,10 @@ C'est le cœur structurel de FKE. L'anatomie canonique d'un kernel est **symétr
 |---|---|---|
 | **Déterminisme / reproductibilité** | sous-lentille | ⊂ Invariants ∀ — le miroir de repro est l'invariant « ∀ input, sortie stable / émission byte-identique » (load-bearing de KRD, mais c'est un ∀) |
 | **Concurrence / thread-safety / idempotence / exactly-once** | sous-lentille | ⊂ Invariants ∀ — « ∀ entrelacement, correct » (linéarisabilité) |
-| **Observabilité / traçabilité** | sous-lentille | ⊂ Performance/Budgets — c'est *comment on mesure* B et V (OTel) |
+| **Observabilité / traçabilité** | sous-lentille | ⊂ Fiabilité/Résilience + Performance — c'est *comment on mesure* R/B/V (OTel) |
 | **Conformité / vie privée / GDPR** | sous-lentille | ⊂ Sécurité — classification des données (S1) + S116 |
-| **Accessibilité / i18n / UX / ExperienceClaim** | sous-lentille | ⊂ Fonctionnel — vérité molle (§13.6), typée à part |
-| **Réversibilité / opérabilité (rollback, kill-switch, runbook)** | sous-lentille | ⊂ Performance/Budgets |
+| **Accessibilité (a11y) / i18n** | sous-lentille | ⊂ **Expérience (X)** — désormais une facette à part entière (X3/X4) |
+| **Réversibilité / récupération (rollback, restore, kill-switch)** | sous-lentille | ⊂ **Fiabilité/Résilience (R)** — désormais une facette (R5) |
 | **Portabilité (zéro endpoint en dur, self-hosted→cloud)** | sous-lentille | ⊂ Évolutivité (cross-env) |
 | **Éthique / alignement d'agent** | sous-lentille | ⊂ Sécurité (l'agentlayer) |
 | **Contrats / interopérabilité (Pact)** | dimension latérale | arête `contracts_with` (§17) |
@@ -3697,17 +3725,17 @@ C'est le cœur structurel de FKE. L'anatomie canonique d'un kernel est **symétr
 | **Reviewability** | propriété du **changeset** | §FKE-26 — porte sur le diff, pas sur le kernel en régime |
 | **Valeur / utilité (ValueCase)** | en **amont** | le besoin (l'intent) + ValueCase §66.3 (⊂ B) — ce n'est pas une propriété du kernel, c'est sa raison d'être |
 
-Le modèle est donc **clos à six facettes** non par fatigue mais par **construction** : le test ci-dessus classe tout candidat. S'il en surgit un qui est (a) une question, (b) orthogonale, (c) sur les internals d'UN kernel, (d) non réductible à une des six — il devient la 7ᵉ. Je n'en connais pas ; les sérieux ci-dessus tombent tous en sous-lentille, arête, ou amont.
+Le modèle est donc **clos à huit facettes** non par fatigue mais par **construction + croisement externe (ISO 25010)** : le test ci-dessus classe tout candidat. S'il en surgit un qui est (a) une question, (b) orthogonale, (c) sur les internals d'UN kernel, (d) non réductible à une des huit — il devient la 9ᵉ. Je n'en connais pas après croisement ISO ; les sérieux ci-dessus tombent tous en sous-lentille, arête, amont, ou ont été promus (X, R).
 
-**Facettes effondrables (anti-explosion, même règle que le kernel effondré).** Un kernel n'instancie une facette **que s'il porte cette nature de vérité**. La facette **fonctionnelle est toujours présente** (incompressible : F1 + sa paire de preuve). Une fonction pure de tri porte F + I + M, pas S/B/V. Un endpoint qui expose des données PII porte F + S + B + V + M. Un kernel-vue déclaratif peut n'avoir que F (+ M minimal). On n'instancie jamais une facette vide : « le plus petit cliquet qui clique ».
+**Facettes effondrables (anti-explosion, même règle que le kernel effondré).** Un kernel n'instancie une facette **que s'il porte cette nature de vérité**. La facette **fonctionnelle est toujours présente** (incompressible : F1 + sa paire de preuve). Une fonction pure de tri porte F + I + M, pas S/B/V/R/X. Un endpoint PII user-facing porte tout (F+I+S+B+R+V+M+X). Un kernel-vue déclaratif peut n'avoir que F + X (+ M minimal). On n'instancie jamais une facette vide : « le plus petit cliquet qui clique ».
 
-**Les opérateurs de la traversée** (la mécanique, pas du contenu, communs à TOUTES les facettes) : **Validation** = la porte du MUR D'INTENTION (la moitié dessus est-elle acceptée ? — Decision Card) ; **Exécution** = l'acte (Evidence Runner) qui produit Résultats + Evidence observée de toutes les facettes instanciées ; **Conscience** = compare **toutes les paires instanciées** une à une (jusqu'à 6 × 6 = 36, en pratique bien moins, facettes effondrées) ; **Loopback ciblé** = sur divergence d'une paire (quelle que soit la lentille), un red wave **ciblé** qui remonte exactement au slot dessus concerné. **Une paire qui diverge bloque, quelle que soit sa lentille** — une régression de perf, une faille de sécurité ou une migration qui perd de la donnée, non reflétée, est un monstre, au même titre qu'un test fonctionnel manquant.
+**Les opérateurs de la traversée** (la mécanique, pas du contenu, communs à TOUTES les facettes) : **Validation** = la porte du MUR D'INTENTION (la moitié dessus est-elle acceptée ? — Decision Card) ; **Exécution** = l'acte (Evidence Runner) qui produit Résultats + Evidence observée de toutes les facettes instanciées ; **Conscience** = compare **toutes les paires instanciées** une à une (jusqu'à 6 × 8 = 48, en pratique bien moins, facettes effondrées) ; **Loopback ciblé** = sur divergence d'une paire (quelle que soit la lentille), un red wave **ciblé** qui remonte exactement au slot dessus concerné. **Une paire qui diverge bloque, quelle que soit sa lentille** — une régression de perf, une faille de sécurité ou une migration qui perd de la donnée, non reflétée, est un monstre, au même titre qu'un test fonctionnel manquant.
 
 *(Vue effondrée à 10 slots — le raccourci historique : s1=F1↑, s10=F1↓ ; s2=F2↑ ; s3=F4↑, s7=F4↓ ; s4=F3↑+F6↑, s5=F3↓, s6=F2↓+F6↓ ; s8=F5↓ ; la facette sécurité S1-S6 y était compressée en « consigne sécurité » — la forme complète la déplie.)*
 
 Cinq conséquences fondatrices :
 
-1. **Le « miroir » se généralise en N facettes × six paires**, quatre lentilles canoniques (fonctionnel F, invariants ∀ I, sécurité S, performance/budgets B), effondrables. Une paire qui diverge — *quelle que soit la facette* — = soit l'implémentation est rouge, soit la vérité doit évoluer (la boucle, §FKE-35).
+1. **Le « miroir » se généralise en N facettes × six paires**, huit lentilles canoniques (F · I · S · B · R · V · M · X), effondrables. Une paire qui diverge — *quelle que soit la facette* — = soit l'implémentation est rouge, soit la vérité doit évoluer (la boucle, §FKE-35).
 2. **Plus aucune orpheline : le Contrat (F5↑) apparie enfin le Code (F5↓), et le Contrat sécurité (S5↑) apparie la Police (S5↓).** Dans la vue effondrée, s8 (code) semblait sans contrepartie ; la forme complète montre qu'il reflète le **Contrat**. Le code reste **optionnel par ÉMISSION, pas par absence de partenaire** : pour un kernel déclaratif (vue, policy, doc), le Contrat est satisfait **entièrement par projection** — le code est généré, pas écrit à la main (loi 6).
 3. **Le mur est aussi une frontière de LANGUE.** La plupart des paires sont **ubiquitaires des deux côtés** — l'humain lit sa langue jusque dans les retours d'en bas (Résultats, Doc dérivée, Projection, denials, Evidence observée). Seuls **les côtés DESSOUS de F5 (Code), S4 (sécurité implémentée) et S5 (police/scans)** parlent machine : la zone machine = exactement la zone de l'agent.
 4. **La sécurité est une FACETTE complète, pas une note.** Six paires propres (S1-S6), strictement parallèles aux six fonctionnelles : la sécurité a sa spec, ses abuse cases, ses scénarios, son threat model, son contrat, son evidence — déclarés au-dessus — et leurs reflets prouvés en-dessous (doc, denials, tests sécurité, sécurité implémentée, police+scans, evidence sécurité). C'est la **sécurité fractale** (§FKE-8) déployée en 1-pour-1.
