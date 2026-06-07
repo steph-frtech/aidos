@@ -1,16 +1,16 @@
 package gateway
 
 // DefaultRegistry is the CLOSED, content-addressable set of MCP tools the S58 gateway
-// exposes over HTTP — EVERY tool of the 14 existing AIDOS MCP servers the roadmap
+// exposes over HTTP — EVERY tool of the 13 existing AIDOS MCP servers the roadmap
 // names (store · mirror-runner · changeset · dag · idea-intake · memory · context ·
 // evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project),
 // PLUS the explicitly-fenced truth-zone write namespace (CLAUDE.md §2).
 //
-// THE WALL, ENCODED AS DATA (server-side). All 14 servers' real tools are BELOW THE
+// THE WALL, ENCODED AS DATA (server-side). All 13 servers' real tools are BELOW THE
 // LINE — they read/op the archive·brain·context·ideas·changesets·dag·besoin schemas
 // the agent role MAY touch (the changeset_* tools ARE the legal ChangeSet door, the
 // only path truth moves: they stay below-line because they propose/stage/apply through
-// the gate, never a raw kernel write). None of the 14 holds a GRANT to write
+// the gate, never a raw kernel write). None of the 13 holds a GRANT to write
 // kernel/mirrors/fitness — that is the wall by construction.
 //
 // The truth-zone WRITE namespace (kernel_write · mirror_write · fitness_write) is NOT a
@@ -80,7 +80,7 @@ func DefaultTools() []Tool {
 	return t
 }
 
-// GatewayServers is the closed list of the 14 MCP servers S58 exposes (display + the
+// GatewayServers is the closed list of the 13 MCP servers S58 exposes (display + the
 // completeness assertion: every named server has ≥1 exposed tool). Ordered.
 func GatewayServers() []string {
 	return []string{

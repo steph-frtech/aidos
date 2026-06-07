@@ -126,7 +126,7 @@ func TestTransport_TruthWriteRefusedOverHTTP(t *testing.T) {
 	}
 }
 
-// TestTransport_ToolsAndServersOverHTTP proves the closed surface + the 14 servers are
+// TestTransport_ToolsAndServersOverHTTP proves the closed surface + the 13 servers are
 // reachable over HTTP.
 func TestTransport_ToolsAndServersOverHTTP(t *testing.T) {
 	cs := connectHTTP(t)

@@ -97,7 +97,7 @@ type Tool struct {
 	// Name is the MCP tool name (e.g. "store_get"), the JSON-RPC method the HTTP edge
 	// dispatches on.
 	Name string `json:"name"`
-	// Server is the owning MCP server (one of the 14 S58 names), for routing + display.
+	// Server is the owning MCP server (one of the 13 S58 names), for routing + display.
 	Server string `json:"server"`
 	// Disposition is the tool's server-side wall classification.
 	Disposition Disposition `json:"disposition"`

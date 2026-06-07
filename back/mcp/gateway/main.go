@@ -19,7 +19,7 @@
 //
 //	gateway_route   — the routing decision for a (scope, tool, target) call (the wall)
 //	gateway_tools   — the CLOSED set of exposed tools (server + disposition)
-//	gateway_servers — the 14 MCP servers the gateway fronts
+//	gateway_servers — the 13 MCP servers the gateway fronts
 //
 // DETERMINISM-FIRST (CLAUDE.md §6/§8): "pur routage, zéro LLM". The router is a pure
 // total function; this server only frames it over the two transports. The actual
@@ -134,7 +134,7 @@ func newMCPServer() *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "aidos-gateway", Version: "v0.1.0"}, nil)
 	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_route", Description: "The server-side wall routing decision for a (scope, tool, target) call: route a below-the-line op, refuse a cross-project/forged call (AGENT_CROSS_PROJECT_WRITE), or refuse a truth-write (GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET). Pure, deterministic — zero LLM."}, s.route)
 	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_tools", Description: "The CLOSED set of MCP tools the gateway exposes (name · owning server · wall disposition), sorted. Pure."}, s.tools)
-	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_servers", Description: "The 14 MCP servers the gateway fronts (store · mirror-runner · changeset · dag · idea-intake · memory · context · evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project)."}, s.servers)
+	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_servers", Description: "The 13 MCP servers the gateway fronts (store · mirror-runner · changeset · dag · idea-intake · memory · context · evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project)."}, s.servers)
 	return srv
 }
 
