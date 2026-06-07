@@ -305,9 +305,20 @@
 			"restoreOk": "Project restored to active.",
 			"deleteOk": "Project deleted (soft — the row is kept, append-only).",
 			"notFound": "Project not found.",
-			"dbUnreachable": "Postgres unreachable — write impossible. No data changed."
+			"dbUnreachable": "Postgres unreachable — write impossible. No data changed.",
+			"duplicateOk": "Project “{slug}” duplicated (isolated root) — id {id}."
 		},
-		"footer": "Source: live <code>projects</code> schema in Postgres. The panel writes — but only the project scope, <em>below</em> the wall (append-only, soft delete); truth (kernel/mirrors/fitness) stays out of reach. The canonical door remains the <code>project</code> MCP server (ADR 0009); reconciliation goes through the HTTP gateway (S58)."
+		"footer": "Source: live <code>projects</code> schema in Postgres. The panel writes — but only the project scope, <em>below</em> the wall (append-only, soft delete); truth (kernel/mirrors/fitness) stays out of reach. The canonical door remains the <code>project</code> MCP server (ADR 0009); reconciliation goes through the HTTP gateway (S58).",
+		"modeLabel": "Creation mode",
+		"modeBlank": "Blank",
+		"modeTemplate": "From a template",
+		"sourceLabel": "Source project to duplicate",
+		"duplicateSubmit": "Duplicate project"
+	},
+	"projectSwitcher": {
+		"label": "Project",
+		"none": "No active project",
+		"empty": "Create a project"
 	},
 	"records": {
 		"eyebrow": "Kernel · KRDCore records",

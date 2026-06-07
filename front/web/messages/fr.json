@@ -305,9 +305,20 @@
 			"restoreOk": "Projet restauré en actif.",
 			"deleteOk": "Projet supprimé (doux — la ligne est conservée, append-only).",
 			"notFound": "Projet introuvable.",
-			"dbUnreachable": "Postgres injoignable — écriture impossible. Aucune donnée modifiée."
+			"dbUnreachable": "Postgres injoignable — écriture impossible. Aucune donnée modifiée.",
+			"duplicateOk": "Projet « {slug} » dupliqué (racine isolée) — id {id}."
 		},
-		"footer": "Source : schéma <code>projects</code> en direct dans Postgres. Le panneau écrit — mais uniquement le scope projet, <em>sous</em> le mur (append-only, suppression douce) ; la vérité (kernel/mirrors/fitness) reste hors de portée. La porte canonique reste le serveur MCP <code>project</code> (ADR 0009) ; la réconciliation passe par la passerelle HTTP (S58)."
+		"footer": "Source : schéma <code>projects</code> en direct dans Postgres. Le panneau écrit — mais uniquement le scope projet, <em>sous</em> le mur (append-only, suppression douce) ; la vérité (kernel/mirrors/fitness) reste hors de portée. La porte canonique reste le serveur MCP <code>project</code> (ADR 0009) ; la réconciliation passe par la passerelle HTTP (S58).",
+		"modeLabel": "Mode de création",
+		"modeBlank": "Vierge",
+		"modeTemplate": "Depuis un modèle",
+		"sourceLabel": "Projet source à dupliquer",
+		"duplicateSubmit": "Dupliquer le projet"
+	},
+	"projectSwitcher": {
+		"label": "Projet",
+		"none": "Aucun projet actif",
+		"empty": "Créer un projet"
 	},
 	"records": {
 		"eyebrow": "Kernel · enregistrements KRDCore",

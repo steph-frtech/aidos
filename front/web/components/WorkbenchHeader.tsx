@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ProjectSwitcher } from "@/components/ProjectSwitcher";
 
 /**
  * Navigation latérale du Workbench (ADR 0010 design system + ADR 0011 bilingue).
@@ -248,6 +249,9 @@ export function WorkbenchHeader() {
 					</Link>
 					<LanguageSwitcher />
 				</div>
+				<div className="border-b border-border px-4 py-2">
+					<ProjectSwitcher />
+				</div>
 				<div className="flex-1 overflow-y-auto">{nav}</div>
 			</aside>
 
@@ -271,7 +275,10 @@ export function WorkbenchHeader() {
 					>
 						AIDOS
 					</Link>
-					<LanguageSwitcher />
+					<div className="flex items-center gap-2">
+						<ProjectSwitcher />
+						<LanguageSwitcher />
+					</div>
 				</div>
 			</header>
 

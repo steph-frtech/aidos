@@ -244,3 +244,64 @@ export async function deleteProjectAction(
 	// Soft delete only — append-only (the hard GDPR delete is S116). No SQL DELETE.
 	return transition(String(formData.get("id") ?? ""), "deleted", "deleteOk");
 }
+
+/**
+ * duplicateProjectAction (S57, blank-vs-template) — fork a project into a NEW,
+ * ISOLATED root project. It reuses the create path: a fresh content-addressed
+ * project + its own DAG root, sharing NO source node (the S56 Duplicate fixture).
+ * The new project's owner is the caller; the source is read but never mutated.
+ * Below the wall, append-only.
+ */
+export async function duplicateProjectAction(
+	_prev: ActionResult,
+	formData: FormData,
+): Promise<ActionResult> {
+	const sourceId = String(formData.get("sourceId") ?? "").trim();
+	const slug = String(formData.get("slug") ?? "").trim();
+	const name = String(formData.get("name") ?? "").trim();
+	const owner = String(formData.get("owner") ?? "").trim();
+	if (!slug || !name || !owner) {
+		return { ok: false, messageKey: "createEmpty" };
+	}
+	if (!isValidSlug(slug)) {
+		return { ok: false, messageKey: "createBadSlug", slug };
+	}
+	const createdAt = `${new Date().toISOString().slice(0, 10)}T00:00:00Z`;
+	const c = client();
+	if (!c) {
+		return { ok: false, messageKey: "dbUnreachable", slug };
+	}
+	try {
+		const heads = await liveHeads(c);
+		// The source must exist (a duplicate forks FROM a real project, never a guess).
+		if (sourceId && !heads.some((h) => h.id === sourceId)) {
+			return { ok: false, messageKey: "notFound", id: sourceId };
+		}
+		if (!canCreate(heads, owner, slug)) {
+			return { ok: false, messageKey: "createDuplicate", slug };
+		}
+		const p = newProject(slug, name, owner, createdAt);
+		const body = canonicalBody({
+			slug,
+			name,
+			ownerRef: owner,
+			createdAt,
+			lifecycle: "active",
+		});
+		await c.begin(async (tx) => {
+			await tx`
+				insert into projects.project (id, body, version)
+				values (${p.id}, ${body}::jsonb, ${p.id})
+				on conflict (id) do nothing`;
+			await tx`
+				insert into projects.dag_root (project_id, node_id, label)
+				values (${p.id}, ${contentAddress({ slug, name, ownerRef: owner, createdAt, lifecycle: "active" })}, ${rootNodeIdLabel(p)})
+				on conflict (project_id) do nothing`;
+		});
+		revalidatePath("/projects");
+		return { ok: true, messageKey: "duplicateOk", id: p.id, slug };
+	} catch (err) {
+		console.warn("[/projects] duplicate failed:", (err as Error).message);
+		return { ok: false, messageKey: "dbUnreachable", slug };
+	}
+}
