@@ -320,3 +320,9 @@ Le frontload est délibéré sur les **deux bloqueurs structurels transverses** 
 | **Capacité NOUVELLE** : couche connecteurs (Connector/Skill/MCP-server gouvernés) | **DP19–DP24** | dépend de la passerelle **S58** (E2) + **GV** (S15 scope + S16 authority) + secrets **S91** ; dépendance vers l'arrière, ne perturbe pas l'ordre. |
 
 **Nouveaux ADR (déploiement) :** table frozen-stack **séparée** du substrat de l'app émise (≠ stack Go d'AIDOS) ; couche connecteurs gouvernée (approbation RW **runtime, hors `authority.Decide`**) ; modèle emit-output-contract/bootstrap déterministe ; **addendum ADR 0006** « Doltgres non-prod uniquement » (couplé à l'élargissement `scope.Environment` +`local`+`future_cloud`) ; fork StackManifest **record-kind vs `kind:layer`**.
+
+---
+
+## Appendice — Suite : la piste FKE (FK01→FK16, après S117)
+
+> **Décision (2026-06-07) : la piste FKE s'enchaîne à la suite de l'app-builder.** Quand S117 est vert, `/long-run` continue dans la **piste FK** (`docs/plan/ROADMAP-fke.md`, gravée dans `BUILDER_PLAN.md` après S117). Les deltas code de Fractal Kernel Engineering (LIVRE XXX du Tome, ADR 0044+0045) : l'anatomie 1-pour-1, les **8 facettes** (F/I/S/B/R/V/M/X), les **2 axes** (facette orthogonale × verticale latérale), la **conscience** agrégateur, le **cockpit AI Lab**, la **causalité arrière** (WhyTree/`/why`/`caused_by`), le `truth_level`, les projections d'outillage, la bascule **E0-E7**. 5 épics FK-A→FK-E, tout additif (anti-overwrite §9), post-S117. L'autoresume est bi-phase (`S BUILDER_PLAN.md 117 FK 16`) : curseur S→FK, fin à FK16, rebascule prod à la toute fin.

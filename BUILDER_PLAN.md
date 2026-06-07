@@ -458,3 +458,105 @@
 **Detail:** ROADMAP-app-builder.md §EPIC 14 (S117). Assemble et conseille, n'installe/ship rien, n'écrit aucune vérité.
 **Inputs:** S03 CLI, S47 release, S58 passerelle.
 **Criteres de done:** chaque nouveau verbe CLI a un miroir rouge + un vert ; le pack de release énumère honnêtement ce qui EXISTE dans le truth-store live du user.
+
+---
+
+# PISTE FKE — FK01→FK16 (À LA SUITE DE L'APP-BUILDER, après S117)
+
+> Les deltas code de la discipline Fractal Kernel Engineering (LIVRE XXX, ADR 0044+0045). Détail complet : `docs/plan/ROADMAP-fke.md` (épics FK-A coordonnées · FK-B miroirs par facette · FK-C conscience+cockpit · FK-D causalité avant/arrière · FK-E projections/lexique/bascule E). Tout additif (anti-overwrite §9) ; le squelette 6-paires généralise N0-N5 ; les facettes réutilisent les senseurs existants ; le mur intact ; determinism-first partout. Lancé seulement quand S117 est vert.
+
+## FK01 — truth_level stocké + miroir de parité
+**Sous-systeme:** Kernel / Archive
+**Objectif:** Les 7 niveaux de vérité (Raw→Reconciled) stockés sur les records, écrits uniquement par la transition déterministe (idea/changeset/miroir/evidence/conscience).
+**Detail:** ROADMAP-fke.md FK01 ; KRD.md FKE-5/§5. Migration additive.
+**Criteres de done:** property — stored_level == computed_level (miroir de parité, divergence=rouge) ; transition = fonction pure totale ; SemanticDiff add ; panel filtre par niveau.
+
+## FK02 — Les 8 facettes déclarées + facet-set effondrable
+**Sous-systeme:** Kernel
+**Objectif:** Un kernel déclare ses lentilles instanciées (F/I/S/B/R/V/M/X) ; F toujours présente (incompressible = intention + paire de preuve) ; validation refuse facette vide ou requise manquante.
+**Detail:** ROADMAP-fke.md FK02 ; KRD.md FKE-1.3. Ensemble clos ; X = vérité molle §13.6. Gate tout le reste.
+**Criteres de done:** property — kernel sans facette fonctionnelle refusé ; facette déclarée sans ses paires = monstre ; round-trip content-adressé.
+
+## FK03 — La grille niveau × facette (les deux axes)
+**Sous-systeme:** Kernel / Runtime
+**Objectif:** Toute vérité porte ses deux coordonnées — niveau (verticale produit→entité, axe latéral couplant) × facette (nature, axe orthogonal séparant) ; le graphe/ContextRouter expose la cellule.
+**Detail:** ROADMAP-fke.md FK03 ; KRD.md FKE-1.4. Réutilise S15 (niveau) + FK02 (facette).
+**Criteres de done:** property — chaque vérité résout à une cellule déterministe ; un changement bas marque les rungs source au-dessus (couplage latéral) ; les facettes n'interagissent pas.
+
+## FK04 — Complétude facet-aware (le monstre généralisé)
+**Sous-systeme:** Mirror
+**Objectif:** La complétude vérifie les paires de TOUTES les facettes instanciées ; une paire requise manquante/divergente de n'importe quelle facette = monstre (faille sécu, régression perf, migration qui perd, invariant non prouvé = monstres comme un test manquant).
+**Detail:** ROADMAP-fke.md FK04 ; KRD.md FKE-1.3 conséquence 5. Étend S12.
+**Criteres de done:** fault-injection — retirer une paire d'une facette instanciée → monstre ; un kernel effondré légal passe ; aucun kernel conforme existant invalidé (additif).
+
+## FK05 — Expand E0-E7 : mapping N→E + types de preuve manquants
+**Sous-systeme:** Mirror
+**Objectif:** Table N0-N5→E0-E7 (fonction pure) + double-étiquetage additif + types E4 (gosec/gitleaks/evals-injection), E6 (runtime+rollback), E7 (formel) au contrat de preuve.
+**Detail:** ROADMAP-fke.md FK05 ; KRD.md FKE-16 (expand ; le contract = FK16).
+**Criteres de done:** property — même miroir → même E (mapping total) ; evidence E-typée affichée ; zéro miroir N existant modifié.
+
+## FK06 — Dérivation déterministe de s9 (doc dérivée du code)
+**Sous-systeme:** Generators
+**Objectif:** Émetteur pur DeriveDoc(kernel)→s9 depuis les ASTs (operations, controls, routes, noms de tests, erreurs), structurée pour la comparaison.
+**Detail:** ROADMAP-fke.md FK06 ; KRD.md FKE-1.3 décision (a).
+**Criteres de done:** property — même kernel → s9 byte-identique ; s9 structurée (concepts du lexique, behaviors, erreurs).
+
+## FK07 — Les doc-miroirs + data-miroir (comparaison structurelle)
+**Sous-systeme:** Mirror
+**Objectif:** Comparaison structurelle ensembliste s2↔s9 et s1↔s10 (concepts/behaviors/erreurs) — divergence structurelle bloquante, prose advisory (LLM signale, n'arbitre jamais) ; data-miroir s3↔s7 déclaré.
+**Detail:** ROADMAP-fke.md FK07 ; KRD.md FKE-1.3 décision (a). Le juge reste un calcul.
+**Criteres de done:** fault-injection — retirer un behavior du code → doc-miroir rouge ; éditer la prose seule → advisory ; property — même paire → même verdict.
+
+## FK08 — Câbler les facettes S/R/V/M/X (les colonnes parallèles)
+**Sous-systeme:** Mirror / Runtime / Generators
+**Objectif:** Réaliser les 6 paires de chaque facette non-fonctionnelle : S (tests sécu + police/scans, réutilise GV) · R (chaos/fault-injection/failover/restore/disjoncteurs/outbox) · V (migration expand-contract/backfill/restore, réutilise S95) · M (arch-fitness 2e cliquet §47, réutilise S102/FN02) · X (ExperienceClaim §13.6, soft : informe, ne bloque pas).
+**Detail:** ROADMAP-fke.md FK08 ; KRD.md FKE-1.3 (les 6 tables de facettes).
+**Criteres de done:** par facette, fault-injection — casser une paire rougit la bonne colonne ; X reste advisory (ne cliquette pas dur) ; property — chaque facette = le squelette 6-paires sous son angle.
+
+## FK09 — La conscience : agrégateur déterministe + rapport + decision cards
+**Sous-systeme:** Runtime / Workbench
+**Objectif:** Reconcile(kernel)→ConsciousnessReport, fonction pure composant les verdicts des juges EXISTANTS (runner/complétude/SemanticDiff/RealityMirror/senseurs/ledger), toutes facettes instanciées ; produit les decision cards ; route /conscience. Aucun nouveau juge.
+**Detail:** ROADMAP-fke.md FK09 ; KRD.md FKE-6.3.
+**Criteres de done:** property — mêmes verdicts d'entrée → même rapport ; rapport = verdicts sourcés seulement ; e2e — une divergence produit sa decision card.
+
+## FK10 — A0-A8 : 6e axe de l'agentlayer + montée par preuve
+**Sous-systeme:** Kernel / Runtime
+**Objectif:** autonomy_level ∈ {A0..A8} (ensemble clos) déclaré par CoucheAgent ; enforcement fail-closed ; montée calculée depuis l'historique AgentRun (N runs verts E4+ sans incident).
+**Detail:** ROADMAP-fke.md FK10 ; KRD.md FKE-11/34. A8 jamais sur action critique.
+**Criteres de done:** fixture — un A1 tentant un merge refusé ; property — promotion = fonction pure de l'historique, jamais déclarée.
+
+## FK11 — L'écran AI Lab : le cockpit trialogue
+**Sous-systeme:** Workbench / Runtime
+**Objectif:** Route /ai-lab — GAUCHE chat scopé au nœud (slots proposés, jamais de vérité) · CENTRE la couche navigable = kernel + anatomie 1-pour-1, mur dessiné, voyant 🟢/🔴/🟡 par paire de toutes les facettes · DROITE decision cards + blast radius + red wave + promotion gate. 2 modes (conversationnel/navigationnel) = même écran à zoom différent.
+**Detail:** ROADMAP-fke.md FK11 ; KRD.md FKE-38. Compose S58+S60+E4+E5+FK09 ; évolution du GraphCockpit.
+**Criteres de done:** Playwright e2e — chatter → slot proposé → valider une card → paire 🔴→🟢 ; écriture-vérité directe depuis le chat refusée ; bas du mur read-only ; cliquer une paire scope gauche+droite. Property — écarts = déterministes.
+
+## FK12 — Lien caused_by + red-wave inverse déterministe
+**Sous-systeme:** Kernel / Links
+**Objectif:** Nouveau type de lien caused_by (arête causale arrière, §17, inverse d'impacts) versionné ; remontée déterministe d'un miroir rouge vers ses dépendances.
+**Detail:** ROADMAP-fke.md FK12 ; KRD.md FKE-35.1. Réutilise S17 + S22 (le sens avant existe).
+**Criteres de done:** property — caused_by round-trip versionné ; remontée déterministe (même graphe+symptôme → même chaîne de causes) ; cycle refusé.
+
+## FK13 — WhyTree + geste /why (le 5-pourquoi redressé)
+**Sous-systeme:** Runtime / Workbench
+**Objectif:** /why construit un WhyTree (arbre fishbone content-adressé provenancé) depuis un symptôme : remontée déterministe sur caused_by (FK12) ; LLM gaté pour le pourquoi hors-graphe AVEC cause vérifiée/reproduite (anti-confabulation) ; terminaison OBLIGATOIRE en miroir (racine → /learn → miroir d'anti-récurrence). Extension de /diagnose + /learn.
+**Detail:** ROADMAP-fke.md FK13 ; KRD.md FKE-35.1. Pas une facette — geste du loopback, transversal.
+**Criteres de done:** fixture — chaque cause du WhyTree reproductible (sinon rejetée) ; un WhyTree sans miroir terminal refusé (WHYTREE_NO_MIRROR) ; property — remontée graphe déterministe ; e2e — incident → arbre → miroir racine → red wave.
+
+## FK14 — Lexicon Kernel + linter inter-couches
+**Sous-systeme:** Kernel / Mirror
+**Objectif:** Le concept nommé à travers les 16 couches comme source (fork stockage record-kind vs kind:layer, tranché ici) ; linter pur détecte un symbole hors lexique par couche.
+**Detail:** ROADMAP-fke.md FK14 ; KRD.md FKE-21.
+**Criteres de done:** fault-injection — renommer une table hors lexique → rouge ; property — vérification = fonction pure du lexique + symboles.
+
+## FK15 — Projections d'outillage : CLAUDE.md/AGENTS.md générés
+**Sous-systeme:** Generators
+**Objectif:** CLAUDE.md/AGENTS.md/.cursorrules/memory-bank émis depuis les kernels (policy/memory/style/architecture/agent-profile), jamais hand-édités (hash-protégés, drift par source-hash).
+**Detail:** ROADMAP-fke.md FK15 ; KRD.md FKE-20. D'abord kerneliser le contenu actuel (legacy kernelizer, inferred→validé) sans perte.
+**Criteres de done:** property — mêmes kernels → mêmes fichiers byte-identiques ; hand-edit détecté ; contenu actuel kernelisé sans perte.
+
+## FK16 — Contract E0-E7 : bascule du schéma (STRICTEMENT en dernier)
+**Sous-systeme:** Mirror / Archive / Workbench
+**Objectif:** Bascule mirrors/cert_language/panneaux (/proof-levels → E0-E7)/docs vers E ; N déprécié via lifecycle, jamais supprimé (append-only) ; migration expand-contract gated DataTruthScope.
+**Detail:** ROADMAP-fke.md FK16 ; KRD.md FKE-16 (contract). Dernier de la piste (touche le gelé-prouvé). À FK16 vert : rebascule :3000 prod.
+**Criteres de done:** zéro perte (chaque miroir N porte son E) ; panels rendent E ; aidos check vert sur tout le corpus re-étiqueté ; docs Mintlify à jour.

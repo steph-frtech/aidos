@@ -24,22 +24,35 @@ log(){ echo "$(date '+%F %T') $*" >>"$LOG"; }
 # 0. single-instance (held for the whole run; overlapping cron fires skip instantly)
 exec 9>"$LOCK"; flock -n 9 || exit 0
 
-# 1. which track? default EL; STATE file lets you point it elsewhere later.
-TRACK=EL; PLAN=EL_PLAN.md; LAST=19
-if [ -f "$STATE" ]; then read -r TRACK PLAN LAST < "$STATE" 2>/dev/null || true; fi
+# 1. which track? STATE: "TRACK PLAN LAST [NEXTPREFIX NEXTLAST]" (2nd phase optional).
+TRACK=EL; PLAN=EL_PLAN.md; LAST=19; NEXTPREFIX=""; NEXTLAST=""
+if [ -f "$STATE" ]; then read -r TRACK PLAN LAST NEXTPREFIX NEXTLAST < "$STATE" 2>/dev/null || true; fi
 
-# 2. cursor = last validated step (docs pushed) + 1
-last_done=$(cd "$DOCS" 2>/dev/null && git log --oneline -60 2>/dev/null \
-            | grep -oiE "${TRACK}[0-9]+" | tr 'a-z' 'A-Z' | sort -u | tail -1)
-last_n=${last_done#"${TRACK}"}
-if [[ "$last_n" =~ ^[0-9]+$ ]]; then last_n=$((10#$last_n)); else last_n=-1; fi
-next_n=$((last_n + 1))
-if [ "$next_n" -gt "$LAST" ]; then
-  log "[$TRACK] all steps done (last=$last_done) → removing autoresume cron"
+# highest NN pushed in docs for a given step-prefix, or -1
+last_num(){
+  local p="$1" v
+  v=$(cd "$DOCS" 2>/dev/null && git log --oneline -150 2>/dev/null \
+      | grep -oiE "${p}[0-9]+" | sed -E "s/^${p}//I" | sort -n | tail -1)
+  if [[ "$v" =~ ^[0-9]+$ ]]; then echo $((10#$v)); else echo -1; fi
+}
+
+# 2. phase selection (S→FK) + cursor = last validated step + 1
+s_last=$(last_num "$TRACK")
+phase_prefix="$TRACK"; phase_last="$LAST"; phase_done=$s_last
+if [ -n "$NEXTPREFIX" ]; then
+  nx_last=$(last_num "$NEXTPREFIX")
+  if [ "$nx_last" -ge 0 ] || [ "$s_last" -ge "$LAST" ]; then
+    phase_prefix="$NEXTPREFIX"; phase_last="$NEXTLAST"; phase_done=$nx_last   # in 2nd phase
+  fi
+fi
+next_n=$((phase_done + 1)); [ "$next_n" -lt 1 ] && next_n=1
+if [ "$next_n" -gt "$phase_last" ]; then
+  log "[$phase_prefix] all steps done → removing autoresume cron"
   crontab -l 2>/dev/null | grep -v 'autoresume-build.sh' | crontab - 2>/dev/null || true
   exit 0
 fi
-CURSOR=$(printf '%s%02d' "$TRACK" "$next_n")
+TRACK="$phase_prefix"; LAST="$phase_last"
+CURSOR=$(printf '%s%02d' "$phase_prefix" "$next_n")
 
 # 3. is a build already progressing?  (any workflow file touched recently)
 if find "$HOME/.claude/projects" -path '*subagents/workflows/*' -type f -mmin -"$STALE_MIN" 2>/dev/null | grep -q .; then
@@ -63,7 +76,7 @@ if ! curl -sf -m4 -o /dev/null http://localhost:3000 2>/dev/null; then
 fi
 
 # 6. relaunch in a detached tmux running a fresh claude (stays alive to drive the bg workflow)
-PROMPT="Tu es en ULTRACODE (effort xhigh + orchestration par workflows). Reprends le build AIDOS (track ${TRACK}, plan ${PLAN}) dans /data/dev/aidos. Lance le Workflow long-run avec planPath='${PLAN}', startFrom='${CURSOR}', enveloppé dans une boucle d'auto-relance : relance sur une cale infra (long-run STOP stoppedAt='plan' jusqu'à 5× consécutifs, OU une même étape qui cale jusqu'à 3×), s'arrête sur un vrai échec de vérification / BLOCKED (humain requis), et va jusqu'à ${TRACK}${LAST}. Le long-run dispatche chaque étape à son agent step-sNN dédié s'il existe, sinon retombe sur step-executor (acceptable). Assure-toi d'abord que le dev server :3000 répond en mode dev (sinon 'npm run dev -w @aidos/web' en arrière-plan) — les e2e par étape ont besoin du hot-reload. Nettoie tout binaire Go parasite (back/<nom>) avant chaque commit (déjà gitignorés). À ${TRACK}${LAST} atteint : commit groupé + push sur build/s00-s47, puis rebascule :3000 en build prod ('npm run build -w @aidos/web' + 'npm run start -w @aidos/web'). Ne fais RIEN d'autre que ce build. Le mur reste intact : aucune écriture kernel/mirrors/fitness hors idée→miroir→/goal."
+PROMPT="Tu es en ULTRACODE (effort xhigh + orchestration par workflows). Reprends le build AIDOS dans /data/dev/aidos depuis l'étape ${CURSOR}. Le plan ${PLAN} enchaîne l'app-builder (S53→S117) PUIS la piste FKE (FK01→FK16) — tu vas jusqu'à FK16. Lance le Workflow long-run avec planPath='${PLAN}', startFrom='${CURSOR}', enveloppé dans une boucle d'auto-relance : relance sur une cale infra (long-run STOP stoppedAt='plan' jusqu'à 5× consécutifs, OU une même étape qui cale jusqu'à 3×), s'arrête sur un vrai échec de vérification / BLOCKED (humain requis). Le long-run dispatche chaque étape à son agent step-sNN/step-FKnn dédié s'il existe, sinon retombe sur step-executor (acceptable). Assure-toi d'abord que le dev server :3000 répond en mode dev (sinon 'npm run dev -w @aidos/web' en arrière-plan) — les e2e par étape ont besoin du hot-reload. Nettoie tout binaire Go parasite (back/<nom>) avant chaque commit (déjà gitignorés). Commit groupé + push sur build/s00-s47 régulièrement. À FK16 atteint (la toute fin) : rebascule :3000 en build prod ('npm run build -w @aidos/web' + 'npm run start -w @aidos/web'). Ne fais RIEN d'autre que ce build. Le mur reste intact : aucune écriture kernel/mirrors/fitness hors idée→miroir→/goal."
 log "[$TRACK] RELAUNCH from $CURSOR (last_done=$last_done) in tmux aidos-build"
 tmux new-session -d -s aidos-build \
   "cd $REPO && $CLAUDE --permission-mode bypassPermissions --effort xhigh \"$PROMPT\" >>/tmp/aidos-autoresume-claude.log 2>&1; echo \"\$(date) claude session ended\" >>$LOG"
