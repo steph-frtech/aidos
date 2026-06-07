@@ -3443,7 +3443,8 @@ La revue DTFS avait pointé le danger du double-typage. v8.1 ajoute une règle s
 | **paire-miroir** | doc-miroir, data-miroir, spec-miroir | `paire-miroir` nomme la famille (s1↔s10, s2↔s9, s3↔s7, s4↔s5/s6) ; les noms composés en sont les instances |
 | **kernel effondré** | collapsed kernel | le gabarit minimal d'un kernel-feuille ; incompressible = s1 + paire de preuve |
 | **Vibe Lab** | zone /spike, bac à vibe | `Vibe Lab` est le concept FKE ; `/spike` est son implémentation AIDOS |
-| **Promotion Gate** | harvest+grill+goal | le gate FKE ; les trois gestes AIDOS restent ses alias opérationnels |
+| **Promotion Gate** | harvest+grill+goal | le gate FKE — UN concept, DEUX portes (entrée vibe→kernel ; sortie artefact→stable) ; les trois gestes AIDOS restent ses alias opérationnels |
+| **pipeline VIBE AI LAB** | la traversée canonique, le pipeline FKE | le flux de bout en bout (Vibe Lab → … → Kernel Graph), treize étages, deux traversées de mur — Livre XXX, §FKE-3 |
 
 ## 162. Règle de placement : où ajouter un futur concept
 
@@ -3673,6 +3674,95 @@ vibe_lab_kernel:
 ```
 
 *(Référence AIDOS : la zone `/spike` — ratchet OFF, rigueur T0, écritures confinées — est un Vibe Lab opérationnel.)*
+
+### Le pipeline VIBE AI LAB — la traversée canonique
+
+Le flux de bout en bout de FKE tient en un dessin — **le pipeline VIBE AI LAB** : treize étages, deux traversées de mur.
+
+```
+┌────────────────────────────────────────────┐
+│  VIBE LAB                                  │
+│  exploration, prototype, spike, brouillon  │
+│  statut: expérimental, jetable, non fiable │
+└─────────────────────┬──────────────────────┘
+                      ↓
+┌────────────────────────────────────────────┐
+│  RAW SIGNAL STORE                          │
+│  chat, forum, erreur, doc, idée, log       │
+└─────────────────────┬──────────────────────┘
+                      ↓
+┌────────────────────────────────────────────┐
+│  MEMORY POLICE                             │
+│  trust, scope, privacy, TTL, contradiction │
+└─────────────────────┬──────────────────────┘
+                      ↓
+┌────────────────────────────────────────────┐
+│  LEFT BRAIN / INTENT COMPILER              │
+│  intent, contrat, invariants, sécurité     │
+└─────────────────────┬──────────────────────┘
+                      ↓
+┌────────────────────────────────────────────┐
+│  DECISION CARDS / GOVERNORS                │
+│  accept, reject, amend, defer              │
+└─────────────────────┬──────────────────────┘
+
+====================== INTENT WALL ======================
+
+                      ↓
+┌────────────────────────────────────────────┐
+│  ACCEPTED KERNEL STORE                     │
+│  vérité intentionnelle validée             │
+└─────────────────────┬──────────────────────┘
+                      ↓
+┌────────────────────────────────────────────┐
+│  CONTEXT PACK BUILDER                      │
+│  contexte minimal, validé, scoped          │
+└─────────────────────┬──────────────────────┘
+                      ↓
+┌────────────────────────────────────────────┐
+│  RIGHT BRAIN / REALIZATION COMPILER        │
+│  code, tests, agents, MCP, skills, infra   │
+└─────────────────────┬──────────────────────┘
+                      ↓
+┌────────────────────────────────────────────┐
+│  EVIDENCE RUNNER                           │
+│  tests, lint, typecheck, scan, benchmark   │
+└─────────────────────┬──────────────────────┘
+
+==================== SECURITY / POLICE WALL ==============
+
+                      ↓
+┌────────────────────────────────────────────┐
+│  POLICY ENGINE / POLICE                    │
+│  allow, block, audit, approval             │
+└─────────────────────┬──────────────────────┘
+                      ↓
+┌────────────────────────────────────────────┐
+│  CONSCIOUSNESS / ALIGNMENT GOVERNOR        │
+│  compare voulu, construit, prouvé, permis  │
+└─────────────────────┬──────────────────────┘
+                      ↓
+┌────────────────────────────────────────────┐
+│  PROMOTION GATE                            │
+│  stable, experimental, rejected, rewrite   │
+└─────────────────────┬──────────────────────┘
+                      ↓
+┌────────────────────────────────────────────┐
+│  KERNEL GRAPH / MEMORY / REGISTRY          │
+│  apprend, trace, réutilise, explique       │
+└────────────────────────────────────────────┘
+```
+
+**Ce que le pipeline précise (acté) :**
+
+1. **Le Raw Signal Store a plusieurs entrées.** Le Vibe Lab y verse ses sorties *à côté* du chat, des forums, des erreurs, des docs et des logs — la flèche du haut est l'entrée *vibe*, pas l'unique entrée.
+2. **La Memory Police filtre AVANT le cerveau gauche.** Même le gauche lit à travers elle (trust, scope, privacy, TTL, contradiction) ; la différence des deux cerveaux demeure — le gauche reçoit du **brut-policé**, le droit du **validé-seulement** (via le Context Pack Builder).
+3. **La police est ambiante ET une porte.** Elle intercepte chaque action *dès* la réalisation (chaque tool call, écriture, appel MCP — le hook fail-closed), et le mur SECURITY/POLICE du pipeline marque la **traversée** que l'artefact ne franchit pas sans clearance (allow/block/audit/approval). Le dessin trace la porte ; l'interception, elle, ne cesse jamais.
+4. **Deux portes, une au passage de chaque mur.** Les **Decision Cards / Governors** sont la porte du MUR D'INTENTION (la vérité proposée est-elle acceptée ? — accept/reject/amend/defer). Le **Promotion Gate** est la porte de SORTIE (l'artefact réalisé, prouvé, policé et réconcilié est-il promu ? — stable/experimental/rejected/rewrite). Le gate vibe→kernel de §4 est l'instance d'**entrée** du même concept ; le pipeline montre l'instance de **sortie**. Un seul concept, deux portes.
+5. **Les cinq facettes du mur demeurent** (§7) : le pipeline dessine ses deux traversées ; la memory police y figure comme étage, le runtime wall est ambiant au déploiement.
+6. **La fin du pipeline EST les lois 24-25** : tout artefact durable atterrit dans le Kernel Graph / Memory / Registry — qui apprend, trace, réutilise et explique.
+
+**Mapping AIDOS étage par étage :** Vibe Lab=`/spike` · Raw Signal Store=`ideas`+signaux bruts · Memory Police=memory-firewall · Left Brain=`/grill`+interview EL · Decision Cards=approbation ChangeSet · Accepted Kernel Store=schéma `kernel` · Context Pack Builder=ContextRouter · Right Brain=boucle-build (S83) · Evidence Runner=mirror-runner+senseurs · Policy Engine/Police=hook+enforcers+ledger Merkle · Consciousness=l'agrégateur (FK05) · Promotion Gate=stop-gate `goal-check`+promotion-gate · Kernel Graph/Memory/Registry=links+DAG+brain.
 
 ---
 
