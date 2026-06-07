@@ -90,12 +90,24 @@ export function GatewayPanel({ surface }: { surface: GatewaySurface }) {
 				aria-labelledby="surface-heading"
 				className="rounded-lg border border-border bg-card p-6"
 			>
-				<h2
-					id="surface-heading"
-					className="text-lg font-semibold tracking-tight text-foreground"
-				>
-					{t("surfaceHeading")}
-				</h2>
+				<div className="flex items-center justify-between gap-3">
+					<h2
+						id="surface-heading"
+						className="text-lg font-semibold tracking-tight text-foreground"
+					>
+						{t("surfaceHeading")}
+					</h2>
+					<span
+						data-testid="surface-source"
+						className={
+							surface.source === "live"
+								? "inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
+								: "inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+						}
+					>
+						{t(surface.source === "live" ? "sourceLive" : "sourceDemo")}
+					</span>
+				</div>
 				<p className="mt-1 text-sm text-muted-foreground">
 					{t("surfaceIntro")}
 				</p>

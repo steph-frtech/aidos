@@ -6,6 +6,15 @@ import {
 	route,
 	tools,
 } from "@/lib/gateway";
+import {
+	arr,
+	callMeta,
+	type Decoder,
+	decodeVia,
+	isObject,
+	type Source,
+	str,
+} from "@/lib/gateway-sdk";
 
 /**
  * /gateway Server Actions (S58). Every action is a PURE, DETERMINISTIC projection over
@@ -66,16 +75,55 @@ export async function routeAction(
 export interface GatewaySurface {
 	servers: string[];
 	tools: { name: string; server: string; disposition: string }[];
+	/** S59 cutover: did the surface come from the live gateway, or the deterministic twin? */
+	source: Source;
 }
 
-/** gatewaySurface returns the closed exposed surface (the 13 servers + their tools). */
+// The surface decoder, declared EXACTLY ONCE (the never-double-typed hinge): the static
+// shape of the live gateway_tools / gateway_servers payloads is inferred from these.
+const serversDecoder: Decoder<string[]> = (raw) => {
+	if (!isObject(raw)) return null;
+	return arr(str)(raw.servers);
+};
+const toolDecoder: Decoder<{
+	name: string;
+	server: string;
+	disposition: string;
+}> = (raw) => {
+	if (!isObject(raw)) return null;
+	const name = str(raw.name);
+	const server = str(raw.server);
+	const disposition = str(raw.disposition);
+	if (name === null || server === null || disposition === null) return null;
+	return { name, server, disposition };
+};
+const toolsDecoder: Decoder<
+	{ name: string; server: string; disposition: string }[]
+> = (raw) => {
+	if (!isObject(raw)) return null;
+	return arr(toolDecoder)(raw.tools);
+};
+
+/**
+ * gatewaySurface returns the closed exposed surface (the 13 servers + their tools). S59
+ * CUTOVER: it now reads the LIVE gateway via the typed SDK (callMeta → decodeVia) when
+ * AIDOS_GATEWAY_HTTP_URL is set and the payload decodes; otherwise it falls back to the
+ * DETERMINISTIC twin (lib/gateway), tagging `source:"live" | "demo"`. The decoder is the
+ * single type source — the panel never double-types. THE WALL (§2): a read only.
+ */
 export async function gatewaySurface(): Promise<GatewaySurface> {
-	return {
-		servers: [...GATEWAY_SERVERS],
-		tools: tools().map((t) => ({
-			name: t.name,
-			server: t.server,
-			disposition: t.disposition,
-		})),
-	};
+	const demoServers = [...GATEWAY_SERVERS];
+	const demoTools = tools().map((t) => ({
+		name: t.name,
+		server: t.server,
+		disposition: t.disposition,
+	}));
+	const srvRes = await callMeta("gateway_servers", {});
+	const toolRes = await callMeta("gateway_tools", {});
+	const srv = await decodeVia(srvRes, serversDecoder, demoServers);
+	const tls = await decodeVia(toolRes, toolsDecoder, demoTools);
+	// The surface is "live" only when BOTH meta-reads decoded from the live gateway.
+	const source: Source =
+		srv.source === "live" && tls.source === "live" ? "live" : "demo";
+	return { servers: srv.data, tools: tls.data, source };
 }

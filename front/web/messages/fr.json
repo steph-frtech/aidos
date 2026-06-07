@@ -3722,6 +3722,8 @@
 		"surfaceHeading": "La surface exposée",
 		"surfaceIntro": "Un registre FERMÉ : les 13 serveurs MCP frontés et leurs outils. La passerelle n'expose jamais un passthrough arbitraire — un outil inconnu est refusé.",
 		"toolCount": "{count} outils exposés.",
+		"sourceLive": "live",
+		"sourceDemo": "démo",
 		"routeHeading": "Router un appel par le mur côté serveur",
 		"routeIntro": "Exécute gateway.route (le même routeur que le serveur HTTP vivant) sur un scope actif (identité + projet), un outil et une cible (projet + identité éventuellement forgée). Le verdict est route, ou un refus avec un BlockReason actionnable.",
 		"presetBelow": "Below-the-line (route)",

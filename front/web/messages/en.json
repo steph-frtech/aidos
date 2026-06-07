@@ -3722,6 +3722,8 @@
 		"surfaceHeading": "The exposed surface",
 		"surfaceIntro": "A CLOSED registry: the 13 fronted MCP servers and their tools. The gateway never exposes an arbitrary passthrough — an unknown tool is refused.",
 		"toolCount": "{count} tools exposed.",
+		"sourceLive": "live",
+		"sourceDemo": "demo",
 		"routeHeading": "Route a call through the server-side wall",
 		"routeIntro": "Executes gateway.route (the same router the live HTTP server applies) over an active scope (identity + project), a tool and a target (project + an optionally-forged identity). The verdict is route, or a refusal with an actionable BlockReason.",
 		"presetBelow": "Below-the-line (route)",
