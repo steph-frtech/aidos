@@ -95,7 +95,8 @@
 		"appBuilder": "App Builder",
 		"projectScope": "Scope projet",
 		"projectWall": "Mur project-aware",
-		"projectDag": "DAG par projet"
+		"projectDag": "DAG par projet",
+		"gateway": "Passerelle MCP-HTTP"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3713,6 +3714,29 @@
 		"buildButton": "Construire la lecture scopée",
 		"building": "Construction…",
 		"footer": "S54 · sous le mur (CLAUDE.md §2) : le project_id est une colonne de scope, pas une porte d'écriture. L'agent garde un accès <code>SELECT</code> seul sur <code>kernel</code>/<code>mirrors</code> ; la RLS keyée sur l'identité propagée arrive en S55."
+	},
+	"gateway": {
+		"eyebrow": "Runtime · passerelle MCP-over-HTTP project-scopée",
+		"title": "Passerelle MCP-over-HTTP",
+		"intro": "S58 expose CHAQUE outil MCP existant (store · mirror-runner · changeset · dag · idea-intake · memory · context · evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project) derrière une seule porte HTTP/JSON-RPC project-scopée. Le mur est appliqué côté serveur : un appel below-the-line est routé, un appel inter-projets ou à identité forgée est refusé (AGENT_CROSS_PROJECT_WRITE), une écriture de vérité directe est refusée (GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET). Routage pur, zéro LLM.",
+		"surfaceHeading": "La surface exposée",
+		"surfaceIntro": "Un registre FERMÉ : les 13 serveurs MCP frontés et leurs outils. La passerelle n'expose jamais un passthrough arbitraire — un outil inconnu est refusé.",
+		"toolCount": "{count} outils exposés.",
+		"routeHeading": "Router un appel par le mur côté serveur",
+		"routeIntro": "Exécute gateway.route (le même routeur que le serveur HTTP vivant) sur un scope actif (identité + projet), un outil et une cible (projet + identité éventuellement forgée). Le verdict est route, ou un refus avec un BlockReason actionnable.",
+		"presetBelow": "Below-the-line (route)",
+		"presetCross": "Projet croisé (refus)",
+		"presetTruth": "Écriture de vérité (refus)",
+		"presetUnknown": "Outil inconnu (refus)",
+		"fieldIdentity": "Identité active (propagée)",
+		"fieldActiveProject": "Projet actif",
+		"fieldTool": "Outil MCP",
+		"fieldTargetProject": "Projet cible",
+		"fieldClaimedIdentity": "Identité revendiquée (vide = héritée)",
+		"routeButton": "Router",
+		"routing": "Routage…",
+		"outcomeRoute": "Routé : l'appel below-the-line est dispatché vers son serveur.",
+		"footer": "S58 · le mur ne change pas (CLAUDE.md §2) : la passerelle laisse passer les opérations below-the-line et route la vérité par <code>ChangeSet</code>, jamais par une écriture directe. Le routeur est un algorithme, pas un prompt — <code>pur routage, zéro LLM</code>."
 	},
 	"projectWall": {
 		"eyebrow": "Runtime · mur project-aware deux couches",

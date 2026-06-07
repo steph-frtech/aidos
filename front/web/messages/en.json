@@ -95,7 +95,8 @@
 		"appBuilder": "App Builder",
 		"projectScope": "Project scope",
 		"projectWall": "Project-aware wall",
-		"projectDag": "Per-project DAG"
+		"projectDag": "Per-project DAG",
+		"gateway": "MCP-HTTP gateway"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3713,6 +3714,29 @@
 		"buildButton": "Build scoped read",
 		"building": "Building…",
 		"footer": "S54 · below the wall (CLAUDE.md §2): project_id is a scope column, not a write door. The agent keeps <code>SELECT</code>-only on <code>kernel</code>/<code>mirrors</code>; RLS keyed on the propagated identity arrives in S55."
+	},
+	"gateway": {
+		"eyebrow": "Runtime · project-scoped MCP-over-HTTP gateway",
+		"title": "MCP-over-HTTP gateway",
+		"intro": "S58 exposes EVERY existing MCP tool (store · mirror-runner · changeset · dag · idea-intake · memory · context · evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project) behind one project-scoped HTTP/JSON-RPC front door. The wall is applied server-side: a below-the-line call is routed, a cross-project or forged-identity call is refused (AGENT_CROSS_PROJECT_WRITE), a direct truth-write is refused (GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET). Pure routing, zero LLM.",
+		"surfaceHeading": "The exposed surface",
+		"surfaceIntro": "A CLOSED registry: the 13 fronted MCP servers and their tools. The gateway never exposes an arbitrary passthrough — an unknown tool is refused.",
+		"toolCount": "{count} tools exposed.",
+		"routeHeading": "Route a call through the server-side wall",
+		"routeIntro": "Executes gateway.route (the same router the live HTTP server applies) over an active scope (identity + project), a tool and a target (project + an optionally-forged identity). The verdict is route, or a refusal with an actionable BlockReason.",
+		"presetBelow": "Below-the-line (route)",
+		"presetCross": "Cross-project (refused)",
+		"presetTruth": "Truth-write (refused)",
+		"presetUnknown": "Unknown tool (refused)",
+		"fieldIdentity": "Active identity (propagated)",
+		"fieldActiveProject": "Active project",
+		"fieldTool": "MCP tool",
+		"fieldTargetProject": "Target project",
+		"fieldClaimedIdentity": "Claimed identity (empty = inherited)",
+		"routeButton": "Route",
+		"routing": "Routing…",
+		"outcomeRoute": "Routed: the below-the-line call is dispatched to its server.",
+		"footer": "S58 · the wall is unchanged (CLAUDE.md §2): the gateway passes below-the-line ops through and routes truth via a <code>ChangeSet</code>, never a direct write. The router is an algorithm, not a prompt — <code>pure routing, zero LLM</code>."
 	},
 	"projectWall": {
 		"eyebrow": "Runtime · two-layer project-aware wall",
