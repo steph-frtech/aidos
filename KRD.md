@@ -3592,20 +3592,30 @@ Un kernel n'est **pas forcément du code**. Un kernel peut représenter : une id
 
 C'est le cœur structurel de FKE. L'anatomie canonique d'un kernel est **symétrique autour du Mur d'Intention** : chaque slot au-dessus a son **reflet** en dessous. Le mur est un **plan de symétrie**.
 
-| # | AU-DESSUS (humain, possède) | | # | EN-DESSOUS (agent, reflète) |
+**La forme complète — strictement 1-pour-1.** Chaque vérité déclarée au-dessus a EXACTEMENT un reflet prouvé en dessous. Huit paires-miroir, aucune orpheline :
+
+| # | AU-DESSUS (déclaré — cerveau gauche) | ↔ | EN-DESSOUS (prouvé — cerveau droit) | ubiquitaire ? |
 |---|---|---|---|---|
-| **s1** | Spec textuelle (intention, buts, non-buts, risques, hypothèses) | ↔ | **s10** | Documentation textuelle finale |
-| **s2** | Use cases / comportements (BDD) — *ubiquitaire* | ↔ | **s9** | Doc du use case **dérivée du code** — *ubiquitaire* |
-| **s3** | Modèle de donnée **au sens humain** — *ubiquitaire* | ↔ | **s7** | Projection en données (schéma + données réelles) — *ubiquitaire* |
-| **s4** | Scénarios de test + contrat de preuve attendu — *ubiquitaire* | ↔ | **s5** | Code du test · **s6** Résultat observé — *ubiquitaire* |
-| — | | | **s8** | **Le code lui-même — OPTIONNEL** |
+| **P1** | Spec | ↔ | Documentation | oui |
+| **P2** | Comportement (use case) | ↔ | Résultats (comportement observé) | oui |
+| **P3** | Scénarios | ↔ | Tests | oui |
+| **P4** | Scénarios sécurité | ↔ | Tests sécurité | oui |
+| **P5** | Modèle (donnée, sens humain) | ↔ | Projection données (schéma + données) | oui |
+| **P6** | **Contrat** (in/out, pré/post, invariants) | ↔ | **Code** | non (P6 dessous = machine) |
+| **P7** | Sécurité (consigne, policy) | ↔ | Sécurité implémentée (police, authz) | non (P7 dessous = machine) |
+| **P8** | Evidence attendue | ↔ | Evidence observée | oui |
 
-Quatre conséquences fondatrices :
+**Les opérateurs de la traversée** (la mécanique, pas du contenu) : **Validation** = la porte du MUR D'INTENTION (la moitié dessus est-elle acceptée ? — Decision Card) ; **Exécution** = l'acte (Evidence Runner) qui, depuis Code+Tests, produit Résultats + Evidence observée ; **Conscience** = compare les 8 paires une à une ; **Loopback ciblé** = sur divergence d'une paire, un red wave **ciblé** qui remonte exactement au slot dessus concerné (jamais un rebuild global).
 
-1. **Le « miroir » se généralise en QUATRE familles de paires.** Pas seulement scénario↔test (s4↔s5/s6) : le **doc-miroir** (s2↔s9 : la doc *dérivée du code* doit re-dire le use case déclaré — tue mécaniquement la dérive documentaire), le **data-miroir** (s3↔s7 : la projection doit refléter le modèle humain), le **spec-miroir** (s1↔s10). Une paire qui diverge = soit l'implémentation est rouge, soit la vérité doit évoluer (la boucle, §35).
-2. **s8 est le seul slot sans contrepartie au-dessus** — c'est *précisément* pourquoi l'agent le possède, et pourquoi il est **optionnel** : un kernel-vue, un kernel-policy ou un kernel-doc est **déclaratif pur**, entièrement émis depuis d'autres kernels, sans code propre.
-3. **Le mur est aussi une frontière de LANGUE.** Tout ce qui se *lit* (s2,s3,s4 et leurs reflets s9,s7,s6) parle la **langue ubiquitaire** du domaine. Les seuls slots non-ubiquitaires sont **s5 et s8 — le code**. La zone machine est exactement la zone de l'agent ; l'humain ne lit jamais autre chose que sa langue, *y compris les retours d'en bas*.
-4. **La conscience (§6.3) est le comparateur des paires réfléchies.** Aligné = chaque paire concorde. Drift = une paire diverge. La loi de complétude devient : *un kernel dont un slot requis manque ou dont une paire diverge sans décision est un monstre*.
+*(Vue effondrée à 10 slots — le raccourci historique : s1=P1↑, s10=P1↓ ; s2=P2↑ ; s3=P5↑, s7=P5↓ ; s4=P3↑+P8↑, s5=P3↓, s6=P2↓+P8↓ ; s8=P6↓. P4/P6↑/P7 sont les ajouts qui complètent la symétrie.)*
+
+Cinq conséquences fondatrices :
+
+1. **Le « miroir » se généralise en HUIT paires strictes** (et quatre familles : doc-miroir P1, comportement-miroir P2, scénario-miroir P3/P4, data-miroir P5, contrat-miroir P6, sécurité-miroir P7, evidence-miroir P8). Une paire qui diverge = soit l'implémentation est rouge, soit la vérité doit évoluer (la boucle, §FKE-35).
+2. **Plus aucune orpheline : le Contrat (P6↑) apparie enfin le Code (P6↓).** Dans la vue effondrée, s8 (code) semblait sans contrepartie ; la forme complète montre qu'il reflète le **Contrat**. Le code reste **optionnel par ÉMISSION, pas par absence de partenaire** : pour un kernel déclaratif (vue, policy, doc), le Contrat est satisfait **entièrement par projection** — le code est généré, pas écrit à la main (loi 6 : le code est une projection).
+3. **Le mur est aussi une frontière de LANGUE.** Six des huit paires sont **ubiquitaires des deux côtés** (P1-P5, P8) — l'humain lit sa langue jusque dans les retours d'en bas (Résultats, Doc dérivée, Projection, Evidence observée). Seuls **les côtés DESSOUS de P6 (Code) et P7 (sécurité implémentée)** parlent machine : la zone machine = exactement la zone de l'agent.
+4. **La sécurité est une COLONNE complète, pas une note** : elle a ses deux paires propres — P4 (scénarios sécurité ↔ tests sécurité) et P7 (consigne ↔ police implémentée) — strictement parallèles à la colonne fonctionnelle. La sécurité fractale (§FKE-8) est ce 1-pour-1 appliqué.
+5. **La conscience (§FKE-6.3) est le comparateur des huit paires.** Aligné = les huit concordent. Drift = une paire diverge → Loopback **ciblé** sur le slot dessus de cette paire. La loi de complétude devient : *un kernel dont une paire requise manque ou diverge sans décision est un monstre*.
 
 La symétrie vaut aussi pour les **facettes transversales** : la sécurité (§8) a sa moitié intentionnelle (au-dessus) et sa moitié implémentée (en-dessous) ; la mémoire, la policy et la doc pareillement. **Tout le manifest (§19) est organisé en deux colonnes réfléchies + la boucle qui les compare.**
 
@@ -3770,34 +3780,40 @@ Le pipeline ci-dessus n'est pas réservé au projet : c'est **l'anatomie d'un se
 
 ```
 ENTRÉE (textuelle) — besoin · chat · ticket · incident · erreur
-        │  (le cerveau gauche éclate l'entrée en slots du dessus)
-        ├─▶ SPEC                (s1)   intention, buts, non-buts, hypothèses, risques
-        ├─▶ COMPORTEMENT        (s2)   use cases / BDD                    — ubiquitaire
-        ├─▶ MODÈLE              (s3)   modèle de donnée au sens humain     — ubiquitaire
-        ├─▶ SCÉNARIO            (s4)   scénarios + preuves attendues       — ubiquitaire
-        └─▶ CONSIGNE SÉCURITÉ          permissions, effets de bord, threat model
+        │  (le cerveau gauche éclate l'entrée — DÉCLARÉ)
+        ├─▶ SPEC                  (P1↑)
+        ├─▶ COMPORTEMENT          (P2↑)   use case BDD             — ubiquitaire
+        ├─▶ SCÉNARIOS             (P3↑)                            — ubiquitaire
+        ├─▶ SCÉNARIOS SÉCURITÉ    (P4↑)                            — ubiquitaire
+        ├─▶ MODÈLE                (P5↑)   donnée, sens humain      — ubiquitaire
+        ├─▶ CONTRAT               (P6↑)   in/out, pré/post, invariants
+        ├─▶ SÉCURITÉ             (P7↑)   consigne, policy, threat model
+        └─▶ EVIDENCE ATTENDUE     (P8↑)   le contrat de preuve E0-E7
         ↓
-DECISION CARD — accept · reject · amend · defer
+VALIDATION — Decision Card : accept · reject · amend · defer
 ══════════════════════ MUR D'INTENTION ══════════════════════
-        │  (le cerveau droit reflète CHAQUE slot du dessus)
-        ├─▶ TEST                (s5)   le code du test            ◀ reflète s4
-        ├─▶ CODE                (s8)   le code lui-même — OPTIONNEL (absent si kernel déclaratif : vue, policy, doc)
-        ├─▶ PROJECTION DONNÉES  (s7)   schéma + données réelles   ◀ reflète s3
-        ├─▶ RÉSULTAT            (s6)   le résultat observé        ◀ reflète s4
-        ├─▶ DOC DÉRIVÉE         (s9)   doc issue du code          ◀ reflète s2 — ubiquitaire
-        ├─▶ DOC FINALE          (s10)  documentation              ◀ reflète s1
-        └─▶ SÉCURITÉ IMPLÉMENTÉE       authz, allowlist, redaction, scans  ◀ reflète la consigne sécurité
+        │  (le cerveau droit reflète CHAQUE slot — PROUVÉ, 1-pour-1)
+        ├─▶ TESTS                 (P3↓ ◀ Scénarios)
+        ├─▶ TESTS SÉCURITÉ        (P4↓ ◀ Scénarios sécurité)
+        ├─▶ CODE                  (P6↓ ◀ Contrat — émis si kernel déclaratif)
+        ├─▶ PROJECTION DONNÉES    (P5↓ ◀ Modèle)
+        ├─▶ SÉCURITÉ IMPLÉMENTÉE  (P7↓ ◀ Sécurité — authz, police)
+        ├─▶ EXÉCUTION             ── l'acte : lance Code + Tests
+        ├─▶ RÉSULTATS             (P2↓ ◀ Comportement : le comportement observé)
+        ├─▶ DOCUMENTATION         (P1↓ ◀ Spec ; inclut la doc dérivée du code)
+        └─▶ EVIDENCE OBSERVÉE     (P8↓ ◀ Evidence attendue)
         ↓
-═══════════════════ MUR SÉCURITÉ / POLICE ═══════════════════
+════════════════════ MUR SÉCURITÉ / POLICE ════════════════════
         ↓
 POLICE — allow · block · audit · approval (ambiante : intercepte chaque action)
         ↓
-CONSCIENCE — compare chaque PAIRE : s1↔s10 · s2↔s9 · s3↔s7 · s4↔s5/s6 · sécu↑↔sécu↓
+CONSCIENCE — compare les 8 PAIRES une à une (P1…P8)
         ↓
-        ├─ aligné ──────────▶ PROMOTION : le kernel devient vérité stable, entre au Kernel Graph
-        └─ divergence ─────▶ DECISION CARD qui REMONTE au-dessus du mur ─┐
-                              « l'implémentation a-t-elle changé s1/s2/s3/s4 ? »
-        ┌──────────────── la boucle (lois 24-25) ◀───────────────────────┘
+        ├─ aligné ──────────▶ PROMOTION : vérité stable → Kernel Graph
+        └─ divergence ─────▶ LOOPBACK CIBLÉ : Decision Card qui remonte EXACTEMENT
+                              au slot dessus de la paire divergente ─┐
+                                                                     │
+        ┌──────────────── la boucle (lois 24-25) ◀───────────────────┘
 ```
 
 **L'isomorphisme exact (micro ↔ macro) :**
