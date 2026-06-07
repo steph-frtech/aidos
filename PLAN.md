@@ -331,3 +331,15 @@ Subsystem tags: **Runtime · Kernel · Mirror · Archive · Workbench**.
 **Detail:** docs/plan/S52-agent-layer.md
 **Inputs:** S04, S16, S29, S30
 **Criteres de done:** an `agent` layer-kind + its AST persist; a mirror proves an agent role writing above the waterline (kernel/mirrors/fitness) is refused with BlockReason AGENT_WRITE_ABOVE_WATERLINE, and that an agent can PROPOSE a truth/scenario but cannot self-approve (requires human authority); an AgentRun traces one execution; a /agents Workbench route + Playwright e2e; the wall enforces it.
+
+## S53
+**Objectif:** Kernel/Archive — Entité racine `project` + ProjectScope (fondation multi-tenant, EPIC 1): un enregistrement `project` (slug, name, owner_ref, created_at, lifecycle active|archived|deleted) content-adressé, concept Kernel de premier rang qui scope toute vérité ; schéma `projects` Postgres ; nœud racine DAG par projet ; soft-delete append-only.
+**Detail:** docs/plan/S53-project-root-scope.md
+**Inputs:** S02 records, S24 DAG, le chemin store (S00/S01)
+**Criteres de done:** property — id content-adressé, slug unique par owner, deux graphes-projets disjoints (aucune lecture croisée) ; `/projects` écrit below-the-line via le chemin store ; scoping = fonction pure ; cycle de vie delete (soft, append-only) ; route Workbench /projects action-capable + e2e Playwright.
+
+## S54
+**Objectif:** Archive — Project-scope migration du truth-store (fondation multi-tenant, EPIC 1): migration Atlas expand-contract ajoutant `project_id` (FK) à kernel·mirrors·ideas·changesets·dag·brain·context ; backfill du graphe singleton existant dans un projet seed `__system__` (la démo Order).
+**Detail:** docs/plan/S54-project-scope-migration.md
+**Inputs:** S53 (project + projects schema), S02 records, S31 brain, S15 context
+**Criteres de done:** `migrate` prouve zéro perte (append-only) + toutes les FK résolvent (Testcontainers) ; fixture — requête scopée A ne renvoie jamais de ligne B (ScopedSelect `WHERE project_id = $1`) ; émission de migration reproductible (property) ; seed `__system__` content-adressé pinné Go↔SQL ; route Workbench /project-scope action-capable + e2e Playwright ; le mur inchangé (SELECT-only kernel/mirrors).

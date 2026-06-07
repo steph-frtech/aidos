@@ -94,7 +94,8 @@
 		"besoinCapitalisation": "Capitalisation du besoin",
 		"appBuilder": "App Builder",
 		"projectScope": "Scope projet",
-		"projectWall": "Mur project-aware"
+		"projectWall": "Mur project-aware",
+		"projectDag": "DAG par projet"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3726,5 +3727,38 @@
 		"classifying": "Classement…",
 		"verdictAllow": "Autorisé : l'opération est dans le projet courant, sous l'identité active.",
 		"footer": "S55 · le mur ne change pas (CLAUDE.md §2) : la RLS gouverne le scope (quel projet), jamais la ligne de flottaison (quelles zones). L'agent garde un accès <code>SELECT</code> seul sur <code>kernel</code>/<code>mirrors</code>. Le routeur de contexte est un algorithme, pas un prompt."
+	},
+	"projectDag": {
+		"eyebrow": "Archive · DAG par projet",
+		"title": "DAG par projet",
+		"intro": "S56 donne à chaque projet sa propre genèse DAG et son namespace content-adressé. Branch, checkout, rebranch et merge restent dans la frontière du projet : une phase coupée dans A est invisible des heads de B, un merge inter-projets est refusé (CROSS_PROJECT_MERGE), duplicate forke une racine isolée, et archive masque sans jamais détruire (append-only).",
+		"codesHeading": "Les codes de refus du mur de version",
+		"codesIntro": "La frontière du projet est un prédicat pur (sameProject) ; le franchir est refusé avec un BlockReason actionnable.",
+		"codeMergeLabel": "Merge inter-projets",
+		"codeNodeLabel": "Nœud hors frontière",
+		"branchHeading": "Couper une phase dans la frontière",
+		"branchIntro": "Exécute branch(from) à l'intérieur du projet. Un nœud d'un autre projet est refusé (CROSS_PROJECT_NODE) : une phase étrangère est invisible ici.",
+		"fieldProject": "Projet",
+		"fieldFrom": "Depuis le nœud (vide = genèse)",
+		"fieldLabel": "Nom de la ligne",
+		"branchButton": "Brancher",
+		"mergeHeading": "Garde de merge inter-projets",
+		"mergeIntro": "Exécute le garde de frontière : un merge entre deux projets différents est refusé (CROSS_PROJECT_MERGE) avant même que le moteur de merge ne tourne.",
+		"fieldMergeLeft": "Projet gauche",
+		"fieldMergeRight": "Projet droit",
+		"mergeButton": "Tenter le merge",
+		"mergeAllowed": "Autorisé : les deux côtés sont dans le même projet ; le moteur sémantique (§122) décide ensuite clean/conflict.",
+		"dupHeading": "Dupliquer depuis un template",
+		"dupIntro": "Exécute duplicate : forke une racine DAG isolée pour un nouveau projet. La copie ne partage aucun nœud avec la source.",
+		"fieldNewProject": "Nouveau projet",
+		"dupButton": "Forker une racine isolée",
+		"dupIsolated": "Racine isolée : le fork ne partage aucun nœud avec la source (genèse disjointe).",
+		"dupNotIsolated": "Échec d'isolation (ne devrait jamais arriver).",
+		"archHeading": "Archiver / restaurer (masquer sans détruire)",
+		"archIntro": "Exécute archive : masque la vue de version du projet en gardant tous ses nœuds (append-only). Restore réaffiche les heads — rien n'est jamais détruit.",
+		"archiveButton": "Archiver",
+		"restoreButton": "Restaurer",
+		"running": "Exécution…",
+		"footer": "S56 · l'Archive ne change pas (CLAUDE.md §2) : ce panel calcule le verdict d'espace de version via le jumeau déterministe <code>projectDag</code> (byte-identique au Go) ; enregistrer un nœud passe par le MCP <code>dag</code> sous le rôle privilégié, jamais par l'écran."
 	}
 }

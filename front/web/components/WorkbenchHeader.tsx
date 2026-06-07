@@ -24,6 +24,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/projects", k: "projects" },
 			{ href: "/project-scope", k: "projectScope" },
 			{ href: "/project-wall", k: "projectWall" },
+			{ href: "/project-dag", k: "projectDag" },
 			{ href: "/app-builder", k: "appBuilder" },
 			{ href: "/first-app", k: "firstApp" },
 			{ href: "/proof-levels", k: "proofLevels" },

@@ -94,7 +94,8 @@
 		"besoinCapitalisation": "Need capitalisation",
 		"appBuilder": "App Builder",
 		"projectScope": "Project scope",
-		"projectWall": "Project-aware wall"
+		"projectWall": "Project-aware wall",
+		"projectDag": "Per-project DAG"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3726,5 +3727,38 @@
 		"classifying": "Classifying…",
 		"verdictAllow": "Allowed: the op is in the current project, under the active identity.",
 		"footer": "S55 · the wall is unchanged (CLAUDE.md §2): RLS governs scope (which project), never the waterline (which zones). The agent keeps <code>SELECT</code>-only on <code>kernel</code>/<code>mirrors</code>. The context router is an algorithm, not a prompt."
+	},
+	"projectDag": {
+		"eyebrow": "Archive · per-project DAG",
+		"title": "Per-project DAG",
+		"intro": "S56 gives every project its own DAG genesis and its own content-addressed namespace. Branch, checkout, rebranch and merge stay inside the project frontier: a phase cut in A is invisible from B's heads, a cross-project merge is refused (CROSS_PROJECT_MERGE), duplicate forks an isolated root, and archive masks without ever destroying (append-only).",
+		"codesHeading": "The version-wall refusal codes",
+		"codesIntro": "The project frontier is a pure predicate (sameProject); crossing it is refused with an actionable BlockReason.",
+		"codeMergeLabel": "Cross-project merge",
+		"codeNodeLabel": "Out-of-frontier node",
+		"branchHeading": "Cut a phase inside the frontier",
+		"branchIntro": "Runs branch(from) inside the project. A node from another project is refused (CROSS_PROJECT_NODE): a foreign phase is invisible here.",
+		"fieldProject": "Project",
+		"fieldFrom": "From node (empty = genesis)",
+		"fieldLabel": "Line name",
+		"branchButton": "Branch",
+		"mergeHeading": "Cross-project merge guard",
+		"mergeIntro": "Runs the frontier guard: a merge between two different projects is refused (CROSS_PROJECT_MERGE) before the merge engine even runs.",
+		"fieldMergeLeft": "Left project",
+		"fieldMergeRight": "Right project",
+		"mergeButton": "Attempt merge",
+		"mergeAllowed": "Allowed: both sides are in the same project; the semantic engine (§122) then decides clean/conflict.",
+		"dupHeading": "Duplicate from a template",
+		"dupIntro": "Runs duplicate: forks an isolated DAG root for a new project. The copy shares no node with the source.",
+		"fieldNewProject": "New project",
+		"dupButton": "Fork an isolated root",
+		"dupIsolated": "Isolated root: the fork shares no node with the source (disjoint genesis).",
+		"dupNotIsolated": "Isolation failure (should never happen).",
+		"archHeading": "Archive / restore (mask without destroying)",
+		"archIntro": "Runs archive: masks the project's version view while keeping all its nodes (append-only). Restore brings the heads back — nothing is ever destroyed.",
+		"archiveButton": "Archive",
+		"restoreButton": "Restore",
+		"running": "Running…",
+		"footer": "S56 · the Archive is unchanged (CLAUDE.md §2): this panel computes the version-space verdict via the deterministic <code>projectDag</code> twin (byte-identical to Go); recording a node rides the <code>dag</code> MCP under the privileged role, never the screen."
 	}
 }
