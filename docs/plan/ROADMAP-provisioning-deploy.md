@@ -30,6 +30,28 @@
 
 ---
 
+## Stack d'infrastructure retenue (tool-search mai/juin 2026 — ADR 0043) — BINDING
+
+> **Décision utilisateur : « il faut un langage infra-as-code »** (pas une spec YAML). Cette section **prime** sur tout texte d'étape qui parlait d'un émetteur `docker-compose.yml` direct : le compose n'est plus la cible primaire, c'est une **projection parmi d'autres** d'un **programme IaC typé**.
+
+- **Langage IaC = Pulumi (TypeScript fonctionnel)** — *mandatory* (ADR 0043). L'app émise devient **TS de bout en bout** : app Hono/TS **+** infra Pulumi/TS, gouvernées par le **même** mandat FN02 / `EMITTED_FUNCTION_PURE` / `EMITTED_NO_GLOBAL_MUTABLE`. Infra **typée + testable** (tests unitaires sans provisionner → **miroir-first sur l'infra**). **Un programme → toutes les cibles** : Docker+Traefik aujourd'hui, k8s/Fly/cloud demain (stacks/config Pulumi par environnement). **Interop HCL/Terraform native (janv. 2026)** → réutilise l'écosystème OpenTofu sans quitter le langage.
+- **Reverse-proxy = Traefik v3** (inchangé, conventions `/data/dockers` conservées via le provider Docker de Pulumi).
+- **State Pulumi auto-hébergé** (pas Pulumi Cloud), scopé `project_id`, below-the-line.
+- **Alternatives (replaceable) :** KCL/Pkl (config typée déclarative, option puriste-déterministe, génération seule) ; Score (abstraction de workload, interop) ; OpenTofu/HCL (via l'interop Pulumi) ; Kamal 2 (exécuteur zero-downtime, *jamais* au prix de Traefik). Coolify/Drizzle exclus ; Windmill (pas Temporal) ; Postgres prod / Doltgres non-prod.
+
+**Adaptation KRD (le cœur) :** Pulumi **n'est pas la source** — la vérité reste le **StackManifest AST content-adressé au-dessus du mur** (EPIC A). Le StackManifest **émet un programme Pulumi/TS pur fonctionnel** (below-the-line, byte-stable, content-adressé). **Déterminisme en double garde :** (a) émission byte-identique du programme (miroir de repro) ; (b) programme FN02-pur (arch-fitness émis EXISTANT) ; (c) `pulumi preview` déterministe pour (programme, providers épinglés, state). L'agent écrit le code d'infra **au build**, jamais dans la boucle runtime (§8).
+
+**Reconfiguration des épics (les étapes héritent ceci) :**
+- **EPIC A — DP03/DP05** : « émetteur StackManifest → `docker-compose.yml` » devient **`TargetPulumiProgram` : émetteur StackManifest → programme Pulumi/TS** (+ module Traefik versionné). Le compose devient une **projection** que Pulumi (provider Docker) produit, pas l'artefact primaire. Miroir de repro = byte-stabilité **du programme TS**.
+- **EPIC B — DP06/DP07** : Environment = **stacks + config Pulumi par environnement** ; `resolveConnection` = resources/links Pulumi ; `EMITTED_NO_HARDCODED_ENDPOINT` s'applique au programme Pulumi (pas d'endpoint en dur, tout en config de stack).
+- **EPIC C — DP12** : le bootstrap one-shot orchestre **`pulumi up`** (preview → apply) au lieu de `docker compose up` brut (Traefik d'abord via dépendances Pulumi) ; résolution de ports = fonction de (programme, snapshot hôte) — Amendement A4.
+- **EPIC D — DP15-DP18** : chaque service-substrat = une **resource Pulumi** (provider Docker), profile = sélection de resources ; Doltgres non-prod via stack config (Amendement A1, addendum ADR 0006).
+- **EPIC E — DP20-DP23** : connecteurs/MCP-gateway/registries = **resources Pulumi** déclarées, gouvernées par le mur+agentlayer+ledger (inchangé).
+- **EPIC F — DP26** : deploy = ré-projection de phase → **émission du programme Pulumi → `pulumi up`** (toujours « done is computed », ré-projection jamais procédurale).
+- **EPIC G — DP33** : future_cloud = **mêmes sources, providers cloud Pulumi (+ interop HCL)** ; portabilité par changement de stack config, jamais de réécriture.
+
+---
+
 ## Pré-vol — accrétion d'artefacts (CLAUDE.md §6/§7)
 
 > **Pas une étape de code.** Avant `/long-run {startFrom:'DP01'}` : créer les agents `step-DPnn` (DP01–DP33) via `agent-creator` (héritant `step-executor`, aucune allowlist `tools:` stricte) ; câbler `PLAN.md` (une entrée par `docs/plan/DPnn-*.md` à semer par `/grill-with-docs`) et `TEST_PLAN.md` (un scénario par flux critique : stack-emit, bootstrap, connecteur RW gaté, deploy-by-phase, rollback) ; **scaffolder sans activer** les hooks + MCP des **deux plans** (outillage AIDOS *et* app émise) ; redémarrer la session Claude pour enregistrer agents/skills/MCP. Un hook qui ne tire jamais est un monstre — activé + fault-injecté uniquement à l'étape qui en a besoin.

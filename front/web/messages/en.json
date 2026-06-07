@@ -90,7 +90,8 @@
 		"besoinIntake": "besoin-intake door",
 		"emitIdeas": "emit-ideas emitter",
 		"redBacklog": "RedBacklog topo-sorted",
-		"besoinCapitalisation": "Need capitalisation"
+		"besoinCapitalisation": "Need capitalisation",
+		"appBuilder": "App Builder"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3587,5 +3588,51 @@
 		"backlogHeading": "Ordered red backlog (topological order)",
 		"wizardLink": "← Back to the /compound-besoin tunnel",
 		"footer": "EL19 — the /compound-besoin/doc view: the requirements-doc generator. EmitRequirementsDoc (lib/besoin-requirements-doc.ts) COMPOSES emitIdeas (EL16), redBacklog (EL17), levelMirrorForm (EL10), levelToProposes (EL05) — re-implements none. Pure deterministic render: same graph → same bytes. Above the wall: PROPOSE, never writes the Kernel."
+	},
+	"appBuilder": {
+		"title": "App Builder — build YOUR app",
+		"intro": "From intention to button, from a single screen. Declare your need level by level, prove every truth with a mirror, emit the app, provision and deploy it. Every live capability is clickable; planned capabilities carry their roadmap reference (DP / Sxx).",
+		"statusLive": "Live",
+		"statusPlanned": "Planned",
+		"footnote": "The wall stays intact: every truth write goes through idea → mirror → /goal → approval. This screen only routes to capabilities; it writes no truth.",
+		"sections": {
+			"besoin": {
+				"title": "1 · Declare the need",
+				"desc": "The forced level-by-level interview above the wall (compound of the need) → BesoinGraph → ideas → ordered backlog."
+			},
+			"prove": {
+				"title": "2 · Prove the truths",
+				"desc": "Idea → grill → goal → mirror: every behaviour proven in BDD before it exists, across the six N0–N5 layers."
+			},
+			"emit": {
+				"title": "3 · Emit & preview",
+				"desc": "Deterministic emitters: one source → API + DB + types + UI. Preview the built app."
+			},
+			"deploy": {
+				"title": "4 · Provision & deploy",
+				"desc": "Pulumi/TS IaC language (ADR 0043): content-addressed StackManifest → infra program → Docker+Traefik today, cloud tomorrow. Governed connectors, deploy keyed on stable phases."
+			},
+			"product": {
+				"title": "5 · Multi-tenant & SaaS product",
+				"desc": "What turns the engine into a product a stranger uses: isolated projects, gateway, auth, modeler, build-loop, federation, reality, billing."
+			}
+		},
+		"planned": {
+			"stackManifest": "StackManifest & infra emission",
+			"environments": "Environments & connection modes",
+			"bootstrap": "One-shot bootstrap & profiles",
+			"substrate": "Substrate services (Postgres/Valkey/Windmill/SigNoz…)",
+			"connectors": "Governed connectors (RO/RW, audit)",
+			"deployCockpit": "Preview · Deploy · Domains/TLS · Rollback",
+			"appOps": "Docs · Backup · Secrets · Cloud",
+			"projects": "Isolated multi-tenant projects",
+			"gateway": "MCP-over-HTTP gateway",
+			"appAuth": "Authentication & identity",
+			"modeler": "Domain modeler (entities, relations, async)",
+			"buildLoop": "Build agent loop (red→green in sandbox)",
+			"federation": "Cell federation by contracts",
+			"reality": "Reality loop (prod teaches the kernel)",
+			"saas": "Onboarding · GDPR · Billing"
+		}
 	}
 }

@@ -90,7 +90,8 @@
 		"besoinIntake": "Porte besoin-intake",
 		"emitIdeas": "Émetteur emit-ideas",
 		"redBacklog": "RedBacklog topo-trié",
-		"besoinCapitalisation": "Capitalisation du besoin"
+		"besoinCapitalisation": "Capitalisation du besoin",
+		"appBuilder": "App Builder"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3587,5 +3588,51 @@
 		"backlogHeading": "Backlog rouge ordonné (ordre topologique)",
 		"wizardLink": "← Retour au tunnel /compound-besoin",
 		"footer": "EL19 — la vue /compound-besoin/doc : le générateur du document d'exigences. EmitRequirementsDoc (lib/besoin-requirements-doc.ts) COMPOSE emitIdeas (EL16), redBacklog (EL17), levelMirrorForm (EL10), levelToProposes (EL05) — re-implémente aucun. Rendu pur déterministe : même graphe → mêmes octets. Above le mur : PROPOSE, n'écrit jamais le Kernel."
+	},
+	"appBuilder": {
+		"title": "App Builder — développez VOTRE app",
+		"intro": "De l'intention au bouton, depuis un seul écran. Déclarez votre besoin niveau par niveau, prouvez chaque vérité par un miroir, émettez l'app, provisionnez-la et déployez-la. Chaque capacité live est cliquable ; les capacités planifiées portent leur référence de feuille de route (DP / Sxx).",
+		"statusLive": "Live",
+		"statusPlanned": "Planifié",
+		"footnote": "Le mur reste intact : toute écriture de vérité passe par idée → miroir → /goal → approbation. Cet écran ne fait que router vers les capacités ; il n'écrit aucune vérité.",
+		"sections": {
+			"besoin": {
+				"title": "1 · Déclarer le besoin",
+				"desc": "L'interview forcée niveau par niveau au-dessus du mur (compound du besoin) → BesoinGraph → idées → backlog ordonné."
+			},
+			"prove": {
+				"title": "2 · Prouver les vérités",
+				"desc": "Idée → grill → goal → miroir : chaque comportement prouvé en BDD avant d'exister, sur les six couches N0–N5."
+			},
+			"emit": {
+				"title": "3 · Émettre & prévisualiser",
+				"desc": "Émetteurs déterministes : une source → API + DB + types + UI. Prévisualisez l'app construite."
+			},
+			"deploy": {
+				"title": "4 · Provisionner & déployer",
+				"desc": "Langage IaC Pulumi/TS (ADR 0043) : StackManifest content-adressé → programme d'infra → Docker+Traefik aujourd'hui, cloud demain. Connecteurs gouvernés, deploy keyé sur les phases stables."
+			},
+			"product": {
+				"title": "5 · Produit multi-tenant & SaaS",
+				"desc": "Ce qui transforme le moteur en produit qu'un inconnu utilise : projets isolés, passerelle, auth, modeleur, boucle-build, fédération, réalité, facturation."
+			}
+		},
+		"planned": {
+			"stackManifest": "StackManifest & émission d'infra",
+			"environments": "Environnements & modes de connexion",
+			"bootstrap": "Bootstrap one-shot & profiles",
+			"substrate": "Services-substrat (Postgres/Valkey/Windmill/SigNoz…)",
+			"connectors": "Connecteurs gouvernés (RO/RW, audit)",
+			"deployCockpit": "Preview · Deploy · Domaines/TLS · Rollback",
+			"appOps": "Docs · Backup · Secrets · Cloud",
+			"projects": "Projets multi-tenant isolés",
+			"gateway": "Passerelle MCP-over-HTTP",
+			"appAuth": "Authentification & identité",
+			"modeler": "Modeleur du domaine (entités, relations, async)",
+			"buildLoop": "Boucle-agent build (red→green en bac à sable)",
+			"federation": "Fédération de cellules par contrats",
+			"reality": "Boucle de réalité (la prod enseigne au noyau)",
+			"saas": "Onboarding · GDPR · Facturation"
+		}
 	}
 }

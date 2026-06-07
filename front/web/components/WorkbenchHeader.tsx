@@ -21,6 +21,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 		key: "start",
 		items: [
 			{ href: "/", k: "home" },
+			{ href: "/app-builder", k: "appBuilder" },
 			{ href: "/first-app", k: "firstApp" },
 			{ href: "/proof-levels", k: "proofLevels" },
 			{ href: "/demo-checkout", k: "demoCheckout" },
