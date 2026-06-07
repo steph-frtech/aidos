@@ -12,6 +12,22 @@ _Avoid_: using "AIDOS" and "KRD" interchangeably.
 The method AIDOS implements — _Kernel-Ratchet Development_. The discipline of a small human-anchored kernel of executable truth, freely-evolving AI-written code that the kernel ratchets, and a mirror that proves each truth. Defined in full in `KRD.md`.
 _Avoid_: treating KRD as a product or a directory; it is the methodology, not the tool.
 
+**FKE (Fractal Kernel Engineering)**:
+The universal discipline of which KRD is the software-product method and AIDOS the reference runtime (FKE ⊃ KRD ⊃ AIDOS). Lives INSIDE the Tome as `KRD.md` LIVRE XXX (ADR 0044). Its core is the **symmetric kernel anatomy**: ten slots mirrored around the wall, the wall being both the write-barrier and a *language frontier* (only the two code slots speak machine).
+_Avoid_: "Fractal Kernel Vibing"/FKV (the vibe is a contained phase — the Vibe Lab —, not the discipline's name); treating FKE as a separate founding document (it is fused into the Tome).
+
+**Paire-miroir (mirror pair)**:
+One of the four reflected slot pairs of the kernel anatomy: spec↔doc (s1↔s10), use-case↔code-derived-doc (s2↔s9, the *doc-miroir*), human-data-model↔data-projection (s3↔s7, the *data-miroir*), scenario↔test+result (s4↔s5/s6). The judge is a structural set comparison; prose divergence is advisory only.
+_Avoid_: reducing "miroir" to tests — the test pair is one family of four.
+
+**Conscience**:
+The deterministic AGGREGATOR composing the verdicts of the existing judges (mirror runner, completeness/monster, SemanticDiff, RealityMirror, sensors, ledger) into one consciousness report per kernel + decision cards. It compares the mirror pairs; it never judges on its own.
+_Avoid_: an active LLM "alignment governor" that evaluates — that is the second-agent-as-proof the method forbids (§8).
+
+**Kernel effondré (collapsed kernel)**:
+A leaf kernel that collapses its derivable slots (s2/s3 into s1; s9/s10 derived; s8 absent). Incompressible minimum: **s1 (intent, even one line) + the proof pair (s4↔s5/s6)**.
+_Avoid_: collapsing the proof pair (reintroduces the monster); forcing all ten slots onto a three-line function (the ×10 tax).
+
 **Workbench UI (`front/web/`)**:
 AIDOS's own operating interface — the visual governance surface of the OS. This is what `front/web/` is.
 _Avoid_: confusing it with a web app that AIDOS *emits* for an end user (see Emitted projection).
