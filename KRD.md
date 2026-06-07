@@ -3592,30 +3592,41 @@ Un kernel n'est **pas forcément du code**. Un kernel peut représenter : une id
 
 C'est le cœur structurel de FKE. L'anatomie canonique d'un kernel est **symétrique autour du Mur d'Intention** : chaque slot au-dessus a son **reflet** en dessous. Le mur est un **plan de symétrie**.
 
-**La forme complète — strictement 1-pour-1.** Chaque vérité déclarée au-dessus a EXACTEMENT un reflet prouvé en dessous. Huit paires-miroir, aucune orpheline :
+**La forme complète — strictement 1-pour-1, DEUX facettes parallèles.** Chaque kernel a deux facettes — **fonctionnelle** et **sécurité** — et chacune est une anatomie 1-pour-1 complète : six paires-miroir par facette, **douze au total**, aucune orpheline. La sécurité n'est pas une note dans le fonctionnel : c'est une **colonne entière**, strictement parallèle.
 
-| # | AU-DESSUS (déclaré — cerveau gauche) | ↔ | EN-DESSOUS (prouvé — cerveau droit) | ubiquitaire ? |
+**Facette FONCTIONNELLE — 6 paires :**
+
+| # | AU-DESSUS (déclaré) | ↔ | EN-DESSOUS (prouvé) | ubiq. |
 |---|---|---|---|---|
-| **P1** | Spec | ↔ | Documentation | oui |
-| **P2** | Comportement (use case) | ↔ | Résultats (comportement observé) | oui |
-| **P3** | Scénarios | ↔ | Tests | oui |
-| **P4** | Scénarios sécurité | ↔ | Tests sécurité | oui |
-| **P5** | Modèle (donnée, sens humain) | ↔ | Projection données (schéma + données) | oui |
-| **P6** | **Contrat** (in/out, pré/post, invariants) | ↔ | **Code** | non (P6 dessous = machine) |
-| **P7** | Sécurité (consigne, policy) | ↔ | Sécurité implémentée (police, authz) | non (P7 dessous = machine) |
-| **P8** | Evidence attendue | ↔ | Evidence observée | oui |
+| **F1** | Spec | ↔ | Documentation | oui |
+| **F2** | Comportement (use cases) | ↔ | Résultats (comportement observé) | oui |
+| **F3** | Scénarios | ↔ | Tests | oui |
+| **F4** | Modèle (donnée, sens humain) | ↔ | Projection données (schéma + données) | oui |
+| **F5** | Contrat (in/out, pré/post, invariants) | ↔ | Code | dessous = machine |
+| **F6** | Evidence attendue | ↔ | Evidence observée | oui |
 
-**Les opérateurs de la traversée** (la mécanique, pas du contenu) : **Validation** = la porte du MUR D'INTENTION (la moitié dessus est-elle acceptée ? — Decision Card) ; **Exécution** = l'acte (Evidence Runner) qui, depuis Code+Tests, produit Résultats + Evidence observée ; **Conscience** = compare les 8 paires une à une ; **Loopback ciblé** = sur divergence d'une paire, un red wave **ciblé** qui remonte exactement au slot dessus concerné (jamais un rebuild global).
+**Facette SÉCURITÉ — 6 paires (le même squelette, lu en menaces) :**
 
-*(Vue effondrée à 10 slots — le raccourci historique : s1=P1↑, s10=P1↓ ; s2=P2↑ ; s3=P5↑, s7=P5↓ ; s4=P3↑+P8↑, s5=P3↓, s6=P2↓+P8↓ ; s8=P6↓. P4/P6↑/P7 sont les ajouts qui complètent la symétrie.)*
+| # | AU-DESSUS (déclaré) | ↔ | EN-DESSOUS (prouvé) | ubiq. |
+|---|---|---|---|---|
+| **S1** | Spec sécurité (finalité, classification des données, secrets nécessaires/interdits) | ↔ | Doc sécurité (threat model documenté, runbook, SECURITY) | oui |
+| **S2** | Abuse cases (les comportements d'attaque) | ↔ | Résultats sécurité (denials, blocks observés, refus) | oui |
+| **S3** | Scénarios sécurité | ↔ | Tests sécurité (+ evals anti-prompt-injection, tests d'exfiltration, red-team) | oui |
+| **S4** | Threat model (surfaces d'attaque, acteurs, trust boundaries) | ↔ | Sécurité implémentée (authn, authz, allowlist, redaction, sandbox, capability lease, injection de secrets) | dessous = machine |
+| **S5** | Contrat sécurité (permissions, capabilities, effets de bord autorisés/interdits, policy) | ↔ | Police + scans (enforcement runtime + SAST/DAST/dependency/SBOM/container/gitleaks) | dessous = machine |
+| **S6** | Evidence sécurité attendue (E4 : pas d'exfiltration, pas d'élévation de privilège) | ↔ | Evidence sécurité observée (scans verts, evals passées, audit Merkle tamper-evident) | oui |
+
+**Les opérateurs de la traversée** (la mécanique, pas du contenu, communs aux deux facettes) : **Validation** = la porte du MUR D'INTENTION (la moitié dessus est-elle acceptée ? — Decision Card) ; **Exécution** = l'acte (Evidence Runner) qui produit Résultats + Evidence observée des deux facettes ; **Conscience** = compare les **douze** paires une à une ; **Loopback ciblé** = sur divergence d'une paire (fonctionnelle OU sécurité), un red wave **ciblé** qui remonte exactement au slot dessus concerné. **Une paire sécurité qui diverge bloque autant qu'une paire fonctionnelle.**
+
+*(Vue effondrée à 10 slots — le raccourci historique : s1=F1↑, s10=F1↓ ; s2=F2↑ ; s3=F4↑, s7=F4↓ ; s4=F3↑+F6↑, s5=F3↓, s6=F2↓+F6↓ ; s8=F5↓ ; la facette sécurité S1-S6 y était compressée en « consigne sécurité » — la forme complète la déplie.)*
 
 Cinq conséquences fondatrices :
 
-1. **Le « miroir » se généralise en HUIT paires strictes** (et quatre familles : doc-miroir P1, comportement-miroir P2, scénario-miroir P3/P4, data-miroir P5, contrat-miroir P6, sécurité-miroir P7, evidence-miroir P8). Une paire qui diverge = soit l'implémentation est rouge, soit la vérité doit évoluer (la boucle, §FKE-35).
-2. **Plus aucune orpheline : le Contrat (P6↑) apparie enfin le Code (P6↓).** Dans la vue effondrée, s8 (code) semblait sans contrepartie ; la forme complète montre qu'il reflète le **Contrat**. Le code reste **optionnel par ÉMISSION, pas par absence de partenaire** : pour un kernel déclaratif (vue, policy, doc), le Contrat est satisfait **entièrement par projection** — le code est généré, pas écrit à la main (loi 6 : le code est une projection).
-3. **Le mur est aussi une frontière de LANGUE.** Six des huit paires sont **ubiquitaires des deux côtés** (P1-P5, P8) — l'humain lit sa langue jusque dans les retours d'en bas (Résultats, Doc dérivée, Projection, Evidence observée). Seuls **les côtés DESSOUS de P6 (Code) et P7 (sécurité implémentée)** parlent machine : la zone machine = exactement la zone de l'agent.
-4. **La sécurité est une COLONNE complète, pas une note** : elle a ses deux paires propres — P4 (scénarios sécurité ↔ tests sécurité) et P7 (consigne ↔ police implémentée) — strictement parallèles à la colonne fonctionnelle. La sécurité fractale (§FKE-8) est ce 1-pour-1 appliqué.
-5. **La conscience (§FKE-6.3) est le comparateur des huit paires.** Aligné = les huit concordent. Drift = une paire diverge → Loopback **ciblé** sur le slot dessus de cette paire. La loi de complétude devient : *un kernel dont une paire requise manque ou diverge sans décision est un monstre*.
+1. **Le « miroir » se généralise en DOUZE paires strictes**, deux facettes de six (fonctionnel F1-F6, sécurité S1-S6). Une paire qui diverge — *quelle que soit la facette* — = soit l'implémentation est rouge, soit la vérité doit évoluer (la boucle, §FKE-35).
+2. **Plus aucune orpheline : le Contrat (F5↑) apparie enfin le Code (F5↓), et le Contrat sécurité (S5↑) apparie la Police (S5↓).** Dans la vue effondrée, s8 (code) semblait sans contrepartie ; la forme complète montre qu'il reflète le **Contrat**. Le code reste **optionnel par ÉMISSION, pas par absence de partenaire** : pour un kernel déclaratif (vue, policy, doc), le Contrat est satisfait **entièrement par projection** — le code est généré, pas écrit à la main (loi 6).
+3. **Le mur est aussi une frontière de LANGUE.** La plupart des paires sont **ubiquitaires des deux côtés** — l'humain lit sa langue jusque dans les retours d'en bas (Résultats, Doc dérivée, Projection, denials, Evidence observée). Seuls **les côtés DESSOUS de F5 (Code), S4 (sécurité implémentée) et S5 (police/scans)** parlent machine : la zone machine = exactement la zone de l'agent.
+4. **La sécurité est une FACETTE complète, pas une note.** Six paires propres (S1-S6), strictement parallèles aux six fonctionnelles : la sécurité a sa spec, ses abuse cases, ses scénarios, son threat model, son contrat, son evidence — déclarés au-dessus — et leurs reflets prouvés en-dessous (doc, denials, tests sécurité, sécurité implémentée, police+scans, evidence sécurité). C'est la **sécurité fractale** (§FKE-8) déployée en 1-pour-1.
+5. **La conscience (§FKE-6.3) est le comparateur des douze paires.** Aligné = les douze concordent. Drift = une paire diverge → Loopback **ciblé** sur le slot dessus de cette paire. La loi de complétude devient : *un kernel dont une paire requise (fonctionnelle OU sécurité) manque ou diverge sans décision est un monstre* — **une faille de sécurité non reflétée est un monstre, au même titre qu'un test manquant.**
 
 La symétrie vaut aussi pour les **facettes transversales** : la sécurité (§8) a sa moitié intentionnelle (au-dessus) et sa moitié implémentée (en-dessous) ; la mémoire, la policy et la doc pareillement. **Tout le manifest (§19) est organisé en deux colonnes réfléchies + la boucle qui les compare.**
 
@@ -3779,41 +3790,40 @@ Le flux de bout en bout de FKE tient en un dessin — **le pipeline VIBE AI LAB*
 Le pipeline ci-dessus n'est pas réservé au projet : c'est **l'anatomie d'un seul kernel (§FKE-1.3) déroulée comme une traversée**. Une **entrée textuelle** (un besoin, une ligne de chat, un ticket, un incident) **s'éclate** (fan-out, par le cerveau gauche) en les slots du dessus ; chaque slot a son **reflet** en dessous (par le cerveau droit) ; la conscience **compare les paires** ; puis on promeut — ou la divergence **remonte** au-dessus du mur. **Le macro pipeline EST ce micro pipeline à l'échelle du projet.**
 
 ```
-ENTRÉE (textuelle) — besoin · chat · ticket · incident · erreur
-        │  (le cerveau gauche éclate l'entrée — DÉCLARÉ)
-        ├─▶ SPEC                  (P1↑)
-        ├─▶ COMPORTEMENT          (P2↑)   use case BDD             — ubiquitaire
-        ├─▶ SCÉNARIOS             (P3↑)                            — ubiquitaire
-        ├─▶ SCÉNARIOS SÉCURITÉ    (P4↑)                            — ubiquitaire
-        ├─▶ MODÈLE                (P5↑)   donnée, sens humain      — ubiquitaire
-        ├─▶ CONTRAT               (P6↑)   in/out, pré/post, invariants
-        ├─▶ SÉCURITÉ             (P7↑)   consigne, policy, threat model
-        └─▶ EVIDENCE ATTENDUE     (P8↑)   le contrat de preuve E0-E7
-        ↓
-VALIDATION — Decision Card : accept · reject · amend · defer
-══════════════════════ MUR D'INTENTION ══════════════════════
-        │  (le cerveau droit reflète CHAQUE slot — PROUVÉ, 1-pour-1)
-        ├─▶ TESTS                 (P3↓ ◀ Scénarios)
-        ├─▶ TESTS SÉCURITÉ        (P4↓ ◀ Scénarios sécurité)
-        ├─▶ CODE                  (P6↓ ◀ Contrat — émis si kernel déclaratif)
-        ├─▶ PROJECTION DONNÉES    (P5↓ ◀ Modèle)
-        ├─▶ SÉCURITÉ IMPLÉMENTÉE  (P7↓ ◀ Sécurité — authz, police)
-        ├─▶ EXÉCUTION             ── l'acte : lance Code + Tests
-        ├─▶ RÉSULTATS             (P2↓ ◀ Comportement : le comportement observé)
-        ├─▶ DOCUMENTATION         (P1↓ ◀ Spec ; inclut la doc dérivée du code)
-        └─▶ EVIDENCE OBSERVÉE     (P8↓ ◀ Evidence attendue)
-        ↓
-════════════════════ MUR SÉCURITÉ / POLICE ════════════════════
-        ↓
-POLICE — allow · block · audit · approval (ambiante : intercepte chaque action)
-        ↓
-CONSCIENCE — compare les 8 PAIRES une à une (P1…P8)
-        ↓
-        ├─ aligné ──────────▶ PROMOTION : vérité stable → Kernel Graph
-        └─ divergence ─────▶ LOOPBACK CIBLÉ : Decision Card qui remonte EXACTEMENT
-                              au slot dessus de la paire divergente ─┐
-                                                                     │
-        ┌──────────────── la boucle (lois 24-25) ◀───────────────────┘
+                    ENTRÉE (textuelle) — besoin · chat · ticket · incident · erreur
+                                       │  (cerveau gauche éclate — DÉCLARÉ)
+        ┌──────────── FACETTE FONCTIONNELLE ───────────┐   ┌────────────── FACETTE SÉCURITÉ ──────────────┐
+DESSUS  │ F1 ▸ Spec                                     │   │ S1 ▸ Spec sécurité (finalité, classif. données)│
+        │ F2 ▸ Comportement (use cases)                 │   │ S2 ▸ Abuse cases (comportements d'attaque)     │
+        │ F3 ▸ Scénarios                                │   │ S3 ▸ Scénarios sécurité                         │
+        │ F4 ▸ Modèle (donnée)                          │   │ S4 ▸ Threat model (surfaces, acteurs)          │
+        │ F5 ▸ Contrat (in/out, invariants)             │   │ S5 ▸ Contrat sécurité (permissions, capab.)    │
+        │ F6 ▸ Evidence attendue (E0-E3)                │   │ S6 ▸ Evidence sécurité attendue (E4)           │
+        └───────────────────────┬───────────────────────┘   └───────────────────────┬──────────────────────┘
+                                ↓        VALIDATION — Decision Card (accept · reject · amend · defer)
+════════════════════════════════════ MUR D'INTENTION ════════════════════════════════════
+                                ↓  (cerveau droit reflète CHAQUE slot — PROUVÉ, 1-pour-1)
+        ┌──────────── FACETTE FONCTIONNELLE ───────────┐   ┌────────────── FACETTE SÉCURITÉ ──────────────┐
+DESSOUS │ F1 ▸ Documentation        ◀ Spec             │   │ S1 ▸ Doc sécurité (threat model doc, runbook)  │
+        │ F2 ▸ Résultats            ◀ Comportement     │   │ S2 ▸ Résultats sécurité (denials, blocks)      │
+        │ F3 ▸ Tests                ◀ Scénarios        │   │ S3 ▸ Tests sécurité (+ evals injection/exfil.) │
+        │ F4 ▸ Projection données   ◀ Modèle           │   │ S4 ▸ Sécurité implémentée (authz, allowlist,   │
+        │ F5 ▸ Code                 ◀ Contrat (émis si  │   │      redaction, sandbox)     ◀ Threat model    │
+        │      kernel déclaratif)                       │   │ S5 ▸ Police + scans (SAST/DAST/SBOM/gitleaks)  │
+        │ F6 ▸ Evidence observée    ◀ Evidence att.     │   │      ◀ Contrat sécurité                        │
+        │ + EXÉCUTION : lance Code + Tests              │   │ S6 ▸ Evidence séc. observée (scans verts,      │
+        │                                               │   │      evals OK, audit Merkle) ◀ Evidence séc.   │
+        └───────────────────────┬───────────────────────┘   └───────────────────────┬──────────────────────┘
+                                ↓
+══════════════════════════════════ MUR SÉCURITÉ / POLICE ══════════════════════════════════
+                                ↓  POLICE — allow · block · audit · approval (ambiante : chaque action)
+                                ↓  CONSCIENCE — compare les 12 PAIRES (F1-F6 ∧ S1-S6) une à une
+                                ↓
+        ┌─ aligné ──────────────▶ PROMOTION : vérité stable → Kernel Graph
+        └─ divergence (F ou S) ─▶ LOOPBACK CIBLÉ : Decision Card qui remonte EXACTEMENT
+                                  au slot dessus de la paire divergente ──┐
+                                                                          │
+        ┌────────────────────── la boucle (lois 24-25) ◀───────────────────┘
 ```
 
 **L'isomorphisme exact (micro ↔ macro) :**
