@@ -47,6 +47,12 @@ func Compile(goal Goal, branch string, graph ContextGraph) ContextPack {
 	// ── 2. affected_layers — the red layers, branch-fenced, BC-fenced, load-bearing ──
 	var affected []string
 	for _, l := range graph.Layers {
+		// Project-aware (S55): a node from ANOTHER project never enters the cut — the outer
+		// scope, checked first. A pack of project A contains zero nodes of project B.
+		if crossProject(goal.Project, l.Project) {
+			excluded = append(excluded, Excluded{ID: l.ID, Reason: ReasonCrossProject})
+			continue
+		}
 		// Branch-aware: a node from another branch never enters the cut, never leaks (§143).
 		if l.Branch != "" && l.Branch != branch {
 			continue
@@ -74,6 +80,12 @@ func Compile(goal Goal, branch string, graph ContextGraph) ContextPack {
 		if inSet(goal.RedSet, l.ID) {
 			continue
 		}
+		// Project fence first (S55): a neighbor-project layer is excluded cross-project, never
+		// surfaced as a cosmetic same-BC sibling.
+		if crossProject(goal.Project, l.Project) {
+			excluded = append(excluded, Excluded{ID: l.ID, Reason: ReasonCrossProject})
+			continue
+		}
 		if l.Branch != "" && l.Branch != branch {
 			continue
 		}
@@ -90,6 +102,10 @@ func Compile(goal Goal, branch string, graph ContextGraph) ContextPack {
 	// ── 3. active_kernel.mirrors — red mirrors define the stop condition; neighbor-BC out ──
 	var mirrors []string
 	for _, m := range graph.Mirrors {
+		if crossProject(goal.Project, m.Project) {
+			excluded = append(excluded, Excluded{ID: m.ID, Reason: ReasonCrossProject})
+			continue
+		}
 		if m.BoundedContext != "" && m.BoundedContext != goal.BoundedContext {
 			excluded = append(excluded, Excluded{ID: m.ID, Reason: ReasonCrossBC})
 			continue
@@ -103,6 +119,12 @@ func Compile(goal Goal, branch string, graph ContextGraph) ContextPack {
 	// ── 4. active_kernel.contracts — goal-BC contracts + neighbor crossed PUBLIC contract ──
 	var contracts []string
 	for _, c := range graph.Contracts {
+		// Project isolation is the OUTER scope (S55): a neighbor-project contract NEVER crosses,
+		// not even a PUBLIC one — PUBLIC crosses a bounded-context boundary WITHIN a project.
+		if crossProject(goal.Project, c.Project) {
+			excluded = append(excluded, Excluded{ID: c.ID, Reason: ReasonCrossProject})
+			continue
+		}
 		if c.BoundedContext == "" || c.BoundedContext == goal.BoundedContext {
 			contracts = append(contracts, c.ID)
 			continue
@@ -120,6 +142,12 @@ func Compile(goal Goal, branch string, graph ContextGraph) ContextPack {
 	// ── 5. memory — scope overlap ∧ confidence ≥ repeated ∧ not stale ∧ approved (§119.3) ──
 	var lessons, incidents, glossary []string
 	for _, r := range graph.Memory {
+		// Project fence first (S55): a neighbor-project memory record never enters the pack,
+		// regardless of confidence/approval/scope — the outer scope.
+		if crossProject(goal.Project, r.Project) {
+			excluded = append(excluded, Excluded{ID: r.ID, Reason: ReasonCrossProject})
+			continue
+		}
 		// Stale → forbidden (§119.3). Checked first so a stale record is tagged `stale`.
 		if r.Stale {
 			excluded = append(excluded, Excluded{ID: r.ID, Reason: ReasonStale})

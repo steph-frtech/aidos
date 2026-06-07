@@ -12,6 +12,7 @@
 	"nav": {
 		"home": "Accueil",
 		"contract": "Contrat d'exécution",
+		"projects": "Projets",
 		"store": "Magasin de contenu",
 		"records": "Enregistrements",
 		"cli": "CLI aidos",
@@ -91,7 +92,9 @@
 		"emitIdeas": "Émetteur emit-ideas",
 		"redBacklog": "RedBacklog topo-trié",
 		"besoinCapitalisation": "Capitalisation du besoin",
-		"appBuilder": "App Builder"
+		"appBuilder": "App Builder",
+		"projectScope": "Scope projet",
+		"projectWall": "Mur project-aware"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -264,6 +267,46 @@
 			"body": "- id: tdd\n  label: \"/tdd to code\"\n  description: >\n    red → green → refactor, dans le paquet de l'étape.\n  gate: computational",
 			"takeaway": "Bilan : chaque phase porte la même enveloppe — <code>id</code>, <code>label</code>, <code>gate</code> — et le tableau ci-dessous n'est rien d'autre que la projection de ces entrées. Pour faire évoluer le contrat, on ne l'édite pas ici : on passe par un ChangeSet (à venir S20) et on incrémente le semver."
 		}
+	},
+	"projects": {
+		"eyebrow": "Kernel/Archive · scope racine multi-tenant",
+		"title": "Projets",
+		"intro": "Le projet est le concept Kernel de premier rang qui scope toute vérité. Deux utilisateurs (ou deux apps) ne se télescopent jamais dans le truth-store singleton : chaque vérité appartient à un projet. Un projet est adressé par contenu (son empreinte SHA-256), porte un cycle de vie active|archived|deleted, et reçoit un nœud racine de DAG isolé. Écrit sous le mur, append-only — la suppression est douce (la suppression dure GDPR est S116).",
+		"liveTitle": "Lu en direct depuis le Postgres aidos (schéma projects)",
+		"demoTitle": "Postgres injoignable — affichage des données de démo",
+		"createHeading": "Créer un projet",
+		"createHint": "Le slug est l'identifiant stable (a-z0-9, tirets simples), UNIQUE par propriétaire. L'id est l'empreinte du corps canonique — créer deux fois le même projet est idempotent. Un nœud racine de DAG est créé pour ce projet.",
+		"slugLabel": "Slug",
+		"slugPlaceholder": "ex. ma-boutique",
+		"nameLabel": "Nom",
+		"namePlaceholder": "ex. Ma Boutique",
+		"ownerLabel": "Propriétaire",
+		"ownerPlaceholder": "ex. owner-1",
+		"createSubmit": "Créer le projet",
+		"listHeading": "Projets ({count})",
+		"rootNode": "racine DAG",
+		"rootNodeTitle": "Le nœud racine du DAG, isolé par projet (S53)",
+		"archive": "Archiver",
+		"restore": "Restaurer",
+		"delete": "Supprimer (doux)",
+		"working": "En cours…",
+		"lifecycle": {
+			"active": "actif",
+			"archived": "archivé",
+			"deleted": "supprimé"
+		},
+		"result": {
+			"createOk": "Projet créé sous l'empreinte {id}.",
+			"createEmpty": "Renseignez slug, nom et propriétaire.",
+			"createBadSlug": "Slug invalide : a-z0-9 avec tirets simples (« {slug} »).",
+			"createDuplicate": "Le slug « {slug} » est déjà pris pour ce propriétaire.",
+			"archiveOk": "Projet archivé (append-only, la tête s'est déplacée).",
+			"restoreOk": "Projet restauré en actif.",
+			"deleteOk": "Projet supprimé (doux — la ligne est conservée, append-only).",
+			"notFound": "Projet introuvable.",
+			"dbUnreachable": "Postgres injoignable — écriture impossible. Aucune donnée modifiée."
+		},
+		"footer": "Source : schéma <code>projects</code> en direct dans Postgres. Le panneau écrit — mais uniquement le scope projet, <em>sous</em> le mur (append-only, suppression douce) ; la vérité (kernel/mirrors/fitness) reste hors de portée. La porte canonique reste le serveur MCP <code>project</code> (ADR 0009) ; la réconciliation passe par la passerelle HTTP (S58)."
 	},
 	"records": {
 		"eyebrow": "Kernel · enregistrements KRDCore",
@@ -3634,5 +3677,54 @@
 			"reality": "Boucle de réalité (la prod enseigne au noyau)",
 			"saas": "Onboarding · GDPR · Facturation"
 		}
+	},
+	"projectScope": {
+		"eyebrow": "Archive · scope projet du truth-store",
+		"title": "Scope projet",
+		"intro": "S54 fait passer le truth-store d'un graphe singleton indivis à un truth-store multi-tenant : un project_id (FK) traverse chaque vérité — kernel·mirrors·ideas·changesets·dag·brain·context — et le graphe préexistant (la démo Order) est rapatrié, sans aucune perte (append-only), dans un projet seed __system__. Toute lecture est scopée (WHERE project_id = $1) : une requête du projet A ne renvoie jamais une ligne du projet B.",
+		"seedHeading": "Le projet seed __system__",
+		"seedIntro": "Le projet adressé par contenu qui adopte le graphe singleton préexistant. Son id est l'empreinte SHA-256 de son corps canonique (le même schéma que tout projet, S53) — pinné à l'identique dans la migration et le code Go.",
+		"seedSlug": "Slug",
+		"seedOwner": "Owner",
+		"seedName": "Nom",
+		"seedLifecycle": "Cycle de vie",
+		"seedGenesis": "Nœud genèse DAG",
+		"seedId": "Id (adresse de contenu)",
+		"tablesHeading": "Tables scopées par projet",
+		"tablesIntro": "L'ensemble clos des tables de vérité et dérivées qui reçoivent un project_id (FK vers projects.project) + un index. La migration est expand-contract et reproductible.",
+		"colTable": "Table",
+		"colFk": "Contrainte FK",
+		"colIndex": "Index",
+		"buildHeading": "Construire une lecture scopée",
+		"buildIntro": "Exécute le constructeur déterministe ScopedSelect : il porte toujours WHERE project_id = $1 (liez $1 au projet actif), et refuse une table hors de l'ensemble clos — jamais une requête non scopée.",
+		"buildSelectLabel": "Choisir une table scopée",
+		"buildButton": "Construire la lecture scopée",
+		"building": "Construction…",
+		"footer": "S54 · sous le mur (CLAUDE.md §2) : le project_id est une colonne de scope, pas une porte d'écriture. L'agent garde un accès <code>SELECT</code> seul sur <code>kernel</code>/<code>mirrors</code> ; la RLS keyée sur l'identité propagée arrive en S55."
+	},
+	"projectWall": {
+		"eyebrow": "Runtime · mur project-aware deux couches",
+		"title": "Mur project-aware",
+		"intro": "S55 rend le mur conscient du projet : l'agent ne lit/écrit below-the-line que pour le projet courant, sous son identité propagée (S61). Une écriture croisée (un scope projet A qui vise une ligne du projet B) ou une identité forgée à la passerelle est refusée. Défense en profondeur deux couches : un hook PreToolUse (couche 1) ET une RLS Postgres keyée sur l'identité (couche 2) — qui rougissent indépendamment.",
+		"layersHeading": "Les deux couches",
+		"layersIntro": "La même règle, appliquée à deux endroits indépendants : casser l'un n'ouvre jamais l'autre.",
+		"layerHook": "Couche 1 — hook PreToolUse",
+		"layerHookValue": "back/runtime/projectwall : un classificateur pur et déterministe (un algorithme, pas un prompt) qui refuse une opération hors du projet actif.",
+		"layerRls": "Couche 2 — RLS Postgres",
+		"layerRlsValue": "back/migrations/project_rls_baseline.sql : une politique row-level keyée sur (app.project, app.identity) ; même bypassé au niveau du hook, le rôle agent ne voit aucune ligne d'un autre projet.",
+		"blockCodeLabel": "Code de refus",
+		"classifyHeading": "Classer une opération inter-projets",
+		"classifyIntro": "Exécute projectwall.Classify (le même prédicat que la RLS) sur un scope actif (identité + projet) et une cible (projet + une identité éventuellement forgée). Le verdict est allow, ou deny avec un BlockReason actionnable.",
+		"presetSame": "Même projet (allow)",
+		"presetCross": "Projet croisé (deny)",
+		"presetForged": "Identité forgée (deny)",
+		"fieldIdentity": "Identité active (propagée)",
+		"fieldActiveProject": "Projet actif",
+		"fieldTargetProject": "Projet cible",
+		"fieldClaimedIdentity": "Identité revendiquée (vide = héritée)",
+		"classifyButton": "Classer",
+		"classifying": "Classement…",
+		"verdictAllow": "Autorisé : l'opération est dans le projet courant, sous l'identité active.",
+		"footer": "S55 · le mur ne change pas (CLAUDE.md §2) : la RLS gouverne le scope (quel projet), jamais la ligne de flottaison (quelles zones). L'agent garde un accès <code>SELECT</code> seul sur <code>kernel</code>/<code>mirrors</code>. Le routeur de contexte est un algorithme, pas un prompt."
 	}
 }

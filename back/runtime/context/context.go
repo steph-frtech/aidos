@@ -81,6 +81,11 @@ const (
 type ExclusionReason string
 
 const (
+	// ReasonCrossProject — the node belongs to ANOTHER project (S55, app-builder EPIC 1). The
+	// ContextRouter compiles a pack ONLY from the active project's subgraph; a node from a
+	// neighbor project NEVER enters the pack (the done-criterion: a pack of project A contains
+	// zero nodes of project B). Checked FIRST, before bounded-context — project is the outer scope.
+	ReasonCrossProject ExclusionReason = "cross-project"
 	// ReasonCrossBC — the node belongs to a neighbor bounded context (billing internals for a
 	// checkout goal); only its crossed PUBLIC contract is admitted, never its internals.
 	ReasonCrossBC ExclusionReason = "cross-BC"
@@ -103,6 +108,9 @@ type Layer struct {
 	BoundedContext string `json:"bounded_context"`
 	Branch         string `json:"branch"`
 	LoadBearing    bool   `json:"load_bearing"`
+	// Project is the project_id the node is scoped to (S55). A node whose Project is set and
+	// differs from the goal's Project is fenced out (cross-project) before any other rule.
+	Project string `json:"project,omitempty"`
 }
 
 // Mirror is a mirror node in the ContextGraph (§142, reuses the S06 Mirror record shape). Red
@@ -112,6 +120,8 @@ type Mirror struct {
 	ID             string `json:"id"`
 	BoundedContext string `json:"bounded_context"`
 	Red            bool   `json:"red"`
+	// Project scopes the mirror (S55); a neighbor-project mirror never enters the pack.
+	Project string `json:"project,omitempty"`
 }
 
 // Contract is a cross-cell contract node (§142, Pact between cells). Public marks it as the
@@ -121,6 +131,10 @@ type Contract struct {
 	ID             string `json:"id"`
 	BoundedContext string `json:"bounded_context"`
 	Public         bool   `json:"public"`
+	// Project scopes the contract (S55). Project isolation is the OUTER scope: a neighbor
+	// project's contract NEVER crosses, not even a PUBLIC one (a PUBLIC contract crosses a
+	// bounded-context boundary WITHIN a project, never a project boundary).
+	Project string `json:"project,omitempty"`
 }
 
 // MemoryRecord is a scored memory node (§142/§144). It arrives PRE-SCORED (scope, confidence,
@@ -133,6 +147,9 @@ type MemoryRecord struct {
 	Confidence Confidence `json:"confidence"`
 	Stale      bool       `json:"stale"`
 	Approved   bool       `json:"approved"`
+	// Project scopes the memory record (S55); a neighbor-project record never enters the pack
+	// regardless of confidence/approval — the project fence is the outer scope.
+	Project string `json:"project,omitempty"`
 }
 
 // Goal is the red goal the pack is compiled for (§143). RedSet is the S22 red-set, REUSED here
@@ -144,6 +161,11 @@ type Goal struct {
 	BoundedContext string   `json:"bounded_context"`
 	RedSet         []string `json:"red_set"`
 	AllowedPaths   []string `json:"allowed_paths"`
+	// Project is the ACTIVE project the goal is worked in (S55). The router compiles the pack
+	// ONLY from this project's subgraph: any graph node whose Project differs is fenced out
+	// (cross-project) before any other rule. Empty Project ⇒ the pre-S55 singleton behaviour
+	// (no project fence — backward-compatible with the S33 corpus and the __system__ seed).
+	Project string `json:"project,omitempty"`
 }
 
 // ContextGraph is the read-only ContextGraph VIEW the router compiles over (§142). It is the
@@ -212,6 +234,16 @@ var wallForbiddenPaths = []string{"/kernel/**", "/mirror/**"}
 // The canonical stop condition every pack carries (§143, §8 — done is computed: red set →
 // green ∧ prior green intact ∧ aggregate complete).
 const stopCondition = "red_set_green AND previous_green_intact AND aggregate_complete"
+
+// crossProject reports whether a node scoped to nodeProject is OUTSIDE the goal's active
+// project (S55). The fence is conservative and backward-compatible: if either the goal or the
+// node carries no project (the pre-S55 singleton / __system__ seed), there is no cross-project
+// fence (false) — only when BOTH name a project and they DIFFER is the node fenced out. This is
+// the OUTER scope, checked before bounded-context/branch in every node loop, so a pack of
+// project A can contain zero nodes of project B (the done-criterion).
+func crossProject(goalProject, nodeProject string) bool {
+	return goalProject != "" && nodeProject != "" && goalProject != nodeProject
+}
 
 // inSet reports membership in a string slice.
 func inSet(xs []string, x string) bool {

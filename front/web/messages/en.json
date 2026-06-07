@@ -12,6 +12,7 @@
 	"nav": {
 		"home": "Home",
 		"contract": "Execution contract",
+		"projects": "Projects",
 		"store": "Content store",
 		"records": "Records",
 		"cli": "aidos CLI",
@@ -91,7 +92,9 @@
 		"emitIdeas": "emit-ideas emitter",
 		"redBacklog": "RedBacklog topo-sorted",
 		"besoinCapitalisation": "Need capitalisation",
-		"appBuilder": "App Builder"
+		"appBuilder": "App Builder",
+		"projectScope": "Project scope",
+		"projectWall": "Project-aware wall"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -264,6 +267,46 @@
 			"body": "- id: tdd\n  label: \"/tdd to code\"\n  description: >\n    red → green → refactor, in the step's own package.\n  gate: computational",
 			"takeaway": "Takeaway: every phase carries the same envelope — <code>id</code>, <code>label</code>, <code>gate</code> — and the table below is nothing more than the projection of these entries. To evolve the contract you don't edit it here: you go through a ChangeSet (coming S20) and bump the semver."
 		}
+	},
+	"projects": {
+		"eyebrow": "Kernel/Archive · multi-tenant root scope",
+		"title": "Projects",
+		"intro": "The project is the first-rank Kernel concept that scopes every truth. Two users (or two apps) never collide in the singleton truth-store: every truth belongs to a project. A project is content-addressed (its SHA-256 digest), carries an active|archived|deleted lifecycle, and gets an isolated DAG root node. Written below the wall, append-only — deletion is soft (the hard GDPR delete is S116).",
+		"liveTitle": "Read live from the aidos Postgres (projects schema)",
+		"demoTitle": "Postgres unreachable — showing demo data",
+		"createHeading": "Create a project",
+		"createHint": "The slug is the stable handle (a-z0-9, single hyphens), UNIQUE per owner. The id is the hash of the canonical body — creating the same project twice is idempotent. A DAG root node is created for this project.",
+		"slugLabel": "Slug",
+		"slugPlaceholder": "e.g. my-shop",
+		"nameLabel": "Name",
+		"namePlaceholder": "e.g. My Shop",
+		"ownerLabel": "Owner",
+		"ownerPlaceholder": "e.g. owner-1",
+		"createSubmit": "Create project",
+		"listHeading": "Projects ({count})",
+		"rootNode": "DAG root",
+		"rootNodeTitle": "The DAG root node, isolated per project (S53)",
+		"archive": "Archive",
+		"restore": "Restore",
+		"delete": "Delete (soft)",
+		"working": "Working…",
+		"lifecycle": {
+			"active": "active",
+			"archived": "archived",
+			"deleted": "deleted"
+		},
+		"result": {
+			"createOk": "Project created under hash {id}.",
+			"createEmpty": "Fill in slug, name and owner.",
+			"createBadSlug": "Invalid slug: a-z0-9 with single hyphens (\"{slug}\").",
+			"createDuplicate": "The slug \"{slug}\" is already taken for this owner.",
+			"archiveOk": "Project archived (append-only, the head moved).",
+			"restoreOk": "Project restored to active.",
+			"deleteOk": "Project deleted (soft — the row is kept, append-only).",
+			"notFound": "Project not found.",
+			"dbUnreachable": "Postgres unreachable — write impossible. No data changed."
+		},
+		"footer": "Source: live <code>projects</code> schema in Postgres. The panel writes — but only the project scope, <em>below</em> the wall (append-only, soft delete); truth (kernel/mirrors/fitness) stays out of reach. The canonical door remains the <code>project</code> MCP server (ADR 0009); reconciliation goes through the HTTP gateway (S58)."
 	},
 	"records": {
 		"eyebrow": "Kernel · KRDCore records",
@@ -3634,5 +3677,54 @@
 			"reality": "Reality loop (prod teaches the kernel)",
 			"saas": "Onboarding · GDPR · Billing"
 		}
+	},
+	"projectScope": {
+		"eyebrow": "Archive · truth-store project scope",
+		"title": "Project scope",
+		"intro": "S54 turns the truth-store from one undivided singleton graph into a multi-tenant one: a project_id (FK) threads through every truth — kernel·mirrors·ideas·changesets·dag·brain·context — and the pre-existing graph (the Order demo) is backfilled, with zero loss (append-only), into a __system__ seed project. Every read is scoped (WHERE project_id = $1): a query for project A never returns a project B row.",
+		"seedHeading": "The __system__ seed project",
+		"seedIntro": "The content-addressed project that adopts the pre-existing singleton graph. Its id is the SHA-256 of its canonical body (the same scheme as any project, S53) — pinned byte-for-byte in both the migration and the Go code.",
+		"seedSlug": "Slug",
+		"seedOwner": "Owner",
+		"seedName": "Name",
+		"seedLifecycle": "Lifecycle",
+		"seedGenesis": "DAG genesis node",
+		"seedId": "Id (content address)",
+		"tablesHeading": "Project-scoped tables",
+		"tablesIntro": "The closed set of truth + derived tables that gain a project_id (FK to projects.project) plus an index. The migration is expand-contract and reproducible.",
+		"colTable": "Table",
+		"colFk": "FK constraint",
+		"colIndex": "Index",
+		"buildHeading": "Build a scoped read",
+		"buildIntro": "Runs the deterministic ScopedSelect builder: it always carries WHERE project_id = $1 (bind $1 to the active project), and refuses a table outside the closed set — never an unscoped query.",
+		"buildSelectLabel": "Choose a scoped table",
+		"buildButton": "Build scoped read",
+		"building": "Building…",
+		"footer": "S54 · below the wall (CLAUDE.md §2): project_id is a scope column, not a write door. The agent keeps <code>SELECT</code>-only on <code>kernel</code>/<code>mirrors</code>; RLS keyed on the propagated identity arrives in S55."
+	},
+	"projectWall": {
+		"eyebrow": "Runtime · two-layer project-aware wall",
+		"title": "Project-aware wall",
+		"intro": "S55 makes the wall project-aware: the agent reads/writes below the line ONLY for the current project, under its propagated identity (S61). A cross-project op (a project-A scope reaching a project-B row) or a forged gateway identity is refused. Two-layer defense-in-depth: a PreToolUse hook (layer 1) AND a Postgres RLS keyed on identity (layer 2) — which redden independently.",
+		"layersHeading": "The two layers",
+		"layersIntro": "The same rule, enforced in two independent places: breaking one never opens the other.",
+		"layerHook": "Layer 1 — PreToolUse hook",
+		"layerHookValue": "back/runtime/projectwall: a pure, deterministic classifier (an algorithm, not a prompt) that refuses an op outside the active project.",
+		"layerRls": "Layer 2 — Postgres RLS",
+		"layerRlsValue": "back/migrations/project_rls_baseline.sql: a row-level policy keyed on (app.project, app.identity); even bypassed at the hook, the agent role sees no row of another project.",
+		"blockCodeLabel": "Refusal code",
+		"classifyHeading": "Classify a cross-project op",
+		"classifyIntro": "Executes projectwall.Classify (the same predicate the RLS enforces) over an active scope (identity + project) and a target (project + an optionally forged identity). The verdict is allow, or deny with an actionable BlockReason.",
+		"presetSame": "Same project (allow)",
+		"presetCross": "Cross project (deny)",
+		"presetForged": "Forged identity (deny)",
+		"fieldIdentity": "Active identity (propagated)",
+		"fieldActiveProject": "Active project",
+		"fieldTargetProject": "Target project",
+		"fieldClaimedIdentity": "Claimed identity (empty = inherited)",
+		"classifyButton": "Classify",
+		"classifying": "Classifying…",
+		"verdictAllow": "Allowed: the op is in the current project, under the active identity.",
+		"footer": "S55 · the wall is unchanged (CLAUDE.md §2): RLS governs scope (which project), never the waterline (which zones). The agent keeps <code>SELECT</code>-only on <code>kernel</code>/<code>mirrors</code>. The context router is an algorithm, not a prompt."
 	}
 }
