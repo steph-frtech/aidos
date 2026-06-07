@@ -3440,7 +3440,8 @@ La revue DTFS avait pointé le danger du double-typage. v8.1 ajoute une règle s
 | **miroir** | test, preuve, certifier | `miroir` est la tête-preuve ; `test` est un type de miroir |
 | **FKE** | Fractal Kernel Vibing, FKV | `FKE` est le nom acté de la discipline (Livre XXX) ; « vibing » ne désigne que la phase Vibe Lab |
 | **conscience** | Alignment Governor, réconciliateur | `conscience` = l'agrégateur déterministe des verdicts des juges existants — jamais un second juge |
-| **paire-miroir** | doc-miroir, data-miroir, spec-miroir | `paire-miroir` nomme la famille (s1↔s10, s2↔s9, s3↔s7, s4↔s5/s6) ; les noms composés en sont les instances |
+| **paire-miroir** | doc-miroir, data-miroir, spec-miroir | `paire-miroir` nomme une paire déclaré↔prouvé du squelette à 6 paires ; les noms composés en sont des instances |
+| **facette** | lentille, colonne, dimension de vérité | `facette` = une lecture du squelette à 6 paires ; 4 lentilles canoniques (fonctionnel F · invariants ∀ I · sécurité S · performance/budgets B), effondrables |
 | **kernel effondré** | collapsed kernel | le gabarit minimal d'un kernel-feuille ; incompressible = s1 + paire de preuve |
 | **Vibe Lab** | zone /spike, bac à vibe | `Vibe Lab` est le concept FKE ; `/spike` est son implémentation AIDOS |
 | **Promotion Gate** | harvest+grill+goal | le gate FKE — UN concept, DEUX portes (entrée vibe→kernel ; sortie artefact→stable) ; les trois gestes AIDOS restent ses alias opérationnels |
@@ -3616,17 +3617,50 @@ C'est le cœur structurel de FKE. L'anatomie canonique d'un kernel est **symétr
 | **S5** | Contrat sécurité (permissions, capabilities, effets de bord autorisés/interdits, policy) | ↔ | Police + scans (enforcement runtime + SAST/DAST/dependency/SBOM/container/gitleaks) | dessous = machine |
 | **S6** | Evidence sécurité attendue (E4 : pas d'exfiltration, pas d'élévation de privilège) | ↔ | Evidence sécurité observée (scans verts, evals passées, audit Merkle tamper-evident) | oui |
 
-**Les opérateurs de la traversée** (la mécanique, pas du contenu, communs aux deux facettes) : **Validation** = la porte du MUR D'INTENTION (la moitié dessus est-elle acceptée ? — Decision Card) ; **Exécution** = l'acte (Evidence Runner) qui produit Résultats + Evidence observée des deux facettes ; **Conscience** = compare les **douze** paires une à une ; **Loopback ciblé** = sur divergence d'une paire (fonctionnelle OU sécurité), un red wave **ciblé** qui remonte exactement au slot dessus concerné. **Une paire sécurité qui diverge bloque autant qu'une paire fonctionnelle.**
+**Facette INVARIANTS ∀ — 6 paires (le squelette lu en « vrai sur TOUS les chemins ») :**
+
+| # | AU-DESSUS (déclaré) | ↔ | EN-DESSOUS (prouvé) | ubiq. |
+|---|---|---|---|---|
+| **I1** | Énoncé de l'invariant (∀x, P(x)) | ↔ | Doc de l'invariant | oui |
+| **I2** | Comportement universel (ce qui tient sur tout chemin) | ↔ | Résultats ∀ (l'observation sur l'échantillon généré) | oui |
+| **I3** | Propriétés (idempotence, commutativité, monotonie, conservation) | ↔ | Property tests (rapid / fast-check) | oui |
+| **I4** | Domaine de quantification (l'espace d'entrée) | ↔ | Générateurs (l'espace réellement échantillonné) + shrink | oui |
+| **I5** | Contre-exemples interdits (le ∃¬ banni) | ↔ | Invariant enforcé (assert/garde qui le porte ; remontée latérale aux rungs SOURCE) | dessous = machine |
+| **I6** | Evidence ∀ attendue (E5) | ↔ | Evidence ∀ observée (mutation score, fuzz sans crash, contre-exemple minimal) | oui |
+
+**Facette PERFORMANCE / BUDGETS — 6 paires (le squelette lu en « assez rapide, pas trop cher, assez fiable ») :**
+
+| # | AU-DESSUS (déclaré) | ↔ | EN-DESSOUS (prouvé) | ubiq. |
+|---|---|---|---|---|
+| **B1** | Spec de performance (SLO : objectif de latence/débit/dispo) | ↔ | Doc d'exploitation (SLO documenté, runbook perf) | oui |
+| **B2** | Comportement sous charge (ce qui doit tenir à l'échelle) | ↔ | Résultats observés (p50/p95/p99, débit, taux d'erreur) | oui |
+| **B3** | Scénarios de charge | ↔ | Load tests (k6) + benchmarks | oui |
+| **B4** | Modèle de coût (ressources, quotas, ValueCase §66.3) | ↔ | Métrage observé (coût réel, tokens, CI-minutes, AgentRun) | oui |
+| **B5** | Budgets (HarnessCostBudget : caps déclarés, jamais appris) | ↔ | Enforcement de budget (disjoncteur, rate-limit, BlockReason over-budget) | dessous = machine |
+| **B6** | Evidence perf attendue (E5/E6) | ↔ | Evidence perf observée (benchmark vert, OTel runtime, SLO tenu) | oui |
+
+**L'unification — N facettes, UN squelette, N lentilles.** Les quatre facettes ne sont pas quatre anatomies différentes : c'est **le même squelette de six paires** (Spec → Comportement → Scénarios → Modèle/Domaine → Contrat → Evidence ↔ leurs reflets), **lu à travers une lentille** :
+
+| Lentille | La question qu'elle pose | Niveau de preuve dominant |
+|---|---|---|
+| **Fonctionnel** (F) | fait-il ce qu'on veut ? (par l'exemple, ∃) | N0/N2/N4 → E1-E3 |
+| **Invariants ∀** (I) | est-ce vrai sur TOUS les chemins ? | N1 → E5 |
+| **Sécurité** (S) | résiste-t-il aux attaques ? | → E4 |
+| **Performance / Budgets** (B) | assez rapide, pas trop cher, assez fiable ? | → E5/E6 |
+
+**Facettes effondrables (anti-explosion, même règle que le kernel effondré).** Un kernel n'instancie une facette **que s'il porte cette nature de vérité**. La facette **fonctionnelle est toujours présente** (incompressible : F1 + sa paire de preuve). Une fonction pure de tri porte F + I (invariants), pas forcément S ni B. Un endpoint qui expose des données PII porte F + S + B. Un kernel-vue déclaratif peut n'avoir que F. On n'instancie jamais une facette vide : « le plus petit cliquet qui clique ».
+
+**Les opérateurs de la traversée** (la mécanique, pas du contenu, communs à TOUTES les facettes) : **Validation** = la porte du MUR D'INTENTION (la moitié dessus est-elle acceptée ? — Decision Card) ; **Exécution** = l'acte (Evidence Runner) qui produit Résultats + Evidence observée de toutes les facettes instanciées ; **Conscience** = compare **toutes les paires instanciées** une à une (jusqu'à 6 × 4 = 24, en pratique les facettes effondrées) ; **Loopback ciblé** = sur divergence d'une paire (quelle que soit la lentille), un red wave **ciblé** qui remonte exactement au slot dessus concerné. **Une paire qui diverge bloque, quelle que soit sa lentille** — une régression de perf ou une faille de sécurité non reflétée est un monstre, au même titre qu'un test fonctionnel manquant.
 
 *(Vue effondrée à 10 slots — le raccourci historique : s1=F1↑, s10=F1↓ ; s2=F2↑ ; s3=F4↑, s7=F4↓ ; s4=F3↑+F6↑, s5=F3↓, s6=F2↓+F6↓ ; s8=F5↓ ; la facette sécurité S1-S6 y était compressée en « consigne sécurité » — la forme complète la déplie.)*
 
 Cinq conséquences fondatrices :
 
-1. **Le « miroir » se généralise en DOUZE paires strictes**, deux facettes de six (fonctionnel F1-F6, sécurité S1-S6). Une paire qui diverge — *quelle que soit la facette* — = soit l'implémentation est rouge, soit la vérité doit évoluer (la boucle, §FKE-35).
+1. **Le « miroir » se généralise en N facettes × six paires**, quatre lentilles canoniques (fonctionnel F, invariants ∀ I, sécurité S, performance/budgets B), effondrables. Une paire qui diverge — *quelle que soit la facette* — = soit l'implémentation est rouge, soit la vérité doit évoluer (la boucle, §FKE-35).
 2. **Plus aucune orpheline : le Contrat (F5↑) apparie enfin le Code (F5↓), et le Contrat sécurité (S5↑) apparie la Police (S5↓).** Dans la vue effondrée, s8 (code) semblait sans contrepartie ; la forme complète montre qu'il reflète le **Contrat**. Le code reste **optionnel par ÉMISSION, pas par absence de partenaire** : pour un kernel déclaratif (vue, policy, doc), le Contrat est satisfait **entièrement par projection** — le code est généré, pas écrit à la main (loi 6).
 3. **Le mur est aussi une frontière de LANGUE.** La plupart des paires sont **ubiquitaires des deux côtés** — l'humain lit sa langue jusque dans les retours d'en bas (Résultats, Doc dérivée, Projection, denials, Evidence observée). Seuls **les côtés DESSOUS de F5 (Code), S4 (sécurité implémentée) et S5 (police/scans)** parlent machine : la zone machine = exactement la zone de l'agent.
 4. **La sécurité est une FACETTE complète, pas une note.** Six paires propres (S1-S6), strictement parallèles aux six fonctionnelles : la sécurité a sa spec, ses abuse cases, ses scénarios, son threat model, son contrat, son evidence — déclarés au-dessus — et leurs reflets prouvés en-dessous (doc, denials, tests sécurité, sécurité implémentée, police+scans, evidence sécurité). C'est la **sécurité fractale** (§FKE-8) déployée en 1-pour-1.
-5. **La conscience (§FKE-6.3) est le comparateur des douze paires.** Aligné = les douze concordent. Drift = une paire diverge → Loopback **ciblé** sur le slot dessus de cette paire. La loi de complétude devient : *un kernel dont une paire requise (fonctionnelle OU sécurité) manque ou diverge sans décision est un monstre* — **une faille de sécurité non reflétée est un monstre, au même titre qu'un test manquant.**
+5. **La conscience (§FKE-6.3) est le comparateur de toutes les paires instanciées** (les 4 lentilles, facettes effondrées). Aligné = toutes concordent. Drift = une paire diverge → Loopback **ciblé** sur le slot dessus de cette paire. La loi de complétude devient : *un kernel dont une paire requise (toute lentille) manque ou diverge sans décision est un monstre* — **une faille de sécurité, une régression de perf ou un invariant non prouvé sont des monstres, au même titre qu'un test fonctionnel manquant.**
 
 La symétrie vaut aussi pour les **facettes transversales** : la sécurité (§8) a sa moitié intentionnelle (au-dessus) et sa moitié implémentée (en-dessous) ; la mémoire, la policy et la doc pareillement. **Tout le manifest (§19) est organisé en deux colonnes réfléchies + la boucle qui les compare.**
 
