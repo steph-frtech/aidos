@@ -29,6 +29,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/gateway", k: "gateway" },
 			{ href: "/goal-stream", k: "goalStream" },
 			{ href: "/blocks", k: "blocks" },
+			{ href: "/auth", k: "auth" },
 			{ href: "/app-builder", k: "appBuilder" },
 			{ href: "/first-app", k: "firstApp" },
 			{ href: "/proof-levels", k: "proofLevels" },

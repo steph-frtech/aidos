@@ -98,7 +98,8 @@
 		"projectDag": "Per-project DAG",
 		"gateway": "MCP-HTTP gateway",
 		"goalStream": "Live goal",
-		"blocks": "Refusals (BlockReason)"
+		"blocks": "Refusals (BlockReason)",
+		"auth": "Authentication"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -3795,6 +3796,35 @@
 		"severityLabel": "Severity",
 		"routedUnexpected": "Routed (unexpected) — this tool is not a truth-write.",
 		"footer": "S60 · the wall is unchanged (CLAUDE.md §2): truth moves only via a <code>ChangeSet</code> (idea → mirror → /goal → approval). The refusal is deterministic — same input → same BlockReason."
+	},
+	"auth": {
+		"eyebrow": "Auth · OAuth/OIDC + sessions + two-layer identity",
+		"title": "Authentication & sessions",
+		"intro": "S61 adds OAuth/OIDC + sessions (Auth.js in the Workbench, JWT verified by the gateway) and the account model (accounts.users: id, email, identity_provider). The resolved identity propagates into EVERY gateway call AND descends to the Postgres RLS (S55) — never gateway-only. Auth lives outside the Kernel.",
+		"sessionHeading": "Sign in · open a session",
+		"sessionIntro": "Pick an OAuth/OIDC provider and sign in. The gateway verifies the JWT and resolves a verified principal whose identity descends to BOTH walls (gateway scope + the RLS GUC app.identity). A blank subject is refused UNAUTHENTICATED (no anonymous door).",
+		"fieldSubject": "Subject (accounts.users.id)",
+		"fieldEmail": "Verified email",
+		"fieldProvider": "OIDC provider",
+		"signInButton": "Sign in",
+		"signingIn": "Signing in…",
+		"signOutButton": "Sign out",
+		"sessionOpenTitle": "Session open — identity propagated",
+		"labelIdentity": "Propagated identity",
+		"labelEmail": "Email",
+		"labelProvider": "Provider",
+		"propagationNote": "This identity is the ONE value both the gateway (layer 1) AND the Postgres RLS (layer 2, SET LOCAL app.identity) use — a gateway bug cannot widen it.",
+		"attemptHeading": "Unauthenticated call to a truth-write",
+		"attemptIntro": "Executes a call WITHOUT a valid session to a truth-write endpoint, through the same door the live server applies (auth → scope → zone). It is refused UNAUTHENTICATED UPSTREAM of routing — it reaches NO project data. Its real BlockReason surfaces as an inline toast.",
+		"fieldProject": "Target project",
+		"fieldTool": "Truth-write endpoint",
+		"attemptButton": "Attempt unauthenticated",
+		"attempting": "Attempting…",
+		"toastTitle": "Refused: unauthenticated call",
+		"howToFixLabel": "How to fix",
+		"severityLabel": "Severity",
+		"routedUnexpected": "Routed (unexpected) — an unauthenticated call should never have passed.",
+		"footer": "S61 · authentication is never gateway-only (CLAUDE.md §2): the same identity descends to the Postgres RLS (S55). An unauthenticated call is refused <code>UNAUTHENTICATED</code> before any data access. Deterministic — same input → same decision."
 	},
 	"projectWall": {
 		"eyebrow": "Runtime · two-layer project-aware wall",

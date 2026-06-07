@@ -98,7 +98,8 @@
 		"projectDag": "DAG par projet",
 		"gateway": "Passerelle MCP-HTTP",
 		"goalStream": "Goal en direct",
-		"blocks": "Refus (BlockReason)"
+		"blocks": "Refus (BlockReason)",
+		"auth": "Authentification"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3795,6 +3796,35 @@
 		"severityLabel": "Sévérité",
 		"routedUnexpected": "Routé (inattendu) — cet outil n'est pas une écriture-vérité.",
 		"footer": "S60 · le mur ne change pas (CLAUDE.md §2) : la vérité ne bouge que par <code>ChangeSet</code> (idée → miroir → /goal → approbation). Le refus est déterministe — même entrée → même BlockReason."
+	},
+	"auth": {
+		"eyebrow": "Auth · OAuth/OIDC + sessions + identité deux couches",
+		"title": "Authentification & sessions",
+		"intro": "S61 ajoute OAuth/OIDC + sessions (Auth.js côté Workbench, JWT vérifié par la passerelle) et le modèle compte (accounts.users : id, email, identity_provider). L'identité résolue se propage dans CHAQUE appel passerelle ET descend jusqu'à la RLS Postgres (S55) — jamais gateway-only. L'auth vit hors du Kernel.",
+		"sessionHeading": "Se connecter · ouvrir une session",
+		"sessionIntro": "Choisissez un fournisseur OAuth/OIDC et connectez-vous. La passerelle vérifie le JWT et résout un principal vérifié dont l'identité descend aux DEUX murs (scope passerelle + GUC RLS app.identity). Un sujet vide est refusé UNAUTHENTICATED (pas de porte anonyme).",
+		"fieldSubject": "Sujet (accounts.users.id)",
+		"fieldEmail": "Email vérifié",
+		"fieldProvider": "Fournisseur OIDC",
+		"signInButton": "Se connecter",
+		"signingIn": "Connexion…",
+		"signOutButton": "Se déconnecter",
+		"sessionOpenTitle": "Session ouverte — identité propagée",
+		"labelIdentity": "Identité propagée",
+		"labelEmail": "Email",
+		"labelProvider": "Fournisseur",
+		"propagationNote": "Cette identité est l'UNIQUE valeur que la passerelle (couche 1) ET la RLS Postgres (couche 2, SET LOCAL app.identity) utilisent — un bug passerelle ne peut pas l'élargir.",
+		"attemptHeading": "Appel non authentifié à une écriture-vérité",
+		"attemptIntro": "Exécute un appel SANS session valide vers un endpoint d'écriture-vérité, par la même porte que le serveur vivant (auth → scope → zone). Il est refusé UNAUTHENTICATED EN AMONT du routage — il n'atteint AUCUNE donnée projet. Son BlockReason réel fait surface en toast inline.",
+		"fieldProject": "Projet ciblé",
+		"fieldTool": "Endpoint écriture-vérité",
+		"attemptButton": "Tenter sans authentification",
+		"attempting": "Tentative…",
+		"toastTitle": "Refusé : appel non authentifié",
+		"howToFixLabel": "Comment réparer",
+		"severityLabel": "Sévérité",
+		"routedUnexpected": "Routé (inattendu) — un appel non authentifié n'aurait jamais dû passer.",
+		"footer": "S61 · l'authentification n'est jamais gateway-only (CLAUDE.md §2) : la même identité descend jusqu'à la RLS Postgres (S55). Un appel non authentifié est refusé <code>UNAUTHENTICATED</code> avant tout accès aux données. Déterministe — même entrée → même décision."
 	},
 	"projectWall": {
 		"eyebrow": "Runtime · mur project-aware deux couches",
