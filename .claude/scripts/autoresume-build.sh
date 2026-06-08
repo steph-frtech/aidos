@@ -28,11 +28,12 @@ exec 9>"$LOCK"; flock -n 9 || exit 0
 TRACK=EL; PLAN=EL_PLAN.md; LAST=19; NEXTPREFIX=""; NEXTLAST=""
 if [ -f "$STATE" ]; then read -r TRACK PLAN LAST NEXTPREFIX NEXTLAST < "$STATE" 2>/dev/null || true; fi
 
-# highest NN pushed in docs for a given step-prefix, or -1
+# highest step NN whose concept doc FILE exists, or -1.
+# Filesystem-based (steps/concept/<prefix>NN-*.mdx), NOT git-log: a commit MESSAGE
+# mentioning e.g. "FK01-16" must never be mistaken for a pushed FK step doc.
 last_num(){
   local p="$1" v
-  v=$(cd "$DOCS" 2>/dev/null && git log --oneline -150 2>/dev/null \
-      | grep -oiE "${p}[0-9]+" | sed -E "s/^${p}//I" | sort -n | tail -1)
+  v=$(ls "$DOCS/steps/concept" 2>/dev/null | grep -oiE "^${p}[0-9]+" | sed -E "s/^${p}//I" | sort -n | tail -1)
   if [[ "$v" =~ ^[0-9]+$ ]]; then echo $((10#$v)); else echo -1; fi
 }
 
