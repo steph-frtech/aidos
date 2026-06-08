@@ -106,11 +106,11 @@
 **Detail:** FKE-21.
 **Criteres de done:** fault-injection — renommer une table hors lexique → rouge ; property — vérification = fonction pure du lexique + symboles.
 
-## FK15 — Projections d'outillage : CLAUDE.md/AGENTS.md générés
+## FK15 — Projections d'outillage + Spécification technique & Tests techniques (générés)
 **Sous-systeme:** Generators
-**Objectif:** `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, memory-bank émis depuis les kernels (policy/memory/style/architecture/agent-profile) — jamais hand-édités (hash-protégés, drift par source-hash).
-**Detail:** FKE-20. D'abord kerneliser le contenu actuel (legacy kernelizer, trust=inferred→validé), sans perte.
-**Criteres de done:** property — mêmes kernels → mêmes fichiers byte-identiques ; un hand-edit détecté ; contenu actuel kernelisé sans perte.
+**Objectif:** (a) `CLAUDE.md`/`AGENTS.md`/`.cursorrules`/memory-bank émis depuis les kernels (policy/memory/style/architecture/agent-profile) ; (b) **deux projections par kernel** (FKE-20.1) : la **Fiche de Spécification Technique** (assemble Contrat F5 + Modèle F4 + specs des facettes S1/B1/R1/V1/M1 + ADR liés, rangée par couches ISO) et la **Suite de Tests Techniques** (unitaire/intégration N4 + infra N5 + tests sécurité/perf/chaos/arch S3/B3/R3/M3). Jamais hand-éditées (hash-protégées, drift par source-hash) ; jamais la vérité (vues assemblées, pas de double-typage).
+**Detail:** FKE-20 + FKE-20.1. D'abord kerneliser le contenu actuel (legacy kernelizer, trust=inferred→validé), sans perte.
+**Criteres de done:** property — mêmes kernels → mêmes fichiers byte-identiques (outillage ET fiche tech ET suite de tests) ; un hand-edit détecté ; la fiche technique assemble exactement les déclarations techniques existantes (zéro nouvelle vérité) ; contenu actuel kernelisé sans perte.
 
 ## FK16 — Contract E0-E7 : bascule du schéma (STRICTEMENT en dernier)
 **Sous-systeme:** Mirror / Archive / Workbench
