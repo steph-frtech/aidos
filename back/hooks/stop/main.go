@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/steph-frtech/aidos/back/kernel/mirror/completeness"
+	"github.com/steph-frtech/aidos/back/runtime/blockreason"
 )
 
 const (
@@ -39,12 +40,23 @@ func DecodeEvent(r io.Reader) (StopEvent, error) {
 	return ev, nil
 }
 
-// Run is the binary entrypoint: read the Stop event, load the current cut, run the
-// completeness gate, record the run append-only (when a DB is wired), and return
-// the process exit code (0 = allow Stop, 2 = block Stop). On block it writes the
-// BlockReason JSON to stdout so the harness can surface the actionable refusal. A
-// decode error fails closed (block) — an unparseable event is a failure made
-// explicit (KRD §82), never a silent pass.
+// goalSource is the goal-check half's input seam (S29). It defaults to NoGoalSource
+// (no open goal → goal-check is a no-op) so the binary and the prior completeness
+// tests run unchanged; the production binary wires the SELECT-only Postgres source,
+// and the goal fault-injection test swaps it to stage an open goal. This is the
+// non-bypassable, ADDITIVE composition of the two halves (a new guardrail ADDS,
+// never REMOVES — CLAUDE.md §5 meta-loop).
+var goalSource GoalCheckSource = NoGoalSource{}
+
+// Run is the binary entrypoint: read the Stop event, run the NON-GAMEABLE goal-check
+// (red set → green ∧ prior green intact ∧ mutation ≥ floor ∧ no monster — KRD §57 ①,
+// S29) THEN the completeness gate (`goal-check && completeness-check`, doc.go),
+// record the run append-only (when a DB is wired), and return the process exit code
+// (0 = allow Stop, 2 = block Stop). On block it writes the BlockReason JSON to stdout
+// so the harness can surface the actionable refusal. A decode error — or a goal that
+// is still red / a broken prior green / a low mutation / a monster — fails closed
+// (block): an unverifiable or not-yet-done Stop does NOT pass (KRD §82), never a
+// silent pass. "Done" is COMPUTED here, never declared by the agent (CLAUDE.md §8).
 func Run(ctx context.Context, stdin io.Reader, stdout io.Writer, src CutSource, log RunLog) int {
 	if _, err := DecodeEvent(stdin); err != nil {
 		writeBlock(stdout, &completeness.BlockReason{
@@ -58,6 +70,15 @@ func Run(ctx context.Context, stdin io.Reader, stdout io.Writer, src CutSource, 
 		return exitBlock
 	}
 
+	// (1) Goal-check half (S29) — the non-gameable stop. Runs FIRST: if the goal is
+	// still red (or prior green broken / mutation below floor / a monster), the Stop
+	// is blocked before the completeness half, and the agent cannot self-declare done.
+	if br := CheckGoal(ctx, goalSource); br != nil {
+		writeGoalBlock(stdout, br)
+		return exitBlock
+	}
+
+	// (2) Completeness half (S12) — no monster in the head cut.
 	decision := CheckCompleteness(ctx, src, log)
 	if decision.Verdict == completeness.VerdictBlock {
 		writeBlock(stdout, decision.BlockReason)
@@ -67,6 +88,15 @@ func Run(ctx context.Context, stdin io.Reader, stdout io.Writer, src CutSource, 
 }
 
 func writeBlock(w io.Writer, br *completeness.BlockReason) {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(br)
+}
+
+// writeGoalBlock emits the goal-check half's actionable BlockReason (S13 shape, reused
+// from back/runtime/goal via blockreason). Distinct from writeBlock only by payload
+// type; both surface an actionable refusal to the harness on a blocked Stop.
+func writeGoalBlock(w io.Writer, br *blockreason.BlockReason) {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(br)

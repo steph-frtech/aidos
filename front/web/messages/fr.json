@@ -99,7 +99,9 @@
 		"gateway": "Passerelle MCP-HTTP",
 		"goalStream": "Goal en direct",
 		"blocks": "Refus (BlockReason)",
-		"auth": "Authentification"
+		"auth": "Authentification",
+		"projectMembers": "Adhésions",
+		"authorityBinding": "Liaison autorité"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -3883,5 +3885,91 @@
 		"restoreButton": "Restaurer",
 		"running": "Exécution…",
 		"footer": "S56 · l'Archive ne change pas (CLAUDE.md §2) : ce panel calcule le verdict d'espace de version via le jumeau déterministe <code>projectDag</code> (byte-identique au Go) ; enregistrer un nœud passe par le MCP <code>dag</code> sous le rôle privilégié, jamais par l'écran."
+	},
+	"projectMembers": {
+		"eyebrow": "S62 · Adhésion & propriété",
+		"title": "Adhésions de projet",
+		"intro": "La jointure (identité × projet × rôle). Troisième couche du mur (S55 ⇄ S61 ⇄ S62) : l'authentification prouve QUI vous êtes, l'adhésion prouve que vous êtes membre de CE projet. Un non-membre est refusé NOT_A_MEMBER ; un viewer lit mais ne mute pas. Inviter / changer un rôle / retirer — sous le mur, append-only, gradient owner ⊃ editor ⊃ viewer.",
+		"liveTitle": "Lecture en direct de accounts.project_members.",
+		"demoTitle": "Postgres injoignable — démonstration déterministe (oz owner, ed editor, vic viewer).",
+		"inviteHeading": "Inviter un membre",
+		"inviteHint": "Lie une identité au projet avec un rôle. Réservé au owner (l'identité « actrice » doit être owner de ce projet) ; un non-owner est refusé ROLE_FORBIDDEN.",
+		"actorLabel": "Identité actrice",
+		"actorPlaceholder": "ex. oz (owner)",
+		"identityLabel": "Identité invitée",
+		"identityPlaceholder": "ex. alice@x",
+		"roleLabel": "Rôle",
+		"inviteSubmit": "Inviter",
+		"roleApply": "Appliquer",
+		"remove": "Retirer",
+		"working": "…",
+		"listHeading": "Membres de « {project} » ({count})",
+		"role": {
+			"owner": "owner",
+			"editor": "editor",
+			"viewer": "viewer"
+		},
+		"result": {
+			"inviteOk": "Membre invité (adhésion {id}).",
+			"roleOk": "Rôle changé (nouvelle adhésion {id}).",
+			"removeOk": "Membre retiré (révoqué, append-only).",
+			"inviteEmpty": "Identité et rôle requis.",
+			"badRole": "Rôle invalide — owner, editor ou viewer.",
+			"notAMember": "Refus : l'identité actrice n'est PAS membre de ce projet (NOT_A_MEMBER).",
+			"roleForbidden": "Refus : seul un owner peut administrer l'adhésion (ROLE_FORBIDDEN).",
+			"notFound": "Aucune adhésion active à modifier.",
+			"dbUnreachable": "Postgres injoignable — action non persistée."
+		},
+		"footer": "Sous le mur (CLAUDE.md §2) : <code>accounts.project_members</code> n'est pas kernel/mirrors/fitness. La RLS S55 se keye sur l'adhésion ; le gradient est déclaré, jamais appris (§8)."
+	},
+	"authorityBinding": {
+		"eyebrow": "S63 · Humain lié à l'autorité",
+		"title": "Liaison autorité & provenance",
+		"intro": "Un user réel — via son rôle d'adhésion (S62) — est lié à une autorité (approver / veto / escalation) PAR SCOPE (S16 AuthorityGraph). Une proposition d'écriture-vérité exige l'approbation d'un user détenant l'autorité du scope, sinon INSUFFICIENT_AUTHORITY. Chaque Idea/ChangeSet enregistre l'humain agissant comme provenance — jamais un placeholder. Un override reste une décision ENREGISTRÉE (ChangeSet + ADR + provenance).",
+		"liveTitle": "Décision déterministe — le juge est du code (pas un LLM).",
+		"demoTitle": "Décision déterministe — le juge est du code (pas un LLM).",
+		"proposeHeading": "Proposer une écriture-vérité",
+		"proposeHint": "L'humain agissant doit détenir l'autorité du scope. Domaine checkout : approbateur product_owner, veto security. Bindings : un owner détient product_owner.",
+		"actorIdentityLabel": "Identité actrice (réelle)",
+		"actorIdentityPlaceholder": "ex. user-alice",
+		"actorDisplayLabel": "Nom affiché",
+		"actorDisplayPlaceholder": "ex. Alice",
+		"memberRoleLabel": "Rôle d'adhésion dans le scope",
+		"intentLabel": "Intention (provenance verbatim)",
+		"intentPlaceholder": "ex. je veux une remise checkout",
+		"proposeSubmit": "Proposer",
+		"nonMember": "non-membre",
+		"verdictHeading": "Verdict",
+		"decisionAdmitted": "ADMISE",
+		"decisionBlocked": "BLOQUÉE",
+		"decisionEscalated": "ESCALADÉE",
+		"grantedRoles": "Rôles d'autorité détenus",
+		"noRoles": "aucun",
+		"provenanceHeading": "Provenance enregistrée",
+		"overrideHeading": "Enregistrer un override",
+		"overrideHint": "Un override n'est pas une édition, c'est une décision ENREGISTRÉE (CLAUDE.md §8) : ChangeSet + ADR + provenance d'acteur réel obligatoires.",
+		"changesetLabel": "ChangeSet (réf.)",
+		"changesetPlaceholder": "ex. cs-123",
+		"adrLabel": "ADR (réf.)",
+		"adrPlaceholder": "ex. ADR 0042",
+		"reasonLabel": "Raison (verbatim)",
+		"reasonPlaceholder": "ex. exception réglementaire validée",
+		"overrideSubmit": "Enregistrer l'override",
+		"overrideRecorded": "Override enregistré (content-addressed) : {id}",
+		"working": "…",
+		"memberRole": {
+			"owner": "owner",
+			"editor": "editor",
+			"viewer": "viewer",
+			"none": "non-membre"
+		},
+		"code": {
+			"INSUFFICIENT_AUTHORITY": "INSUFFICIENT_AUTHORITY",
+			"PLACEHOLDER_ACTOR": "PLACEHOLDER_ACTOR",
+			"OVERRIDE_NOT_RECORDED": "OVERRIDE_NOT_RECORDED",
+			"VETOED": "VETOED"
+		},
+		"howToFix": "Comment corriger",
+		"footer": "Code : <code>back/runtime/authoritybinding</code> (pur, déterministe) + son jumeau <code>lib/authority-binding.ts</code>. Le juge est du code, jamais un LLM (CLAUDE.md §8). Le mur est intact : la décision ne lit ni n'écrit la vérité ; un override passe par un ChangeSet."
 	}
 }

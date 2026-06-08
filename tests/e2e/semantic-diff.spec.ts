@@ -47,7 +47,9 @@ test.describe("S21 — the SemanticDiff panel", () => {
 		const result = page.getByTestId("diff-result");
 		await expect(result).toBeVisible();
 		await expect(result).toHaveAttribute("data-change-type", "rescope");
-		await expect(page.getByTestId("change-type-badge")).toContainText("rescope");
+		await expect(page.getByTestId("change-type-badge")).toContainText(
+			"rescope",
+		);
 		await expect(page.getByTestId("change-type-badge")).not.toContainText(
 			"override",
 		);

@@ -21,4 +21,6 @@ S07 = the PostToolUse sensors hook (`back/hooks/posttooluse`), twin of the S04 w
 
 **OpenQuestions (forward-deps, NOT residual):** OQ-S07-1 affected-set transitive closure; OQ-S07-2 go-arch-lint/depguard at arch-fitness step; OQ-S07-3 sensors MCP for rerun-on-demand.
 
-Verified PASS, zero corrections, zero residual. AID-48 Done (correct). Docs live + pushed (8858d97 == origin/main), mint validate clean, three layers present.
+Verified PASS, zero corrections, zero residual. AID-48 Done (correct). Docs live + pushed, three layers present docs.json:81-82.
+
+RE-VERIFIED 2026-06-07 (post S61, build/s00-s47): all green again on this build — Go -count=1 GREEN 11.6s Testcontainers real pg, gofmt/vet/build ./... clean; vitest 7/7, tsc rc=0, e2e 5/5 live 5.5s, i18n 3441==3441 sensors 19==19 zero drift. WorkbenchHeader:292 biome useKeyWithClickEvents warning = PRE-EXISTING commit 295112e (2026-06-03), NOT S07 (S07 only added nav line 95) — recurring scar, never a residual. Linear MCP unauth=OQ. ZERO corrections.

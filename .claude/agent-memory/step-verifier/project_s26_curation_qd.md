@@ -1,18 +1,24 @@
 ---
 name: s26-curation-qd
-description: S26 ArchiveCurationPolicy (keep/compress/tombstone) + QD MAP-Elites niches — pure cores, append-only DAG side tables, read-only projection
+description: S26 ArchiveCurationPolicy (keep/compress/tombstone §44.4) + QD niches MAP-Elites (§62/§123) — verified-green verdict
 metadata:
   type: project
 ---
 
-S26 = the Archive's curation policy + quality-diversity selection, both PURE.
+S26 = ArchiveCurationPolicy keep/compress/tombstone (§44.4) + QD niches MAP-Elites (§62/§123). verification_status=passed, ZERO corrections.
 
-- `curation.Curate(nodes,policy,now)→[]CurationDecision` — declared bands (KRD §44.4), precedence tombstone>keep>compress, keep conservative default; `now` is a parameter (replayable); every input node id appears exactly once (no-node-dropped/append-only); `Hashed()` reuses S01/S02 content hash (KindPhase body), never forked.
-- `qd.Elites(variants)→map[niche]Variant` — MAP-Elites, one green-mirror élite per niche by max anchored fitness (ties by smaller id); red mirror NEVER promoted whatever fitness (the deterministic Judge is the mirror, anti-Goodhart); niche descriptor declared not learned; never invents niche/fitness.
-- Migration `dag_curation_qd_baseline.sql`: `dag.curation_decision` (id=content-hash PK, verdict CHECK) + `dag.niche_elite` (PK (niche_key, recorded_at) ⇒ new élite = new row, append-only). Tombstone/compress = a DECISION ROW, never DELETE/DROP. Wall: agent SELECT-only, UPDATE/DELETE withheld from both roles, `aidos` writer INSERT via S20.
-- Mirrors: Go fixtures + rapid properties (semantic asserts, content-address re-derived via records.Hash) + Testcontainers roundtrip (CHECK, agent INSERT/DELETE refused, append-only, prior dag.* intact) + front fast-check twin (9 tests).
-- Front twin lib/archive-curation.ts mirrors Go semantics exactly; data fixture drives e2e (createOrder/discount→var-C élite; cancelOrder/refund red-only→EMPTY cell). 6 Playwright pass on port 3000. 25 i18n keys present fr+en (namespace archiveCuration; nav label under nav.*).
+curation.go PURE Curate(nodes,policy,now)->[]CurationDecision; now=PARAM no clock; precedence tombstone>keep>compress, conservative keep default; tombstone/compress=DECISION ROW never delete (append-only §12); every input node EXACTLY once (findDecision count==1); DefaultPolicy materializes §44.4 bands verbatim never coined; decision.Hashed reuses S02 records.Canonicalize+records.Hash through KindPhase body NOT forked. qd.go PURE Elites->one green-mirror élite per niche by MAX anchored fitness, ties smaller id; red-mirror NEVER promoted WHATEVER fitness (mirror is Judge never score never CellVitality); empty cell for red-only niche.
 
-**Why:** read-only projection step — curation/QD are selection DECISIONS surfaced read-only; truth-writes ride S20 ChangeSet ⇒ ui-completeness vacuous on write-path (consistent with the verified-green line).
+DONE-CRIT all met: unsafe=>tombstone+still-present (var-7), stable_phase+pareto_elite=>keep, failed>30d=>compress, content-addr id==Hash(Canon(body)) recomputed independently; green-mirror=>élite, red-higher-fitness=>NOT promoted.
 
-**How to apply:** OpenQuestions (node-metadata flag source from prior steps; fitness consumed not coined; compress=decision not compacted artifact; variant generation = S42 /evolve) are by-design forward-deps, NOT residual issues. Linear AID-14 = S26. Verified-green.
+go test green; migration Testcontainers ran fresh 11.79s GREEN (VerdictCheck refuses purge, AgentRoleSelectOnly INSERT+DELETE permission-denied, NicheElite append-only 2-rows current=latest, ExpandOnly prior dag.stable_phase untouched, WriterRoleCanInsert). gofmt/vet clean.
+
+migration dag.curation_decision(id PK content-addr, verdict CHECK keep|compress|tombstone)+dag.niche_elite(PK (niche_key,recorded_at)=new élite NEW ROW never UPDATE); agent SELECT-only REVOKE all writes both tables; aidos writer SELECT+INSERT only; prior S02/S23 untouched. NO DELETE/DROP on DAG node.
+
+front lib/archive-curation.ts byte-faithful twin; lib/archive-curation-data.ts (NOT in report files_changed but load-bearing - e2e anchors var-C élite createOrder/discount 0.9>var-A0.8, cancelOrder/refund red-only EMPTY, applyTax/eu filled). vitest 9/9, tsc rc=0, biome clean 5. Panel READ-ONLY action-capable (runs pure curate()/nicheGrid()). e2e 6 tests testids match. nav WorkbenchHeader:117. i18n 3441==3441 archiveCuration 25==25.
+
+Badge raw-palette emerald/amber/zinc = established pattern NOT ADR0010 viol (S21 precedent).
+
+docs 3 layers internals; docs.json:121-122; mint validate PASSED; .aidos-docs 0-ahead pushed tree-clean.
+
+OQ by-design (NOT residual): Linear MCP unauth/variant-generation=later /evolve/fitness+niche-grammar consumed-declared/compress=decision-not-artifact/recording rides S20 ChangeSet. verified-green ZERO corrections.

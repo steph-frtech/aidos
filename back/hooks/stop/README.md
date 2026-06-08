@@ -1,13 +1,18 @@
-# Stop hook — completeness (ACTIVE, S12) + goal-check (scaffold, S29)
+# Stop hook — completeness (ACTIVE, S12) + goal-check (ACTIVE, S29)
 
-> **Status (S12): the COMPLETENESS half is ACTIVE and fault-injection-tested.**
-> The Stop hook now reads the current cut of `mirrors ⋈ kernel`, runs S06's monster
+> **Status: BOTH halves are ACTIVE and fault-injection-tested.**
+> The Stop hook reads the current cut of `mirrors ⋈ kernel`, runs S06's monster
 > detector + the S12 gate (`back/kernel/mirror/completeness`), and **blocks** the
 > Stop on any monster (BlockReason code `MONSTER`; `INCOMPLETE` when the check
 > itself cannot run — KRD §82 fail-closed). Every evaluation is recorded
 > append-only in `runtime.completeness_runs` (ADR 0014/0015, below the waterline).
 > The **goal-check half** (`red set → green ∧ prior green intact ∧ mutation ≥
-> threshold`) remains a scaffold, **activated at S29** (OQ-S12-2).
+> threshold ∧ no monster`) is now **ACTIVE at S29**: it REUSES the pure engine
+> `goal.IsClosed` / `goal.CloseBlockReason` (`back/runtime/goal`) and BLOCKS the
+> Stop while an OPEN goal is not closeable (BlockReason `GOAL_STILL_RED`). It runs
+> FIRST (`goal-check && completeness-check`), reads NO agent-confidence input (the
+> non-gameable stop, §57 ① — the agent never grades its own copy), and fails closed
+> on an unreadable goal source.
 
 ## Role
 

@@ -1,18 +1,22 @@
 ---
-name: s04-wall
-description: S04 the wall — PreToolUse Go hook (pure Classify) + Postgres GRANT level 2 (Testcontainers fault-injection); read-only /wall UI is correct (ui-completeness vacuous)
+name: project-s04-wall
+description: S04 the wall — PreToolUse hook (level 1) + Postgres GRANTs (level 2) defense-in-depth; verified green zero corrections
 metadata:
   type: project
 ---
 
-S04 erects the wall (defense-in-depth, CLAUDE.md §2) and is the canonical two-level pattern.
+S04 = THE WALL (CLAUDE.md §2), defense-in-depth two levels. All 3 done-crit met.
 
-- **Level 1** = pure `Classify(target) -> Decision` in `back/hooks/pretooluse/wall.go`: deny IFF target above waterline (kernel/mirrors/fitness schemas, or `back/kernel/` / `back/migrations/` paths), emits BlockReason{AGENT_WRITE_ABOVE_WATERLINE, severity, explanation, how_to_fix naming idea→mirror→/goal}. `Run` fails-closed on decode error (exit 2). Determinism-first: rapid property `TestClassifyDenyIffAbove` + `TestClassifyDeterministic` are the reproducibility mirror.
-- **Level 2** = `back/migrations/wall_grants_baseline.sql`: aidos_agent gets USAGE+SELECT only, explicit REVOKE INSERT/UPDATE/DELETE/TRUNCATE + REVOKE CREATE + SELECT-only ALTER DEFAULT PRIVILEGES; aidos writer role keeps write. Idempotent/append-only.
-- **Fault-injection (hook-honesty, §5)** = `wall_grant_injection_test.go` (Testcontainers real Postgres): aidos_agent INSERT into kernel.truth/mirrors.mirror/fitness.waterline → permission denied; aidos INSERT → ok. Uses SET LOCAL ROLE on superuser conn (carries the same GRANTs a LOGIN role would) — acceptable proof of the privilege wall.
+Single-source classifier (OQ-S52-wall resolved at BA03): back/hooks/pretooluse/wall/wall.go (package wall) is the ONE place above-waterline zones declared — schemas {kernel,mirrors,fitness} + path prefixes {back/kernel/,back/migrations/}. ForbiddenZones() returns fresh copy. Hook back/hooks/pretooluse/wall.go (package main) re-exports verbatim via type aliases (anti-overwrite §9 supersede-via-projection, public surface unchanged). Importers VERIFIED: runtime/agentimpl/{gate,agentimpl}.go + kernel/agentlayer/wall.go all import the wall pkg.
 
-**UI**: `/wall` is **read-only and that is correct** — the wall writes no truth and exposes no capability, so the action-capable clause of ui-completeness is **vacuously satisfied** (no headless capability hidden). Same verified-green pattern as [[project_s03_cli_stub]] and [[project_s02_content_address]].
+Level 1 Classify(target)->Decision PURE/TOTAL, deny IFF above-waterline, code AGENT_WRITE_ABOVE_WATERLINE + 4-step how_to_fix naming idea->mirror->/goal door; Run() fail-closed on undecodable event (exit 2). Determinism mirror TestClassifyDeterministic + DenyIffAbove.
 
-**OpenQuestions (by-design forward-deps, non-blocking)**: mirror records materialized to tests/+migration (mirrors schema lands S06); hook not yet wired into .claude/settings.json (runtime concern, not S04's package).
+Level 2 back/migrations/wall_grants_baseline.sql: creates fitness schema+waterline table; aidos_agent USAGE+SELECT only, REVOKE INSERT/UPDATE/DELETE/TRUNCATE+CREATE on kernel/mirrors/fitness, default privileges SELECT-only; aidos writer role keeps write = single door. Idempotent (IF NOT EXISTS, guarded role creates).
 
-Verified green: go vet/gofmt/build clean; `go test -count=1 ./hooks/pretooluse/` 4.6s (Godog 5 + rapid + Testcontainers); vitest 6/6; tsc exit 0; i18n 235/235; Playwright 6/6; mint validate ok, docs pushed (4280d57); prior green (kernel/cmd/archive) intact; Linear AID-31 Done.
+Fault-injection RAN GREEN Testcontainers real postgres:16 (5.1s): TestWallGrantsDenyAgentRole (SET LOCAL ROLE aidos_agent INSERT kernel.truth/mirrors.mirror/fitness.waterline -> permission denied all 3) + TestWallGrantsAllowAidosRole (aidos succeeds). Godog tests/runtime/wall.feature 3 scenarios (kernel deny + Outline 3-zone + below-line allow) via in-process Evaluate. gofmt/vet/build ./... clean.
+
+Front /wall READ-ONLY panel (lib/wall.ts static declared registry mirrors wall.go field-for-field, page.tsx Server Component no I/O); ui-completeness VACUOUS (wall enforced by hook+GRANTs never from screen, no headless capability hidden — correct). tsc clean, biome clean 4 files, vitest lib/wall.test.ts 6/6, i18n 3441==3441 (wall 19 keys both), nav WorkbenchHeader:151. Playwright tests/e2e/wall.spec.ts 6/6 GREEN live :3000 (waterline above/below, block-event code, how_to_fix names idea/mirror//goal).
+
+Docs concept+internals s04-the-wall.mdx 3 layers (Implementation:11/Meta:54/Meta-meta:77), docs.json:75-76, mint validate PASS, committed remote 4280d57, tree clean HEAD==origin d5c9a0b.
+
+OQ (not residual): mirrors Postgres schema=S06 so Gherkin materialized to tests/ (valid pre-S06 mirror); Linear MCP unauth this session. verified-green ZERO corrections.

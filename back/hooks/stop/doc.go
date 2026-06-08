@@ -6,8 +6,11 @@
 // LIVRE XXII §126-§127).
 //
 // ACTIVATED AT S12 for the completeness half. The goal-check half (red set → green
-// ∧ prior green intact ∧ mutation ≥ threshold) is OQ-S12-2, wired at S29; until
-// then it is inert (the README documents the full scaffold).
+// ∧ prior green intact ∧ mutation ≥ threshold ∧ no monster) is now ACTIVE at S29
+// (was OQ-S12-2): it REUSES the pure engine goal.IsClosed / goal.CloseBlockReason
+// (back/runtime/goal) and BLOCKS the Stop while an OPEN goal is not closeable —
+// the non-gameable stop (the agent never grades its own copy). goal-check runs
+// FIRST (`goal-check && completeness-check`); both have fault-injection tests.
 //
 // THE WALL (CLAUDE.md §2): this hook READS the head projection of mirrors ⋈ kernel
 // (the cut) and writes only its own audit log in runtime.completeness_runs (below

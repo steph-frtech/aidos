@@ -30,6 +30,8 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/goal-stream", k: "goalStream" },
 			{ href: "/blocks", k: "blocks" },
 			{ href: "/auth", k: "auth" },
+			{ href: "/project-members", k: "projectMembers" },
+			{ href: "/authority-binding", k: "authorityBinding" },
 			{ href: "/app-builder", k: "appBuilder" },
 			{ href: "/first-app", k: "firstApp" },
 			{ href: "/proof-levels", k: "proofLevels" },
