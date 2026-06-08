@@ -89,3 +89,6 @@ next-env.d.ts
 /back/relation-emitter
 /back/app-auth
 /back/build-loop
+/back/doltgres-spike
+/back/provision
+/back/apisurface

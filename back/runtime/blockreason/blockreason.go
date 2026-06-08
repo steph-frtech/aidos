@@ -323,6 +323,19 @@ const (
 	// generation-only exception. ADDED at S83 (the build-loop circuit breaker); additive
 	// enum extension (change_type: refine, never a removal).
 	CodeBuildLoopNoProgress Code = "BUILD_LOOP_NO_PROGRESS"
+	// CodeSecretMissingAtBoot — the per-app SECRET STORE (S91, back/runtime/secretstore,
+	// app-builder EPIC 9, DP32/ADR 0043) refused to inject the emitted app's environment
+	// at BOOT because a DECLARED secret (a key the app's operations/datastore/connectors
+	// declared they require — a DB credential, a third-party API key, an OAuth secret) is
+	// ABSENT from the project's encrypted-at-rest, project_id-scoped store. A missing secret
+	// is FAIL-CLOSED: the boot is refused with this actionable BlockReason, never started
+	// with a blank/guessed credential (honesty, §8 — never fabricate a value). The check is a
+	// DETERMINISTIC set-difference (declared keys − present keys), never an LLM judgment.
+	// A secret NEVER touches the truth-store, git, or the emitted source (the wall §2 + the
+	// leak-scan done-criterion) — it lives only in the encrypted store and is injected as a
+	// boot-time env var. ADDED at S91 (the per-app secret store) — additive enum extension
+	// (change_type: refine, never a removal); recorded by a ChangeSet + SemanticDiff + ADR.
+	CodeSecretMissingAtBoot Code = "SECRET_MISSING_AT_BOOT"
 )
 
 // Severity is the gravity marker of a refusal. The KRD §44.5 example uses
@@ -843,6 +856,26 @@ var reasons = map[Code]BlockReason{
 			"rerun aidos build : le blocage se lève quand la boucle progresse de nouveau (un miroir passe du rouge au vert dans la fenêtre) sous les caps déclarés.",
 		},
 	},
+	CodeSecretMissingAtBoot: {
+		Code:     CodeSecretMissingAtBoot,
+		Severity: SeverityBlocking,
+		Explanation: "Le boot de l'app émise est REFUSÉ (S91, back/runtime/secretstore, DP32/ADR 0043) : un secret " +
+			"DÉCLARÉ requis (un credential DB, une clé API tierce, un secret OAuth dont une operation, le datastore " +
+			"ou un connecteur de l'app a besoin) est ABSENT du secret store du projet (chiffré au repos, scopé " +
+			"project_id). L'injection des variables d'environnement au boot est FAIL-CLOSED : la liste des clés " +
+			"déclarées MOINS la liste des clés présentes est non vide, donc le boot s'arrête HONNÊTEMENT — jamais " +
+			"démarré avec un credential vide, deviné ou fabriqué (§8 : ne jamais inventer une valeur). Un secret " +
+			"ne touche JAMAIS le truth-store, jamais git, jamais le source émis (le mur §2 + le done-criterion " +
+			"de scan anti-fuite) : il vit uniquement dans le store chiffré et n'est exposé qu'en variable d'env au " +
+			"boot. Le manque est CALCULÉ — une différence d'ensembles déterministe (clés déclarées − clés " +
+			"présentes), jamais un jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"set_the_missing_secret : déposez le secret manquant (nommé dans le verdict) dans le store du projet via la porte `aidos secret set` / le MCP secretstore / l'écran /secret-store — il est chiffré au repos et scopé au project_id, jamais committé.",
+			"check_the_project_scope : vérifiez que le secret est posé sous le BON project_id — un secret du projet A n'est jamais visible par le projet B (isolation, le done-criterion anti-fuite cross-projet).",
+			"rotate_if_compromised : si le secret a fuité, faites une rotation (`aidos secret rotate`) — l'ancienne valeur est invalidée et la nouvelle injectée au prochain boot ; jamais une réécriture silencieuse en place.",
+			"rerun the boot : le blocage se lève dès que toutes les clés déclarées sont présentes dans le store du projet ; l'injection d'env redevient complète et déterministe.",
+		},
+	},
 }
 
 // codeOrder is the canonical enumeration order of the Code enum. Declared, never
@@ -879,6 +912,7 @@ var codeOrder = []Code{
 	CodeProposalNotAdmitted,
 	CodeGenFileHandEdited,
 	CodeBuildLoopNoProgress,
+	CodeSecretMissingAtBoot,
 }
 
 // Codes returns every Code in the closed enum, in canonical order.
