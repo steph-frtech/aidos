@@ -114,6 +114,18 @@ const (
 	// ADDED at S42 (the EvolutionSandbox) — additive enum extension (change_type: refine,
 	// never a removal); recorded by a ChangeSet + SemanticDiff + ADR.
 	CodeSandboxWriteEscapesZone Code = "SANDBOX_WRITE_ESCAPES_ZONE"
+	// CodeSandboxEscape — a per-project workspace (S82) attempted to read or write OUTSIDE
+	// its own workspace root: another project's source/build tree, or the AIDOS truth-store.
+	// Each project's generated code lives in an ISOLATED runtime workspace (container + git/jj
+	// repo + worktree); project A can never observe project B's tree/build nor the truth-store
+	// (the cross-project isolation done-criterion). ADDED at S82 (per-project sandbox
+	// provisioning) — additive enum extension (change_type: refine, never a removal).
+	CodeSandboxEscape Code = "SANDBOX_ESCAPE"
+	// CodeSandboxResourceLimit — a per-project workspace (S82) exceeded one of its declared
+	// resource caps (CPU / memory / disk / wall-clock) — a runaway, fork-bomb or disk-filler.
+	// The cgroup/ulimit kills it (anti noisy-neighbor): one project can never starve another.
+	// ADDED at S82 — additive enum extension (change_type: refine, never a removal).
+	CodeSandboxResourceLimit Code = "SANDBOX_RESOURCE_LIMIT"
 	// CodeSandboxCannotGovern — the /evolve loop attempted to write a truth / approval /
 	// exception / right directly (a kernel freeze, a mirror, an authority approval, a
 	// fitness/exception). The evolution PROPOSES; the human FREEZES via /goal (KRD
@@ -285,6 +297,20 @@ const (
 	// apply) — additive enum extension (change_type: refine, never a removal); recorded by a
 	// ChangeSet + SemanticDiff + ADR.
 	CodeProposalNotAdmitted Code = "PROPOSAL_NOT_ADMITTED"
+	// CodeGenFileHandEdited — the S78 project-scoped regeneration (« Régénérer mon app »,
+	// back/runtime/regen, regen.go) refused to (re)emit a project's tree because a file
+	// UNDER the emitted (gen/) tree was HAND-EDITED: its on-disk bytes no longer hash to
+	// the output_hash the emitter recorded (generators.Drifted / relemit drift). gen/ is a
+	// PROJECTION, regenerable, never authored by hand (CLAUDE.md §4/§9 — "NEVER hand-edited",
+	// "hand-editing generated files is forbidden"). A regeneration that overwrote a drifted
+	// file would SILENTLY DESTROY the human edit (non-destruction, §9), and a drift unnoticed
+	// is a stale projection that lies about its source. The drift is COMPUTED — a pure hash
+	// inequality over (recorded output_hash, on-disk bytes), never an LLM judgment (§8). The
+	// refusal is fail-closed: the FIRST drifted file blocks the whole regen (no partial,
+	// silently-overwriting pass). ADDED at S78 (the project-scoped regenerator) — additive
+	// enum extension (change_type: refine, never a removal); recorded by a ChangeSet +
+	// SemanticDiff + ADR.
+	CodeGenFileHandEdited Code = "GEN_FILE_HAND_EDITED"
 )
 
 // Severity is the gravity marker of a refusal. The KRD §44.5 example uses
@@ -490,6 +516,35 @@ var reasons = map[Code]BlockReason{
 			"confine_write_to_/branches/evolution_or_/reports_or_/ideas/proposed : ramenez l'écriture sous une des trois zones autorisées — tout ce que la boucle produit y reste un candidat.",
 			"open_a_/goal_to_promote_a_candidate : pour qu'un candidat devienne vérité, ouvrez un /goal séparé (mirror_green ∧ out_of_sample_green ∧ authority_approval) — la seule porte vers /kernel ; l'IA propose, l'humain gèle.",
 			"rerun aidos check : le blocage se lève dès que l'écriture est confinée à la zone autorisée.",
+		},
+	},
+	CodeSandboxEscape: {
+		Code:     CodeSandboxEscape,
+		Severity: SeverityBlocking,
+		Explanation: "Refus du bac à sable de projet (S82, ADR 0001) : le workspace d'un projet tente de " +
+			"LIRE ou d'ÉCRIRE en dehors de sa propre racine — l'arbre source/build d'un AUTRE projet, " +
+			"ou le truth-store d'AIDOS. Chaque projet émis vit dans un workspace runtime ISOLÉ " +
+			"(conteneur + dépôt git/jj + worktree) ; le projet A ne peut jamais observer l'arbre/build " +
+			"du projet B ni le noyau/miroirs (le mur §2). L'isolation inter-projets est défaut-refus : " +
+			"tout chemin hors de la racine du workspace courant est refusé.",
+		HowToFix: []string{
+			"confine_to_workspace_root : ramenez la lecture/écriture sous la racine du workspace du projet courant (son arbre /ideas /spike /src /kernel/spec isolé).",
+			"cross_project_reuse_goes_through_capitalisation : pour réutiliser un artefact d'un autre projet, passez par la porte légale (idée → miroir → /goal), jamais par une lecture directe de son arbre.",
+			"rerun aidos check : le blocage se lève dès que l'accès reste confiné à la racine du workspace courant.",
+		},
+	},
+	CodeSandboxResourceLimit: {
+		Code:     CodeSandboxResourceLimit,
+		Severity: SeverityBlocking,
+		Explanation: "Refus du bac à sable de projet (S82) : le workspace d'un projet a dépassé une de ses " +
+			"limites de ressources déclarées (CPU / mémoire / disque / temps mural) — une boucle " +
+			"runaway, une fork-bomb ou un remplissage de disque. Le cgroup/ulimit le TUE (anti " +
+			"noisy-neighbor) : un projet ne peut jamais affamer un autre. Les limites sont déclarées " +
+			"au provisioning (au-dessus de la ligne), jamais un bouton du workspace.",
+		HowToFix: []string{
+			"reduce_the_workload_under_the_caps : le build/test du projet doit rester sous les caps CPU/mémoire/disque/temps déclarés ; une charge légitime plus lourde se négocie au provisioning.",
+			"raise_the_cap_via_provisioning : pour relever un cap, redéclarez les ResourceLimits du workspace au provisioning (au-dessus de la ligne) — jamais depuis l'écran ni dans la boucle.",
+			"rerun aidos check : le workspace tué peut être re-provisionné ; le blocage se lève dès que la charge reste sous les caps.",
 		},
 	},
 	CodeSandboxCannotGovern: {
@@ -739,6 +794,24 @@ var reasons = map[Code]BlockReason{
 			"rerun aidos check : le blocage se lève dès qu'un enregistrement d'autorité S16 admet réellement la proposition (le champ Status n'est jamais cru, seul le verdict re-dérivé compte).",
 		},
 	},
+	CodeGenFileHandEdited: {
+		Code:     CodeGenFileHandEdited,
+		Severity: SeverityBlocking,
+		Explanation: "Refus de la régénération project-scopée S78 (« Régénérer mon app », back/runtime/regen) : " +
+			"un fichier de l'arbre émis (gen/) a été ÉDITÉ À LA MAIN — ses octets sur disque ne correspondent " +
+			"plus à l'output_hash que l'émetteur avait enregistré (drift). L'arbre gen/ est une PROJECTION " +
+			"régénérable, jamais autorée à la main (CLAUDE.md §4/§9). Une régénération qui écraserait un fichier " +
+			"drifté DÉTRUIRAIT silencieusement l'édition humaine (non-destruction, §9) ; un drift ignoré est une " +
+			"projection périmée qui ment sur sa source. Le drift est CALCULÉ — une inégalité de hash pure (hash " +
+			"des octets sur disque ≠ output_hash enregistré), jamais un jugement LLM (§8). Le refus est " +
+			"fail-closed : le PREMIER fichier drifté bloque toute la régénération (aucune passe partielle qui " +
+			"écrase en silence).",
+		HowToFix: []string{
+			"revert_the_hand_edit : restaurez le fichier généré à sa dernière sortie d'émetteur (git checkout du fichier gen/) — gen/ se modifie en changeant SA SOURCE (l'AST d'entité/operation/control/blob), jamais le fichier émis.",
+			"change_the_source_then_regenerate : si l'édition manuelle traduisait un vrai besoin, portez-la dans la source Kernel via idea → mirror → /goal → approbation, puis relancez la régénération — l'émetteur déterministe ré-émet le fichier.",
+			"rerun « Régénérer mon app » : le blocage se lève dès qu'aucun fichier de l'arbre émis ne diverge de son output_hash enregistré ; la régénération est alors byte-stable.",
+		},
+	},
 }
 
 // codeOrder is the canonical enumeration order of the Code enum. Declared, never
@@ -773,6 +846,7 @@ var codeOrder = []Code{
 	CodeAgentIdentityUnverified,
 	CodeAgentLeaseFenced,
 	CodeProposalNotAdmitted,
+	CodeGenFileHandEdited,
 }
 
 // Codes returns every Code in the closed enum, in canonical order.

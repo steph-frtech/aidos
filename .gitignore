@@ -87,3 +87,4 @@ next-env.d.ts
 /back/dsl-editor
 /back/entity-modeler
 /back/relation-emitter
+/back/app-auth
