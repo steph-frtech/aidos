@@ -109,7 +109,9 @@
 		"shapeEditor": "Shape editor",
 		"mirrorWatch": "Watch it redden",
 		"mirrorLibrary": "Mirror library",
-		"entityRelation": "Entity relations"
+		"entityRelation": "Entity relations",
+		"blobAttribute": "Blob/file type",
+		"asyncOperation": "Async/scheduled operation"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -4301,6 +4303,63 @@
 		"messages": {
 			"resolved": "RESOLVED — the relation to “{target}” has a content address (round-trip).",
 			"refused": "REFUSED — the target is not declared or a kind is outside the closed set."
+		}
+	},
+	"blobAttribute": {
+		"eyebrow": "AIDOS Kernel · S72",
+		"title": "Blob/file type of the Entity AST",
+		"subtitle": "upload · signed URLs · MIME + size · project_id-scoped",
+		"intro": "The entity type system gains a third DISTINCT node — a blob/file (an upload: image/document/file) — without touching the closed scalar set of S35 nor the relation node of S71. A blob round-trips as a content-addressed AST and emits a DETERMINISTIC upload/download handler (signed URLs). The bytes live in PER-PROJECT object storage (project_id-scoped), never in the truth-store nor git.",
+		"tutorialHeading": "How it works",
+		"tutorialBody": "The blob node “avatar” declares a CLOSED MIME allow-list (image/png, image/jpeg) and a size ceiling. Pin an upload (MIME + size) and validate it: a conforming upload mints the project_id-SCOPED storage key (projA/User/avatar/…), proves cross-project isolation (A reaches it, B is refused BLOB_CROSS_PROJECT) and emits the deterministic handler. An out-of-MIME upload is refused BLOB_MIME_REFUSED; over-size, BLOB_SIZE_REFUSED — never truncated nor coerced. Validation, scoping and emission are PURE, never an LLM; a blob is a SOURCE above the line (the wall, §2).",
+		"activeProjectLabel": "Active project",
+		"noProject": "no project",
+		"declaredHeading": "Declared blob node (closed MIME list + ceiling)",
+		"nodeLabel": "attribute",
+		"runHeading": "Pin an upload · validate + scope + emit it",
+		"mimeLabel": "Upload MIME type",
+		"sizeLabel": "Size (bytes)",
+		"runButton": "Validate the upload",
+		"working": "Validating…",
+		"wallNote": "The wall: validate, scope and emit writes no truth — the bytes never enter the truth-store nor git.",
+		"acceptedBadge": "ACCEPTED",
+		"refusedBadge": "REFUSED",
+		"reachable": "reachable",
+		"refused": "refused",
+		"blobIdLabel": "blob id",
+		"keyLabel": "scoped key",
+		"footer": "S72 · the scalar set stays closed: a blob is its own node, never a scalar. Validation is read-only (the wall, §2); the bytes live in per-project object storage (provider ADR, replaceable slot).",
+		"messages": {
+			"accepted": "ACCEPTED — the upload conforms: scoped key minted, cross-project isolation proven, deterministic handler emitted."
+		}
+	},
+	"asyncOperation": {
+		"eyebrow": "AIDOS Kernel · S73",
+		"title": "Async / scheduled operation + outbox",
+		"subtitle": "cron · queue · webhook_out · notification · exactly-once relative",
+		"intro": "The Operation DSL (S10) gains a THIRD dimension — an async/scheduled node (cron / queue / webhook_out / notification) — without touching the six sync verbs. A scheduled operation fires at its echeance (a tick over an INJECTED clock) and emits its events; its effects flow through the transactional OUTBOX — written in the same transaction as the state change, then dispatched exactly-once relative. The scheduler is code, never an LLM.",
+		"tutorialHeading": "How it works",
+		"tutorialBody": "The « sendReminder » operation declares a cron trigger (an RFC3339 echeance) and a notification effect. Pin an INJECTED clock instant and run: before the echeance nothing fires; at/after it the operation fires exactly once. The panel then drives the outbox crash → replay path: the effect is written PENDING, the dispatcher delivers it once (at-least-once: a write-then-crash never loses the effect), then the at-least-once redelivery re-presents the same content-addressed id → SUPPRESSED. The observable delivery count stays exactly 1 (exactly-once relative). The tick and dispatch are PURE, never an LLM; an async operation is a SOURCE above the line (the wall, §2).",
+		"activeProjectLabel": "Active project",
+		"noProject": "no project",
+		"declaredHeading": "Declared async node (trigger + effect)",
+		"opLabel": "operation",
+		"runHeading": "Pin an injected clock · tick + dispatch the outbox",
+		"clockLabel": "Injected clock (RFC3339)",
+		"runButton": "Tick the schedule",
+		"working": "Running…",
+		"wallNote": "The wall: ticking, scheduling and dispatching writes no truth — the outbox is a runtime datastore table.",
+		"firedBadge": "FIRED",
+		"notFiredBadge": "NOT YET",
+		"effectIdLabel": "effect id (idempotency key)",
+		"deliveredLabel": "delivered (1st dispatch)",
+		"suppressedLabel": "suppressed replays",
+		"observableLabel": "observable deliveries",
+		"exactlyOnceNote": "Exactly-once relative: at-least-once (the effect is never lost) + idempotent dispatch (the replay is suppressed) ⇒ no observable duplicate.",
+		"footer": "S73 · the trigger set stays closed { cron, queue, webhook_out, notification }, never invented. The tick/dispatch is read-only (the wall, §2); the scheduler is code, never an LLM (DP16, ADR 0043: Windmill/NATS substrate).",
+		"messages": {
+			"fired": "FIRED — the scheduled operation runs at this echeance; the effect flows through the outbox, dispatched exactly-once relative.",
+			"notFired": "NOT YET — the injected clock is before the echeance; no operation fires (deterministic scheduling)."
 		}
 	}
 }

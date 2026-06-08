@@ -135,6 +135,8 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/emitters", k: "emitters" },
 			{ href: "/entity-map", k: "entityMap" },
 			{ href: "/entity-relation", k: "entityRelation" },
+			{ href: "/blob-attribute", k: "blobAttribute" },
+			{ href: "/async-operation", k: "asyncOperation" },
 			{ href: "/api-projection", k: "apiProjection" },
 			{ href: "/db-projection", k: "dbProjection" },
 			{ href: "/web-preview", k: "webPreview" },

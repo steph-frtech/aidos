@@ -5,6 +5,7 @@
   "batch_size": 5,
   "caps": { "plan_relaunches_max": 5, "same_step_retries_max": 3 },
   "counters": { "plan_relaunches": 0, "same_step_retries": 0 },
+  "current_run": { "run_id": "wf_3ee06516-764", "task_id": "wwaq02a9o", "batch_from": "S72", "batch_expected": ["S72","S73","S74","S75","S76"] },
   "last_stop_step": null,
   "batches_done": [],
   "steps_validated": [],

@@ -109,7 +109,9 @@
 		"shapeEditor": "Éditeur par forme",
 		"mirrorWatch": "Voir le miroir rougir",
 		"mirrorLibrary": "Librairie de miroirs",
-		"entityRelation": "Relations d'entité"
+		"entityRelation": "Relations d'entité",
+		"blobAttribute": "Type blob/fichier",
+		"asyncOperation": "Operation async/planifiée"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -4301,6 +4303,63 @@
 		"messages": {
 			"resolved": "RÉSOLU — la relation vers « {target} » a une adresse de contenu (round-trip).",
 			"refused": "REFUSÉ — la cible n'est pas déclarée ou un type est hors du jeu fermé."
+		}
+	},
+	"blobAttribute": {
+		"eyebrow": "AIDOS Kernel · S72",
+		"title": "Type blob/fichier de l'Entity AST",
+		"subtitle": "upload · URLs signées · MIME + taille · scopé project_id",
+		"intro": "Le système de types des entités gagne un troisième nœud DISTINCT — un blob/fichier (un upload : image/document/file) — sans toucher à l'ensemble scalaire clos de S35 ni au nœud de relation de S71. Un blob round-trip comme AST content-adressé et émet un handler d'upload/download DÉTERMINISTE (URLs signées). Les octets vivent dans le stockage objet PAR PROJET (scopé project_id), jamais dans le truth-store ni git.",
+		"tutorialHeading": "Comment ça marche",
+		"tutorialBody": "Le nœud blob « avatar » déclare une liste FERMÉE de types MIME (image/png, image/jpeg) et un plafond de taille. Épinglez un upload (MIME + taille) et validez-le : un upload conforme mint la clé de stockage SCOPÉE project_id (projA/User/avatar/…), prouve l'isolation cross-projet (A y accède, B est refusé BLOB_CROSS_PROJECT) et émet le handler déterministe. Un upload hors-MIME est refusé BLOB_MIME_REFUSED ; hors-taille, BLOB_SIZE_REFUSED — jamais tronqué ni coercé. La validation, le scope et l'émission sont PURS, jamais un LLM ; un blob est une SOURCE au-dessus de la ligne (le mur, §2).",
+		"activeProjectLabel": "Projet actif",
+		"noProject": "aucun projet",
+		"declaredHeading": "Nœud blob déclaré (liste MIME fermée + plafond)",
+		"nodeLabel": "attribut",
+		"runHeading": "Épingler un upload · le valider + scoper + émettre",
+		"mimeLabel": "Type MIME de l'upload",
+		"sizeLabel": "Taille (octets)",
+		"runButton": "Valider l'upload",
+		"working": "Validation…",
+		"wallNote": "Le mur : valider, scoper et émettre n'écrit aucune vérité — les octets ne touchent jamais le truth-store ni git.",
+		"acceptedBadge": "ACCEPTÉ",
+		"refusedBadge": "REFUSÉ",
+		"reachable": "accessible",
+		"refused": "refusé",
+		"blobIdLabel": "id du blob",
+		"keyLabel": "clé scopée",
+		"footer": "S72 · l'ensemble scalaire reste clos : un blob est un nœud à part, jamais un scalaire. La validation est read-only (le mur, §2) ; les octets vivent dans le stockage objet par projet (ADR du provider, slot replaceable).",
+		"messages": {
+			"accepted": "ACCEPTÉ — l'upload est conforme : clé scopée mintée, isolation cross-projet prouvée, handler déterministe émis."
+		}
+	},
+	"asyncOperation": {
+		"eyebrow": "AIDOS Kernel · S73",
+		"title": "Operation asynchrone / planifiée + outbox",
+		"subtitle": "cron · queue · webhook_out · notification · exactly-once relatif",
+		"intro": "L'Operation DSL (S10) gagne une TROISIÈME dimension — un nœud async/planifié (cron / queue / webhook_out / notification) — sans toucher aux six verbes synchrones. Une operation planifiée s'exécute à l'échéance (tick sur une horloge INJECTÉE) et émet ses events ; ses effets passent par l'OUTBOX transactionnel — écrits dans la même transaction que le changement d'état, puis dispatchés exactly-once relatif. Le scheduler est du code, jamais un LLM.",
+		"tutorialHeading": "Comment ça marche",
+		"tutorialBody": "L'operation « sendReminder » déclare un trigger cron (une échéance RFC3339) et un effet notification. Épinglez un instant d'horloge INJECTÉE et lancez : avant l'échéance, rien ne fire ; à/après l'échéance, l'operation fire exactement une fois. Le panneau déroule alors le chemin crash → rejeu de l'outbox : l'effet est écrit PENDING, le dispatcher le livre une fois (at-least-once : un write-then-crash ne perd jamais l'effet), puis le rejeu at-least-once re-présente le même id content-adressé → SUPPRIMÉ. Le compte de livraisons observables reste exactement 1 (exactly-once relatif). Le tick et le dispatch sont PURS, jamais un LLM ; une operation async est une SOURCE au-dessus de la ligne (le mur, §2).",
+		"activeProjectLabel": "Projet actif",
+		"noProject": "aucun projet",
+		"declaredHeading": "Nœud async déclaré (trigger + effet)",
+		"opLabel": "operation",
+		"runHeading": "Épingler une horloge injectée · ticker + dispatcher l'outbox",
+		"clockLabel": "Horloge injectée (RFC3339)",
+		"runButton": "Ticker la planification",
+		"working": "Exécution…",
+		"wallNote": "Le mur : ticker, planifier et dispatcher n'écrit aucune vérité — l'outbox est une table de datastore runtime.",
+		"firedBadge": "FIRE",
+		"notFiredBadge": "PAS ENCORE",
+		"effectIdLabel": "id de l'effet (clé d'idempotence)",
+		"deliveredLabel": "livrés (1er dispatch)",
+		"suppressedLabel": "rejeux supprimés",
+		"observableLabel": "livraisons observables",
+		"exactlyOnceNote": "Exactly-once relatif : at-least-once (l'effet n'est jamais perdu) + dispatch idempotent (le rejeu est supprimé) ⇒ aucun doublon observable.",
+		"footer": "S73 · l'ensemble des trigger reste clos { cron, queue, webhook_out, notification }, jamais inventé. Le tick/dispatch est read-only (le mur, §2) ; le scheduler est du code, jamais un LLM (DP16, ADR 0043 : substrat Windmill/NATS).",
+		"messages": {
+			"fired": "FIRE — l'operation planifiée s'exécute à cette échéance ; l'effet passe par l'outbox, dispatché exactly-once relatif.",
+			"notFired": "PAS ENCORE — l'horloge injectée est avant l'échéance ; aucune operation ne fire (planification déterministe)."
 		}
 	}
 }

@@ -1,0 +1,33 @@
+# 2026/06/08 13:29:14.247727 [TestProp_EffectIDStable] [rapid] draw target: "."
+# 2026/06/08 13:29:14.247736 [TestProp_EffectIDStable] [rapid] draw k1: "a"
+# 2026/06/08 13:29:14.247738 [TestProp_EffectIDStable] [rapid] draw k2: "a"
+# 2026/06/08 13:29:14.247739 [TestProp_EffectIDStable] [rapid] draw v1: "a"
+# 2026/06/08 13:29:14.247740 [TestProp_EffectIDStable] [rapid] draw v2: "b"
+# 2026/06/08 13:29:14.247764 [TestProp_EffectIDStable] EffectID not order-stable: "d2c645dd23132e70c380a835af8cab8779c80344071a878a5c11b5bf2ec1d44a" vs "66037c173630bb63d8519f4db0e947faef5a1c714ae0067fb7b480aa12c6bbed"
+# 
+v0.4.8#9384293929529526950
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
