@@ -117,3 +117,31 @@ func TestStable_NoOperandFallsBackToContract(t *testing.T) {
 		t.Fatalf("no-operand must render the stable contract, got:\n%s", out)
 	}
 }
+
+// S86 — per-project stable-phase recording. `aidos stable green --project shop` records a
+// per-project DAG node when the §43 verdict passes; an inconsistent cut is refused, no node.
+func TestStable_Project_RecordsNodeAtVerdict(t *testing.T) {
+	out, code := runStableArgs(t, "green", "--project", "shop")
+	if code != exitOK {
+		t.Fatalf("exit = %d, want %d, out:\n%s", code, exitOK, out)
+	}
+	if !strings.Contains(out, "STABLE") || strings.Contains(out, "UNSTABLE") {
+		t.Fatalf("a green cut must record a stable node, got:\n%s", out)
+	}
+	if !strings.Contains(out, "node id") || !strings.Contains(out, "parents") {
+		t.Fatalf("the recording branch must print the per-project node, got:\n%s", out)
+	}
+}
+
+func TestStable_Project_RefusesInconsistentCut(t *testing.T) {
+	out, code := runStableArgs(t, "red-sensor", "--project", "shop")
+	if code != exitOK {
+		t.Fatalf("exit = %d, want %d, out:\n%s", code, exitOK, out)
+	}
+	if !strings.Contains(out, "UNSTABLE") || !strings.Contains(out, "STABLE_PHASE_INCONSISTENT_CUT") {
+		t.Fatalf("an inconsistent cut must be refused with STABLE_PHASE_INCONSISTENT_CUT, got:\n%s", out)
+	}
+	if strings.Contains(out, "node id") {
+		t.Fatalf("an unstable cut must record NO node, got:\n%s", out)
+	}
+}

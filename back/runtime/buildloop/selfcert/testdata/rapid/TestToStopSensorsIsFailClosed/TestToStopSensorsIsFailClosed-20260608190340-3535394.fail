@@ -1,0 +1,33 @@
+# 2026/06/08 19:03:40.912758 [TestToStopSensorsIsFailClosed] [rapid] draw present-types: false
+# 2026/06/08 19:03:40.912762 [TestToStopSensorsIsFailClosed] [rapid] draw present-lint: false
+# 2026/06/08 19:03:40.912762 [TestToStopSensorsIsFailClosed] [rapid] draw present-unit: false
+# 2026/06/08 19:03:40.912763 [TestToStopSensorsIsFailClosed] [rapid] draw present-fixture: false
+# 2026/06/08 19:03:40.912764 [TestToStopSensorsIsFailClosed] [rapid] draw present-property: false
+# 2026/06/08 19:03:40.912764 [TestToStopSensorsIsFailClosed] [rapid] draw present-pact: false
+# 2026/06/08 19:03:40.912765 [TestToStopSensorsIsFailClosed] [rapid] draw present-archfit: false
+# 2026/06/08 19:03:40.912765 [TestToStopSensorsIsFailClosed] [rapid] draw unknown: false
+# 2026/06/08 19:03:40.912770 [TestToStopSensorsIsFailClosed] [rapid] draw redset: []string{"A", "A"}
+# 2026/06/08 19:03:40.912780 [TestToStopSensorsIsFailClosed] ToStopSensors must cover the whole red set
+# 
+v0.4.8#7088151539898603497
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x9249249249249
+0x0
+0x0
+0x0
+0x0
+0x0
+0x9249249249249
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

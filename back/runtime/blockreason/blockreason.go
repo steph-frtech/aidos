@@ -311,6 +311,18 @@ const (
 	// enum extension (change_type: refine, never a removal); recorded by a ChangeSet +
 	// SemanticDiff + ADR.
 	CodeGenFileHandEdited Code = "GEN_FILE_HAND_EDITED"
+	// CodeBuildLoopNoProgress — the S83 build-loop service (back/runtime/buildloop)
+	// HALTED a build that was SPENDING WITHOUT ADVANCING. The deterministic no-progress
+	// detector (a PURE function of the iteration history — repeated diff-hash / red↔green
+	// oscillation / zero newly-green mirror across the declared stagnation window, OR the
+	// declared max-iteration cap reached) fired, OR the HarnessCostBudget (S51, economics)
+	// flagged the run over a declared cap. The loop stops HONESTLY (KRD §8: a loop that
+	// cannot reach green stops, it never claims a done it did not earn). The verdict is a
+	// FUNCTION OF THE HISTORY — same history ⇒ same halt — never an LLM judgment (§6/§8
+	// determinism-first): the judge is the mirror + the pure detector, the LLM is the
+	// generation-only exception. ADDED at S83 (the build-loop circuit breaker); additive
+	// enum extension (change_type: refine, never a removal).
+	CodeBuildLoopNoProgress Code = "BUILD_LOOP_NO_PROGRESS"
 )
 
 // Severity is the gravity marker of a refusal. The KRD §44.5 example uses
@@ -812,6 +824,25 @@ var reasons = map[Code]BlockReason{
 			"rerun « Régénérer mon app » : le blocage se lève dès qu'aucun fichier de l'arbre émis ne diverge de son output_hash enregistré ; la régénération est alors byte-stable.",
 		},
 	},
+	CodeBuildLoopNoProgress: {
+		Code:     CodeBuildLoopNoProgress,
+		Severity: SeverityBlocking,
+		Explanation: "La boucle de build (S83, back/runtime/buildloop) a STOPPÉ un build qui DÉPENSAIT SANS " +
+			"AVANCER. Le détecteur de non-progrès déterministe — une fonction PURE de l'historique d'itérations " +
+			"(hash de diff répété, oscillation rouge↔vert, zéro miroir nouvellement vert sur la fenêtre de " +
+			"stagnation déclarée, OU le plafond max-itérations atteint), OU le HarnessCostBudget (S51) flaggé " +
+			"au-delà d'un cap déclaré — a déclenché l'arrêt. La boucle s'arrête HONNÊTEMENT (KRD §8 : une boucle " +
+			"qui ne peut atteindre le vert s'arrête, elle ne revendique jamais un « done » non gagné). Le verdict " +
+			"est une FONCTION DE L'HISTORIQUE (même historique ⇒ même arrêt), jamais un jugement LLM (§6/§8 " +
+			"déterminisme-d'abord) : le juge est le miroir + le détecteur pur, le LLM est l'exception " +
+			"génération-only.",
+		HowToFix: []string{
+			"inspect_the_iteration_history : lisez la timeline AgentRun/AgentAction (S52) du run — la cause exacte (diff répété / oscillation / zéro vert / cap / budget) est nommée dans le verdict, jamais devinée.",
+			"sharpen_the_red_set_or_context : un red set non atteignable signale souvent un miroir mal dérivé ou un ContextPack trop pauvre ; raffinez la dérivation (idea → mirror → /goal) ou élargissez le ContextGraph affecté avant de relancer.",
+			"raise_the_declared_budget_via_a_valuecase : si le cap HarnessCostBudget était trop bas pour une cellule qui justifie son coût, ouvrez un ValueCase justifié (§66.3, economics) — le cap est DÉCLARÉ au-dessus de la ligne, jamais relevé en passant.",
+			"rerun aidos build : le blocage se lève quand la boucle progresse de nouveau (un miroir passe du rouge au vert dans la fenêtre) sous les caps déclarés.",
+		},
+	},
 }
 
 // codeOrder is the canonical enumeration order of the Code enum. Declared, never
@@ -847,6 +878,7 @@ var codeOrder = []Code{
 	CodeAgentLeaseFenced,
 	CodeProposalNotAdmitted,
 	CodeGenFileHandEdited,
+	CodeBuildLoopNoProgress,
 }
 
 // Codes returns every Code in the closed enum, in canonical order.
