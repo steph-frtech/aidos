@@ -106,7 +106,10 @@
 		"projectMembers": "Members",
 		"authorityBinding": "Authority binding",
 		"behaviorCapture": "Behavior at capture",
-		"shapeEditor": "Shape editor"
+		"shapeEditor": "Shape editor",
+		"mirrorWatch": "Watch it redden",
+		"mirrorLibrary": "Mirror library",
+		"entityRelation": "Entity relations"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -4216,5 +4219,88 @@
 			"mergeLocked": "Lock: same-field clash — both candidates are surfaced, no write overwrites the other (never last-write-wins)."
 		},
 		"footer": "KRD §34/§90 · form derived from the nature (closed table, never a guess) · parsing = pure function, never an LLM · mirror born red, project-scoped · proposed DRAFT ChangeSet · draft-level concurrency (lock/CRDT), never last-write-wins · the screen PROPOSES, it NEVER writes the mirror (the wall)."
+	},
+	"mirrorWatch": {
+		"eyebrow": "AIDOS Mirror · S69",
+		"title": "Materialize-and-watch-it-redden",
+		"subtitle": "the « watch it fail » as a product",
+		"intro": "Trigger materialization of an authored mirror toward its runner (Gherkin → Godog, property → rapid, fixture → the interpreter) and watch the verdict stream live: RED against absent code, GREEN as soon as a stub exists.",
+		"tutorialHeading": "How it works",
+		"tutorialBody": "Pick the truth-nature, the reflected layer and type the mirror source. The runner is DERIVED from the form (never chosen). Leave « code present » unchecked to watch the mirror redden against absent code; check it to simulate a stub and watch it go green. Materialization and the verdict are PURE functions, never an LLM.",
+		"activeProjectLabel": "Active project",
+		"noProject": "no project",
+		"runHeading": "Author · materialize · run",
+		"natureLabel": "Truth nature",
+		"reflectsLabel": "Reflected layer",
+		"reflectsPlaceholder": "e.g. Order.place",
+		"sourceLabel": "Mirror source",
+		"codePresentLabel": "Code present (stub)",
+		"codePresentNote": "unchecked ⇒ red (watch it fail) · checked ⇒ green",
+		"runButton": "Materialize and run",
+		"working": "Running…",
+		"wallNote": "The wall: S69 only RUNS the authored mirror — it writes no truth.",
+		"redBadge": "RED",
+		"greenBadge": "GREEN",
+		"runnerLabel": "Runner",
+		"shapeLabel": "Shape",
+		"materializedLabel": "Materialized source",
+		"footer": "S69 · the authored mirror above the line is run, never written (propose → ChangeSet → approval, S68/S20).",
+		"messages": {
+			"watchRed": "RED — the mirror fails against absent code (the « watch it fail » of KRD).",
+			"watchGreen": "GREEN — the present stub makes the mirror pass.",
+			"materializeRefused": "Materialization refused — the source does not parse or the nature is unknown."
+		}
+	},
+	"mirrorLibrary": {
+		"eyebrow": "AIDOS Mirror · S70",
+		"title": "Mirror library by project",
+		"subtitle": "project-scoped completeness",
+		"intro": "Your mirrors listed BY APP with their liveness, plus the completeness law SCOPED to one project: a monster (a truth without a living mirror; an orphan mirror) is hunted WITHIN that project alone. Scope changes the verdict — a cross-project mirror is an orphan within the project.",
+		"tutorialHeading": "How it works",
+		"tutorialBody": "Pick a project and run the scoped completeness law. The monster detector sees only the chosen project's cut: a layer with no living mirror is a monster (no_truth_without_mirror); a mirror reflecting a layer absent from the cut (including a layer owned by ANOTHER project) is an orphan (no_orphan_mirror). The detection is a PURE function, never an LLM; project isolation is the RLS wall (S55).",
+		"activeProjectLabel": "Active project",
+		"noProject": "no project",
+		"runHeading": "Pick a project · run the scoped law",
+		"projectLabel": "Project",
+		"runButton": "Run scoped completeness",
+		"working": "Running…",
+		"wallNote": "The wall: the detection READS a projection and computes a verdict — it writes no truth.",
+		"redBadge": "MONSTER",
+		"greenBadge": "COMPLETE",
+		"appsHeading": "Your mirrors by app",
+		"aliveLabel": "alive",
+		"deadLabel": "dead",
+		"footer": "S70 · scope is not cosmetic: it changes the verdict. The detection is read-only (the wall, §2).",
+		"messages": {
+			"monsterFired": "MONSTER — the project-scoped detector fired for « {project} ».",
+			"complete": "COMPLETE — project « {project} » has no monster in its cut."
+		}
+	},
+	"entityRelation": {
+		"eyebrow": "AIDOS Kernel · S71",
+		"title": "Entity AST relation node",
+		"subtitle": "1-1 / 1-N / N-N · fk / association / composition",
+		"intro": "The entity type system gains a DISTINCT node — a relation — without touching the closed scalar set of S35. A relation references a DECLARED entity, with a cardinality (1-1 / 1-N / N-N) and a semantic (fk / association / composition) from the closed sets. It round-trips as a content-addressed AST; its target is resolved, never guessed.",
+		"tutorialHeading": "How it works",
+		"tutorialBody": "Pin a relation (name + target + cardinality + semantic) and resolve it against the declared entity set. A declared target yields the content address (id = Hash(body)) — the content-addressed round-trip. An unknown target is refused UNKNOWN_RELATION_TARGET (never a guessed mapping); an out-of-set cardinality/semantic is refused UNKNOWN_RELATION_KIND. Resolution and hashing are PURE functions, never an LLM; a relation is a SOURCE above the line (the wall, §2).",
+		"activeProjectLabel": "Active project",
+		"noProject": "no project",
+		"declaredHeading": "Declared entity set",
+		"runHeading": "Pin a relation · resolve + content-address it",
+		"nameLabel": "Field name",
+		"targetLabel": "Target entity",
+		"cardinalityLabel": "Cardinality",
+		"semanticLabel": "Semantic",
+		"requiredLabel": "Required (NOT NULL on the FK)",
+		"runButton": "Resolve + content-address",
+		"working": "Resolving…",
+		"wallNote": "The wall: resolving and hashing writes no truth — a relation is a SOURCE above the line.",
+		"resolvedBadge": "RESOLVED",
+		"refusedBadge": "REFUSED",
+		"footer": "S71 · the scalar set stays closed: a relation is its own node, never a scalar. Resolution is read-only (the wall, §2).",
+		"messages": {
+			"resolved": "RESOLVED — the relation to “{target}” has a content address (round-trip).",
+			"refused": "REFUSED — the target is not declared or a kind is outside the closed set."
+		}
 	}
 }

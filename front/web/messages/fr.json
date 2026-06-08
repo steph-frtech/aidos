@@ -106,7 +106,10 @@
 		"projectMembers": "Adhésions",
 		"authorityBinding": "Liaison autorité",
 		"behaviorCapture": "Behavior à la capture",
-		"shapeEditor": "Éditeur par forme"
+		"shapeEditor": "Éditeur par forme",
+		"mirrorWatch": "Voir le miroir rougir",
+		"mirrorLibrary": "Librairie de miroirs",
+		"entityRelation": "Relations d'entité"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -4216,5 +4219,88 @@
 			"mergeLocked": "Verrouillage : collision sur le même champ — les deux candidats sont surfacés, aucune écriture n'écrase l'autre (jamais last-write-wins)."
 		},
 		"footer": "KRD §34/§90 · forme dérivée de la nature (table close, jamais devinée) · parsing = fonction pure, jamais un LLM · miroir né rouge, project-scopé · ChangeSet DRAFT proposé · concurrence draft-level (lock/CRDT), jamais last-write-wins · l'écran PROPOSE, n'écrit JAMAIS le miroir (le mur)."
+	},
+	"mirrorWatch": {
+		"eyebrow": "AIDOS Mirror · S69",
+		"title": "Matérialiser-et-le-voir-rougir",
+		"subtitle": "le « watch it fail » en produit",
+		"intro": "Déclenchez la matérialisation d'un miroir autoré vers son runner (Gherkin → Godog, propriété → rapid, fixture → l'interpréteur) et regardez le verdict s'écouler en direct : ROUGE contre du code absent, VERT dès qu'un stub existe.",
+		"tutorialHeading": "Comment ça marche",
+		"tutorialBody": "Choisissez la nature de la vérité, la couche reflétée et tapez la source du miroir. Le runner est DÉRIVÉ de la forme (jamais choisi). Laissez « code présent » décoché pour voir le miroir rougir contre du code absent ; cochez-le pour simuler un stub et le voir verdir. La matérialisation et le verdict sont des fonctions PURES, jamais un LLM.",
+		"activeProjectLabel": "Projet actif",
+		"noProject": "aucun projet",
+		"runHeading": "Autorer · matérialiser · exécuter",
+		"natureLabel": "Nature de la vérité",
+		"reflectsLabel": "Couche reflétée",
+		"reflectsPlaceholder": "ex. Order.place",
+		"sourceLabel": "Source du miroir",
+		"codePresentLabel": "Code présent (stub)",
+		"codePresentNote": "décoché ⇒ rouge (watch it fail) · coché ⇒ vert",
+		"runButton": "Matérialiser et exécuter",
+		"working": "Exécution…",
+		"wallNote": "Le mur : S69 ne fait qu'EXÉCUTER le miroir autoré — il n'écrit aucune vérité.",
+		"redBadge": "ROUGE",
+		"greenBadge": "VERT",
+		"runnerLabel": "Runner",
+		"shapeLabel": "Forme",
+		"materializedLabel": "Source matérialisée",
+		"footer": "S69 · le miroir autoré au-dessus de la ligne est exécuté, jamais écrit (propose → ChangeSet → approbation, S68/S20).",
+		"messages": {
+			"watchRed": "ROUGE — le miroir échoue contre du code absent (le « watch it fail » de KRD).",
+			"watchGreen": "VERT — le stub présent fait passer le miroir.",
+			"materializeRefused": "Matérialisation refusée — la source ne se parse pas ou la nature est inconnue."
+		}
+	},
+	"mirrorLibrary": {
+		"eyebrow": "AIDOS Mirror · S70",
+		"title": "Librairie de miroirs par projet",
+		"subtitle": "complétude scopée au projet",
+		"intro": "Vos miroirs listés PAR APP avec leur liveness, et la loi de complétude SCOPÉE à un projet : un monstre (vérité sans miroir vivant ; miroir orphelin) est chassé DANS le projet seul. La portée change le verdict — un miroir inter-projet est un orphelin dans le projet.",
+		"tutorialHeading": "Comment ça marche",
+		"tutorialBody": "Choisissez un projet et exécutez la loi de complétude scopée. Le détecteur de monstre ne voit que la coupe du projet choisi : une couche sans miroir vivant est un monstre (no_truth_without_mirror), un miroir qui reflète une couche absente de la coupe (y compris une couche d'un AUTRE projet) est un orphelin (no_orphan_mirror). La détection est une fonction PURE, jamais un LLM ; l'isolation par projet est le mur RLS (S55).",
+		"activeProjectLabel": "Projet actif",
+		"noProject": "aucun projet",
+		"runHeading": "Choisir un projet · exécuter la loi scopée",
+		"projectLabel": "Projet",
+		"runButton": "Exécuter la complétude scopée",
+		"working": "Exécution…",
+		"wallNote": "Le mur : la détection LIT une projection et calcule un verdict — elle n'écrit aucune vérité.",
+		"redBadge": "MONSTRE",
+		"greenBadge": "COMPLET",
+		"appsHeading": "Vos miroirs par app",
+		"aliveLabel": "vivants",
+		"deadLabel": "morts",
+		"footer": "S70 · la portée n'est pas cosmétique : elle change le verdict. La détection est read-only (le mur, §2).",
+		"messages": {
+			"monsterFired": "MONSTRE — le détecteur scopé au projet « {project} » s'est déclenché.",
+			"complete": "COMPLET — le projet « {project} » n'a aucun monstre dans sa coupe."
+		}
+	},
+	"entityRelation": {
+		"eyebrow": "AIDOS Kernel · S71",
+		"title": "Nœud de relation de l'Entity AST",
+		"subtitle": "1-1 / 1-N / N-N · fk / association / composition",
+		"intro": "Le système de types des entités gagne un nœud DISTINCT — une relation — sans toucher à l'ensemble scalaire clos de S35. Une relation référence une entité DÉCLARÉE, avec une cardinalité (1-1 / 1-N / N-N) et une sémantique (fk / association / composition) du jeu fermé. Elle round-trip comme AST content-adressé ; sa cible est résolue, jamais devinée.",
+		"tutorialHeading": "Comment ça marche",
+		"tutorialBody": "Épinglez une relation (nom + cible + cardinalité + sémantique) et résolvez-la contre l'ensemble d'entités déclaré. Une cible déclarée donne l'adresse de contenu (id = Hash(body)) — le round-trip content-adressé. Une cible inconnue est refusée UNKNOWN_RELATION_TARGET (jamais un mapping deviné) ; une cardinalité/sémantique hors jeu est refusée UNKNOWN_RELATION_KIND. La résolution et le hash sont des fonctions PURES, jamais un LLM ; une relation est une SOURCE au-dessus de la ligne (le mur, §2).",
+		"activeProjectLabel": "Projet actif",
+		"noProject": "aucun projet",
+		"declaredHeading": "Ensemble d'entités déclaré",
+		"runHeading": "Épingler une relation · la résoudre + la content-adresser",
+		"nameLabel": "Nom du champ",
+		"targetLabel": "Entité cible",
+		"cardinalityLabel": "Cardinalité",
+		"semanticLabel": "Sémantique",
+		"requiredLabel": "Requis (NOT NULL sur la FK)",
+		"runButton": "Résoudre + content-adresser",
+		"working": "Résolution…",
+		"wallNote": "Le mur : résoudre et hasher n'écrit aucune vérité — une relation est une SOURCE au-dessus de la ligne.",
+		"resolvedBadge": "RÉSOLU",
+		"refusedBadge": "REFUSÉ",
+		"footer": "S71 · l'ensemble scalaire reste clos : une relation est un nœud à part, jamais un scalaire. La résolution est read-only (le mur, §2).",
+		"messages": {
+			"resolved": "RÉSOLU — la relation vers « {target} » a une adresse de contenu (round-trip).",
+			"refused": "REFUSÉ — la cible n'est pas déclarée ou un type est hors du jeu fermé."
+		}
 	}
 }
