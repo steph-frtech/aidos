@@ -336,6 +336,42 @@ const (
 	// boot-time env var. ADDED at S91 (the per-app secret store) — additive enum extension
 	// (change_type: refine, never a removal); recorded by a ChangeSet + SemanticDiff + ADR.
 	CodeSecretMissingAtBoot Code = "SECRET_MISSING_AT_BOOT"
+	// CodeBreakingMigrationNoBackfill — the per-app DATA-MIGRATION planner (S95,
+	// back/runtime/datamigrate, app-builder EPIC 10, DP15/DP26) refused to plan a BREAKING
+	// schema migration of a DEPLOYED emitted app (one carrying REAL rows) because the change
+	// is destructive to historical data (a column rename, an entity split, a 1-N→N-N
+	// cardinality change — each drops/narrows a column the old rows depend on) and NO BACKFILL
+	// is declared. A breaking migration with no backfill is FAIL-CLOSED: it is refused with
+	// this actionable BlockReason, never run with a silent DROP that loses the existing rows
+	// (KRD §44.3 — « changer la vérité du code ne change pas automatiquement la vérité des
+	// données déjà produites » ; CLAUDE.md §9 anti-overwrite). The breaking-ness is COMPUTED —
+	// a deterministic structural diff (dropped/narrowed columns) crossed with the declared
+	// DataTruthScope (a required, preserve_old_truth backfill must be present), never an LLM
+	// judgment. ADDED at S95 — additive enum extension (change_type: refine, never a removal).
+	CodeBreakingMigrationNoBackfill Code = "BREAKING_MIGRATION_NO_BACKFILL"
+	// CodePhaseNotStable — the per-app DEPLOY pipeline (S96, back/runtime/deploy, app-builder
+	// EPIC 10, DP26 / ADR 0043) refused to deploy a phase that is NOT a stable phase. Deploy is
+	// keyed on stable phases ONLY: a phase deploys IFF "done is computed" holds over its cut —
+	// red→green ∧ prior green intact ∧ mutation ≥ threshold ∧ NO MONSTER (KRD §43/§44, CLAUDE.md
+	// §8). The Stop-gate is INHERITED: deploy re-uses phases.IsStable (S23) + the gate inputs
+	// (mutation score, monster count), never a forked check. A non-stable phase is FAIL-CLOSED:
+	// deploy is refused with this actionable BlockReason naming the offending reasons (the red
+	// sensor/link ids, a below-threshold mutation score, a present monster), never deployed with
+	// a red mirror or a stale sandbox artifact. The stability is COMPUTED — the coherent-cut
+	// verdict crossed with the declared mutation threshold, never an LLM judgment (§6/§8). ADDED
+	// at S96 — additive enum extension (change_type: refine, never a removal).
+	CodePhaseNotStable Code = "PHASE_NOT_STABLE"
+	// CodeDomainAlreadyBound — the per-app CUSTOM DOMAIN binding (S97, back/runtime/domainbind,
+	// app-builder EPIC 10, DP27 / ADR 0043) refused to bind a custom domain because that domain
+	// is ALREADY BOUND to another project. A domain belongs to EXACTLY ONE project: the binding
+	// domain→project is INJECTIVE (the done-criteria property). Binding a domain already owned by
+	// a different project is FAIL-CLOSED: it is refused with this actionable BlockReason naming the
+	// project that already owns it, never silently re-pointed (which would hijack another tenant's
+	// HTTPS host). Re-binding the SAME domain to the SAME project is idempotent (not a conflict).
+	// The conflict is COMPUTED — a deterministic name-match over the existing binding registry,
+	// never an LLM judgment (§6/§8). ADDED at S97 — additive enum extension (change_type: refine,
+	// never a removal).
+	CodeDomainAlreadyBound Code = "DOMAIN_ALREADY_BOUND"
 )
 
 // Severity is the gravity marker of a refusal. The KRD §44.5 example uses
@@ -871,9 +907,63 @@ var reasons = map[Code]BlockReason{
 			"présentes), jamais un jugement LLM (§6/§8).",
 		HowToFix: []string{
 			"set_the_missing_secret : déposez le secret manquant (nommé dans le verdict) dans le store du projet via la porte `aidos secret set` / le MCP secretstore / l'écran /secret-store — il est chiffré au repos et scopé au project_id, jamais committé.",
-			"check_the_project_scope : vérifiez que le secret est posé sous le BON project_id — un secret du projet A n'est jamais visible par le projet B (isolation, le done-criterion anti-fuite cross-projet).",
+			"check_the_project_scope_secret : vérifiez que le secret est posé sous le BON project_id — un secret du projet A n'est jamais visible par le projet B (isolation, le done-criterion anti-fuite cross-projet).",
 			"rotate_if_compromised : si le secret a fuité, faites une rotation (`aidos secret rotate`) — l'ancienne valeur est invalidée et la nouvelle injectée au prochain boot ; jamais une réécriture silencieuse en place.",
 			"rerun the boot : le blocage se lève dès que toutes les clés déclarées sont présentes dans le store du projet ; l'injection d'env redevient complète et déterministe.",
+		},
+	},
+	CodeBreakingMigrationNoBackfill: {
+		Code:     CodeBreakingMigrationNoBackfill,
+		Severity: SeverityBlocking,
+		Explanation: "La migration de donnée de l'app émise est REFUSÉE (S95, back/runtime/datamigrate, EPIC 10, " +
+			"DP15/DP26) : le changement de schéma est BREAKING pour les données déjà produites (un rename de " +
+			"colonne, un split d'entité ou un changement de cardinalité de relation 1-N→N-N — chacun drop/narrow " +
+			"une colonne dont les vraies lignes déployées dépendent) et AUCUN BACKFILL n'est déclaré. Une migration " +
+			"breaking sans backfill est FAIL-CLOSED : elle est refusée AVANT tout DROP, jamais exécutée en silence " +
+			"sur une app déployée avec de vraies lignes (KRD §44.3 — « changer la vérité du code ne change pas " +
+			"automatiquement la vérité des données déjà produites » ; CLAUDE.md §9 anti-overwrite, expand-contract " +
+			"forward-only). Le caractère breaking est CALCULÉ — un diff structurel déterministe (colonnes droppées/" +
+			"narrowées) croisé avec la DataTruthScope déclarée (un backfill required, preserve_old_truth:true doit " +
+			"être présent), jamais un jugement LLM (§6/§8). La porte est DataTruthScope-gated (réutilise S95/§44.3).",
+		HowToFix: []string{
+			"declare_the_backfill : déclarez une DataTruthScope dont migration.required:true, migration.strategy ∈ {expand_contract, backfill, dual_read, dual_write} et audit.preserve_old_truth:true pour le changement breaking — le rename porte sa règle de recopie, le split sa ventilation, le N-N sa table de jointure remplie depuis les lignes existantes.",
+			"use_expand_contract : étalez le changement en EXPAND (ajout additif NULLable) → BACKFILL (recopie déclarée, human-gated) → CONTRACT (drop dans un pas forward SÉPARÉ, après backfill) — jamais un DROP destructif unique sur les lignes déployées.",
+			"prove_no_data_loss : rejouez la migration sur un Postgres réel ensemencé (Testcontainers) et assertez que toute ligne antérieure survit avec une valeur lisible avant de la lever ; la preuve est le run, pas l'affirmation.",
+		},
+	},
+	CodePhaseNotStable: {
+		Code:     CodePhaseNotStable,
+		Severity: SeverityBlocking,
+		Explanation: "Le déploiement de la phase est REFUSÉ (S96, back/runtime/deploy, EPIC 10, DP26 / ADR 0043) : " +
+			"la phase visée n'est PAS une phase stable. Le déploiement est keyé sur les phases stables UNIQUEMENT — " +
+			"une phase ne se déploie QUE si « done is computed » tient sur sa coupe : red→vert ∧ vert antérieur intact ∧ " +
+			"mutation ≥ seuil ∧ AUCUN MONSTRE (KRD §43/§44, CLAUDE.md §8). Le Stop-gate est HÉRITÉ : deploy réutilise " +
+			"phases.IsStable (S23) + les entrées du gate (score de mutation, compte de monstres), jamais un check forké. " +
+			"Une phase non-stable est FAIL-CLOSED : le déploiement est refusé AVANT toute ré-émission, nommant les raisons " +
+			"offensantes (le miroir rouge, le score de mutation sous le seuil, le monstre présent), jamais déployé avec un " +
+			"miroir rouge ou un artefact sandbox périmé (déploiement = ré-projection depuis la phase, jamais un artefact " +
+			"stale — DP26). La stabilité est CALCULÉE — le verdict de coupe cohérente croisé au seuil de mutation déclaré, " +
+			"jamais un jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"make_the_phase_stable : amenez la coupe au vert — chaque miroir rouge nommé dans les raisons doit passer au vert (red→green), le vert antérieur doit rester intact, le score de mutation doit atteindre le seuil déclaré, et aucun monstre (vérité sans miroir / miroir orphelin) ne doit subsister.",
+			"recompute_the_phase : rejouez phases.IsStable (S23) + le gate sur la coupe courante après corrections — la stabilité est CALCULÉE, jamais déclarée ; le déploiement se débloque dès que le verdict est stable.",
+			"never_deploy_a_stale_artifact : ne contournez jamais le gate pour déployer un artefact sandbox — le déploiement RÉ-ÉMET l'app depuis la phase (S78, déterministe), il ne restaure jamais un artefact périmé (DP26 / ADR 0043).",
+		},
+	},
+	CodeDomainAlreadyBound: {
+		Code:     CodeDomainAlreadyBound,
+		Severity: SeverityBlocking,
+		Explanation: "Le binding du domaine custom est REFUSÉ (S97, back/runtime/domainbind, EPIC 10, DP27 / ADR 0043) : " +
+			"ce domaine est DÉJÀ LIÉ à un autre projet. Un domaine appartient à EXACTEMENT UN projet — le binding " +
+			"domaine→projet est INJECTIF (KRD §8 ; CLAUDE.md §9 anti-overwrite). Lier un domaine déjà détenu par un " +
+			"autre tenant est FAIL-CLOSED : le binding est refusé, nommant le projet propriétaire, jamais re-pointé " +
+			"silencieusement (ce qui détournerait l'host HTTPS d'un autre tenant — une faille multi-tenant). Re-lier le " +
+			"MÊME domaine au MÊME projet est idempotent (pas un conflit). Le conflit est CALCULÉ — un name-match " +
+			"déterministe sur le registre des bindings existants, jamais un jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"choose_a_free_domain : choisissez un domaine qui n'est lié à aucun autre projet — chaque domaine custom ne sert qu'une seule app (binding injectif).",
+			"release_the_existing_binding : si le domaine doit changer de projet, le projet propriétaire actuel doit d'abord le libérer (unbind) — un domaine ne se déplace jamais en écrasant silencieusement son binding (CLAUDE.md §9).",
+			"use_the_default_deploy_subdomain : sans domaine custom, l'app reste servie sur son sous-domaine de déploiement déterministe (d-<hash>.deploy.aidos.app, S96) — le domaine custom est un alias optionnel par-dessus.",
 		},
 	},
 }
@@ -913,6 +1003,9 @@ var codeOrder = []Code{
 	CodeGenFileHandEdited,
 	CodeBuildLoopNoProgress,
 	CodeSecretMissingAtBoot,
+	CodeBreakingMigrationNoBackfill,
+	CodePhaseNotStable,
+	CodeDomainAlreadyBound,
 }
 
 // Codes returns every Code in the closed enum, in canonical order.
