@@ -372,6 +372,29 @@ const (
 	// never an LLM judgment (§6/§8). ADDED at S97 — additive enum extension (change_type: refine,
 	// never a removal).
 	CodeDomainAlreadyBound Code = "DOMAIN_ALREADY_BOUND"
+	// CodeEnvPromoteNotStable — the per-app ENVIRONMENT PROMOTION ladder (S98,
+	// back/archive/envrollback, app-builder EPIC 10, DP28 / ADR 0043) refused to promote a phase
+	// into an environment (preview→staging→prod) because the phase is NOT a stable phase. A phase
+	// is promotable into an environment IFF "done is computed" holds over its cut — red→green ∧
+	// prior green intact ∧ mutation ≥ threshold ∧ NO MONSTER (KRD §43/§44, CLAUDE.md §8). The
+	// Stop-gate is INHERITED from S96 (deploy.IsDeployable): promotion re-uses phases.IsStable
+	// (S23) + the gate inputs (mutation score, monster count), never a forked check. Promoting a
+	// non-stable phase to ANY environment (and a fortiori to prod) is FAIL-CLOSED: it is refused
+	// with this actionable BlockReason naming the offending reasons, never promoted with a red
+	// mirror or a stale sandbox artifact (promotion re-emits the phase, DP28). The stability is
+	// COMPUTED, never an LLM judgment (§6/§8). ADDED at S98 — additive enum extension.
+	CodeEnvPromoteNotStable Code = "ENV_PROMOTE_NOT_STABLE"
+	// CodeRollbackNotEarlier — the per-app ROLLBACK-TO-PHASE gesture (S98, back/archive/envrollback,
+	// app-builder EPIC 10, DP28 / ADR 0043) refused to roll an environment back to a target phase
+	// because the target is NOT a DISTINCT, EARLIER, STABLE phase. Rollback = CHECKOUT of an
+	// earlier stable DAG phase that DETERMINISTICALLY RE-PROJECTS the app from that phase (S78) —
+	// never a restore of a stale sandbox artifact (CLAUDE.md §9). The target phase must (a) differ
+	// from the currently-served phase (rolling back to the same phase is a no-op, refused), (b)
+	// precede it in the DAG (rollback goes BACKWARD to a known-good phase, never forward), and (c)
+	// itself be stable (you never roll back to a red phase). Any violation is FAIL-CLOSED with this
+	// actionable BlockReason. The ordering and stability are COMPUTED over the DAG, never an LLM
+	// judgment (§6/§8). ADDED at S98 — additive enum extension.
+	CodeRollbackNotEarlier Code = "ROLLBACK_NOT_EARLIER"
 )
 
 // Severity is the gravity marker of a refusal. The KRD §44.5 example uses
@@ -966,6 +989,42 @@ var reasons = map[Code]BlockReason{
 			"use_the_default_deploy_subdomain : sans domaine custom, l'app reste servie sur son sous-domaine de déploiement déterministe (d-<hash>.deploy.aidos.app, S96) — le domaine custom est un alias optionnel par-dessus.",
 		},
 	},
+	CodeEnvPromoteNotStable: {
+		Code:     CodeEnvPromoteNotStable,
+		Severity: SeverityBlocking,
+		Explanation: "La promotion d'environnement est REFUSÉE (S98, back/archive/envrollback, EPIC 10, DP28 / ADR 0043) : " +
+			"la phase visée n'est PAS une phase stable. Une phase n'est promouvable dans un environnement " +
+			"(preview→staging→prod) QUE si « done is computed » tient sur sa coupe : red→vert ∧ vert antérieur intact ∧ " +
+			"mutation ≥ seuil ∧ AUCUN MONSTRE (KRD §43/§44, CLAUDE.md §8). Le Stop-gate est HÉRITÉ de S96 " +
+			"(deploy.IsDeployable) : la promotion réutilise phases.IsStable (S23) + les entrées du gate (score de " +
+			"mutation, compte de monstres), jamais un check forké. Promouvoir une phase non-stable vers un environnement " +
+			"(a fortiori prod) est FAIL-CLOSED : c'est refusé AVANT toute ré-émission, nommant les raisons offensantes " +
+			"(le miroir rouge, le score sous le seuil, le monstre présent), jamais promu avec un miroir rouge ou un " +
+			"artefact sandbox périmé (promotion = ré-émission depuis la phase, DP28). La stabilité est CALCULÉE, jamais " +
+			"un jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"make_the_phase_stable : amenez la coupe au vert — chaque miroir rouge nommé doit passer au vert (red→green), le vert antérieur doit rester intact, le score de mutation doit atteindre le seuil déclaré, et aucun monstre ne doit subsister.",
+			"promote_a_stable_phase : promouvez une phase dont le verdict de coupe cohérente (phases.IsStable, S23) est stable — la stabilité est CALCULÉE, jamais déclarée.",
+			"never_promote_a_stale_artifact : ne contournez jamais le gate ; la promotion RÉ-ÉMET l'app depuis la phase (S78, déterministe), elle ne restaure jamais un artefact sandbox périmé (DP28 / ADR 0043).",
+		},
+	},
+	CodeRollbackNotEarlier: {
+		Code:     CodeRollbackNotEarlier,
+		Severity: SeverityBlocking,
+		Explanation: "Le rollback-vers-phase est REFUSÉ (S98, back/archive/envrollback, EPIC 10, DP28 / ADR 0043) : " +
+			"la phase cible n'est PAS une phase stable DISTINCTE et ANTÉRIEURE. Le rollback = CHECKOUT d'une phase DAG " +
+			"stable antérieure qui RÉ-PROJETTE DÉTERMINISTIQUEMENT l'app depuis cette phase (S78) — jamais une " +
+			"restauration d'un artefact sandbox périmé (CLAUDE.md §9). La phase cible doit (a) différer de la phase " +
+			"actuellement servie (revenir à la même phase est un no-op, refusé), (b) la PRÉCÉDER dans le DAG (le rollback " +
+			"recule vers une phase connue-bonne, jamais en avant), et (c) être elle-même stable (on ne revient jamais à " +
+			"une phase rouge). Toute violation est FAIL-CLOSED. L'ordre et la stabilité sont CALCULÉS sur le DAG, jamais " +
+			"un jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"choose_an_earlier_stable_phase : choisissez une phase qui PRÉCÈDE strictement la phase servie dans le DAG (S24) ET dont le verdict de coupe est stable — le rollback recule vers un point connu-bon.",
+			"do_not_roll_back_to_the_current_phase : revenir à la phase déjà servie est un no-op (rien à ré-émettre) — il n'est pas un rollback.",
+			"rollback_is_re_projection : le rollback RÉ-ÉMET l'app depuis la phase antérieure (S78), réconcilie le datastore (migration inverse expand-contract / Doltgres as-of), et ENREGISTRE la décision (append-only, provenance §9) — il ne restaure JAMAIS un artefact sandbox tel quel.",
+		},
+	},
 }
 
 // codeOrder is the canonical enumeration order of the Code enum. Declared, never
@@ -1006,6 +1065,8 @@ var codeOrder = []Code{
 	CodeBreakingMigrationNoBackfill,
 	CodePhaseNotStable,
 	CodeDomainAlreadyBound,
+	CodeEnvPromoteNotStable,
+	CodeRollbackNotEarlier,
 }
 
 // Codes returns every Code in the closed enum, in canonical order.
