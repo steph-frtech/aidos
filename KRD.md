@@ -3449,7 +3449,8 @@ La revue DTFS avait pointé le danger du double-typage. v8.1 ajoute une règle s
 | **WhyTree** | 5-pourquoi, cause racine, RCA, arbre d'Ishikawa | la causalité ARRIÈRE (effet→cause), arbre fishbone, cause vérifiée, finit en miroir — geste `/why`, §FKE-35.1 ; jamais une facette |
 | **caused_by** | lien causal, arête de cause | l'arête causale arrière du graphe (§17), inverse de `impacts` ; porte la remontée racine du WhyTree |
 | **les deux axes** | facette × verticale, orthogonal × latéral | une vérité = (niveau verticale [latéral, couplant] × facette [orthogonal, séparant]) ; §FKE-1.4 |
-| **spécification technique** | spec technique, tech spec, fiche technique | une PROJECTION (Contrat+Modèle+specs des facettes S/B/R/V/M+ADR, par couches ISO), jamais une rangée du squelette ; §FKE-20.1. Symétrique : **suite de tests techniques** (unitaire/intégration/infra + tests des facettes) |
+| **spécification technique** | spec technique, tech spec, fiche technique | une PROJECTION (Contrat+Modèle+pile OSI si réseau+specs des facettes+ADR), jamais une rangée du squelette ; §FKE-20.1. Symétrique : **suite de tests techniques** |
+| **pile OSI** | couches OSI, stack de communication | la structure interne d'une ARÊTE (API/MCP/connecteur/contrat) : L7 application · L6 présentation · L5 session · L4 transport ; l'OSI est à l'arête ce que l'anatomie est au nœud ; §FKE-20.1. À distinguer d'ISO 25010 (les facettes qualité) |
 
 ## 162. Règle de placement : où ajouter un futur concept
 
@@ -4403,12 +4404,14 @@ Un kernel se projette vers : code, tests, docs, API schema, OpenAPI, SQL, migrat
 
 ### 20.1 Spécification technique & Tests techniques — DEUX PROJECTIONS (pas deux lignes)
 
-Le clivage **fonctionnel ↔ technique** n'ajoute aucune rangée au squelette : il est déjà porté par (a) la **ligne de flottaison** — dans chaque facette, la moitié haute est *métier* (Spec/Comportement/Scénarios, ubiquitaire) et la moitié basse est *technique* (Modèle/**Contrat**/Code/tests unitaires, N4) — et (b) les **facettes** — F = fonctionnel, **S/B/R/V/M = les specs techniques non-fonctionnelles rangées par ISO 25010**. La « spécification technique » n'est donc pas un slot ; c'est une **VUE** qui assemble des déclarations qui existent déjà. La rendre « à chaque fois » = **deux projections déterministes par kernel** (générées, content-adressées, byte-stables, jamais la vérité, jamais hand-éditées) :
+Le clivage **fonctionnel ↔ technique** n'ajoute aucune rangée au squelette : il est déjà porté par (a) la **ligne de flottaison** — dans chaque facette, la moitié haute est *métier* (Spec/Comportement/Scénarios, ubiquitaire) et la moitié basse est *technique* (Modèle/**Contrat**/Code/tests unitaires, N4) — et (b) les **facettes** — F = fonctionnel, S/B/R/V/M = les specs **non-fonctionnelles** (qualité). La « spécification technique » n'est donc pas un slot ; c'est une **VUE** qui assemble des déclarations qui existent déjà. La rendre « à chaque fois » = **deux projections déterministes par kernel** (générées, content-adressées, byte-stables, jamais la vérité, jamais hand-éditées), organisées sur **deux axes** :
 
-- **Fiche de Spécification Technique** = `Contrat (F5↑) + Modèle (F4↑) + S1/B1/R1/V1/M1 + ADR liés`, organisée par les couches ISO. Le « + autre chose » = le contrat d'interface, le modèle de donnée technique, et les décisions d'architecture (ADR).
-- **Suite de Tests Techniques** = `tests unitaires/intégration (N4) + infra (N5) + tests sécurité/perf/chaos/arch-fitness (S3/B3/R3/M3)` — distincte des scénarios d'acceptance métier (N0).
+- **La pile de communication (modèle OSI) — pour les kernels en RÉSEAU** (API, MCP, connecteur, endpoint, contrat inter-cellule). L'OSI est à l'**ARÊTE** ce que l'anatomie est au **NŒUD** : la structure interne d'une frontière de communication, en couches — **L7 application** (schéma API / schéma d'outil MCP / le protocole) · **L6 présentation** (sérialisation/encodage, redaction, field-allowlist) · **L5 session** (auth/OAuth/capability lease) · **L4 transport** (HTTP/gRPC ; transports MCP stdio/http/sse/streamable). L1-L3 sont fournis par l'infra (provisionnés, non spécifiés par le kernel). Une fonction pure n'a **aucune** couche OSI ; une API/MCP/connecteur a la pile complète (conditionnel, comme les facettes).
+- **Les facettes qualité** (S/B/R/V/M) — orthogonales à l'OSI : ce que l'arête doit garantir (sûre, rapide, résiliente, durable, maintenable).
 
-Les ajouter comme **rangées** du squelette dupliquerait le Contrat + les facettes (redondance, perte du 1-pour-1) ; comme **projections**, elles donnent les deux artefacts lisibles *sans double-typer la vérité*.
+**Fiche de Spécification Technique** = `Contrat (F5↑) + Modèle (F4↑) + la pile OSI (si réseau) + specs des facettes S1/B1/R1/V1/M1 + ADR liés`. **Suite de Tests Techniques** = `unitaire/intégration (N4) + infra (N5) + tests par couche OSI (contrat d'interface, allowlist, auth, schéma) + tests des facettes (sécu/perf/chaos/arch)` — distincte des scénarios d'acceptance métier (N0).
+
+Les ajouter comme **rangées** du squelette dupliquerait le Contrat + les facettes + l'arête (redondance, perte du 1-pour-1) ; comme **projections**, elles donnent les deux artefacts lisibles *sans double-typer la vérité*. **L'OSI complète la symétrie nœud/arête** : le nœud a son anatomie, l'arête (lien `contracts_with` / connecteur) a sa pile OSI.
 
 ---
 
