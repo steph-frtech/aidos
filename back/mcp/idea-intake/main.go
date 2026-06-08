@@ -48,6 +48,12 @@ type captureInput struct {
 	Intent   string `json:"intent" jsonschema:"the sketched behaviour in prose (not yet falsifiable)"`
 	Source   string `json:"source" jsonschema:"the provenance source: human | incident"`
 	Detail   string `json:"detail" jsonschema:"the human utterance verbatim, or the incident reference #NNNN"`
+	// ProjectID scopes the captured idea to a project (S64). An empty value lands the
+	// idea in the seed __system__ project (the table DEFAULT, S54). The id stays the
+	// content hash of the SKETCH (proposes/intent/provenance) — two projects can stage
+	// the same sketch as two scoped rows of the same id (the scope is metadata, not
+	// identity; ON CONFLICT keeps the first per the append-only contract).
+	ProjectID string `json:"project_id,omitempty" jsonschema:"the project the captured idea is scoped to (S64); empty = the __system__ seed"`
 }
 
 type ideaOutput struct {
@@ -58,6 +64,9 @@ type ideaOutput struct {
 	Detail       string `json:"detail"`
 	Status       string `json:"status"`
 	RejectReason string `json:"reject_reason,omitempty"`
+	// ProjectID is the project this idea is scoped to (S64). The inbox lists ideas of
+	// the active project only; capture carries the project the user is pinned to.
+	ProjectID string `json:"project_id,omitempty"`
 	// HasMirror is always false from this server: an idea has no mirror — that is
 	// what makes it an idea. The Workbench renders the "no mirror yet" marker.
 	HasMirror bool `json:"has_mirror"`
@@ -74,6 +83,9 @@ type rejectInput struct {
 
 type listInput struct {
 	Status string `json:"status,omitempty" jsonschema:"optional lifecycle filter: draft|grilled|spiking|harvested|rejected"`
+	// ProjectID scopes the inbox to one project (S64). Empty = unscoped (every project),
+	// preserved for the global triage queue; the per-project inbox passes the active id.
+	ProjectID string `json:"project_id,omitempty" jsonschema:"optional project scope (S64); empty = every project"`
 }
 type listOutput struct {
 	Ideas []ideaOutput `json:"ideas"`
@@ -111,10 +123,12 @@ func (s *server) capture(ctx context.Context, _ *mcp.CallToolRequest, in capture
 	if err != nil {
 		return nil, ideaOutput{}, err
 	}
-	if err := s.store.Insert(ctx, i); err != nil {
+	if err := s.store.InsertScoped(ctx, i, in.ProjectID); err != nil {
 		return nil, ideaOutput{}, err
 	}
-	return nil, toOutput(i), nil
+	out := toOutput(i)
+	out.ProjectID = in.ProjectID
+	return nil, out, nil
 }
 
 // advance loads an idea, applies a pure lifecycle gesture, and persists the result.
@@ -164,13 +178,15 @@ func (s *server) statusTool(ctx context.Context, _ *mcp.CallToolRequest, in idIn
 }
 
 func (s *server) list(ctx context.Context, _ *mcp.CallToolRequest, in listInput) (*mcp.CallToolResult, listOutput, error) {
-	all, err := s.store.List(ctx, in.Status)
+	all, err := s.store.ListScoped(ctx, in.Status, in.ProjectID)
 	if err != nil {
 		return nil, listOutput{}, err
 	}
 	out := listOutput{Ideas: make([]ideaOutput, len(all))}
-	for i, idea := range all {
-		out.Ideas[i] = toOutput(idea)
+	for i, sc := range all {
+		o := toOutput(sc.Idea)
+		o.ProjectID = sc.ProjectID
+		out.Ideas[i] = o
 	}
 	return nil, out, nil
 }

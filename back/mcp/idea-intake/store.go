@@ -81,14 +81,35 @@ func fromRow(id string, body []byte) (ideas.Idea, error) {
 // through MK03's idempotent door) is a NO-OP, not a duplicate-key error: ON CONFLICT DO NOTHING
 // keeps the first capture untouched (append-only — never overwrites a staged idea, never deletes).
 func (s *Store) Insert(ctx context.Context, i ideas.Idea) error {
+	return s.InsertScoped(ctx, i, "")
+}
+
+// InsertScoped persists a freshly captured idea SCOPED TO A PROJECT (S64). When projectID is empty
+// the row falls back to the table DEFAULT (the __system__ seed, S54), so old callers keep working;
+// when set, the idea joins that project's inbox. The id stays the content hash of the SKETCH —
+// project_id is a SCOPE column, never part of identity (CLAUDE.md §2 / S54). Append-only:
+// ON CONFLICT DO NOTHING keeps the first staged row untouched, never overwrites, never deletes.
+func (s *Store) InsertScoped(ctx context.Context, i ideas.Idea, projectID string) error {
 	body, err := toBody(i)
 	if err != nil {
 		return err
 	}
+	if projectID == "" {
+		_, err = s.pool.Exec(ctx,
+			"INSERT INTO ideas.idea (id, body, version) VALUES ($1, $2::jsonb, $3) ON CONFLICT (id) DO NOTHING",
+			i.ID, string(body), i.ID)
+		return err
+	}
 	_, err = s.pool.Exec(ctx,
-		"INSERT INTO ideas.idea (id, body, version) VALUES ($1, $2::jsonb, $3) ON CONFLICT (id) DO NOTHING",
-		i.ID, string(body), i.ID)
+		"INSERT INTO ideas.idea (id, body, version, project_id) VALUES ($1, $2::jsonb, $3, $4) ON CONFLICT (id) DO NOTHING",
+		i.ID, string(body), i.ID, projectID)
 	return err
+}
+
+// ScopedIdea pairs an idea with the project it is scoped to (S64) — what the per-project inbox lists.
+type ScopedIdea struct {
+	Idea      ideas.Idea
+	ProjectID string
 }
 
 // Update persists an advanced idea (UPDATE — advance status / trace reject). The id
@@ -117,13 +138,41 @@ func (s *Store) Get(ctx context.Context, id string) (ideas.Idea, error) {
 }
 
 // List reads all ideas, optionally filtered by status. Ordered by id for a stable,
-// deterministic listing.
+// deterministic listing. Unscoped — the per-project inbox uses ListScoped (S64).
 func (s *Store) List(ctx context.Context, status string) ([]ideas.Idea, error) {
-	q := "SELECT id, body FROM ideas.idea"
+	scoped, err := s.ListScoped(ctx, status, "")
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ideas.Idea, len(scoped))
+	for i, sc := range scoped {
+		out[i] = sc.Idea
+	}
+	return out, nil
+}
+
+// ListScoped reads ideas of ONE project (S64 inbox), optionally filtered by status. An empty
+// projectID lists every project (the global triage queue, back-compat). Ordered by id for a stable,
+// deterministic listing (determinism-first: same rows → same order). Each row carries its scope so
+// the inbox can prove "this idea belongs to the active project".
+func (s *Store) ListScoped(ctx context.Context, status, projectID string) ([]ScopedIdea, error) {
+	q := "SELECT id, body, project_id FROM ideas.idea"
 	args := []any{}
+	conds := []string{}
 	if status != "" {
-		q += " WHERE body->>'status' = $1"
 		args = append(args, status)
+		conds = append(conds, fmt.Sprintf("body->>'status' = $%d", len(args)))
+	}
+	if projectID != "" {
+		args = append(args, projectID)
+		conds = append(conds, fmt.Sprintf("project_id = $%d", len(args)))
+	}
+	for n, c := range conds {
+		if n == 0 {
+			q += " WHERE " + c
+		} else {
+			q += " AND " + c
+		}
 	}
 	q += " ORDER BY id"
 	rows, err := s.pool.Query(ctx, q, args...)
@@ -131,18 +180,18 @@ func (s *Store) List(ctx context.Context, status string) ([]ideas.Idea, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []ideas.Idea
+	var out []ScopedIdea
 	for rows.Next() {
-		var id string
+		var id, proj string
 		var body []byte
-		if err := rows.Scan(&id, &body); err != nil {
+		if err := rows.Scan(&id, &body, &proj); err != nil {
 			return nil, err
 		}
 		i, err := fromRow(id, body)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, i)
+		out = append(out, ScopedIdea{Idea: i, ProjectID: proj})
 	}
 	return out, rows.Err()
 }

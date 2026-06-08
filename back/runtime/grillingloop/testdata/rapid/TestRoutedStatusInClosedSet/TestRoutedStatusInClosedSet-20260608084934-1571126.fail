@@ -1,0 +1,15 @@
+# 2026/06/08 08:49:34.699695 [TestRoutedStatusInClosedSet] [rapid] draw intention: grillingloop.Intention{Intent:" ", Scenarios:[]string{}}
+# 2026/06/08 08:49:34.699706 [TestRoutedStatusInClosedSet] [rapid] draw verdict: "sharp"
+# 2026/06/08 08:49:34.699707 [TestRoutedStatusInClosedSet] Route(sharp): grillingloop: intention has empty intent
+# 
+v0.4.8#3268550048319694501
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

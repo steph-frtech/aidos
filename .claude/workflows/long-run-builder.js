@@ -18,8 +18,8 @@ export const meta = {
 
 const PLAN_PATH = (args && args.planPath) || 'BUILDER_PLAN.md'
 const MAX_RETRIES = (args && args.maxRetries) ?? 2
-const START_FROM = (args && args.startFrom) || 'S62' // CURSOR — orchestrator edits this literal between relaunches
-const MAX_STEPS = (args && args.maxSteps) || null
+const START_FROM = (args && args.startFrom) || 'S64' // CURSOR — orchestrator edits this literal between relaunches
+const MAX_STEPS = (args && args.maxSteps) || 5 // BATCH SIZE — orchestrator commits+relaunches per batch (args override)
 const STOP_AFTER = (args && args.stopAfter) || null
 
 const PLAN_SCHEMA = {

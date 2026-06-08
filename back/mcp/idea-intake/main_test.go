@@ -52,6 +52,10 @@ func startServer(t *testing.T) *server {
 	for _, f := range []string{
 		"../../migrations/kernel_records_baseline.sql",
 		"../../migrations/ideas_lifecycle_baseline.sql",
+		// S53/S54: the live schema gives ideas.idea its project_id scope column
+		// (the per-project inbox, S64). The store always reads it.
+		"../../migrations/projects_baseline.sql",
+		"../../migrations/project_scope_baseline.sql",
 	} {
 		mig, err := os.ReadFile(f)
 		if err != nil {

@@ -80,6 +80,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/operation", k: "operation" },
 			{ href: "/control", k: "control" },
 			{ href: "/ideas", k: "ideas" },
+			{ href: "/capture-idea", k: "captureIdea" },
 			{ href: "/truth-typing", k: "truthTyping" },
 			{ href: "/scopes", k: "scopes" },
 			{ href: "/authorities", k: "authorities" },
@@ -124,6 +125,10 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 		items: [
 			{ href: "/goal", k: "goal" },
 			{ href: "/exploration", k: "exploration" },
+			{ href: "/grilling-loop", k: "grillingLoop" },
+			{ href: "/goal-piloting", k: "goalPiloting" },
+			{ href: "/behavior-capture", k: "behaviorCapture" },
+			{ href: "/shape-editor", k: "shapeEditor" },
 			{ href: "/emitted-target", k: "emittedTarget" },
 			{ href: "/emitters", k: "emitters" },
 			{ href: "/entity-map", k: "entityMap" },
