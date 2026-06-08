@@ -83,3 +83,7 @@ next-env.d.ts
 /back/stop
 /back/store
 /back/telemetry-reader
+/back/behavior-expander
+/back/dsl-editor
+/back/entity-modeler
+/back/relation-emitter
