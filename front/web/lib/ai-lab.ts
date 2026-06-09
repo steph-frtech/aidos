@@ -586,7 +586,9 @@ export type AssistantReply =
 			specs: number;
 			/** how many machines in this facet column still diverge 🔴 (the conscience). */
 			divergent: number;
-	  };
+	  }
+	/** the deterministic twin answered (real Claude unavailable) — honesty about the brain. */
+	| { kind: "fallback"; placed: number };
 
 /**
  * assistantReply is the left-brain's TURN: from a chat message scoped to a facet + the resulting
@@ -609,4 +611,115 @@ export function assistantReply(
 /** A stable id for a chat turn at a given position (append-only — never reordered). */
 export function turnId(index: number, role: ChatTurn["role"]): string {
 	return `T${index}-${role}`;
+}
+
+// ── The placement space — the chat acts on ALL levels (verticale × fractale) ──
+//
+// CORRECTION (the owner): the chat does NOT pick a facet/level. It acts on the WHOLE verticale;
+// the INTELLIGENCE (the left brain — a real Claude, gated) decides WHERE to put each piece of a
+// need: which LEVEL, which FACET, which mirror-PAIR. The placement is the LLM's irreducible
+// judgment, VERIFIED here (clamped to the declared target space; the wall: proposes, never writes).
+
+/** The verticale — the 7 levels a need fans out across (S-vertical, produit → entité). */
+export const VERTICAL_LEVELS = [
+	"produit",
+	"parcours",
+	"vue",
+	"contrôle",
+	"action",
+	"opération",
+	"entité",
+] as const;
+export type Level = (typeof VERTICAL_LEVELS)[number];
+
+/** The full facet set the left brain may target (F·I·S·B·R·V·M·X). */
+export const ALL_FACETS: Facet[] = ["F", "I", "S", "B", "R", "V", "M", "X"];
+
+/** A placement the left brain PROPOSES: a generated spec dropped at level × facet × pair. */
+export interface Placement {
+	level: Level;
+	facet: Facet;
+	pairId: string;
+	/** the spec text (above the wall) the left brain compiled for this cell. */
+	spec: string;
+	/** an optional fractal sub-kernel the placement nests under (e.g. "checkout/cart"). */
+	kernel?: string;
+}
+
+function isLevel(x: unknown): x is Level {
+	return (VERTICAL_LEVELS as readonly string[]).includes(x as string);
+}
+function isFacet(x: unknown): x is Facet {
+	return (ALL_FACETS as readonly string[]).includes(x as string);
+}
+function isPairId(x: unknown): boolean {
+	return MIRROR_PAIRS.some((p) => p.id === x);
+}
+
+/**
+ * validatePlacements GATES the left brain's output (determinism-first §8): the LLM PROPOSES
+ * placements, but only those whose (level, facet, pairId) are in the DECLARED target space
+ * survive — an invented level/facet/pair is dropped, never coerced. Pure + total. The spec text is
+ * trimmed + length-capped (never executed, never written to truth — the wall §2). Deterministic:
+ * same raw input ⇒ same kept placements (stable order: level, facet, pair).
+ */
+export function validatePlacements(raw: unknown): Placement[] {
+	if (!Array.isArray(raw)) return [];
+	const kept: Placement[] = [];
+	for (const r of raw) {
+		if (!r || typeof r !== "object") continue;
+		const o = r as Record<string, unknown>;
+		if (!isLevel(o.level) || !isFacet(o.facet) || !isPairId(o.pairId)) continue;
+		const spec = typeof o.spec === "string" ? o.spec.trim().slice(0, 280) : "";
+		if (!spec) continue;
+		const placement: Placement = {
+			level: o.level,
+			facet: o.facet,
+			pairId: o.pairId as string,
+			spec,
+		};
+		if (typeof o.kernel === "string" && o.kernel.trim())
+			placement.kernel = o.kernel.trim().slice(0, 60);
+		kept.push(placement);
+	}
+	const lvl = (l: Level) => VERTICAL_LEVELS.indexOf(l);
+	const fct = (f: Facet) => ALL_FACETS.indexOf(f);
+	const par = (p: string) => MIRROR_PAIRS.findIndex((m) => m.id === p);
+	kept.sort(
+		(a, b) =>
+			lvl(a.level) - lvl(b.level) ||
+			fct(a.facet) - fct(b.facet) ||
+			par(a.pairId) - par(b.pairId),
+	);
+	return kept;
+}
+
+/** Group placements by level (the verticale) for the right-pane render. Deterministic. */
+export function placementsByLevel(
+	placements: Placement[],
+): { level: Level; items: Placement[] }[] {
+	return VERTICAL_LEVELS.map((level) => ({
+		level,
+		items: placements.filter((p) => p.level === level),
+	}));
+}
+
+/** The dedup key of a placement cell (level × facet × pair × kernel). */
+export function placementKey(p: Placement): string {
+	return `${p.level}|${p.facet}|${p.pairId}|${p.kernel ?? ""}`;
+}
+
+/**
+ * mergePlacements accumulates the conversation's placements: a later turn's placement for the
+ * SAME cell (level × facet × pair × kernel) OVERRIDES the earlier spec (the chat refines), others
+ * are kept. Re-sorted to the canonical order. PURE + TOTAL + deterministic.
+ */
+export function mergePlacements(
+	prev: Placement[],
+	next: Placement[],
+): Placement[] {
+	const byKey = new Map<string, Placement>();
+	for (const p of prev) byKey.set(placementKey(p), p);
+	for (const p of next) byKey.set(placementKey(p), p);
+	return validatePlacements([...byKey.values()]);
 }

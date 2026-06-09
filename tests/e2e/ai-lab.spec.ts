@@ -1,101 +1,61 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * FK11 Playwright e2e — the « AI Lab : le générateur de specs » Workbench panel (FKE-38, corrected).
+ * FK11 Playwright e2e — the « AI Lab » Workbench panel (FKE-38, corrected: the chat acts on ALL
+ * levels; the left brain decides where to place each spec).
  * mirror record: reflects=FK11-ai-lab, test_kind=e2e, cert_language=playwright, liveness=live
  *
- * Proves /ai-lab is action-capable (ui-completeness, CLAUDE.md §7): the AI Lab is a TWO-PANE SPEC
- * GENERATOR, not a navigation cockpit. From the screen:
- *   - GAUCHE — a natural-language chat GENERATES the specs across the 6 mirror-pairs of the chosen
- *     facet (a column of the 6×6), ABOVE the wall (the machines below turn 🟢);
- *   - a DIVERGENT machine stays 🔴 even when a spec is generated (the conscience computes it);
- *   - a DIRECT TRUTH-WRITE from the chat is REFUSED at the wall (§2) — nothing is generated;
- *   - a cell with no generated spec is 🟡 (declared, not yet proven).
+ * Proves /ai-lab is action-capable (ui-completeness, CLAUDE.md §7): a two-pane CONVERSATION wired
+ * to the real left brain (Claude), with a deterministic fallback.
+ *   - GAUCHE — a multi-turn chat: a message adds a user turn + a left-brain reply.
+ *   - DROITE — the VERTICALE (7 levels): the specs the intelligence PLACED, grouped by level.
+ *   - a DIRECT TRUTH-WRITE is REFUSED at the wall (§2), before any LLM call (deterministic).
  *
- * THE WALL (CLAUDE.md §2): the chat generates ABOVE the wall (proposes); the machines BELOW are
- * read-only; promotion to truth is /goal. DETERMINISM-FIRST (§8): the pure twin lib/ai-lab runs.
+ * THE WALL (§2): the chat proposes; placements are clamped to the declared space, never written to
+ * truth. The brain-mode badge says whether the real Claude (llm) or the twin (fallback) answered.
  */
 
-test.describe("FK11 — the AI Lab spec generator (chat → 6×6 → machines)", () => {
-	test("renders the two panes: the chat thread + the 6×6 grid", async ({
+test.describe("FK11 — the AI Lab (chat acts on all levels)", () => {
+	test("renders the two panes: the chat thread + the verticale", async ({
 		page,
 	}) => {
 		await page.goto("/ai-lab");
 		await expect(
 			page.getByRole("heading", { level: 1, name: /ai lab/i }),
 		).toBeVisible();
-		// the conversation: a thread with the left-brain's greeting + the composer.
 		await expect(page.getByTestId("thread")).toBeVisible();
-		await expect(page.getByTestId("turn-assistant").first()).toBeVisible();
+		await expect(page.getByTestId("turn-assistant").first()).toBeVisible(); // greeting
 		await expect(page.getByTestId("chat")).toBeVisible();
-		await expect(page.getByTestId("facet")).toBeVisible();
 		await expect(page.getByTestId("generate")).toBeVisible();
-		// the grid exists: a cell per (mirror-pair, facet).
-		await expect(page.getByTestId("cell-spec-F")).toBeVisible();
-		// the seeded divergent machine is 🔴 from the start (contract @ Security).
-		await expect(page.getByTestId("cell-contract-S")).toHaveAttribute(
-			"data-voyant",
-			"red",
-		);
-		// a cell with no generated spec is 🟡 (declared, not yet proven).
-		await expect(page.getByTestId("cell-spec-F")).toHaveAttribute(
-			"data-spec",
-			"0",
-		);
-		await expect(page.getByTestId("cell-spec-F")).toHaveAttribute(
-			"data-voyant",
-			"amber",
-		);
+		// the verticale: the 7 levels are present (produit → entité).
+		await expect(page.getByTestId("level-level_produit")).toBeVisible();
+		await expect(page.getByTestId("level-level_entite")).toBeVisible();
 	});
 
-	test("discussing: a message adds a user turn + an assistant reply, generates specs → machines 🟢", async ({
+	test("discussing places specs across the verticale (user turn + reply + placements)", async ({
 		page,
 	}) => {
+		test.setTimeout(120_000); // the real left brain (Claude) may take a while
 		await page.goto("/ai-lab");
-		await page.getByTestId("facet").selectOption("F");
 		await page
 			.getByTestId("chat")
-			.fill("un panier qui retient un article 30 minutes puis le libère");
+			.fill(
+				"quand le panier expire au bout de 30 minutes, prévenir l'utilisateur et libérer le stock",
+			);
 		await page.getByTestId("generate").click();
 
-		// the conversation grew: the user turn + the left-brain's reply.
+		// the conversation grew + the left-brain mode is shown.
 		await expect(page.getByTestId("turn-user")).toHaveText(/panier/);
-		await expect(page.getByTestId("turn-assistant").last()).toBeVisible();
+		await expect(page.getByTestId("turn-assistant").last()).toBeVisible({
+			timeout: 110_000,
+		});
+		await expect(page.getByTestId("brain-mode")).toBeVisible();
 
-		// the column-F cells now carry a generated spec (above the wall) …
-		await expect(page.getByTestId("cell-spec-F")).toHaveAttribute(
-			"data-spec",
-			"1",
-		);
-		await expect(page.getByTestId("cell-contract-F")).toHaveAttribute(
-			"data-spec",
-			"1",
-		);
-		// … and their machine (below the wall) is now 🟢 aligned.
-		await expect(page.getByTestId("cell-spec-F")).toHaveAttribute(
-			"data-voyant",
-			"green",
-		);
-		// 6 specs generated — one per mirror-pair.
-		await expect(page.getByTestId("spec-count")).toContainText("6");
+		// at least one spec was placed somewhere on the verticale.
+		await expect(page.getByTestId("spec-count")).not.toContainText("0");
 	});
 
-	test("a divergent machine stays 🔴 even with a generated spec (the conscience)", async ({
-		page,
-	}) => {
-		await page.goto("/ai-lab");
-		await page.getByTestId("facet").selectOption("S");
-		await page
-			.getByTestId("chat")
-			.fill("exiger une authentification forte au checkout");
-		await page.getByTestId("generate").click();
-
-		const contractS = page.getByTestId("cell-contract-S");
-		await expect(contractS).toHaveAttribute("data-spec", "1"); // a spec WAS generated
-		await expect(contractS).toHaveAttribute("data-voyant", "red"); // but the machine diverges
-	});
-
-	test("a direct truth-write from the chat is REFUSED at the wall (§2) — nothing generated", async ({
+	test("a direct truth-write is REFUSED at the wall (§2) — no LLM call, no placement", async ({
 		page,
 	}) => {
 		await page.goto("/ai-lab");
@@ -106,9 +66,5 @@ test.describe("FK11 — the AI Lab spec generator (chat → 6×6 → machines)",
 
 		await expect(page.getByTestId("wall-refused")).toBeVisible();
 		await expect(page.getByTestId("spec-count")).toContainText("0");
-		await expect(page.getByTestId("cell-spec-F")).toHaveAttribute(
-			"data-spec",
-			"0",
-		);
 	});
 });

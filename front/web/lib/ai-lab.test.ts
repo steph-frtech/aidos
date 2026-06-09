@@ -28,10 +28,14 @@ import {
 	generateSpecs,
 	isTruthWriteRequest,
 	MIRROR_PAIRS,
+	mergePlacements,
 	pairKey,
 	pairTier,
+	placementsByLevel,
 	proposeSlot,
 	scopeForPair,
+	VERTICAL_LEVELS,
+	validatePlacements,
 	voyantFor,
 } from "./ai-lab";
 import { reconcile, type SourcedVerdict } from "./conscience";
@@ -333,5 +337,66 @@ describe("FK11 — the 6×6 generative grid (FKE-38, corrected)", () => {
 		const a = assistantReply("F", "un panier", cells);
 		const b = assistantReply("F", "un panier", cells);
 		expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+	});
+});
+
+describe("FK11 — placement GATE (the chat acts on all levels; the LLM is verified)", () => {
+	it("validatePlacements keeps only declared (level × facet × pair), drops invented ones", () => {
+		const kept = validatePlacements([
+			{ level: "opération", facet: "F", pairId: "contract", spec: "ok" },
+			{ level: "INVENTÉ", facet: "F", pairId: "spec", spec: "bad level" },
+			{ level: "vue", facet: "ZZ", pairId: "spec", spec: "bad facet" },
+			{ level: "vue", facet: "S", pairId: "not-a-pair", spec: "bad pair" },
+			{ level: "vue", facet: "S", pairId: "spec", spec: "  " }, // empty spec dropped
+		]);
+		expect(kept).toHaveLength(1);
+		expect(kept[0]).toMatchObject({
+			level: "opération",
+			facet: "F",
+			pairId: "contract",
+		});
+	});
+
+	it("validatePlacements is deterministic + canonically ordered (level, facet, pair)", () => {
+		const raw = [
+			{ level: "entité", facet: "S", pairId: "model", spec: "a" },
+			{ level: "produit", facet: "F", pairId: "spec", spec: "b" },
+		];
+		const a = validatePlacements(raw);
+		const b = validatePlacements([...raw].reverse());
+		expect(JSON.stringify(a)).toBe(JSON.stringify(b)); // order-invariant
+		expect(a[0].level).toBe("produit"); // produit sorts before entité
+	});
+
+	it("validatePlacements caps spec length + tolerates garbage input", () => {
+		expect(validatePlacements(null)).toEqual([]);
+		expect(validatePlacements("nope")).toEqual([]);
+		const long = validatePlacements([
+			{ level: "vue", facet: "X", pairId: "spec", spec: "x".repeat(500) },
+		]);
+		expect(long[0].spec.length).toBeLessThanOrEqual(280);
+	});
+
+	it("mergePlacements: a later spec for the same cell OVERRIDES; others kept", () => {
+		const prev = validatePlacements([
+			{ level: "vue", facet: "F", pairId: "spec", spec: "v1" },
+			{ level: "action", facet: "S", pairId: "contract", spec: "keep" },
+		]);
+		const next = validatePlacements([
+			{ level: "vue", facet: "F", pairId: "spec", spec: "v2" },
+		]);
+		const merged = mergePlacements(prev, next);
+		expect(merged).toHaveLength(2);
+		expect(merged.find((p) => p.level === "vue")?.spec).toBe("v2"); // overridden
+		expect(merged.find((p) => p.level === "action")?.spec).toBe("keep");
+	});
+
+	it("placementsByLevel covers all 7 verticale levels in order", () => {
+		const grouped = placementsByLevel([
+			{ level: "entité", facet: "F", pairId: "model", spec: "x" },
+		]);
+		expect(grouped.map((g) => g.level)).toEqual([...VERTICAL_LEVELS]);
+		expect(grouped.find((g) => g.level === "entité")?.items).toHaveLength(1);
+		expect(grouped.find((g) => g.level === "produit")?.items).toHaveLength(0);
 	});
 });

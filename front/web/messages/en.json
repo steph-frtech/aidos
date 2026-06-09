@@ -6121,8 +6121,8 @@
 		"deterministicYes": "deterministic ✓",
 		"deterministicNo": "NOT deterministic ✗",
 		"leftHeading": "Chat — generate the specs",
-		"leftHelp": "Speak in natural language. The left brain compiles your words into specs (above the wall), for the 6 mirror-pairs of the facet. It never changes a truth.",
-		"chatPlaceholder": "“a cart that holds an item for 30 minutes then releases it…”",
+		"leftHelp": "Describe a need in natural language. The left brain (Claude) fans it out and places the specs where they belong — it decides the level(s), facet(s) and pair(s). It proposes; promotion to truth goes through /goal.",
+		"chatPlaceholder": "“when the cart expires after 30 min, notify the user and release the stock…”",
 		"chatCta": "Send",
 		"proposedSlot": "Proposed slot (a candidate, not a truth)",
 		"wallRefused": "Refused at the wall (§2) — the chat never writes truth",
@@ -6162,6 +6162,20 @@
 		"legendAmber": "declared, not proven",
 		"replyGreeting": "Hi 👋 Describe in natural language what you want — I generate the specs above the wall, across the 6 mirror-pairs of the chosen facet, and you watch the machines (on the right) react. The chat proposes; promotion to truth goes through a /goal.",
 		"replyRefused": "I can’t write truth from the chat — that’s the wall (§2). I propose, I don’t decide: promotion goes idea → mirror → /goal. Rephrase as intent and I’ll generate the specs.",
-		"replyGenerated": "I posted {n} spec(s) above the wall for the {facet} facet (the 6 mirror-pairs). {divergent, plural, =0 {Their machines turn green 🟢.} one {# machine still diverges 🔴 — the conscience computed it; refine its pair to realign it.} other {# machines still diverge 🔴 — the conscience computed it; refine their pairs to realign them.}}"
+		"replyGenerated": "I posted {n} spec(s) above the wall for the {facet} facet (the 6 mirror-pairs). {divergent, plural, =0 {Their machines turn green 🟢.} one {# machine still diverges 🔴 — the conscience computed it; refine its pair to realign it.} other {# machines still diverge 🔴 — the conscience computed it; refine their pairs to realign them.}}",
+		"placementsHeading": "Where the intelligence placed your specs — the verticale",
+		"modeLlm": "Claude wired live",
+		"modeFallback": "deterministic mode — Claude unavailable",
+		"levelEmpty": "nothing here yet",
+		"replyFallback": "(deterministic mode — Claude unavailable) I placed {placed} specs at the operation level, Functional facet. Wire Claude for the real multi-level fan-out.",
+		"level_produit": "Product",
+		"level_parcours": "Journey",
+		"level_vue": "View",
+		"level_controle": "Control",
+		"level_action": "Action",
+		"level_operation": "Operation",
+		"level_entite": "Entity",
+		"facet_I": "Invariants",
+		"facet_X": "Experience"
 	}
 }

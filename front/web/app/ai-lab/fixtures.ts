@@ -1,11 +1,9 @@
 import {
-	buildGrid,
 	type ChatTurn,
 	type CockpitState,
-	type GeneratedSpec,
-	type GridCell,
 	type Mode,
 	type PairScope,
+	type Placement,
 	type ProposedSlot,
 	turnId,
 	type WallRefusal,
@@ -146,22 +144,25 @@ export const GRID_FACETS: Facet[] = ["F", "S", "B", "R", "V", "M"];
  */
 export const SEEDED_DIVERGENT: string[] = ["contract@S"];
 
-/** The 6×6 generative lab view: the chat THREAD + accumulated specs + the rebuilt grid. */
+/**
+ * The lab view (FKE-38, corrected): a multi-turn CONVERSATION (left) + the PLACEMENTS the left
+ * brain fanned the need out into, across the whole verticale (right). No manual facet/level pick —
+ * the intelligence decides where each spec goes. `mode` records whether the real Claude answered
+ * (llm) or the deterministic twin did (fallback) — honesty about which brain spoke.
+ */
 export interface LabView {
 	ok: boolean;
-	selectedFacet: Facet;
 	/** the multi-turn conversation (user + left-brain assistant turns). */
 	thread: ChatTurn[];
-	specs: GeneratedSpec[];
-	cells: GridCell[];
-	refusal?: WallRefusal;
+	/** every spec the left brain placed, across all levels (the fan-out). */
+	placements: Placement[];
+	mode: "idle" | "llm" | "fallback";
 	error?: string;
 }
 
 export function emptyLab(): LabView {
 	return {
 		ok: true,
-		selectedFacet: "F",
 		thread: [
 			{
 				id: turnId(0, "assistant"),
@@ -170,11 +171,7 @@ export function emptyLab(): LabView {
 				reply: { kind: "greeting" },
 			},
 		],
-		specs: [],
-		cells: buildGrid({
-			facets: GRID_FACETS,
-			specs: [],
-			divergent: SEEDED_DIVERGENT,
-		}),
+		placements: [],
+		mode: "idle",
 	};
 }

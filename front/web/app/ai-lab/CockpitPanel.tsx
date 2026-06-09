@@ -6,49 +6,36 @@ import { useFormStatus } from "react-dom";
 import {
 	type AssistantReply,
 	type ChatTurn,
-	type GridCell,
-	MIRROR_PAIRS,
+	type Level,
+	placementsByLevel,
 } from "@/lib/ai-lab";
-import type { Facet } from "@/lib/facetwire";
-import { generateSpecsAction } from "./actions";
-import { emptyLab, GRID_FACETS, type LabView } from "./fixtures";
+import { leftBrainAction } from "./actions";
+import { emptyLab, type LabView } from "./fixtures";
 
 /**
  * CockpitPanel makes /ai-lab action-capable (ui-completeness, CLAUDE.md §7): the corrected
- * FKE-38 AI Lab — a two-pane SPEC GENERATOR with a real CONVERSATION.
- *  - GAUCHE : a multi-turn natural-language CHAT (the « cerveau gauche »). You discuss; each
- *    message GENERATES the specs across the 6 mirror-pairs of the selected facet (a column of the
- *    6×6), ABOVE the wall (proposed — never a truth), and the left brain replies. A direct
- *    truth-write is REFUSED at the wall (§2) ; the only door is idea → mirror → /goal.
- *  - DROITE : the 6×6 grid — 6 mirror-pairs (rows) × facets (columns). Each cell shows the
- *    generated SPEC (above the wall) and its MACHINE (the mirror/test, below the wall) with the
- *    live conscience voyant 🟢/🔴/🟡.
+ * FKE-38 AI Lab — a CONVERSATION wired to the REAL left brain (Claude).
+ *  - GAUCHE : a multi-turn natural-language chat. You discuss; the message is NOT scoped — the
+ *    left brain (Claude, gated) decides WHERE each spec goes across the whole verticale
+ *    (produit → entité) × facet × mirror-pair. A direct truth-write is REFUSED at the wall (§2).
+ *  - DROITE : the VERTICALE — the 7 levels, each showing the specs the intelligence PLACED there
+ *    (facet · pair · spec). « Le chat agit sur tout niveau ; l'intelligence trouve où le mettre. »
  *
- * DETERMINISM-FIRST (§6/§8): the conversation runs the PURE twin lib/ai-lab (generateSpecs +
- * buildGrid + assistantReply) — the reply is a structured value rendered bilingually; the prose
- * compilation is the gated runtime exception, not this twin. THE WALL (§2): the chat proposes;
- * machines below are read-only; promotion is /goal. Themed ADR 0010, i18n 0011.
+ * THE WALL (§2): the chat proposes; placements are clamped to the declared space (validatePlacements)
+ * and never written to truth (promotion = /goal). DETERMINISM-FIRST (§6/§8): the LLM is the gated
+ * exception (irreducible placement judgment), VERIFIED; a deterministic twin answers on failure
+ * (mode "fallback", honestly flagged). Themed ADR 0010, i18n 0011.
  */
 
-function voyantDot(v: GridCell["voyant"]): string {
-	if (v === "green") return "bg-green-500";
-	if (v === "red") return "bg-destructive";
-	return "bg-amber-500";
-}
-
-/** Render a structured assistant reply bilingually. */
-function useReplyText() {
-	const t = useTranslations("aiLab");
-	return (reply: AssistantReply): string => {
-		if (reply.kind === "greeting") return t("replyGreeting");
-		if (reply.kind === "refused") return t("replyRefused");
-		return t("replyGenerated", {
-			facet: t(`facet_${reply.facet}`),
-			n: reply.specs,
-			divergent: reply.divergent,
-		});
-	};
-}
+const LEVEL_KEY: Record<Level, string> = {
+	produit: "level_produit",
+	parcours: "level_parcours",
+	vue: "level_vue",
+	contrôle: "level_controle",
+	action: "level_action",
+	opération: "level_operation",
+	entité: "level_entite",
+};
 
 function SendButton({ label, working }: { label: string; working: string }) {
 	const { pending } = useFormStatus();
@@ -64,6 +51,21 @@ function SendButton({ label, working }: { label: string; working: string }) {
 	);
 }
 
+function useReplyText() {
+	const t = useTranslations("aiLab");
+	return (reply: AssistantReply): string => {
+		if (reply.kind === "greeting") return t("replyGreeting");
+		if (reply.kind === "refused") return t("replyRefused");
+		if (reply.kind === "fallback")
+			return t("replyFallback", { placed: reply.placed });
+		return t("replyGenerated", {
+			facet: t(`facet_${reply.facet}`),
+			n: reply.specs,
+			divergent: reply.divergent,
+		});
+	};
+}
+
 function Bubble({ turn, text }: { turn: ChatTurn; text: string }) {
 	const isUser = turn.role === "user";
 	const refused = turn.reply?.kind === "refused";
@@ -74,7 +76,7 @@ function Bubble({ turn, text }: { turn: ChatTurn; text: string }) {
 					refused ? "wall-refused" : isUser ? "turn-user" : "turn-assistant"
 				}
 				data-role={turn.role}
-				className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+				className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
 					isUser
 						? "rounded-br-sm bg-primary text-primary-foreground"
 						: refused
@@ -92,32 +94,45 @@ export function CockpitPanel() {
 	const t = useTranslations("aiLab");
 	const replyText = useReplyText();
 	const [view, action] = useActionState<LabView, FormData>(
-		generateSpecsAction,
+		leftBrainAction,
 		emptyLab(),
 	);
 
-	const specCount = view.specs?.length ?? 0;
-	const cells = view.cells ?? [];
-	const byKey = new Map(cells.map((c) => [c.key, c]));
+	const placements = view.placements ?? [];
+	const byLevel = placementsByLevel(placements);
 	const thread = view.thread ?? [];
 
 	return (
 		<div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[24rem_1fr]">
-			{/* ─────────────── GAUCHE — the conversation ─────────────── */}
+			{/* ─────────────── GAUCHE — the conversation (real Claude) ─────────────── */}
 			<section
 				aria-label={t("leftHeading")}
-				className="flex h-[34rem] flex-col rounded-xl border border-border bg-card"
+				className="flex h-[36rem] flex-col rounded-xl border border-border bg-card"
 			>
-				<div className="space-y-1 border-b border-border p-4">
-					<h2 className="text-sm font-semibold tracking-tight text-foreground">
-						{t("leftHeading")}
-					</h2>
-					<p className="text-xs leading-relaxed text-muted-foreground">
-						{t("leftHelp")}
-					</p>
+				<div className="flex items-center justify-between gap-2 border-b border-border p-4">
+					<div className="space-y-1">
+						<h2 className="text-sm font-semibold tracking-tight text-foreground">
+							{t("leftHeading")}
+						</h2>
+						<p className="text-xs leading-relaxed text-muted-foreground">
+							{t("leftHelp")}
+						</p>
+					</div>
+					{view.mode && view.mode !== "idle" ? (
+						<span
+							data-testid="brain-mode"
+							data-mode={view.mode}
+							className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+								view.mode === "llm"
+									? "bg-blue-600/15 text-blue-700 dark:text-blue-300"
+									: "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+							}`}
+						>
+							{view.mode === "llm" ? t("modeLlm") : t("modeFallback")}
+						</span>
+					) : null}
 				</div>
 
-				{/* the thread (scrollable) */}
 				<div
 					data-testid="thread"
 					className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
@@ -126,150 +141,105 @@ export function CockpitPanel() {
 						<Bubble
 							key={turn.id}
 							turn={turn}
-							text={turn.reply ? replyText(turn.reply) : ""}
+							text={turn.reply ? replyText(turn.reply) : turn.text}
 						/>
 					))}
 				</div>
 
-				{/* the composer (bottom, chat-style) */}
 				<form
 					action={action}
-					className="flex flex-col gap-2 border-t border-border p-3"
+					className="flex items-end gap-2 border-t border-border p-3"
 				>
-					<div className="flex items-center gap-2">
-						<label
-							htmlFor="lab-facet"
-							className="text-xs font-medium text-muted-foreground"
-						>
-							{t("facetLabel")}
-						</label>
-						<select
-							id="lab-facet"
-							name="facet"
-							defaultValue={view.selectedFacet ?? "F"}
-							data-testid="facet"
-							className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
-						>
-							{GRID_FACETS.map((f: Facet) => (
-								<option key={f} value={f}>
-									{f} — {t(`facet_${f}`)}
-								</option>
-							))}
-						</select>
-					</div>
-					<div className="flex items-end gap-2">
-						<textarea
-							name="message"
-							rows={2}
-							required
-							data-testid="chat"
-							placeholder={t("chatPlaceholder")}
-							className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-						/>
-						<SendButton label={t("chatCta")} working={t("working")} />
-					</div>
+					<textarea
+						name="message"
+						rows={2}
+						required
+						maxLength={600}
+						data-testid="chat"
+						placeholder={t("chatPlaceholder")}
+						className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+					/>
+					<SendButton label={t("chatCta")} working={t("working")} />
 				</form>
 			</section>
 
-			{/* ─────────── DROITE — the 6×6 grid (specs above, machines below) ─────────── */}
+			{/* ─────────── DROITE — la verticale : où l'intelligence a placé les specs ─────────── */}
 			<section
-				aria-label={t("gridHeading")}
-				className="space-y-4 rounded-xl border border-border bg-card p-5"
+				aria-label={t("placementsHeading")}
+				className="space-y-3 rounded-xl border border-border bg-card p-5"
 			>
 				<div className="flex flex-wrap items-center justify-between gap-2">
 					<h2 className="text-sm font-semibold tracking-tight text-foreground">
-						{t("gridHeading")}
+						{t("placementsHeading")}
 					</h2>
 					<span
 						data-testid="spec-count"
 						className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
 					>
-						{t("specsCount", { n: specCount })}
+						{t("specsCount", { n: placements.length })}
 					</span>
 				</div>
 
-				<div className="overflow-x-auto">
-					<table className="w-full border-separate border-spacing-1 text-xs">
-						<thead>
-							<tr>
-								<th className="p-1 text-left font-medium text-muted-foreground">
-									{t("pairColHeading")}
-								</th>
-								{GRID_FACETS.map((f) => (
-									<th
-										key={f}
-										className="p-1 text-center font-semibold text-foreground"
-										title={t(`facet_${f}`)}
-									>
-										{f}
-									</th>
-								))}
-							</tr>
-						</thead>
-						<tbody>
-							{MIRROR_PAIRS.map((p) => (
-								<tr key={p.id}>
-									<th className="whitespace-nowrap p-1 text-left align-middle font-normal">
-										<span className="font-medium text-foreground">
-											{p.above}
-										</span>
-										<span className="text-muted-foreground"> ↔ {p.below}</span>
-									</th>
-									{GRID_FACETS.map((f) => {
-										const cell = byKey.get(`${p.id}@${f}`);
-										const v = cell?.voyant ?? "amber";
-										const hasSpec = Boolean(cell?.spec);
-										return (
-											<td key={f} className="p-0.5">
-												<div
-													data-testid={`cell-${p.id}-${f}`}
-													data-voyant={v}
-													data-spec={hasSpec ? "1" : "0"}
-													title={
-														cell?.spec
-															? `${t("aboveWall")}: ${cell.spec.text}\n${t("belowWall")}: ${p.below} — ${v}`
-															: `${p.below} — ${v}`
-													}
-													className="flex flex-col overflow-hidden rounded-md border border-border"
-												>
-													<div
-														className={`h-5 ${hasSpec ? "bg-amber-500/25" : "bg-muted/40"}`}
-													/>
-													<div className="h-px bg-foreground/40" />
-													<div className="flex h-5 items-center justify-center bg-background">
-														<span
-															className={`inline-block h-2.5 w-2.5 rounded-full ${voyantDot(v)}`}
-														/>
-													</div>
-												</div>
-											</td>
-										);
-									})}
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
+				<ol className="space-y-2">
+					{byLevel.map(({ level, items }) => (
+						<li
+							key={level}
+							data-testid={`level-${LEVEL_KEY[level]}`}
+							data-count={items.length}
+							className={`rounded-lg border p-3 ${
+								items.length
+									? "border-border bg-background"
+									: "border-dashed border-border/60 bg-muted/20"
+							}`}
+						>
+							<div className="flex items-center gap-2">
+								<span className="text-xs font-semibold tracking-tight text-foreground">
+									{t(LEVEL_KEY[level])}
+								</span>
+								{items.length ? (
+									<span className="rounded-full bg-primary/10 px-1.5 text-[10px] font-medium text-primary">
+										{items.length}
+									</span>
+								) : (
+									<span className="text-[10px] text-muted-foreground">
+										{t("levelEmpty")}
+									</span>
+								)}
+							</div>
+							{items.length ? (
+								<ul className="mt-2 space-y-1.5">
+									{items.map((p) => (
+										<li
+											key={`${p.facet}-${p.pairId}-${p.kernel ?? ""}`}
+											className="flex items-start gap-2 text-xs"
+										>
+											<span
+												title={t(`facet_${p.facet}`)}
+												className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-foreground/10 font-mono text-[10px] font-bold text-foreground"
+											>
+												{p.facet}
+											</span>
+											<span className="text-muted-foreground">
+												<span className="font-medium text-foreground">
+													{p.pairId}
+												</span>
+												{p.kernel ? (
+													<span className="text-muted-foreground">
+														{" "}
+														· {p.kernel}
+													</span>
+												) : null}{" "}
+												— {p.spec}
+											</span>
+										</li>
+									))}
+								</ul>
+							) : null}
+						</li>
+					))}
+				</ol>
 
-				<div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
-					<span className="flex items-center gap-1.5">
-						<span className="inline-block h-3 w-3 rounded-sm bg-amber-500/25 ring-1 ring-border" />
-						{t("legendSpec")}
-					</span>
-					<span className="flex items-center gap-1.5">
-						<span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500" />
-						{t("legendGreen")}
-					</span>
-					<span className="flex items-center gap-1.5">
-						<span className="inline-block h-2.5 w-2.5 rounded-full bg-destructive" />
-						{t("legendRed")}
-					</span>
-					<span className="flex items-center gap-1.5">
-						<span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" />
-						{t("legendAmber")}
-					</span>
-				</div>
-				<p className="text-xs leading-relaxed text-muted-foreground">
+				<p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
 					{t("wallNote")}
 				</p>
 			</section>

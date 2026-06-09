@@ -4663,35 +4663,33 @@ kernel rollback
 
 **IDE** : afficher le kernel d'une fonction, son contrat, ses preuves, ses policies, sa mémoire, ses agent runs, ses drifts, son blast radius. **Dashboard** : kernels par statut, drifts ouverts, evidence gaps, security gaps, contradictions mémoire, agents overpowered, MCP risqués, reviewability des PR, kernel debt, couverture sémantique, couverture sécurité.
 
-### L'écran AI Lab — le générateur de specs (chat → 6×6 → machines)
+### L'écran AI Lab — le chat qui agit sur tous les niveaux
 
-La surface principale de FKE n'est ni un éditeur de code ni un cockpit de navigation : c'est un **générateur de specs à deux volets**. On **parle en langage naturel à gauche** ; le cerveau gauche **génère les specs au-dessus du mur** (le côté *déclaré* de chaque paire-miroir) sur toute la grille **6×6** ; et **à droite on voit les « machines » que ça change** — les **miroirs/tests exécutables** (le côté *prouvé*, en-dessous du mur), en direct. Le chat ne navigue pas une couche : il **écrit la spec** ; la droite **reflète** ce que cette spec fait bouger.
+La surface principale de FKE n'est ni un éditeur de code ni un cockpit de navigation : c'est une **conversation** branchée sur le **cerveau gauche** (un vrai Claude). On **parle en langage naturel à gauche** ; le chat **n'est scopé à rien** — il **agit sur toute la verticale**. C'est l'**intelligence** qui décide **où ranger** chaque spec : à quel(s) **niveau(x)** (produit → parcours → vue → contrôle → action → opération → entité), quelle(s) **facette(s)**, quelle(s) **paire(s)-miroir**, et à quelle **profondeur fractale** (kernel). Un besoin **s'éclate** (fan-out) sur plusieurs niveaux à la fois ; **à droite**, on voit **où l'intelligence a placé** chaque spec, niveau par niveau.
 
 ```
 ┌────────────────────────────┬──────────────────────────────────────────────┐
-│  GAUCHE — CHAT (langage      │  DROITE — LES MACHINES (ce que la spec change) │
-│  naturel)                    │                                                │
-│                              │   LA GRILLE 6×6  (6 paires × facettes)         │
-│  vous écrivez en clair :     │   ┌─ AU-DESSUS DU MUR — généré par le chat ────┐│
-│  « un panier qui retient     │   │ Spec · Comportement · Scénarios ·           ││
-│    un article 30 min … »     │   │ Modèle · Contrat · Evidence-attendue        ││
-│  ─────────────────────────   │   ╞════════════ MUR D'INTENTION ══════════════╡│
-│  le cerveau gauche GÉNÈRE    │   │ EN-DESSOUS — LES MACHINES (miroirs/tests)   ││
-│  les SPECS au-dessus du mur  │   │ Doc · Résultats · Tests · Projection-données││
-│  (proposé, jamais la vérité) │   │ Code · Evidence-observée      🟢 🔴 🟡       ││
-│                              │   └─ chaque spec d'en haut → sa machine en bas ─┘│
-│  [Envoyer]                   │   (▸ clic sur une cellule → le chat s'y scope) │
+│  GAUCHE — CHAT (Claude,      │  DROITE — LA VERTICALE (où l'intelligence      │
+│  le cerveau gauche)          │  a placé vos specs)                            │
+│                              │                                                │
+│  vous décrivez un besoin :   │   produit   ▸ …                                │
+│  « quand le panier expire    │   parcours  ▸ F·scenarios — « prévenir … »     │
+│    au bout de 30 min … »     │   vue       ▸ X·spec — « bandeau d'expiration »│
+│  ─────────────────────────   │   contrôle  ▸ F·contract — « bouton prolonger »│
+│  Claude ÉCLATE le besoin     │   action    ▸ S·behavior — « libérer le stock »│
+│  et PLACE les specs aux bons │   opération ▸ F·behavior — « expiration 30min »│
+│  endroits (niveau×facette×   │   entité    ▸ V·model — « TTL sur Panier »     │
+│  paire). Il PROPOSE, jamais  │                                                │
+│  la vérité.   [Envoyer]      │   (placements GATÉS : clampés à l'espace réel) │
 └────────────────────────────┴──────────────────────────────────────────────┘
-   CHAT (NL) ──▶ LEFT BRAIN ──▶ SPECS (6×6, au-dessus) ══MUR══▶ MACHINES (miroirs, en-dessous) ──▶ 🟢/🔴/🟡
+   CHAT (NL) ──▶ CLAUDE (cerveau gauche, gaté) ──▶ PLACEMENTS (niveau×facette×paire) ══vérifiés══▶ la verticale
 ```
 
-- **À gauche, on génère.** Le chat en langage naturel est l'entrée du **Raw Signal Store** + le **cerveau gauche** ; il **compile** ce qu'on dit en **specs** posées **au-dessus du mur** — le côté *déclaré* de chaque paire (spec, comportement, scénarios, modèle, contrat, evidence-attendue), pour chaque facette concernée. Le chat **ne change jamais une vérité** : il **génère des propositions** (amber).
-- **À droite, on voit les machines.** Pour chaque spec générée, son **reflet exécutable en-dessous du mur** — les **miroirs/tests** (doc, résultats, tests, projection-données, code, evidence-observée) — apparaît ou change, avec son **voyant** 🟢 aligné / 🔴 diverge / 🟡 sous-prouvé (la conscience §FKE-6.3, en direct). « Les machines que ça change » = **exactement ces miroirs**.
-- **Le mur, entre les deux.** Au-dessus = généré, proposé, éditable par proposition ; en-dessous = les machines, **lecture seule** (on ne hand-édite jamais un miroir ni du code depuis l'écran — on change la spec d'au-dessus qu'ils reflètent). La seule promotion en vérité est une **décision** (card → ChangeSet → **/goal** → approbation). Les écarts montrés à droite sont **calculés** (SemanticDiff, blast radius, red wave), jamais l'avis d'un LLM.
+- **À gauche, on discute.** Le chat en langage naturel est l'entrée du **Raw Signal Store** + le **cerveau gauche**, **branché sur un vrai Claude**. On **n'a rien à scoper** : on décrit un besoin, point. Le chat **propose** (amber) ; il **ne change jamais une vérité** — une demande d'écriture-vérité directe est **refusée au mur avant tout appel LLM**.
+- **L'intelligence trouve où le mettre.** Claude **éclate** le besoin et **place** chaque spec à sa coordonnée : **niveau** (la verticale) × **facette** × **paire-miroir** × **profondeur fractale**. C'est le **jugement irréductible** — l'exception gatée (§6/§8) — mais **VÉRIFIÉ** : `validatePlacements` **clampe** chaque placement à l'espace déclaré (un niveau/facette/paire inventé est *jeté*, jamais coercé), le texte est borné, et **rien n'est écrit** (le mur). Si Claude est indisponible, un **jumeau déterministe** répond (mode `fallback`, honnêtement signalé) — jamais une erreur opaque.
+- **À droite, la verticale.** Les **7 niveaux** (produit → entité), chacun montrant **les specs que l'intelligence y a placées** (facette · paire · texte). « Le chat agit sur tout niveau » = un seul besoin peuple **plusieurs** niveaux d'un coup. La promotion en vérité reste une **décision → /goal** (le mur).
 
-**La grille 6×6.** Les **6 paires-miroir** (Spec↔Doc, Comportement↔Résultats, Scénarios↔Tests, Modèle↔Projection-données, Contrat↔Code, Evidence-attendue↔Evidence-observée) **en lignes** × les **facettes en colonnes**. Le chat remplit le **haut** de chaque cellule (la **spec**, au-dessus du mur) ; la **machine** (le **bas** — le miroir/test) est ce qui se génère/change à droite. Sélectionner une cellule **scope le chat dessus** (son ContextPack devient le contexte) — c'est la seule « navigation », au service de la génération, jamais une zone séparée.
-
-**Mapping AIDOS / atterrissage.** Route **`/ai-lab`** : à **gauche** le chat (génère les specs), à **droite** la grille 6×6 dont chaque cellule montre la **spec** (haut) et sa **machine/miroir** (bas) avec le voyant de la conscience. Il **compose** des briques déjà au plan : la passerelle MCP-over-HTTP (S58) + le streaming red-set/BlockReason (S60) + la boucle KRD par écran (E4 : capture → grill → goal → miroir, S64-S66) + l'autorat de miroirs (E5) + la conscience (FK05) + les decision cards (§FKE-31). Il **n'introduit aucun nouveau pouvoir** : tout passe par le mur existant. e2e Playwright : **chatter en langage naturel → voir des specs générées au-dessus du mur dans la 6×6 → voir les machines (miroirs) apparaître/changer à droite → une décision promeut via /goal** ; une écriture-vérité directe depuis le chat est refusée.
+**Mapping AIDOS / atterrissage.** Route **`/ai-lab`** : à **gauche** le chat (Claude, le cerveau gauche, exécuté via le CLI `claude` — l'auth Claude Code, sans clé API), à **droite** la **verticale** où s'affichent les placements. Determinism-first : le **placement** (NL → coordonnée + prose) est l'**exception LLM gatée**, puis **vérifiée** (`validatePlacements` clampe ; le mur refuse l'écriture-vérité ; fallback déterministe). Il **compose** des briques déjà au plan (passerelle S58, streaming S60, conscience FK09, decision cards §FKE-31) et **n'introduit aucun nouveau pouvoir**. e2e Playwright : **décrire un besoin → un tour utilisateur + une réponse du cerveau gauche → des specs placées sur plusieurs niveaux de la verticale** ; une écriture-vérité directe est refusée au mur. **OpenQuestion (sécurité/coût) :** exposer publiquement un chat qui exécute Claude consomme l'abonnement à chaque visiteur — borné par une limite de longueur ; une clé API + un rate-limit sont à câbler avant une vraie exposition.
 
 ---
 

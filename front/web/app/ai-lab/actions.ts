@@ -1,29 +1,172 @@
 "use server";
 
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import {
 	applyCardValidation,
-	assistantReply,
 	buildCockpit,
-	buildGrid,
 	type ChatTurn,
 	type CockpitNode,
-	generateSpecs,
+	isTruthWriteRequest,
+	MIRROR_PAIRS,
 	type Mode,
+	mergePlacements,
+	type Placement,
 	proposeSlot,
 	scopeForPair,
 	turnId,
+	VERTICAL_LEVELS,
+	validatePlacements,
 } from "@/lib/ai-lab";
 import type { Facet } from "@/lib/facetwire";
 import {
 	type CockpitView,
 	DEFAULT_MODE,
 	emptyView,
-	GRID_FACETS,
 	type LabView,
 	SAMPLE_GATE,
-	SEEDED_DIVERGENT,
 	scenario,
 } from "./fixtures";
+
+const execFileP = promisify(execFile);
+/** The Claude Code CLI wired behind the chat (the « cerveau gauche »). Overridable. */
+const CLAUDE_BIN =
+	process.env.AIDOS_CLAUDE_BIN || "/home/stevig/.local/bin/claude";
+
+/** The left-brain prompt: a need → JSON placements across the verticale (propose-only, the wall). */
+function leftBrainPrompt(message: string): string {
+	return [
+		"Tu es le CERVEAU GAUCHE d'AIDOS (Fractal Kernel Engineering).",
+		"Tu reçois un BESOIN en langage naturel et tu l'ÉCLATES en specs PROPOSÉES, placées aux bons endroits.",
+		"Tu PROPOSES seulement ; tu n'écris JAMAIS la vérité (le mur). Si on te demande d'écrire/figer le kernel ou un miroir, refuse.",
+		"",
+		"Espace de placement :",
+		`- NIVEAU (verticale) ∈ {${VERTICAL_LEVELS.join(", ")}}`,
+		"- FACETTE ∈ {F=fonctionnel, I=invariants, S=sécurité, B=perf/budgets, R=fiabilité, V=évolutivité, M=maintenabilité/archi, X=expérience}",
+		`- PAIRE-MIROIR ∈ {${MIRROR_PAIRS.map((p) => p.id).join(", ")}}`,
+		"",
+		"Décide À QUELS niveaux le besoin touche (souvent plusieurs), et pour chacun la facette + la paire-miroir, avec un texte de spec court (1 phrase, en français).",
+		"Réponds UNIQUEMENT par un objet JSON valide, sans aucun texte autour, de la forme :",
+		'{"reply":"<1-2 phrases conversationnelles en français>","placements":[{"level":"...","facet":"F","pairId":"spec","spec":"..."}]}',
+		"",
+		`Besoin : "${message.replace(/"/g, "'")}"`,
+	].join("\n");
+}
+
+/** Pull the JSON object out of a model answer that may carry prose / ``` fences. */
+function extractJson(text: string): string {
+	const a = text.indexOf("{");
+	const b = text.lastIndexOf("}");
+	return a >= 0 && b > a ? text.slice(a, b + 1) : "";
+}
+
+/** Call the real Claude (CLI) — returns null on any failure (caller falls back). */
+async function callClaude(
+	message: string,
+): Promise<{ reply: string; placements: Placement[] } | null> {
+	try {
+		const { stdout } = await execFileP(
+			CLAUDE_BIN,
+			[
+				"-p",
+				leftBrainPrompt(message),
+				"--output-format",
+				"json",
+				"--max-turns",
+				"1",
+			],
+			{ cwd: "/tmp", timeout: 90_000, maxBuffer: 8 * 1024 * 1024 },
+		);
+		const outer = JSON.parse(stdout);
+		const text = typeof outer?.result === "string" ? outer.result : "";
+		const inner = JSON.parse(extractJson(text));
+		const placements = validatePlacements(inner?.placements);
+		const reply = typeof inner?.reply === "string" ? inner.reply.trim() : "";
+		if (!reply && placements.length === 0) return null;
+		return { reply, placements };
+	} catch {
+		return null;
+	}
+}
+
+/** Deterministic fallback when Claude is unavailable: place the 6 pairs at opération/F. */
+function fallbackPlacements(message: string): Placement[] {
+	const intent = message.trim().slice(0, 120);
+	return MIRROR_PAIRS.map((p) => ({
+		level: "opération" as const,
+		facet: "F" as Facet,
+		pairId: p.id,
+		spec: `${p.above} ⟵ « ${intent} »`,
+	}));
+}
+
+/**
+ * leftBrainAction — the chat's turn, wired to the REAL Claude (CLI). A need fans out across the
+ * verticale: Claude decides WHERE each spec goes (level × facet × pair) — the irreducible judgment
+ * (§6/§8 gated exception), then VERIFIED (validatePlacements clamps to the declared space; the wall
+ * §2: propose-only, a truth-write is refused before any LLM call). On any CLI failure it falls back
+ * to the deterministic twin (mode "fallback"), never an opaque error. State accumulates via `prev`.
+ */
+export async function leftBrainAction(
+	prev: LabView,
+	formData: FormData,
+): Promise<LabView> {
+	const message = String(formData.get("message") ?? "")
+		.trim()
+		.slice(0, 600);
+	if (!message) return { ...prev, error: "message vide" };
+
+	const n = prev.thread.length;
+	const userTurn: ChatTurn = {
+		id: turnId(n, "user"),
+		role: "user",
+		text: message,
+	};
+	const asst = (turn: Partial<ChatTurn>): ChatTurn => ({
+		id: turnId(n + 1, "assistant"),
+		role: "assistant",
+		text: "",
+		...turn,
+	});
+
+	// THE WALL (§2): a direct truth-write is refused BEFORE any LLM call.
+	if (isTruthWriteRequest(message)) {
+		return {
+			...prev,
+			thread: [...prev.thread, userTurn, asst({ reply: { kind: "refused" } })],
+			error: undefined,
+		};
+	}
+
+	const out = await callClaude(message);
+	if (out) {
+		const placements = mergePlacements(prev.placements, out.placements);
+		const reply =
+			out.reply ||
+			`J'ai placé ${out.placements.length} spec(s) sur la verticale.`;
+		return {
+			ok: true,
+			thread: [...prev.thread, userTurn, asst({ text: reply })],
+			placements,
+			mode: "llm",
+			error: undefined,
+		};
+	}
+
+	// fallback — the deterministic twin (Claude unavailable), honestly flagged.
+	const fb = fallbackPlacements(message);
+	return {
+		ok: true,
+		thread: [
+			...prev.thread,
+			userTurn,
+			asst({ reply: { kind: "fallback", placed: fb.length } }),
+		],
+		placements: mergePlacements(prev.placements, fb),
+		mode: "fallback",
+		error: undefined,
+	};
+}
 
 /**
  * Server Actions for the /ai-lab Workbench cockpit (FK11 — the trialogue).
@@ -133,71 +276,5 @@ export async function validateCardAction(
 		state,
 		flippedPair: res.flippedPair,
 		openedGoal: res.openedGoal,
-	};
-}
-
-/**
- * generateSpecsAction — the LEFT (chat) gesture of the corrected FKE-38 lab: a natural-language
- * message GENERATES the specs across the 6 mirror-pairs of the selected facet (a column of the
- * 6×6), ABOVE the wall, then rebuilds the grid so the RIGHT shows the machines that changed. A
- * direct truth-write is REFUSED at the wall (§2) — it generates nothing, only records the attempt.
- * State accumulates via `prev` (useActionState). Pure twin: lib/ai-lab generateSpecs + buildGrid.
- */
-export async function generateSpecsAction(
-	prev: LabView,
-	formData: FormData,
-): Promise<LabView> {
-	const message = String(formData.get("message") ?? "").trim();
-	const facet =
-		(String(formData.get("facet") ?? prev.selectedFacet ?? "F") as Facet) ??
-		"F";
-	if (!message) {
-		return { ...prev, refusal: undefined, error: "message vide" };
-	}
-
-	const n = prev.thread.length;
-	const userTurn: ChatTurn = {
-		id: turnId(n, "user"),
-		role: "user",
-		text: message,
-	};
-
-	const res = generateSpecs(facet, message);
-	if ("refused" in res) {
-		const reply = assistantReply(facet, message, prev.cells);
-		return {
-			...prev,
-			selectedFacet: facet,
-			thread: [
-				...prev.thread,
-				userTurn,
-				{ id: turnId(n + 1, "assistant"), role: "assistant", text: "", reply },
-			],
-			refusal: res,
-			error: undefined,
-		};
-	}
-
-	const byId = new Map(prev.specs.map((s) => [s.id, s]));
-	for (const s of res) byId.set(s.id, s);
-	const specs = [...byId.values()];
-	const cells = buildGrid({
-		facets: GRID_FACETS,
-		specs,
-		divergent: SEEDED_DIVERGENT,
-	});
-	const reply = assistantReply(facet, message, cells);
-	return {
-		ok: true,
-		selectedFacet: facet,
-		thread: [
-			...prev.thread,
-			userTurn,
-			{ id: turnId(n + 1, "assistant"), role: "assistant", text: "", reply },
-		],
-		specs,
-		cells,
-		refusal: undefined,
-		error: undefined,
 	};
 }
