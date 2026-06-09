@@ -17,11 +17,16 @@ import { expect, test } from "@playwright/test";
  */
 
 test.describe("FK11 — the AI Lab spec generator (chat → 6×6 → machines)", () => {
-	test("renders the two panes: the chat + the 6×6 grid", async ({ page }) => {
+	test("renders the two panes: the chat thread + the 6×6 grid", async ({
+		page,
+	}) => {
 		await page.goto("/ai-lab");
 		await expect(
 			page.getByRole("heading", { level: 1, name: /ai lab/i }),
 		).toBeVisible();
+		// the conversation: a thread with the left-brain's greeting + the composer.
+		await expect(page.getByTestId("thread")).toBeVisible();
+		await expect(page.getByTestId("turn-assistant").first()).toBeVisible();
 		await expect(page.getByTestId("chat")).toBeVisible();
 		await expect(page.getByTestId("facet")).toBeVisible();
 		await expect(page.getByTestId("generate")).toBeVisible();
@@ -43,7 +48,7 @@ test.describe("FK11 — the AI Lab spec generator (chat → 6×6 → machines)",
 		);
 	});
 
-	test("a NL message GENERATES specs above the wall (6 per column) → machines turn 🟢", async ({
+	test("discussing: a message adds a user turn + an assistant reply, generates specs → machines 🟢", async ({
 		page,
 	}) => {
 		await page.goto("/ai-lab");
@@ -52,6 +57,10 @@ test.describe("FK11 — the AI Lab spec generator (chat → 6×6 → machines)",
 			.getByTestId("chat")
 			.fill("un panier qui retient un article 30 minutes puis le libère");
 		await page.getByTestId("generate").click();
+
+		// the conversation grew: the user turn + the left-brain's reply.
+		await expect(page.getByTestId("turn-user")).toHaveText(/panier/);
+		await expect(page.getByTestId("turn-assistant").last()).toBeVisible();
 
 		// the column-F cells now carry a generated spec (above the wall) …
 		await expect(page.getByTestId("cell-spec-F")).toHaveAttribute(

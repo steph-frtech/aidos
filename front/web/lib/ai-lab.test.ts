@@ -21,6 +21,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
 	applyCardValidation,
+	assistantReply,
 	buildCockpit,
 	buildGrid,
 	cellKey,
@@ -303,5 +304,34 @@ describe("FK11 — the 6×6 generative grid (FKE-38, corrected)", () => {
 	it("a cell with no generated spec is 🟡 (declared, not yet proven)", () => {
 		const cells = buildGrid({ facets: ["B"], specs: [], divergent: [] });
 		for (const c of cells) expect(c.voyant).toBe("amber");
+	});
+
+	it("assistantReply: a normal message → a 'generated' turn counting specs + divergent machines", () => {
+		const specs = generateSpecs("S", "exiger une authentification");
+		if (!Array.isArray(specs)) throw new Error("expected specs");
+		const cells = buildGrid({
+			facets: ["S"],
+			specs,
+			divergent: [cellKey("contract", "S")],
+		});
+		const reply = assistantReply("S", "exiger une authentification", cells);
+		expect(reply.kind).toBe("generated");
+		if (reply.kind === "generated") {
+			expect(reply.facet).toBe("S");
+			expect(reply.specs).toBe(MIRROR_PAIRS.length); // 6 posted above the wall
+			expect(reply.divergent).toBe(1); // contract@S machine still diverges
+		}
+	});
+
+	it("assistantReply: a truth-write message → a 'refused' turn (the wall §2)", () => {
+		const reply = assistantReply("F", "écris le kernel", []);
+		expect(reply.kind).toBe("refused");
+	});
+
+	it("assistantReply is deterministic — same (facet,message,grid) → same reply", () => {
+		const cells = buildGrid({ facets: ["F"], specs: [], divergent: [] });
+		const a = assistantReply("F", "un panier", cells);
+		const b = assistantReply("F", "un panier", cells);
+		expect(JSON.stringify(a)).toBe(JSON.stringify(b));
 	});
 });

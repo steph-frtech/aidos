@@ -1,11 +1,13 @@
 import {
 	buildGrid,
+	type ChatTurn,
 	type CockpitState,
 	type GeneratedSpec,
 	type GridCell,
 	type Mode,
 	type PairScope,
 	type ProposedSlot,
+	turnId,
 	type WallRefusal,
 } from "@/lib/ai-lab";
 import {
@@ -144,17 +146,12 @@ export const GRID_FACETS: Facet[] = ["F", "S", "B", "R", "V", "M"];
  */
 export const SEEDED_DIVERGENT: string[] = ["contract@S"];
 
-/** A chat message in the transcript, with a STABLE id (its append position — never reordered). */
-export interface ChatEntry {
-	id: string;
-	text: string;
-}
-
-/** The 6×6 generative lab view: the chat transcript + accumulated specs + the rebuilt grid. */
+/** The 6×6 generative lab view: the chat THREAD + accumulated specs + the rebuilt grid. */
 export interface LabView {
 	ok: boolean;
 	selectedFacet: Facet;
-	transcript: ChatEntry[];
+	/** the multi-turn conversation (user + left-brain assistant turns). */
+	thread: ChatTurn[];
 	specs: GeneratedSpec[];
 	cells: GridCell[];
 	refusal?: WallRefusal;
@@ -165,7 +162,14 @@ export function emptyLab(): LabView {
 	return {
 		ok: true,
 		selectedFacet: "F",
-		transcript: [],
+		thread: [
+			{
+				id: turnId(0, "assistant"),
+				role: "assistant",
+				text: "",
+				reply: { kind: "greeting" },
+			},
+		],
 		specs: [],
 		cells: buildGrid({
 			facets: GRID_FACETS,

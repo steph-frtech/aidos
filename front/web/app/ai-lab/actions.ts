@@ -2,13 +2,16 @@
 
 import {
 	applyCardValidation,
+	assistantReply,
 	buildCockpit,
 	buildGrid,
+	type ChatTurn,
 	type CockpitNode,
 	generateSpecs,
 	type Mode,
 	proposeSlot,
 	scopeForPair,
+	turnId,
 } from "@/lib/ai-lab";
 import type { Facet } from "@/lib/facetwire";
 import {
@@ -151,35 +154,49 @@ export async function generateSpecsAction(
 	if (!message) {
 		return { ...prev, refusal: undefined, error: "message vide" };
 	}
+
+	const n = prev.thread.length;
+	const userTurn: ChatTurn = {
+		id: turnId(n, "user"),
+		role: "user",
+		text: message,
+	};
+
 	const res = generateSpecs(facet, message);
 	if ("refused" in res) {
+		const reply = assistantReply(facet, message, prev.cells);
 		return {
 			...prev,
 			selectedFacet: facet,
-			transcript: [
-				...prev.transcript,
-				{ id: `MSG-${prev.transcript.length}`, text: message },
+			thread: [
+				...prev.thread,
+				userTurn,
+				{ id: turnId(n + 1, "assistant"), role: "assistant", text: "", reply },
 			],
 			refusal: res,
 			error: undefined,
 		};
 	}
+
 	const byId = new Map(prev.specs.map((s) => [s.id, s]));
 	for (const s of res) byId.set(s.id, s);
 	const specs = [...byId.values()];
+	const cells = buildGrid({
+		facets: GRID_FACETS,
+		specs,
+		divergent: SEEDED_DIVERGENT,
+	});
+	const reply = assistantReply(facet, message, cells);
 	return {
 		ok: true,
 		selectedFacet: facet,
-		transcript: [
-			...prev.transcript,
-			{ id: `MSG-${prev.transcript.length}`, text: message },
+		thread: [
+			...prev.thread,
+			userTurn,
+			{ id: turnId(n + 1, "assistant"), role: "assistant", text: "", reply },
 		],
 		specs,
-		cells: buildGrid({
-			facets: GRID_FACETS,
-			specs,
-			divergent: SEEDED_DIVERGENT,
-		}),
+		cells,
 		refusal: undefined,
 		error: undefined,
 	};

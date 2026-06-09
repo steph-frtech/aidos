@@ -554,3 +554,59 @@ export function buildGrid(args: {
 	}
 	return cells;
 }
+
+// ── The conversation — discuter avec le cerveau gauche (FKE-38) ───────────────
+//
+// The left pane is a real multi-turn CHAT. A turn is a user message or the left-brain's reply.
+// The reply is a STRUCTURED, DETERMINISTIC value (a key + params) so the panel renders it
+// bilingually via next-intl — the irreducible prose compilation is the gated runtime exception,
+// never this twin. The conversation drives the 6×6 on the right.
+
+/** A single turn in the chat thread. */
+export interface ChatTurn {
+	id: string;
+	role: "user" | "assistant";
+	/** for a user turn: the raw message. for an assistant turn: empty (rendered from `reply`). */
+	text: string;
+	/** for an assistant turn: the structured, i18n-rendered reply. */
+	reply?: AssistantReply;
+}
+
+/**
+ * The left-brain's structured reply — a translation key + params (rendered by the panel via
+ * next-intl). Deterministic: the same (facet, message, grid) ⇒ the same reply. No LLM in the twin.
+ */
+export type AssistantReply =
+	| { kind: "greeting" }
+	| { kind: "refused" }
+	| {
+			kind: "generated";
+			facet: Facet;
+			/** how many specs were posted above the wall (one per mirror-pair). */
+			specs: number;
+			/** how many machines in this facet column still diverge 🔴 (the conscience). */
+			divergent: number;
+	  };
+
+/**
+ * assistantReply is the left-brain's TURN: from a chat message scoped to a facet + the resulting
+ * grid, it produces the structured reply. A truth-write demand → a refusal turn (the wall §2). A
+ * normal message → a "generated" turn stating the specs posted above the wall + any divergent
+ * machine below it. PURE + TOTAL + deterministic: same input ⇒ same reply. NO LLM in this twin.
+ */
+export function assistantReply(
+	facet: Facet,
+	message: string,
+	gridForFacet: GridCell[],
+): AssistantReply {
+	if (isTruthWriteRequest(message)) return { kind: "refused" };
+	const inColumn = gridForFacet.filter((c) => c.facet === facet);
+	const specs = inColumn.filter((c) => c.spec).length;
+	const divergent = inColumn.filter((c) => c.voyant === "red").length;
+	return { kind: "generated", facet, specs, divergent };
+}
+
+/** A stable id for a chat turn at a given position (append-only — never reordered). */
+export function turnId(index: number, role: ChatTurn["role"]): string {
+	return `T${index}-${role}`;
+}

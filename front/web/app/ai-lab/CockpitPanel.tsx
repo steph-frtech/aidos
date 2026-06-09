@@ -3,24 +3,31 @@
 import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { type GridCell, MIRROR_PAIRS } from "@/lib/ai-lab";
+import {
+	type AssistantReply,
+	type ChatTurn,
+	type GridCell,
+	MIRROR_PAIRS,
+} from "@/lib/ai-lab";
 import type { Facet } from "@/lib/facetwire";
 import { generateSpecsAction } from "./actions";
 import { emptyLab, GRID_FACETS, type LabView } from "./fixtures";
 
 /**
  * CockpitPanel makes /ai-lab action-capable (ui-completeness, CLAUDE.md §7): the corrected
- * FKE-38 AI Lab — a SPEC GENERATOR with TWO panes, not a navigation cockpit.
- *  - GAUCHE : a natural-language chat. A message GENERATES the specs across the 6 mirror-pairs of
- *    the selected facet (a column of the 6×6), ABOVE the wall (amber, proposed — never a truth).
- *    A direct truth-write is REFUSED at the wall (§2) ; the only door is idea → mirror → /goal.
+ * FKE-38 AI Lab — a two-pane SPEC GENERATOR with a real CONVERSATION.
+ *  - GAUCHE : a multi-turn natural-language CHAT (the « cerveau gauche »). You discuss; each
+ *    message GENERATES the specs across the 6 mirror-pairs of the selected facet (a column of the
+ *    6×6), ABOVE the wall (proposed — never a truth), and the left brain replies. A direct
+ *    truth-write is REFUSED at the wall (§2) ; the only door is idea → mirror → /goal.
  *  - DROITE : the 6×6 grid — 6 mirror-pairs (rows) × facets (columns). Each cell shows the
  *    generated SPEC (above the wall) and its MACHINE (the mirror/test, below the wall) with the
- *    live conscience voyant 🟢/🔴/🟡. « Les machines que ça change » = exactly these mirrors.
+ *    live conscience voyant 🟢/🔴/🟡.
  *
- * DETERMINISM-FIRST (§6/§8): the control runs the PURE twin lib/ai-lab (generateSpecs + buildGrid),
- * never an LLM — same message → same grid. THE WALL (§2): the chat generates above, the machines
- * below are read-only ; a truth-write is refused ; promotion is /goal. Themed ADR 0010, i18n 0011.
+ * DETERMINISM-FIRST (§6/§8): the conversation runs the PURE twin lib/ai-lab (generateSpecs +
+ * buildGrid + assistantReply) — the reply is a structured value rendered bilingually; the prose
+ * compilation is the gated runtime exception, not this twin. THE WALL (§2): the chat proposes;
+ * machines below are read-only; promotion is /goal. Themed ADR 0010, i18n 0011.
  */
 
 function voyantDot(v: GridCell["voyant"]): string {
@@ -29,28 +36,61 @@ function voyantDot(v: GridCell["voyant"]): string {
 	return "bg-amber-500";
 }
 
-function GenerateButton({
-	label,
-	working,
-}: {
-	label: string;
-	working: string;
-}) {
+/** Render a structured assistant reply bilingually. */
+function useReplyText() {
+	const t = useTranslations("aiLab");
+	return (reply: AssistantReply): string => {
+		if (reply.kind === "greeting") return t("replyGreeting");
+		if (reply.kind === "refused") return t("replyRefused");
+		return t("replyGenerated", {
+			facet: t(`facet_${reply.facet}`),
+			n: reply.specs,
+			divergent: reply.divergent,
+		});
+	};
+}
+
+function SendButton({ label, working }: { label: string; working: string }) {
 	const { pending } = useFormStatus();
 	return (
 		<button
 			type="submit"
 			disabled={pending}
 			data-testid="generate"
-			className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+			className="inline-flex shrink-0 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
 		>
 			{pending ? working : label}
 		</button>
 	);
 }
 
+function Bubble({ turn, text }: { turn: ChatTurn; text: string }) {
+	const isUser = turn.role === "user";
+	const refused = turn.reply?.kind === "refused";
+	return (
+		<div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+			<div
+				data-testid={
+					refused ? "wall-refused" : isUser ? "turn-user" : "turn-assistant"
+				}
+				data-role={turn.role}
+				className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+					isUser
+						? "rounded-br-sm bg-primary text-primary-foreground"
+						: refused
+							? "rounded-bl-sm border border-destructive/30 bg-destructive/10 text-foreground"
+							: "rounded-bl-sm bg-muted text-foreground"
+				}`}
+			>
+				{isUser ? turn.text : text}
+			</div>
+		</div>
+	);
+}
+
 export function CockpitPanel() {
 	const t = useTranslations("aiLab");
+	const replyText = useReplyText();
 	const [view, action] = useActionState<LabView, FormData>(
 		generateSpecsAction,
 		emptyLab(),
@@ -58,17 +98,17 @@ export function CockpitPanel() {
 
 	const specCount = view.specs?.length ?? 0;
 	const cells = view.cells ?? [];
-	// index cells by pairId@facet for the grid render
 	const byKey = new Map(cells.map((c) => [c.key, c]));
+	const thread = view.thread ?? [];
 
 	return (
-		<div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[20rem_1fr]">
-			{/* ─────────────── GAUCHE — the chat (generates specs) ─────────────── */}
+		<div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[24rem_1fr]">
+			{/* ─────────────── GAUCHE — the conversation ─────────────── */}
 			<section
 				aria-label={t("leftHeading")}
-				className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5"
+				className="flex h-[34rem] flex-col rounded-xl border border-border bg-card"
 			>
-				<div className="space-y-1">
+				<div className="space-y-1 border-b border-border p-4">
 					<h2 className="text-sm font-semibold tracking-tight text-foreground">
 						{t("leftHeading")}
 					</h2>
@@ -77,14 +117,38 @@ export function CockpitPanel() {
 					</p>
 				</div>
 
-				<form action={action} className="flex flex-col gap-3">
-					<label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-						{t("facetLabel")}
+				{/* the thread (scrollable) */}
+				<div
+					data-testid="thread"
+					className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
+				>
+					{thread.map((turn) => (
+						<Bubble
+							key={turn.id}
+							turn={turn}
+							text={turn.reply ? replyText(turn.reply) : ""}
+						/>
+					))}
+				</div>
+
+				{/* the composer (bottom, chat-style) */}
+				<form
+					action={action}
+					className="flex flex-col gap-2 border-t border-border p-3"
+				>
+					<div className="flex items-center gap-2">
+						<label
+							htmlFor="lab-facet"
+							className="text-xs font-medium text-muted-foreground"
+						>
+							{t("facetLabel")}
+						</label>
 						<select
+							id="lab-facet"
 							name="facet"
 							defaultValue={view.selectedFacet ?? "F"}
 							data-testid="facet"
-							className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
+							className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
 						>
 							{GRID_FACETS.map((f: Facet) => (
 								<option key={f} value={f}>
@@ -92,51 +156,19 @@ export function CockpitPanel() {
 								</option>
 							))}
 						</select>
-					</label>
-
-					<textarea
-						name="message"
-						rows={3}
-						required
-						data-testid="chat"
-						placeholder={t("chatPlaceholder")}
-						className="resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-					/>
-					<GenerateButton label={t("generateCta")} working={t("working")} />
+					</div>
+					<div className="flex items-end gap-2">
+						<textarea
+							name="message"
+							rows={2}
+							required
+							data-testid="chat"
+							placeholder={t("chatPlaceholder")}
+							className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+						/>
+						<SendButton label={t("chatCta")} working={t("working")} />
+					</div>
 				</form>
-
-				{view.refusal ? (
-					<div
-						data-testid="wall-refused"
-						className="space-y-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs"
-					>
-						<p className="font-semibold text-destructive">{t("wallRefused")}</p>
-						<p className="text-muted-foreground">{view.refusal.explanation}</p>
-						<ul className="list-inside list-disc space-y-0.5 text-muted-foreground">
-							{view.refusal.howToFix.map((h) => (
-								<li key={h}>{h}</li>
-							))}
-						</ul>
-					</div>
-				) : null}
-
-				{view.transcript && view.transcript.length > 0 ? (
-					<div className="space-y-2">
-						<h3 className="text-xs font-semibold tracking-tight text-foreground">
-							{t("transcriptHeading")}
-						</h3>
-						<ul className="space-y-1.5" data-testid="transcript">
-							{view.transcript.map((m) => (
-								<li
-									key={m.id}
-									className="rounded-md bg-muted px-2.5 py-1.5 text-xs text-foreground"
-								>
-									{m.text}
-								</li>
-							))}
-						</ul>
-					</div>
-				) : null}
 			</section>
 
 			{/* ─────────── DROITE — the 6×6 grid (specs above, machines below) ─────────── */}
@@ -200,13 +232,10 @@ export function CockpitPanel() {
 													}
 													className="flex flex-col overflow-hidden rounded-md border border-border"
 												>
-													{/* ABOVE the wall — the generated spec */}
 													<div
 														className={`h-5 ${hasSpec ? "bg-amber-500/25" : "bg-muted/40"}`}
 													/>
-													{/* the wall */}
 													<div className="h-px bg-foreground/40" />
-													{/* BELOW the wall — the machine voyant */}
 													<div className="flex h-5 items-center justify-center bg-background">
 														<span
 															className={`inline-block h-2.5 w-2.5 rounded-full ${voyantDot(v)}`}
@@ -222,7 +251,6 @@ export function CockpitPanel() {
 					</table>
 				</div>
 
-				{/* legend + the wall reading */}
 				<div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
 					<span className="flex items-center gap-1.5">
 						<span className="inline-block h-3 w-3 rounded-sm bg-amber-500/25 ring-1 ring-border" />
