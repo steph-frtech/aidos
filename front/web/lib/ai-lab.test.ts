@@ -25,6 +25,7 @@ import {
 	buildCockpit,
 	buildGrid,
 	buildSpecGraph,
+	cellFullyHandled,
 	cellKey,
 	cellPlacements,
 	EXISTING_DAG,
@@ -558,6 +559,35 @@ describe("FK11 — the 3D spec graph (positions on the 3 axes, deterministic)", 
 		const g = buildSpecGraph(placements, [], []);
 		const descent = g.links.filter((l) => l.kind === "descent");
 		expect(descent).toHaveLength(2); // spec→behavior, behavior→scenarios
+	});
+
+	it("cellFullyHandled: true iff ≥1 placement and all validated/realized", () => {
+		expect(cellFullyHandled([], "produit", "F")).toBe(false);
+		const proposed = validatePlacements([
+			{ level: "produit", facet: "F", pairId: "spec", spec: "a" },
+		]);
+		expect(cellFullyHandled(proposed, "produit", "F")).toBe(false);
+		const done = proposed.map((p) => ({ ...p, status: "validated" as const }));
+		expect(cellFullyHandled(done, "produit", "F")).toBe(true);
+	});
+
+	it("an impacted DAG node RESOLVES (red→green) once its cell is fully validated", () => {
+		const dagNode = EXISTING_DAG[0]; // produit/F/spec
+		const impacts = [{ specId: dagNode.id, reason: "touché" }];
+		// a proposed spec in the same cell → impacted but NOT resolved.
+		const proposed = validatePlacements([
+			{ level: dagNode.level, facet: dagNode.facet, pairId: "spec", spec: "x" },
+		]);
+		let g = buildSpecGraph(proposed, EXISTING_DAG, impacts);
+		expect(g.nodes.find((n) => n.id === `d:${dagNode.id}`)?.resolved).toBe(
+			false,
+		);
+		// every placement validated → resolved (green).
+		const done = proposed.map((p) => ({ ...p, status: "validated" as const }));
+		g = buildSpecGraph(done, EXISTING_DAG, impacts);
+		expect(g.nodes.find((n) => n.id === `d:${dagNode.id}`)?.resolved).toBe(
+			true,
+		);
 	});
 
 	it("links an impacted DAG node to the placement of its cell + is deterministic", () => {

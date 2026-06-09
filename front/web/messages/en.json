@@ -6196,6 +6196,7 @@
 		"graphEmpty": "No spec to graph yet — describe a need in the chat, the nodes will appear here.",
 		"graphAxisX": "X → verticale (product → entity)",
 		"graphAxisY": "Y → facet (F·I·S·B·R·V·M·X)",
-		"graphAxisZ": "Z → depth (spec → sub-specs)"
+		"graphAxisZ": "Z → depth (spec → sub-specs)",
+		"impactResolved": "resolved (the addressing cell is validated)"
 	}
 }

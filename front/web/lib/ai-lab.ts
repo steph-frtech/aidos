@@ -805,6 +805,140 @@ export const EXISTING_DAG: ExistingSpec[] = [
 		pairId: "model",
 		title: "Cart — articles, propriétaire",
 	},
+	// — a richer existing DAG: more cells of the grid + some anatomy chains —
+	{
+		id: "d-produit-revenue",
+		level: "produit",
+		facet: "B",
+		pairId: "spec",
+		title: "Revenu — maximiser le panier moyen",
+	},
+	{
+		id: "d-produit-trust",
+		level: "produit",
+		facet: "S",
+		pairId: "spec",
+		title: "Confiance — paiement sûr, données protégées",
+	},
+	{
+		id: "d-produit-a11y",
+		level: "produit",
+		facet: "X",
+		pairId: "spec",
+		title: "Accessibilité — boutique utilisable par tous",
+	},
+	{
+		id: "d-parcours-browse",
+		level: "parcours",
+		facet: "F",
+		pairId: "spec",
+		title: "Parcours catalogue — chercher, filtrer, voir un produit",
+	},
+	{
+		id: "d-parcours-recover",
+		level: "parcours",
+		facet: "R",
+		pairId: "scenarios",
+		title: "Parcours reprise — reprendre un panier après déconnexion",
+	},
+	{
+		id: "d-vue-catalog",
+		level: "vue",
+		facet: "F",
+		pairId: "spec",
+		title: "Vue catalogue — grille de produits paginée",
+	},
+	{
+		id: "d-vue-product",
+		level: "vue",
+		facet: "F",
+		pairId: "model",
+		title: "Vue produit — détail, prix, stock",
+	},
+	{
+		id: "d-vue-checkout-form",
+		level: "vue",
+		facet: "S",
+		pairId: "contract",
+		title: "Vue checkout — formulaire de paiement (champs masqués)",
+	},
+	{
+		id: "d-controle-addtocart",
+		level: "contrôle",
+		facet: "F",
+		pairId: "contract",
+		title: "Bouton Ajouter au panier",
+	},
+	{
+		id: "d-controle-qty",
+		level: "contrôle",
+		facet: "B",
+		pairId: "behavior",
+		title: "Sélecteur de quantité — borné au stock",
+	},
+	{
+		id: "d-action-addline",
+		level: "action",
+		facet: "F",
+		pairId: "behavior",
+		title: "addLine — ajouter une ligne au panier",
+	},
+	{
+		id: "d-action-pay",
+		level: "action",
+		facet: "S",
+		pairId: "scenarios",
+		title: "pay — débiter via le PSP (idempotent)",
+	},
+	{
+		id: "d-action-refund",
+		level: "action",
+		facet: "R",
+		pairId: "behavior",
+		title: "refund — rembourser si la commande échoue",
+	},
+	{
+		id: "d-operation-price",
+		level: "opération",
+		facet: "F",
+		pairId: "behavior",
+		title: "computeTotal — total + remises + taxes",
+	},
+	{
+		id: "d-operation-inventory",
+		level: "opération",
+		facet: "I",
+		pairId: "behavior",
+		title: "inventory — le stock n'est jamais négatif (∀)",
+	},
+	{
+		id: "d-operation-audit",
+		level: "opération",
+		facet: "S",
+		pairId: "evidence",
+		title: "auditLog — trace inviolable des paiements",
+	},
+	{
+		id: "d-entite-product",
+		level: "entité",
+		facet: "F",
+		pairId: "model",
+		title: "Product — sku, prix, stock",
+	},
+	{
+		id: "d-entite-payment",
+		level: "entité",
+		facet: "S",
+		pairId: "model",
+		title: "Payment — montant, statut, jamais le PAN en clair",
+	},
+	{
+		id: "d-entite-stock",
+		level: "entité",
+		facet: "I",
+		pairId: "model",
+		title: "Stock — quantité disponible/réservée (somme conservée)",
+	},
 ];
 
 /** An impact the left brain PROPOSES: a need touches an EXISTING DAG spec (the red wave). */
@@ -918,17 +1052,36 @@ export function cellPlacements(
 }
 
 /**
+ * cellFullyHandled — is the (level × facet) cell entirely worked through? True iff it has at least
+ * one placement AND every placement is validated or realized (none still merely proposed). This is
+ * what RESOLVES an impact (the red wave clears) and turns the cell GREEN. Pure + total.
+ */
+export function cellFullyHandled(
+	placements: Placement[],
+	level: Level,
+	facet: Facet,
+): boolean {
+	const cell = placements.filter((p) => p.level === level && p.facet === facet);
+	return (
+		cell.length > 0 &&
+		cell.every((p) => p.status === "validated" || p.status === "realized")
+	);
+}
+
+/**
  * validateAndDescend — validate the pair (level × facet × pairId) and GENERATE the next pair down
- * the anatomy (deterministic). At the last pair (evidence) it marks the pair "realized" (descent
- * complete, crossed the wall). PURE + TOTAL + idempotent: re-validating yields the same result; an
- * unknown cell is a no-op. The wall §2: this stages a lab proposal, it writes NO truth (promotion
- * stays /goal). matched by (level, facet, pairId), ignoring the fractal kernel.
+ * the anatomy. At the last pair (evidence) it marks the pair "realized" (descent complete, crossed
+ * the wall). The child's CONTENT is `override` when given (Claude enriched it — a real comportement
+ * written from the spec) ELSE the deterministic template (`deriveNextSpec`, the fallback). Either
+ * way the STRUCTURE (which pair, the placement) is deterministic code (§6). PURE + TOTAL + idempotent;
+ * unknown cell = no-op. The wall §2: stages a lab proposal, writes NO truth (promotion stays /goal).
  */
 export function validateAndDescend(
 	placements: Placement[],
 	level: Level,
 	facet: Facet,
 	pairId: string,
+	override?: { spec: string; detail?: string },
 ): Placement[] {
 	const target = placements.find(
 		(p) => p.level === level && p.facet === facet && p.pairId === pairId,
@@ -945,9 +1098,10 @@ export function validateAndDescend(
 		level,
 		facet,
 		pairId: next,
-		spec: deriveNextSpec(next, target.spec),
+		spec: override?.spec?.trim() || deriveNextSpec(next, target.spec),
 		status: "proposed",
 	};
+	if (override?.detail?.trim()) child.detail = override.detail.trim();
 	return mergePlacements(updated, [child]);
 }
 
@@ -972,6 +1126,8 @@ export interface SpecGraphNode {
 	status?: SpecStatus;
 	/** whether an existing-DAG node is impacted by the current need (the red wave). */
 	impacted?: boolean;
+	/** an impacted node is RESOLVED (red → green) once its (level × facet) cell is fully handled. */
+	resolved?: boolean;
 	/** deterministic 3-axis position (x = verticale, y = facette, z = profondeur). */
 	x: number;
 	y: number;
@@ -1033,6 +1189,7 @@ export function buildSpecGraph(
 	}
 	const impactedIds = new Set(impacts.map((i) => i.specId));
 	for (const s of dag) {
+		const impacted = impactedIds.has(s.id);
 		nodes.push({
 			id: `d:${s.id}`,
 			label: s.title.slice(0, 60),
@@ -1040,7 +1197,8 @@ export function buildSpecGraph(
 			facet: s.facet,
 			depth: dep(s.pairId),
 			kind: "dag",
-			impacted: impactedIds.has(s.id),
+			impacted,
+			resolved: impacted && cellFullyHandled(placements, s.level, s.facet),
 			...pos(s.level, s.facet, s.pairId),
 		});
 	}

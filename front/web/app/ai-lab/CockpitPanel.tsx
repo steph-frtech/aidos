@@ -8,6 +8,7 @@ import {
 	type AssistantReply,
 	buildSpecGraph,
 	type ChatTurn,
+	cellFullyHandled,
 	cellPlacements,
 	EXISTING_DAG,
 	type Level,
@@ -278,6 +279,11 @@ export function CockpitPanel() {
 															c.status === "validated" ||
 															c.status === "realized",
 													).length;
+													const handled = cellFullyHandled(
+														placements,
+														level,
+														facet,
+													);
 													const active =
 														sel?.level === level && sel?.facet === facet;
 													return (
@@ -302,12 +308,15 @@ export function CockpitPanel() {
 																	type="submit"
 																	data-testid={`cell-${LEVEL_KEY[level]}-${facet}`}
 																	data-count={count}
+																	data-handled={handled ? "1" : "0"}
 																	className={`flex h-8 w-full items-center justify-center rounded border text-[10px] transition-colors ${
 																		active
-																			? "border-primary bg-primary/15 font-semibold text-primary ring-1 ring-primary"
-																			: count
-																				? "border-border bg-amber-500/10 text-foreground hover:bg-amber-500/20"
-																				: "border-dashed border-border/50 bg-muted/20 text-muted-foreground hover:bg-muted/40"
+																			? "border-primary bg-primary/20 font-semibold text-primary ring-1 ring-primary"
+																			: handled
+																				? "border-green-500/40 bg-green-500/15 font-medium text-green-700 hover:bg-green-500/25 dark:text-green-300"
+																				: count
+																					? "border-border bg-amber-500/10 text-foreground hover:bg-amber-500/20"
+																					: "border-dashed border-border/50 bg-muted/20 text-muted-foreground hover:bg-muted/40"
 																	}`}
 																>
 																	{count ? `${validated}/${count}` : "·"}
@@ -449,15 +458,20 @@ export function CockpitPanel() {
 								{EXISTING_DAG.map((s) => {
 									const impacted = impactById.has(s.id);
 									const reason = impactById.get(s.id);
+									const resolved =
+										impacted && cellFullyHandled(placements, s.level, s.facet);
 									return (
 										<li
 											key={s.id}
 											data-testid={`dag-${s.id}`}
 											data-impacted={impacted ? "1" : "0"}
+											data-resolved={resolved ? "1" : "0"}
 											className={`rounded-md border p-2 text-xs ${
-												impacted
-													? "border-destructive/40 bg-destructive/5"
-													: "border-border/60 bg-muted/10 opacity-70"
+												resolved
+													? "border-green-500/40 bg-green-500/5"
+													: impacted
+														? "border-destructive/40 bg-destructive/5"
+														: "border-border/60 bg-muted/10 opacity-70"
 											}`}
 										>
 											<span className="font-medium text-foreground">
@@ -468,8 +482,12 @@ export function CockpitPanel() {
 												· {t(LEVEL_KEY[s.level])} · {s.facet}·{s.pairId}
 											</span>
 											{impacted ? (
-												<div className="mt-0.5 text-destructive">
-													🔴 {reason || t("impactReasonless")}
+												<div
+													className={`mt-0.5 ${resolved ? "text-green-700 dark:text-green-300" : "text-destructive"}`}
+												>
+													{resolved ? "🟢" : "🔴"}{" "}
+													{reason || t("impactReasonless")}
+													{resolved ? ` — ${t("impactResolved")}` : ""}
 												</div>
 											) : null}
 										</li>

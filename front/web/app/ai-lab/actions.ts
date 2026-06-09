@@ -15,6 +15,7 @@ import {
 	type Mode,
 	mergeImpacts,
 	mergePlacements,
+	nextPairId,
 	type Placement,
 	proposeSlot,
 	scopeForPair,
@@ -114,6 +115,57 @@ function fallbackPlacements(message: string): Placement[] {
 	}));
 }
 
+/** The human label of the pair Claude must write during the descent. */
+const PAIR_WRITE_LABEL: Record<string, string> = {
+	behavior: "Comportement attendu (use cases)",
+	scenarios: "Scénarios Given/When/Then",
+	model: "Modèle de données (sens humain)",
+	contract: "Contrat (in/out, pré/post, invariants)",
+	evidence: "Evidence attendue (ce qui prouvera le contrat)",
+};
+
+/**
+ * enrichNextPair — Claude WRITES the next anatomy pair from the validated spec (a real
+ * comportement from the spec, real scénarios from the comportement, …). The gated exception
+ * (§6): irreducible prose generation, VERIFIED by length-clamping ; returns null on any failure so
+ * the caller falls back to the deterministic template. The wall §2: a proposal, no truth written.
+ */
+async function enrichNextPair(
+	level: Level,
+	facet: Facet,
+	toPair: string,
+	parentSpec: string,
+): Promise<{ spec: string; detail: string } | null> {
+	const label = PAIR_WRITE_LABEL[toPair] ?? toPair;
+	const prompt = [
+		"Tu es le CERVEAU GAUCHE d'AIDOS. À partir d'une spec déjà validée, rédige la PAIRE SUIVANTE de l'anatomie. Tu PROPOSES, tu n'écris jamais la vérité.",
+		`Niveau : ${level} · Facette : ${facet}`,
+		`Spec validée : « ${parentSpec.replace(/"/g, "'")} »`,
+		`Rédige la « ${label} » qui en découle, concrète et vérifiable.`,
+		'Réponds UNIQUEMENT par un JSON valide : {"spec":"<1 phrase>","detail":"<2-3 phrases ou critères>"}',
+	].join("\n");
+	try {
+		const { stdout } = await execFileP(
+			CLAUDE_BIN,
+			["-p", prompt, "--output-format", "json", "--max-turns", "1"],
+			{ cwd: "/tmp", timeout: 90_000, maxBuffer: 8 * 1024 * 1024 },
+		);
+		const outer = JSON.parse(stdout);
+		const text = typeof outer?.result === "string" ? outer.result : "";
+		const inner = JSON.parse(extractJson(text));
+		const spec =
+			typeof inner?.spec === "string" ? inner.spec.trim().slice(0, 280) : "";
+		const detail =
+			typeof inner?.detail === "string"
+				? inner.detail.trim().slice(0, 600)
+				: "";
+		if (!spec) return null;
+		return { spec, detail };
+	} catch {
+		return null;
+	}
+}
+
 /**
  * leftBrainAction — the chat's turn, wired to the REAL Claude (CLI). A need fans out across the
  * verticale: Claude decides WHERE each spec goes (level × facet × pair) — the irreducible judgment
@@ -136,13 +188,30 @@ export async function leftBrainAction(
 	}
 
 	// DESCENT — validate a pair (level × facet × pairId) → generate the next pair down the anatomy.
+	// Claude ENRICHES the next pair's content (a real comportement written from the spec); the
+	// STRUCTURE (which pair, the placement) stays deterministic, and a template fallback covers a
+	// Claude failure (§6: only the prose is the gated exception, verified by length-clamping).
 	if (intent === "validate") {
 		const level = String(formData.get("level") ?? "") as Level;
 		const facet = String(formData.get("facet") ?? "") as Facet;
 		const pairId = String(formData.get("pairId") ?? "");
+		const next = nextPairId(pairId);
+		const parent = prev.placements.find(
+			(p) => p.level === level && p.facet === facet && p.pairId === pairId,
+		);
+		let override: { spec: string; detail?: string } | undefined;
+		if (next && parent)
+			override =
+				(await enrichNextPair(level, facet, next, parent.spec)) ?? undefined;
 		return {
 			...prev,
-			placements: validateAndDescend(prev.placements, level, facet, pairId),
+			placements: validateAndDescend(
+				prev.placements,
+				level,
+				facet,
+				pairId,
+				override,
+			),
 			selectedCell: { level, facet },
 			error: undefined,
 		};

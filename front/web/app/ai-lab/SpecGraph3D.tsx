@@ -18,7 +18,10 @@ const ForceGraph3D = dynamic(() => import("react-force-graph-3d"), {
  * impacted DAG=red. This is the RENDER only; the graph data is the pure twin (determinism-first).
  */
 function nodeColor(n: SpecGraphNode): string {
-	if (n.kind === "dag") return n.impacted ? "#ef4444" : "#9ca3af";
+	if (n.kind === "dag") {
+		if (n.resolved) return "#22c55e"; // impacted but resolved → green (red wave cleared)
+		return n.impacted ? "#ef4444" : "#9ca3af";
+	}
 	if (n.status === "realized") return "#2563eb";
 	if (n.status === "validated") return "#22c55e";
 	return "#f59e0b";

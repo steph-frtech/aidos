@@ -6196,6 +6196,7 @@
 		"graphEmpty": "Aucune spec à grapher pour l’instant — décrivez un besoin dans le chat, les nœuds apparaîtront ici.",
 		"graphAxisX": "X → verticale (produit → entité)",
 		"graphAxisY": "Y → facette (F·I·S·B·R·V·M·X)",
-		"graphAxisZ": "Z → profondeur (spec → sous-specs)"
+		"graphAxisZ": "Z → profondeur (spec → sous-specs)",
+		"impactResolved": "résolu (la cellule qui l’adresse est validée)"
 	}
 }
