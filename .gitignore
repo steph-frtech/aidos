@@ -103,3 +103,6 @@ next-env.d.ts
 /back/collab
 /back/truth-level
 /back/grid
+/back/tool-projection
+/back/why-tree
+/back/lexicon-linter

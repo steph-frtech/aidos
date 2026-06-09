@@ -108,6 +108,9 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/truth-tree", k: "truthTree" },
 			{ href: "/red-propagation", k: "redPropagation" },
 			{ href: "/red-wave", k: "redWave" },
+			{ href: "/caused-by", k: "causedBy" },
+			{ href: "/why-tree", k: "whyTree" },
+			{ href: "/lexicon", k: "lexicon" },
 		],
 	},
 	{
@@ -134,6 +137,8 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/mirror-library", k: "mirrorLibrary" },
 			{ href: "/emitted-target", k: "emittedTarget" },
 			{ href: "/emitters", k: "emitters" },
+			{ href: "/tool-projection", k: "toolProjection" },
+			{ href: "/tech-spec", k: "techSpec" },
 			{ href: "/entity-map", k: "entityMap" },
 			{ href: "/entity-relation", k: "entityRelation" },
 			{ href: "/entity-modeler", k: "entityModeler" },
@@ -205,6 +210,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/facet-wire", k: "facetWireNav" },
 			{ href: "/conscience", k: "conscienceNav" },
 			{ href: "/autonomy", k: "autonomyNav" },
+			{ href: "/ai-lab", k: "aiLabNav" },
 		],
 	},
 	{
