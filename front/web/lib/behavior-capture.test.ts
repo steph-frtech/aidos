@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { catalogue, expand } from "./behavior";
 import {
 	attachBehaviorAtCapture,
+	type Kind,
 	library,
 	proposalPieceCount,
 	proposalPreview,
