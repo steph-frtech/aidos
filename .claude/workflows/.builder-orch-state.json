@@ -1,14 +1,13 @@
 {
   "_doc": "Orchestrator state for the BUILDER_PLAN auto-relaunch loop (S78->S117 then FK01->FK16). Updated by the main-loop orchestrator between Workflow batches. Launch via scriptPath '.claude/workflows/long-run-builder.js' so the edited START_FROM is read fresh (name-launch uses a stale registry snapshot).",
-  "cursor": "FK11",
+  "cursor": "DONE",
   "final_target": "FK16",
   "batch_size": 5,
   "caps": { "plan_relaunches_max": 5, "same_step_retries_max": 3 },
   "counters": { "plan_relaunches": 0, "same_step_retries": 0 },
-  "current_run": { "run_id": "wf_51849f28-1c8", "task_id": "w3yqlt73m", "batch_from": "FK11", "batch_expected": ["FK11","FK12","FK13","FK14","FK15"] },
+  "current_run": null,
   "last_stop_step": null,
-  "fk16_plan": "FK16 (contract E0-E7 schema switchover, STRICTLY last) runs ALONE after FK11-FK15, then prod rebascule.",
-  "milestone": "S-track S53->S117 COMPLETE at commit 04a6d0d. Now FK01->FK16 (FK16 = contract schema switchover, STRICTLY last). Then rebascule prod.",
+  "milestone": "BUILD COMPLETE: S53->S117 + FK01->FK16 all green/validated. FK16 (contract E0-E7 switchover) committed d3101ed, migration audited (SELECT-only agent, REVOKE writes, backfill via privileged role, append-only). Next + only remaining op: rebascule prod on :3000.",
   "batches_done": [
     { "launched_from": "S72(registry ran S69)", "result": "DONE", "completed": ["S69","S70","S71","S72","S73"], "new_work": ["S72","S73"], "commit": "e7535c9" },
     { "launched_from": "S74", "result": "DONE", "completed": ["S74","S75","S76","S77"], "new_work": ["S74","S75","S76","S77"], "commit": "7bd39db", "note": "batch expected S74-S78; session-limit stalled after S77; S74-S77 verifier-validated" },
@@ -21,9 +20,11 @@
     { "launched_from": "S108", "result": "DONE", "completed": ["S108","S109","S110","S111","S112"], "new_work": ["S108","S109","S110","S111","S112"], "commit": "05dc9f7" },
     { "launched_from": "S113", "result": "DONE", "completed": ["S113","S114","S115","S116","S117"], "new_work": ["S113","S114","S115","S116","S117"], "commit": "04a6d0d", "note": "S-track COMPLETE" },
     { "launched_from": "FK01", "result": "DONE", "completed": ["FK01","FK02","FK03","FK04","FK05"], "new_work": ["FK01","FK02","FK03","FK04","FK05"], "commit": "3209218", "note": "kernel DDL migrations (truth_level, facets) audited: pure ALTER, no GRANT/INSERT, wall intact" },
-    { "launched_from": "FK06", "result": "DONE", "completed": ["FK06","FK07","FK08","FK09","FK10"], "new_work": ["FK06","FK07","FK08","FK09","FK10"], "commit": "f1b0f92" }
+    { "launched_from": "FK06", "result": "DONE", "completed": ["FK06","FK07","FK08","FK09","FK10"], "new_work": ["FK06","FK07","FK08","FK09","FK10"], "commit": "f1b0f92" },
+    { "launched_from": "FK11", "result": "DONE", "completed": ["FK11","FK12","FK13","FK14","FK15"], "new_work": ["FK11","FK12","FK13","FK14","FK15"], "commit": "fc360c9", "note": "5 kernel migrations audited: CREATE TABLE + SELECT-only grant + REVOKE writes; wall intact" },
+    { "launched_from": "FK16", "result": "DONE", "completed": ["FK16"], "new_work": ["FK16"], "commit": "d3101ed", "note": "FINAL STEP. Contract E0-E7 switchover. Committed by subagent during run. Migration mirror_evidence_level_contract.sql audited: ALTER+backfill UPDATE via privileged role, agent SELECT-only+REVOKE writes, append-only, no DROP/DELETE. DB parity test ran vs real postgres. Wall intact." }
   ],
-  "steps_validated": ["S69","S70","S71","S72","S73","S74","S75","S76","S77","S78","S79","S80","S81","S82","S83","S84","S85","S86","S87","S88","S89","S90","S91","S92","S93","S94","S95","S96","S97","S98","S99","S100","S101","S102","S103","S104","S105","S106","S107","S108","S109","S110","S111","S112"],
-  "post_fk16": "rebascule prod sur :3000 (cf memory workbench-public-deployment)",
-  "notes": "Launch via scriptPath, not name. S74=relation-emitter, S75=entity-modeler, S76=behavior-expander, S77=dsl-editor all green. Stray MCP binaries (4) gitignored+removed. Next batch S78-S82."
+  "steps_validated": ["S69","S70","S71","S72","S73","S74","S75","S76","S77","S78","S79","S80","S81","S82","S83","S84","S85","S86","S87","S88","S89","S90","S91","S92","S93","S94","S95","S96","S97","S98","S99","S100","S101","S102","S103","S104","S105","S106","S107","S108","S109","S110","S111","S112","S113","S114","S115","S116","S117","FK01","FK02","FK03","FK04","FK05","FK06","FK07","FK08","FK09","FK10","FK11","FK12","FK13","FK14","FK15","FK16"],
+  "post_fk16": "rebascule prod sur :3000 (cf memory workbench-public-deployment) — IN PROGRESS",
+  "notes": "BUILD COMPLETE. Launch via scriptPath, not name. All S53-S117 + FK01-FK16 green. Stray MCP binaries swept+gitignored each batch. 12 batches, commits e7535c9..d3101ed."
 }
