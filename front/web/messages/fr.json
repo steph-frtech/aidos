@@ -59,6 +59,8 @@
 		"dbProjection": "DB Projection",
 		"webPreview": "Projection web",
 		"costMeter": "Compteur de coût & budget",
+		"billing": "Plans, métrage & quotas",
+		"gdprErasure": "GDPR — export & suppression",
 		"meta": "Méta-méta",
 		"mutationScore": "Score de mutation",
 		"kernelDebt": "Dette du noyau",
@@ -108,6 +110,7 @@
 		"blocks": "Refus (BlockReason)",
 		"auth": "Authentification",
 		"projectMembers": "Adhésions",
+		"collab": "Collaboration",
 		"authorityBinding": "Liaison autorité",
 		"behaviorCapture": "Behavior à la capture",
 		"shapeEditor": "Éditeur par forme",
@@ -149,7 +152,8 @@
 		"projectEvolve": "Boucle médiane (/evolve + QD)",
 		"realityEvolution": "Cockpit réalité & évolution",
 		"learn": "/learn — incident → nouvelle dent",
-		"strangler": "Absorption de legacy (strangler-fig)"
+		"strangler": "Absorption de legacy (strangler-fig)",
+		"accountRelease": "Release v0 (compte)"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -2273,6 +2277,48 @@
 			"body": "On n'écrit jamais une ligne de code sans un scénario rouge d'abord. L'humain possède la vérité, l'agent possède l'implémentation, le mur fait respecter la frontière. Chaque vérité passe par cette boucle :",
 			"loop": "Idée → Miroir (BDD) → Goal (set rouge) → Noyau → Vert → Phase stable"
 		},
+		"funnel": {
+			"title": "Le funnel — du compte à l'app déployée, pour de vrai",
+			"lead": "Pas une simulation : chaque étape produit un VRAI artéfact via le moteur. Par défaut, le chemin template-first instancie un starter vert (S81) puis le modifie — un inconnu réussit son premier run. Le chemin idée-blanche est le mode avancé.",
+			"pathLabel": "Choisissez votre chemin",
+			"pathTemplate": "Template-first (recommandé)",
+			"pathTemplateHint": "Instancie un starter déterministe et vert, puis modifiez-le. La porte d'acceptance est déjà verte.",
+			"pathBlank": "Idée blanche (avancé)",
+			"pathBlankHint": "Partez d'une intention libre, sans starter. Peut rater la porte d'acceptance — d'où le mode avancé.",
+			"emailLabel": "Votre e-mail (signup réel)",
+			"templateLabel": "Template de départ",
+			"slugLabel": "Nom du projet (slug)",
+			"intentLabel": "Première modification / idée",
+			"intentTemplateHint": "Sur template-first, c'est la modification que vous greffez sur le starter (ex. « ajouter un code promo »).",
+			"intentBlankHint": "Sur idée blanche, décrivez l'app à construire de zéro.",
+			"verdictLabel": "Verdict du grilling",
+			"verdictSharp": "Nette (prête pour un goal)",
+			"verdictFuzzy": "Floue (→ /spike)",
+			"verdictBad": "Mauvaise (rejetée)",
+			"buildLabel": "Résultat de la boucle de build",
+			"buildGreen": "Vert (set rouge → vert)",
+			"buildRed": "Un sensor rouge (build non vert)",
+			"buildLowMutation": "Score de mutation sous le plancher",
+			"run": "Lancer le funnel",
+			"reset": "Réinitialiser",
+			"checklistHeading": "Checklist — liée à de vrais artéfacts",
+			"artefactsHeading": "Artéfacts produits",
+			"deployedTitle": "🚀 App déployée — pilotée par le vrai moteur",
+			"deployedBody": "Chaque étape a écrit de la vraie vérité (via les jumeaux déterministes) : un starter content-addressed, une idée content-addressed, un set rouge calculé, un verdict de build non contournable, un sous-domaine de déploiement content-addressed. Aucune simulation.",
+			"notDeployedTitle": "Funnel arrêté honnêtement",
+			"notDeployedBody": "Le funnel ne déclare jamais un déploiement sans un build vert. Une étape n'est cochée que si son artéfact réel existe (e-mail vide → bloque au signup ; verdict flou → pas de goal ; build non vert → pas de déploiement).",
+			"previewCta": "Prévisualiser",
+			"deployCta": "Déployer",
+			"stepNames": {
+				"signup": "1 · Créer un compte",
+				"project": "2 · Créer un projet",
+				"idea": "3 · Première modification / idée",
+				"grill": "4 · Griller l'intention",
+				"goal": "5 · Ouvrir un goal (set rouge)",
+				"build": "6 · Boucle de build au vert",
+				"deploy": "7 · Prévisualiser / déployer"
+			}
+		},
 		"guide": {
 			"heading": "Le parcours guidé",
 			"lead": "Huit étapes, de l'idée au bouton. Cochez chacune au fur et à mesure (votre progression est sauvegardée), et ouvrez le panneau correspondant pour la réaliser pour de vrai — tout se fait par écran.",
@@ -2355,68 +2401,6 @@
 			"guide": "Guide : développer votre app"
 		},
 		"footer": "Lecture seule contre la vérité : ce tutoriel vous guide et vous emmène sur chaque panneau, mais n'écrit jamais le noyau. La seule porte reste idée → miroir → /goal → approbation humaine.",
-		"builder": {
-			"title": "Construisez-la, pas à pas",
-			"lead": "Suivez la flèche : à chaque étape, cliquez le bouton surligné. Vous conduisez l'intention « un client passe une commande depuis son panier » de l'idée au bouton cliquable.",
-			"arrow": "Cliquez ici",
-			"restart": "Recommencer",
-			"progress": "Progression",
-			"intentionLabel": "L'intention que vous construisez",
-			"intention": "Un client passe une commande depuis son panier",
-			"complete": "🎉 Bravo — votre première application est née, de l'idée au bouton cliquable.",
-			"completeBody": "Vous avez conduit une intention à travers toute la boucle KRD : idée → miroir rouge → goal → ChangeSet approuvé (la porte) → vert → phase stable → bouton. C'est exactement ainsi que naît chaque capacité dans AIDOS.",
-			"orderPlaced": "Commande passée ✓ — 2 articles",
-			"stages": {
-				"s1": {
-					"action": "Capter l'idée",
-					"active": "Tout part d'une intention, jamais d'un prompt.",
-					"done": "Idée captée — candidate, sans gel",
-					"node": "Idée"
-				},
-				"s2": {
-					"action": "Griller l'intention",
-					"active": "On aiguise l'intention au-dessus du mur : est-elle falsifiable ?",
-					"done": "Nette & falsifiable — verdict « grilled »",
-					"node": "Grill"
-				},
-				"s3": {
-					"action": "Ouvrir le goal",
-					"active": "Le rouge EST le goal — on écrit le miroir qui échoue.",
-					"done": "Set rouge ouvert — createOrder est ROUGE",
-					"node": "Goal"
-				},
-				"s4": {
-					"action": "Écrire le miroir (fixture)",
-					"active": "La nature de la vérité choisit sa langue : ici, une fixture.",
-					"done": "Miroir rouge lié — fixture état→events",
-					"node": "Miroir"
-				},
-				"s5": {
-					"action": "Approuver le ChangeSet",
-					"active": "La seule porte du noyau : l'humain approuve, l'agent n'écrit jamais la vérité.",
-					"done": "DRAFT → APPLIED — la porte ; miroir vivant",
-					"node": "ChangeSet"
-				},
-				"s6": {
-					"action": "Coder au vert",
-					"active": "Maintenant — et seulement maintenant — on code. red → green.",
-					"done": "red → green — le miroir passe au VERT",
-					"node": "Vert"
-				},
-				"s7": {
-					"action": "Émettre & sceller",
-					"active": "Depuis la source, les projections s'émettent ; on scelle la phase stable.",
-					"done": "Projections émises · phase stable scellée",
-					"node": "Stable"
-				},
-				"s8": {
-					"action": "Checkout — 2 articles",
-					"active": "Votre app est prête : cliquez le bouton que vous venez de construire !",
-					"done": "Commande passée ✓ — 2 articles",
-					"node": "Bouton"
-				}
-			}
-		},
 		"panels": {
 			"heading": "Le faire pour de vrai",
 			"lead": "L'assistant ci-dessus simule la boucle. Pour la faire sur les vrais panneaux du Workbench :"
@@ -4228,6 +4212,54 @@
 		},
 		"footer": "Sous le mur (CLAUDE.md §2) : <code>accounts.project_members</code> n'est pas kernel/mirrors/fitness. La RLS S55 se keye sur l'adhésion ; le gradient est déclaré, jamais appris (§8)."
 	},
+	"collab": {
+		"eyebrow": "S113 · Substrat de collaboration + échelle d'adoption",
+		"title": "Collaboration & adoption",
+		"intro": "Le plan social du projet : provenance identifiée (« qui a voulu quoi » avec de vrais users), commentaires sur ideas/miroirs/changesets, feed d'activité, présence temps réel sans écrasement, et l'échelle d'adoption (§82.5) surfacée par projet. Chaque acte passe la porte d'autorité (S62/S110) et est estampillé avec le vrai user — jamais un placeholder. Un membre sans authority ne peut approuver. L'échelle n'avance que quand la porte du palier est atteinte (done is computed).",
+		"actorHeading": "Identité actrice (provenance réelle)",
+		"identityLabel": "Identité",
+		"identityPlaceholder": "ex. vic",
+		"projectLabel": "Projet",
+		"roleLabel": "Rôle",
+		"nonMember": "non-membre",
+		"commentHeading": "Commenter (idée / miroir / changeset)",
+		"targetKindLabel": "Cible",
+		"targetIdLabel": "Id de la cible",
+		"targetIdPlaceholder": "ex. idea-7",
+		"bodyLabel": "Commentaire",
+		"bodyPlaceholder": "ex. needs a mirror first",
+		"commentSubmit": "Commenter",
+		"approveHeading": "Approuver un changeset (porte S110)",
+		"approveHint": "Un membre sans authority administer (owner) ne peut approuver — un viewer/editor est refusé ROLE_FORBIDDEN.",
+		"approveSubmit": "Approuver",
+		"inviteHeading": "Inviter / partager (administer)",
+		"inviteeLabel": "Invité",
+		"inviteePlaceholder": "ex. newbie",
+		"grantLabel": "Rôle accordé",
+		"inviteSubmit": "Inviter",
+		"presenceHeading": "Présence & édition concurrente",
+		"presenceHint": "Deux utilisateurs présents sur le même canvas se voient sans s'écraser ; le verrou d'édition n'est jamais volé en silence.",
+		"joinSubmit": "Rejoindre le canvas",
+		"claimSubmit": "Réclamer le verrou",
+		"releaseSubmit": "Relâcher",
+		"presentLabel": "Présents",
+		"lockHolderLabel": "Verrou détenu par",
+		"noLock": "(libre)",
+		"stageHeading": "Échelle d'adoption du projet (§82.5)",
+		"stageHint": "Le projet surface son palier courant et la prochaine dent. L'échelle n'avance QUE quand la porte du palier est atteinte.",
+		"currentLabel": "Palier courant",
+		"nextLabel": "Prochaine dent",
+		"canAdvanceYes": "La porte est atteinte — le projet peut avancer.",
+		"canAdvanceNo": "La porte n'est pas atteinte — pas d'avance (done is computed).",
+		"gapsLabel": "Capacités manquantes",
+		"advanceSubmit": "Avancer d'un palier",
+		"capabilitiesLabel": "Vue des capacités (cochez ce qui est vivant)",
+		"feedHeading": "Feed d'activité",
+		"feedEmpty": "Aucune activité — agissez ci-dessus.",
+		"allowed": "autorisé",
+		"denied": "refusé",
+		"footer": "Sous le mur (CLAUDE.md §2) : commentaires/partages/invites/feed/présence vivent dans la zone <code>collab</code> sous la ligne — jamais kernel/mirrors/fitness. L'approbation d'une vérité reste le chemin propose→ChangeSet (S110/S85). Tout est pur et déterministe (§8)."
+	},
 	"authorityBinding": {
 		"eyebrow": "S63 · Humain lié à l'autorité",
 		"title": "Liaison autorité & provenance",
@@ -5534,5 +5566,40 @@
 		"green": "vert",
 		"drift": "drift",
 		"footer": "LE MUR (§2) : carve/freeze/refactor n'écrivent AUCUNE vérité — la cellule strangler et ses miroirs de caractérisation sont une valeur (le ChangeSet les propose au-dessus de la ligne). Déterministe (§6/§8) : la génération de miroirs est du code, jamais un LLM ; même entrée → même sortie."
+	},
+	"accountRelease": {
+		"eyebrow": "S117 · Release v0 par compte",
+		"title": "Release v0 par compte — l'inventaire honnête",
+		"intro": "Le pack de release par COMPTE énumère honnêtement ce qui EXISTE dans votre truth-store live : vos projets (avec leur statut démo-vs-réel), la surface CLI complétée (goal/grill/spike/harvest/trim/init en plus des verbes cœur), les routes Workbench, l'index docs, l'inventaire de tests, le changelog et les limites connues honnêtes (Doltgres beta, async best-effort, quotas du plan) — puis conseille la prochaine tier d'adoption. Content-addressed, en lecture seule : il assemble et conseille, n'installe rien, ne livre rien, n'écrit aucune vérité.",
+		"tutorialTitle": "Comment lire ce pack",
+		"tutorialStep1": "Choisissez un compte de démonstration, puis cliquez « Assembler le pack ».",
+		"tutorialStep2": "Chaque projet porte son statut HONNÊTE : réel (une app qui tourne) ou démo (une tranche jouable).",
+		"tutorialStep3": "La surface CLI liste les 5 verbes cœur + les 6 verbes passerelle (S117), chacun routé sur la passerelle.",
+		"tutorialStep4": "La prochaine tier d'adoption est CALCULÉE (le plus petit cliquet qui clique) — conseillée, jamais installée.",
+		"exampleTitle": "Exemple — assembler le pack d'un compte",
+		"scenarioLabel": "Compte de démonstration",
+		"assembleButton": "Assembler le pack",
+		"packTitle": "Pack de release v0 (assemblé)",
+		"accountLabel": "Compte",
+		"projectsTitle": "Projets (statut démo-vs-réel honnête)",
+		"realBadge": "réel",
+		"demoBadge": "démo",
+		"cliSurfaceTitle": "Surface CLI (cœur + passerelle S117)",
+		"coreBadge": "cœur",
+		"gatewayBadge": "passerelle",
+		"routesTitle": "Routes Workbench",
+		"docsTitle": "Index docs",
+		"testInventoryTitle": "Inventaire de tests",
+		"changelogTitle": "Changelog",
+		"knownLimitsTitle": "Limites connues honnêtes",
+		"nextTierTitle": "Prochaine tier d'adoption (conseil)",
+		"currentLabel": "Tier courante",
+		"nextLabel": "Prochaine tier",
+		"allGreenBadge": "Toutes les tiers sont satisfaites — rien à installer de plus.",
+		"assembleOnlyNote": "Assemble seulement : ce pack n'installe rien, ne livre rien, n'écrit aucune vérité (le mur, §2). Activer une capacité passe par idée → miroir → /goal → approbation humaine.",
+		"emptyNote": "—",
+		"scenarioStarter": "Compte starter (T1 → conseille T2)",
+		"scenarioKernel": "Compte kernel+mirror (bloqué à T2 : RealityMirror absent)",
+		"scenarioEmpty": "Compte vide (T0 → conseille T1)"
 	}
 }

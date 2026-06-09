@@ -2,48 +2,84 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
-import { type BuilderStage, FirstAppBuilder } from "./FirstAppBuilder";
+import { curated } from "@/lib/templates";
+import { FirstAppFunnel, type FunnelLabels } from "./FirstAppFunnel";
 
 export const metadata: Metadata = {
 	title: "Votre première application — AIDOS Workbench",
 	description:
-		"Un tutoriel guidé, interactif : suivez les flèches et construisez votre première capacité, de l'intention au bouton cliquable, en suivant la boucle KRD.",
+		"Un funnel d'onboarding guidé-mais-RÉEL : signup → projet (template-first par défaut) → première modification → grill → goal → miroir → build au vert → preview/deploy. Chaque étape écrit de la vraie vérité, aucune simulation.",
 };
 
 /**
- * /first-app — the guided, HANDS-ON onboarding. The star is FirstAppBuilder: an
- * interactive coach-mark walkthrough where the user clicks the highlighted button at each
- * stage (arrow → "Cliquez ici"), the pipeline fills idea→…→button, and the last stage is
- * the real checkout button they just built. Below it, the same eight teeth deep-link to
- * the real Workbench panels ("le faire pour de vrai"). Server Component (strings via
- * next-intl, ADR 0011; tokens, ADR 0010); read-only, the wall is untouched.
+ * /first-app — the S115 guided-but-REAL onboarding funnel. The star is FirstAppFunnel: an
+ * action-capable form that runs the PURE funnel state machine (lib/first-app-funnel) through
+ * the real deterministic twins — TEMPLATE-FIRST by default (a newcomer instantiates a green
+ * S81 starter, then modifies it) and BLANK-IDEA as the advanced path. Each step produces a
+ * REAL artefact (a content-addressed starterId / ideaId, a computed red set, a non-gameable
+ * build verdict, a content-addressed deploy subdomain); the checklist is tied to those
+ * artefacts, never confetti. The retired local simulation (FirstAppBuilder) is gone.
+ *
+ * Server Component (strings via next-intl, ADR 0011; design tokens, ADR 0010). The funnel
+ * action writes no truth (the wall, §2) — it is a dry-run value computation over the twins.
  */
 export default async function FirstAppPage() {
 	const t = await getTranslations("firstApp");
 
-	const builderStages: BuilderStage[] = Array.from({ length: 8 }, (_, i) => {
-		const n = i + 1;
-		return {
-			n,
-			action: t(`builder.stages.s${n}.action`),
-			active: t(`builder.stages.s${n}.active`),
-			done: t(`builder.stages.s${n}.done`),
-			node: t(`builder.stages.s${n}.node`),
-		};
-	});
-
-	const builderLabels = {
-		arrow: t("builder.arrow"),
-		restart: t("builder.restart"),
-		progress: t("builder.progress"),
-		intentionLabel: t("builder.intentionLabel"),
-		intention: t("builder.intention"),
-		complete: t("builder.complete"),
-		completeBody: t("builder.completeBody"),
-		orderPlaced: t("builder.orderPlaced"),
+	const stepNames: Record<string, string> = {
+		signup: t("funnel.stepNames.signup"),
+		project: t("funnel.stepNames.project"),
+		idea: t("funnel.stepNames.idea"),
+		grill: t("funnel.stepNames.grill"),
+		goal: t("funnel.stepNames.goal"),
+		build: t("funnel.stepNames.build"),
+		deploy: t("funnel.stepNames.deploy"),
 	};
 
-	// The eight teeth deep-linked to the real Workbench panels.
+	const funnelLabels: FunnelLabels = {
+		pathLabel: t("funnel.pathLabel"),
+		pathTemplate: t("funnel.pathTemplate"),
+		pathTemplateHint: t("funnel.pathTemplateHint"),
+		pathBlank: t("funnel.pathBlank"),
+		pathBlankHint: t("funnel.pathBlankHint"),
+		emailLabel: t("funnel.emailLabel"),
+		templateLabel: t("funnel.templateLabel"),
+		slugLabel: t("funnel.slugLabel"),
+		intentLabel: t("funnel.intentLabel"),
+		intentTemplateHint: t("funnel.intentTemplateHint"),
+		intentBlankHint: t("funnel.intentBlankHint"),
+		verdictLabel: t("funnel.verdictLabel"),
+		verdictSharp: t("funnel.verdictSharp"),
+		verdictFuzzy: t("funnel.verdictFuzzy"),
+		verdictBad: t("funnel.verdictBad"),
+		buildLabel: t("funnel.buildLabel"),
+		buildGreen: t("funnel.buildGreen"),
+		buildRed: t("funnel.buildRed"),
+		buildLowMutation: t("funnel.buildLowMutation"),
+		run: t("funnel.run"),
+		reset: t("funnel.reset"),
+		checklistHeading: t("funnel.checklistHeading"),
+		artefactsHeading: t("funnel.artefactsHeading"),
+		deployedTitle: t("funnel.deployedTitle"),
+		deployedBody: t("funnel.deployedBody"),
+		notDeployedTitle: t("funnel.notDeployedTitle"),
+		notDeployedBody: t("funnel.notDeployedBody"),
+		stepNames,
+		artefactStarter: "",
+		artefactIdea: "",
+		artefactRedSet: "",
+		artefactBuild: "",
+		artefactSubdomain: "",
+		previewCta: t("funnel.previewCta"),
+		deployCta: t("funnel.deployCta"),
+	};
+
+	const templates = curated().map((b) => ({
+		id: b.id,
+		label: b.labels.fr ?? b.id,
+	}));
+
+	// The eight teeth deep-linked to the real Workbench panels ("le faire pour de vrai").
 	const panels = [
 		{ k: "s1", href: "/ideas" },
 		{ k: "s2", href: "/exploration" },
@@ -117,17 +153,17 @@ export default async function FirstAppPage() {
 					</section>
 				</div>
 
-				{/* The interactive, hands-on builder — the star */}
-				<section className="mt-12 space-y-4" aria-label={t("builder.title")}>
+				{/* The REAL funnel — the star (action-capable, drives real artefacts) */}
+				<section className="mt-12 space-y-4" aria-label={t("funnel.title")}>
 					<div className="space-y-1">
 						<h2 className="text-lg font-semibold tracking-tight text-foreground">
-							{t("builder.title")}
+							{t("funnel.title")}
 						</h2>
 						<p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-							{t("builder.lead")}
+							{t("funnel.lead")}
 						</p>
 					</div>
-					<FirstAppBuilder stages={builderStages} labels={builderLabels} />
+					<FirstAppFunnel labels={funnelLabels} templates={templates} />
 				</section>
 
 				{/* Do it for real — deep links to the actual panels */}

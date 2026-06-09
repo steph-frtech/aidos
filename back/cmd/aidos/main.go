@@ -35,11 +35,26 @@ func Run(args []string, stdout io.Writer) int {
 		return exitOK
 	}
 
+	// S117 — a crafted DIRECT truth-write verb (kernel-write/mirror-write/fitness-write)
+	// is NOT a legitimate sub-command; it routes through the gateway, which REFUSES it
+	// with the ChangeSet-pointing BlockReason. The CLI surfaces that refusal — never
+	// silently performs it — proving the wall is not bypassable through a CLI hole.
+	if _, isWrite := directTruthWriteVerbs[verb]; isWrite {
+		return runDirectTruthWrite(verb, stdout)
+	}
+
 	c, ok := lookup(verb)
 	if !ok {
 		renderHelp(stdout)
 		fmt.Fprintf(stdout, "\nunknown command %q — run \"aidos help\" for the contract of each command\n", verb)
 		return exitUsage
+	}
+
+	// S117 — the surface-completion verbs (goal/grill/spike/harvest/trim/init) route
+	// over the passerelle (gateway). Each runs the SAME deterministic gateway.Route the
+	// HTTP edge runs and renders the decision; the CLI applies the gateway's wall.
+	if _, isGatewayVerb := gatewayToolFor(c.Verb); isGatewayVerb {
+		return runGatewayVerb(c.Verb, args[1:], stdout)
 	}
 
 	// `check` carries real S45 behaviour: run the law-coverage harness over the truth
@@ -103,6 +118,11 @@ func renderHelp(w io.Writer) {
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "Commandes coeur :")
 	for _, c := range Contracts() {
+		fmt.Fprintf(w, "  %-8s %s\n", c.Verb, c.Purpose)
+	}
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "Passerelle (S117 — routees sur la passerelle MCP-over-HTTP) :")
+	for _, c := range GatewayContracts() {
 		fmt.Fprintf(w, "  %-8s %s\n", c.Verb, c.Purpose)
 	}
 	fmt.Fprintln(w, "")

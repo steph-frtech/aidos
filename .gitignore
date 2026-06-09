@@ -98,3 +98,6 @@ next-env.d.ts
 /back/federation
 /back/truth-approval
 /back/reality-evolution
+/back/billing
+/back/erasure
+/back/collab

@@ -1,0 +1,14 @@
+---
+name: s114-billing
+description: §S114/E13 customer-facing billing layer — plans+deterministic metering+quota+provider Pact webhook; verified green
+metadata:
+  type: project
+---
+
+S114 billing (back/runtime/billing) customer-facing ECONOMIC layer of an ACCOUNT, DISTINCT from kernel HarnessCostBudget (S51/S111 build-time advisory) — billing = COMMERCIAL blocking quota. PURE/TOTAL writes-NOTHING below-wall.
+
+Done-crit ALL PROVEN: (1) over-quota→QUOTA_EXCEEDED BlockReason + NextPlan upgrade path NEVER silent (TestProp_QuotaNeverSilent + empty-how_to_fix=prison-forbidden, equal-to-limit=within-quota inclusive ceil); (2) MeterUsage/MeterProject = pure monotone fold COUNT from agentimpl.RunMeter (S111) never estimate never LLM, exact per-(account,project) attribution (per-project sums to account TestProp_MeteringAttributablePerProject + OtherAccountNeverCounted), sandboxHours floor(secs/3600); (3) pact.go VerifyContract provider-verifies in-process httptest endpoint via SAME IngestWebhook (1 ACK/webhook-kind + 1 DENY malformed→400, no network), TestProp_PactProviderAlwaysVerifies×16 + ContractByteStable; (4) ADR 0049 Stripe slot-replaceable. Webhooks = S73 async op run INBOUND, eventID=records.Hash(canonical body) idempotent replay-suppressed (TestProp_WebhookIdempotent reps→1 entry).
+
+CROSS-LANG PARITY independently verified: wrote throwaway Go test computing eventID for TS-pinned event (checkout.completed/evt_42/acct-4/pro) → Go=e0162ca7...==TS billing.test.ts:189 pinned hash. Go records.Canonicalize all-STRING webhook body == TS JSON.stringify(sorted-keys) byte-identical (no number-format divergence since all fields string).
+
+go test billing+mcp green, vet clean, broad build exit0, prior-green agentimpl/records intact, gofmt CLEAN. PROPERTY ROBUST -rapid.checks=3000 from PKG dir (SCAR: from back/ `.` mis-parses→no-Go-files-FAIL, cd pkg dir). Godog 4scen/22steps green. WALL grep CLEAN (INSERT/db/pgx/Exec only in comments "never a kernel"). MCP aidos-billing 6 PURE tools (plans/meter/meter_project/check_quota/ingest_webhook/pact_verify) main_test 7. TS twin lib/billing.ts + lib/billing-verify.ts (browser-pure VerifyContractInBrowser no httptest) vitest 12/12 tsc-clean biome 6-clean. /billing action-capable BillingPanel plain useState+onClick 6 control groups (plan-select/add-run/meter/meter-project/check-quota/webhook-ingest+replay/pact-verify) all testid match e2e; webhook providerId fixed "evt_demo"→replay truly collides. nav WorkbenchHeader:181 i18n fr4976==en4976 EXACT. Playwright 5/5 live:3000 route-200. docs 3-layer internals Impl:9/Méta:41/Méta-méta:49 docs.json:295-296 mint-PASS HEAD 2eb8320==origin/main. OQ Linear-unauth (ToolSearch returns GitHub not linear create/update — known OAuth-needed state)/Stripe-HMAC-sig+real-payload-parse=transport-adapter-deploy-time by-design. verified-green ZERO corrections.

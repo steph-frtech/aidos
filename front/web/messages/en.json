@@ -59,6 +59,8 @@
 		"dbProjection": "DB Projection",
 		"webPreview": "Web Projection",
 		"costMeter": "Cost meter & budget",
+		"billing": "Plans, metering & quotas",
+		"gdprErasure": "GDPR — export & erasure",
 		"meta": "Meta-meta",
 		"mutationScore": "Mutation score",
 		"kernelDebt": "Kernel debt",
@@ -108,6 +110,7 @@
 		"blocks": "Refusals (BlockReason)",
 		"auth": "Authentication",
 		"projectMembers": "Members",
+		"collab": "Collaboration",
 		"authorityBinding": "Authority binding",
 		"behaviorCapture": "Behavior at capture",
 		"shapeEditor": "Shape editor",
@@ -149,7 +152,8 @@
 		"projectEvolve": "Medium loop (/evolve + QD)",
 		"realityEvolution": "Reality & evolution cockpit",
 		"learn": "/learn — incident → new tooth",
-		"strangler": "Legacy absorption (strangler-fig)"
+		"strangler": "Legacy absorption (strangler-fig)",
+		"accountRelease": "Release v0 (account)"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -2273,6 +2277,48 @@
 			"body": "You never write a line of code without a red scenario first. The human owns truth, the agent owns implementation, the wall enforces the boundary. Every truth goes through this loop:",
 			"loop": "Idea → Mirror (BDD) → Goal (red set) → Kernel → Green → Stable phase"
 		},
+		"funnel": {
+			"title": "The funnel — from account to a deployed app, for real",
+			"lead": "Not a simulation: every step produces a REAL artefact through the engine. By default the template-first path instantiates a green starter (S81) then modifies it — a stranger succeeds on their first run. The blank-idea path is the advanced mode.",
+			"pathLabel": "Choose your path",
+			"pathTemplate": "Template-first (recommended)",
+			"pathTemplateHint": "Instantiate a deterministic green starter, then modify it. The acceptance gate is already green.",
+			"pathBlank": "Blank idea (advanced)",
+			"pathBlankHint": "Start from a free-text intention, no starter. May miss the acceptance gate — hence advanced.",
+			"emailLabel": "Your email (real signup)",
+			"templateLabel": "Starter template",
+			"slugLabel": "Project name (slug)",
+			"intentLabel": "First modification / idea",
+			"intentTemplateHint": "On template-first, this is the modification you graft onto the starter (e.g. \"add a promo code\").",
+			"intentBlankHint": "On blank idea, describe the app to build from scratch.",
+			"verdictLabel": "Grilling verdict",
+			"verdictSharp": "Sharp (ready for a goal)",
+			"verdictFuzzy": "Fuzzy (→ /spike)",
+			"verdictBad": "Bad (rejected)",
+			"buildLabel": "Build-loop outcome",
+			"buildGreen": "Green (red set → green)",
+			"buildRed": "One sensor red (build not green)",
+			"buildLowMutation": "Mutation score below the floor",
+			"run": "Run the funnel",
+			"reset": "Reset",
+			"checklistHeading": "Checklist — tied to real artefacts",
+			"artefactsHeading": "Produced artefacts",
+			"deployedTitle": "🚀 App deployed — driven by the real engine",
+			"deployedBody": "Every step wrote real truth (via the deterministic twins): a content-addressed starter, a content-addressed idea, a computed red set, a non-gameable build verdict, a content-addressed deploy subdomain. No simulation.",
+			"notDeployedTitle": "Funnel stopped honestly",
+			"notDeployedBody": "The funnel never declares a deploy without a green build. A step is checked only if its real artefact exists (empty email → blocks at signup; fuzzy verdict → no goal; non-green build → no deploy).",
+			"previewCta": "Preview",
+			"deployCta": "Deploy",
+			"stepNames": {
+				"signup": "1 · Create an account",
+				"project": "2 · Create a project",
+				"idea": "3 · First modification / idea",
+				"grill": "4 · Grill the intention",
+				"goal": "5 · Open a goal (red set)",
+				"build": "6 · Build loop to green",
+				"deploy": "7 · Preview / deploy"
+			}
+		},
 		"guide": {
 			"heading": "The guided walkthrough",
 			"lead": "Eight steps, from idea to button. Check each one off as you go (your progress is saved), and open the matching panel to do it for real — everything happens on a screen.",
@@ -2355,68 +2401,6 @@
 			"guide": "Guide: develop your app"
 		},
 		"footer": "Read-only against truth: this tutorial guides you and takes you to each panel, but never writes the kernel. The only door stays idea → mirror → /goal → human approval.",
-		"builder": {
-			"title": "Build it, step by step",
-			"lead": "Follow the arrow: at each step, click the highlighted button. You drive the intention “a customer places an order from their cart” from idea to a clickable button.",
-			"arrow": "Click here",
-			"restart": "Restart",
-			"progress": "Progress",
-			"intentionLabel": "The intention you're building",
-			"intention": "A customer places an order from their cart",
-			"complete": "🎉 Well done — your first application is born, from idea to clickable button.",
-			"completeBody": "You drove an intention through the whole KRD loop: idea → red mirror → goal → approved ChangeSet (the door) → green → stable phase → button. This is exactly how every capability is born in AIDOS.",
-			"orderPlaced": "Order placed ✓ — 2 items",
-			"stages": {
-				"s1": {
-					"action": "Capture the idea",
-					"active": "It all starts from an intention, never a prompt.",
-					"done": "Idea captured — candidate, no freeze",
-					"node": "Idea"
-				},
-				"s2": {
-					"action": "Grill the intention",
-					"active": "Sharpen the intention above the wall: is it falsifiable?",
-					"done": "Sharp & falsifiable — verdict “grilled”",
-					"node": "Grill"
-				},
-				"s3": {
-					"action": "Open the goal",
-					"active": "The red IS the goal — write the mirror that fails.",
-					"done": "Red set opened — createOrder is RED",
-					"node": "Goal"
-				},
-				"s4": {
-					"action": "Write the mirror (fixture)",
-					"active": "The truth's nature picks its language: here, a fixture.",
-					"done": "Red mirror linked — state→events fixture",
-					"node": "Mirror"
-				},
-				"s5": {
-					"action": "Approve the ChangeSet",
-					"active": "The only door to the kernel: the human approves, the agent never writes truth.",
-					"done": "DRAFT → APPLIED — the door; mirror alive",
-					"node": "ChangeSet"
-				},
-				"s6": {
-					"action": "Code to green",
-					"active": "Now — and only now — you code. red → green.",
-					"done": "red → green — the mirror turns GREEN",
-					"node": "Green"
-				},
-				"s7": {
-					"action": "Emit & seal",
-					"active": "From the source, projections emit; seal the stable phase.",
-					"done": "Projections emitted · stable phase sealed",
-					"node": "Stable"
-				},
-				"s8": {
-					"action": "Checkout — 2 items",
-					"active": "Your app is ready: click the button you just built!",
-					"done": "Order placed ✓ — 2 items",
-					"node": "Button"
-				}
-			}
-		},
 		"panels": {
 			"heading": "Do it for real",
 			"lead": "The assistant above simulates the loop. To do it on the real Workbench panels:"
@@ -4228,6 +4212,54 @@
 		},
 		"footer": "Below the wall (CLAUDE.md §2): <code>accounts.project_members</code> is not kernel/mirrors/fitness. The S55 RLS keys on membership; the gradient is declared, never learned (§8)."
 	},
+	"collab": {
+		"eyebrow": "S113 · Collaboration substrate + adoption ladder",
+		"title": "Collaboration & adoption",
+		"intro": "The project's social plane: identified provenance (\"who wanted what\" with real users), comments on ideas/mirrors/changesets, an activity feed, real-time presence without overwrite, and the adoption ladder (§82.5) surfaced per project. Every act passes the authority gate (S62/S110) and is stamped with the real user — never a placeholder. A member without authority cannot approve. The ladder advances only when the stage gate is reached (done is computed).",
+		"actorHeading": "Acting identity (real provenance)",
+		"identityLabel": "Identity",
+		"identityPlaceholder": "e.g. vic",
+		"projectLabel": "Project",
+		"roleLabel": "Role",
+		"nonMember": "non-member",
+		"commentHeading": "Comment (idea / mirror / changeset)",
+		"targetKindLabel": "Target",
+		"targetIdLabel": "Target id",
+		"targetIdPlaceholder": "e.g. idea-7",
+		"bodyLabel": "Comment",
+		"bodyPlaceholder": "e.g. needs a mirror first",
+		"commentSubmit": "Comment",
+		"approveHeading": "Approve a changeset (S110 gate)",
+		"approveHint": "A member without administer authority (owner) cannot approve — a viewer/editor is refused ROLE_FORBIDDEN.",
+		"approveSubmit": "Approve",
+		"inviteHeading": "Invite / share (administer)",
+		"inviteeLabel": "Invitee",
+		"inviteePlaceholder": "e.g. newbie",
+		"grantLabel": "Granted role",
+		"inviteSubmit": "Invite",
+		"presenceHeading": "Presence & concurrent edit",
+		"presenceHint": "Two users present on the same canvas see each other without overwrite; the edit lock is never silently stolen.",
+		"joinSubmit": "Join canvas",
+		"claimSubmit": "Claim lock",
+		"releaseSubmit": "Release",
+		"presentLabel": "Present",
+		"lockHolderLabel": "Lock held by",
+		"noLock": "(free)",
+		"stageHeading": "Project adoption ladder (§82.5)",
+		"stageHint": "The project surfaces its current stage and the next dent. The ladder advances ONLY when the stage gate is reached.",
+		"currentLabel": "Current stage",
+		"nextLabel": "Next dent",
+		"canAdvanceYes": "The gate is reached — the project may advance.",
+		"canAdvanceNo": "The gate is not reached — no advance (done is computed).",
+		"gapsLabel": "Missing capabilities",
+		"advanceSubmit": "Advance one stage",
+		"capabilitiesLabel": "Capability view (check what is live)",
+		"feedHeading": "Activity feed",
+		"feedEmpty": "No activity — act above.",
+		"allowed": "allowed",
+		"denied": "denied",
+		"footer": "Below the wall (CLAUDE.md §2): comments/shares/invites/feed/presence live in the below-the-line <code>collab</code> zone — never kernel/mirrors/fitness. Approving a truth stays the propose→ChangeSet path (S110/S85). Everything is pure and deterministic (§8)."
+	},
 	"authorityBinding": {
 		"eyebrow": "S63 · Human bound to authority",
 		"title": "Authority binding & provenance",
@@ -5534,5 +5566,40 @@
 		"green": "green",
 		"drift": "drift",
 		"footer": "THE WALL (§2): carve/freeze/refactor WRITE NO truth — the strangler cell and its characterization mirrors are a value (the ChangeSet proposes them above the line). Deterministic (§6/§8): mirror generation is code, never an LLM; same input → same output."
+	},
+	"accountRelease": {
+		"eyebrow": "S117 · Account Release v0",
+		"title": "Account Release v0 — the honest inventory",
+		"intro": "The per-ACCOUNT release pack enumerates HONESTLY what EXISTS in your live truth-store: your projects (with their demo-vs-real status), the completed CLI surface (goal/grill/spike/harvest/trim/init on top of the core verbs), Workbench routes, the docs index, the test inventory, the changelog, and the honest known-limits (Doltgres beta, async best-effort, plan quotas) — then advises the next adoption tier. Content-addressed, read-only: it assembles and advises; it installs nothing, ships nothing, writes no truth.",
+		"tutorialTitle": "How to read this pack",
+		"tutorialStep1": "Pick a demo account, then click “Assemble the pack”.",
+		"tutorialStep2": "Each project carries its HONEST status: real (a working app) or demo (a runnable slice).",
+		"tutorialStep3": "The CLI surface lists the 5 core verbs + the 6 gateway verbs (S117), each routed over the passerelle.",
+		"tutorialStep4": "The next adoption tier is COMPUTED (the smallest ratchet that clicks) — advised, never installed.",
+		"exampleTitle": "Example — assemble an account's pack",
+		"scenarioLabel": "Demo account",
+		"assembleButton": "Assemble the pack",
+		"packTitle": "Release v0 pack (assembled)",
+		"accountLabel": "Account",
+		"projectsTitle": "Projects (honest demo-vs-real status)",
+		"realBadge": "real",
+		"demoBadge": "demo",
+		"cliSurfaceTitle": "CLI surface (core + S117 gateway)",
+		"coreBadge": "core",
+		"gatewayBadge": "gateway",
+		"routesTitle": "Workbench routes",
+		"docsTitle": "Docs index",
+		"testInventoryTitle": "Test inventory",
+		"changelogTitle": "Changelog",
+		"knownLimitsTitle": "Honest known-limits",
+		"nextTierTitle": "Next adoption tier (advice)",
+		"currentLabel": "Current tier",
+		"nextLabel": "Next tier",
+		"allGreenBadge": "Every tier is satisfied — nothing more to install.",
+		"assembleOnlyNote": "Assemble-only: this pack installs nothing, ships nothing, writes no truth (the wall, §2). Turning on a capability goes through idea → mirror → /goal → human approval.",
+		"emptyNote": "—",
+		"scenarioStarter": "Starter account (T1 → advises T2)",
+		"scenarioKernel": "Kernel+mirror account (blocked at T2: RealityMirror missing)",
+		"scenarioEmpty": "Empty account (T0 → advises T1)"
 	}
 }
