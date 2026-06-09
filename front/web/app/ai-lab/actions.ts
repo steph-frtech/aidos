@@ -3,7 +3,9 @@
 import {
 	applyCardValidation,
 	buildCockpit,
+	buildGrid,
 	type CockpitNode,
+	generateSpecs,
 	type Mode,
 	proposeSlot,
 	scopeForPair,
@@ -13,7 +15,10 @@ import {
 	type CockpitView,
 	DEFAULT_MODE,
 	emptyView,
+	GRID_FACETS,
+	type LabView,
 	SAMPLE_GATE,
+	SEEDED_DIVERGENT,
 	scenario,
 } from "./fixtures";
 
@@ -125,5 +130,57 @@ export async function validateCardAction(
 		state,
 		flippedPair: res.flippedPair,
 		openedGoal: res.openedGoal,
+	};
+}
+
+/**
+ * generateSpecsAction — the LEFT (chat) gesture of the corrected FKE-38 lab: a natural-language
+ * message GENERATES the specs across the 6 mirror-pairs of the selected facet (a column of the
+ * 6×6), ABOVE the wall, then rebuilds the grid so the RIGHT shows the machines that changed. A
+ * direct truth-write is REFUSED at the wall (§2) — it generates nothing, only records the attempt.
+ * State accumulates via `prev` (useActionState). Pure twin: lib/ai-lab generateSpecs + buildGrid.
+ */
+export async function generateSpecsAction(
+	prev: LabView,
+	formData: FormData,
+): Promise<LabView> {
+	const message = String(formData.get("message") ?? "").trim();
+	const facet =
+		(String(formData.get("facet") ?? prev.selectedFacet ?? "F") as Facet) ??
+		"F";
+	if (!message) {
+		return { ...prev, refusal: undefined, error: "message vide" };
+	}
+	const res = generateSpecs(facet, message);
+	if ("refused" in res) {
+		return {
+			...prev,
+			selectedFacet: facet,
+			transcript: [
+				...prev.transcript,
+				{ id: `MSG-${prev.transcript.length}`, text: message },
+			],
+			refusal: res,
+			error: undefined,
+		};
+	}
+	const byId = new Map(prev.specs.map((s) => [s.id, s]));
+	for (const s of res) byId.set(s.id, s);
+	const specs = [...byId.values()];
+	return {
+		ok: true,
+		selectedFacet: facet,
+		transcript: [
+			...prev.transcript,
+			{ id: `MSG-${prev.transcript.length}`, text: message },
+		],
+		specs,
+		cells: buildGrid({
+			facets: GRID_FACETS,
+			specs,
+			divergent: SEEDED_DIVERGENT,
+		}),
+		refusal: undefined,
+		error: undefined,
 	};
 }

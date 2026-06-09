@@ -1,9 +1,12 @@
-import type {
-	CockpitState,
-	Mode,
-	PairScope,
-	ProposedSlot,
-	WallRefusal,
+import {
+	buildGrid,
+	type CockpitState,
+	type GeneratedSpec,
+	type GridCell,
+	type Mode,
+	type PairScope,
+	type ProposedSlot,
+	type WallRefusal,
 } from "@/lib/ai-lab";
 import {
 	type ConsciousnessReport,
@@ -128,3 +131,46 @@ export interface CockpitView {
 export const emptyView: CockpitView = { ok: false };
 
 export const DEFAULT_MODE: Mode = "navigational";
+
+// ── The 6×6 generative lab view (FKE-38, corrected) ──────────────────────────
+
+/** The 6 facet COLUMNS of the 6×6 grid (F·S·B·R·V·M — I/X kept off the default grid). */
+export const GRID_FACETS: Facet[] = ["F", "S", "B", "R", "V", "M"];
+
+/**
+ * Seeded DIVERGENT machine cells (key `pairId@facet`): a contract whose security machine
+ * diverges from its spec — the conscience computes it 🔴 even after a spec is generated there,
+ * so the lab shows « une spec générée dont la machine diverge ». DECLARED, deterministic.
+ */
+export const SEEDED_DIVERGENT: string[] = ["contract@S"];
+
+/** A chat message in the transcript, with a STABLE id (its append position — never reordered). */
+export interface ChatEntry {
+	id: string;
+	text: string;
+}
+
+/** The 6×6 generative lab view: the chat transcript + accumulated specs + the rebuilt grid. */
+export interface LabView {
+	ok: boolean;
+	selectedFacet: Facet;
+	transcript: ChatEntry[];
+	specs: GeneratedSpec[];
+	cells: GridCell[];
+	refusal?: WallRefusal;
+	error?: string;
+}
+
+export function emptyLab(): LabView {
+	return {
+		ok: true,
+		selectedFacet: "F",
+		transcript: [],
+		specs: [],
+		cells: buildGrid({
+			facets: GRID_FACETS,
+			specs: [],
+			divergent: SEEDED_DIVERGENT,
+		}),
+	};
+}

@@ -22,7 +22,11 @@ import { describe, expect, it } from "vitest";
 import {
 	applyCardValidation,
 	buildCockpit,
+	buildGrid,
+	cellKey,
+	generateSpecs,
 	isTruthWriteRequest,
+	MIRROR_PAIRS,
 	pairKey,
 	pairTier,
 	proposeSlot,
@@ -229,5 +233,75 @@ describe("FK11 — the AI Lab cockpit deterministic core", () => {
 		expect(isTruthWriteRequest("modifie le kernel")).toBe(true);
 		expect(isTruthWriteRequest("write the kernel now")).toBe(true);
 		expect(isTruthWriteRequest("ajoute une limite à 30 jours")).toBe(false);
+	});
+});
+
+describe("FK11 — the 6×6 generative grid (FKE-38, corrected)", () => {
+	const facetArb = fc.constantFrom<Facet>("F", "S", "B", "R", "V", "M");
+	// a non-empty message that is NOT a truth-write phrasing.
+	const msgArb = fc
+		.string({ minLength: 1, maxLength: 40 })
+		.filter((m) => m.trim() !== "" && !isTruthWriteRequest(m));
+
+	it("a chat message GENERATES one spec per mirror-pair (a column of the 6×6)", () => {
+		const out = generateSpecs("F", "un panier qui retient un article 30 min");
+		expect(Array.isArray(out)).toBe(true);
+		if (Array.isArray(out)) {
+			expect(out).toHaveLength(MIRROR_PAIRS.length); // 6 pairs → 6 specs
+			expect(out.map((s) => s.pairId).sort()).toEqual(
+				MIRROR_PAIRS.map((p) => p.id).sort(),
+			);
+			for (const s of out) {
+				expect(s.facet).toBe("F");
+				expect(s.status).toBe("proposed"); // amber, above the wall — never a truth
+			}
+		}
+	});
+
+	it("a direct truth-write message is REFUSED at the wall — generates nothing (§2)", () => {
+		const out = generateSpecs("S", "écris le kernel maintenant");
+		expect(Array.isArray(out)).toBe(false);
+		if (!Array.isArray(out)) {
+			expect(out.refused).toBe(true);
+			expect(out.code).toBe("AI_LAB_DIRECT_TRUTH_WRITE");
+		}
+	});
+
+	it("generateSpecs is content-addressed — same (facet,message) → same spec ids", () => {
+		fc.assert(
+			fc.property(facetArb, msgArb, (facet, msg) => {
+				const a = generateSpecs(facet, msg);
+				const b = generateSpecs(facet, msg);
+				expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+			}),
+		);
+	});
+
+	it("buildGrid is the 6 pairs × N facets, deterministic & fully covered", () => {
+		const facets: Facet[] = ["F", "S", "B", "R", "V", "M"];
+		const cells = buildGrid({ facets, specs: [], divergent: [] });
+		expect(cells).toHaveLength(MIRROR_PAIRS.length * facets.length); // 6×6 = 36
+		// every (pair,facet) appears exactly once
+		const keys = new Set(cells.map((c) => c.key));
+		expect(keys.size).toBe(cells.length);
+		const again = buildGrid({ facets, specs: [], divergent: [] });
+		expect(JSON.stringify(cells)).toBe(JSON.stringify(again));
+	});
+
+	it("a generated spec turns its cell's machine 🟢; a divergent cell stays 🔴 even with a spec", () => {
+		const specs = generateSpecs("S", "exiger une authentification");
+		if (!Array.isArray(specs)) throw new Error("expected specs");
+		const divergent = [cellKey("contract", "S")]; // the machine diverges from the spec
+		const cells = buildGrid({ facets: ["S"], specs, divergent });
+		const contract = cells.find((c) => c.key === cellKey("contract", "S"));
+		const spec = cells.find((c) => c.key === cellKey("spec", "S"));
+		expect(spec?.voyant).toBe("green"); // spec generated, machine aligned
+		expect(contract?.spec).toBeDefined(); // a spec WAS generated here…
+		expect(contract?.voyant).toBe("red"); // …but the machine still diverges (the conscience)
+	});
+
+	it("a cell with no generated spec is 🟡 (declared, not yet proven)", () => {
+		const cells = buildGrid({ facets: ["B"], specs: [], divergent: [] });
+		for (const c of cells) expect(c.voyant).toBe("amber");
 	});
 });

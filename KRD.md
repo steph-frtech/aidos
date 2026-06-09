@@ -4663,48 +4663,35 @@ kernel rollback
 
 **IDE** : afficher le kernel d'une fonction, son contrat, ses preuves, ses policies, sa mémoire, ses agent runs, ses drifts, son blast radius. **Dashboard** : kernels par statut, drifts ouverts, evidence gaps, security gaps, contradictions mémoire, agents overpowered, MCP risqués, reviewability des PR, kernel debt, couverture sémantique, couverture sécurité.
 
-### L'écran AI Lab — le cockpit du pipeline (trialogue)
+### L'écran AI Lab — le générateur de specs (chat → 6×6 → machines)
 
-La surface principale de FKE n'est ni un chat, ni un éditeur de code : c'est un **trialogue** à trois zones qui rend le pipeline (§FKE-3) et l'anatomie 1-pour-1 (§FKE-1.3) **directement manipulables**. Le mur y est **visible** (une ligne horizontale au centre) et **infranchissable au clic** (on ne franchit que par une décision).
+La surface principale de FKE n'est ni un éditeur de code ni un cockpit de navigation : c'est un **générateur de specs à deux volets**. On **parle en langage naturel à gauche** ; le cerveau gauche **génère les specs au-dessus du mur** (le côté *déclaré* de chaque paire-miroir) sur toute la grille **6×6** ; et **à droite on voit les « machines » que ça change** — les **miroirs/tests exécutables** (le côté *prouvé*, en-dessous du mur), en direct. Le chat ne navigue pas une couche : il **écrit la spec** ; la droite **reflète** ce que cette spec fait bouger.
 
 ```
-┌──────────────────┬─────────────────────────────────────────┬──────────────────────┐
-│  GAUCHE — VIBE   │  CENTRE — LA COUCHE NAVIGABLE            │  DROITE — À VALIDER  │
-│  (cerveau gauche)│  (le kernel courant + son anatomie)     │  (conscience + cards)│
-│                  │                                          │                      │
-│  chat / discuter │  fil d'ariane : produit › parcours ›    │  DECISION CARDS      │
-│  ───────────────  │   vue › contrôle › … › entité           │  ┌────────────────┐  │
-│  ▸ toggle:        │                                          │  │ P2 diverge      │  │
-│    Vibe Lab  ⟂    │   ┌─ DESSUS (déclaré) ───── proposé(▲)─┐ │  │ comportement    │  │
-│    Intent    ✓    │   │ Spec  Comportement  Scénarios       │ │  │ ↔ résultats     │  │
-│                  │   │ Scé.séc  Modèle  Contrat  Sécu  Evi. │ │  │ [accept][amend] │  │
-│  vous écrivez en │   ├────────── MUR D'INTENTION ──────────┤ │  │ [reject][defer] │  │
-│  LANGUE du       │   │ Doc  Résultats  Tests  Tests-séc     │ │  └────────────────┘  │
-│  domaine ; le    │   │ Projection  Code  Sécu-impl  Evi-obs │ │  blast radius: ●●○○  │
-│  cerveau gauche  │   └─ DESSOUS (prouvé) ── 🟢🟢🔴🟢🟢🟡🟢🟢 ─┘ │  red wave: 2 cellules │
-│  COMPILE en      │                                          │  ──────────────────  │
-│  slots proposés  │   chaque paire = un voyant :             │  CONSCIENCE          │
-│  (jamais en      │   🟢 aligné  🔴 diverge  🟡 sous-prouvé  │  7/8 paires alignées │
-│  vérité)         │                                          │  evidence: E3/E4     │
-│                  │   ▸ clic sur une paire → la GAUCHE se    │  ──────────────────  │
-│  [Envoyer]       │     scope dessus, la DROITE montre ses   │  PROMOTION GATE      │
-│                  │     impacts (chatter SUR la couche)      │  ⛔ 1 paire rouge     │
-└──────────────────┴─────────────────────────────────────────┴──────────────────────┘
-       RAW SIGNAL ───▶ LEFT BRAIN ───▶ [VALIDATION] ══MUR══ RIGHT BRAIN ───▶ CONSCIENCE ───▶ [PROMOTION]
+┌────────────────────────────┬──────────────────────────────────────────────┐
+│  GAUCHE — CHAT (langage      │  DROITE — LES MACHINES (ce que la spec change) │
+│  naturel)                    │                                                │
+│                              │   LA GRILLE 6×6  (6 paires × facettes)         │
+│  vous écrivez en clair :     │   ┌─ AU-DESSUS DU MUR — généré par le chat ────┐│
+│  « un panier qui retient     │   │ Spec · Comportement · Scénarios ·           ││
+│    un article 30 min … »     │   │ Modèle · Contrat · Evidence-attendue        ││
+│  ─────────────────────────   │   ╞════════════ MUR D'INTENTION ══════════════╡│
+│  le cerveau gauche GÉNÈRE    │   │ EN-DESSOUS — LES MACHINES (miroirs/tests)   ││
+│  les SPECS au-dessus du mur  │   │ Doc · Résultats · Tests · Projection-données││
+│  (proposé, jamais la vérité) │   │ Code · Evidence-observée      🟢 🔴 🟡       ││
+│                              │   └─ chaque spec d'en haut → sa machine en bas ─┘│
+│  [Envoyer]                   │   (▸ clic sur une cellule → le chat s'y scope) │
+└────────────────────────────┴──────────────────────────────────────────────┘
+   CHAT (NL) ──▶ LEFT BRAIN ──▶ SPECS (6×6, au-dessus) ══MUR══▶ MACHINES (miroirs, en-dessous) ──▶ 🟢/🔴/🟡
 ```
 
-**Les deux modes que l'utilisateur a nommés sont le MÊME écran, à zoom différent :**
+- **À gauche, on génère.** Le chat en langage naturel est l'entrée du **Raw Signal Store** + le **cerveau gauche** ; il **compile** ce qu'on dit en **specs** posées **au-dessus du mur** — le côté *déclaré* de chaque paire (spec, comportement, scénarios, modèle, contrat, evidence-attendue), pour chaque facette concernée. Le chat **ne change jamais une vérité** : il **génère des propositions** (amber).
+- **À droite, on voit les machines.** Pour chaque spec générée, son **reflet exécutable en-dessous du mur** — les **miroirs/tests** (doc, résultats, tests, projection-données, code, evidence-observée) — apparaît ou change, avec son **voyant** 🟢 aligné / 🔴 diverge / 🟡 sous-prouvé (la conscience §FKE-6.3, en direct). « Les machines que ça change » = **exactement ces miroirs**.
+- **Le mur, entre les deux.** Au-dessus = généré, proposé, éditable par proposition ; en-dessous = les machines, **lecture seule** (on ne hand-édite jamais un miroir ni du code depuis l'écran — on change la spec d'au-dessus qu'ils reflètent). La seule promotion en vérité est une **décision** (card → ChangeSet → **/goal** → approbation). Les écarts montrés à droite sont **calculés** (SemanticDiff, blast radius, red wave), jamais l'avis d'un LLM.
 
-- **Mode conversationnel** (« à gauche on chate, à droite les impacts à valider ») : zoom arrière, on parle, le cerveau gauche compile, les decision cards arrivent à droite. C'est l'entrée — souvent en **Vibe Lab** (jetable) jusqu'à ce qu'une intention mérite le Promotion Gate.
-- **Mode navigationnel** (« on navigue sur une couche et on peut chater dessus ») : on sélectionne un kernel ou une **paire** au centre ; **la gauche se scope à ce nœud** (son ContextPack devient le contexte du chat) et la droite montre **ses** impacts. Chatter « sur » la couche = parler au cerveau gauche **avec le nœud comme contexte**.
+**La grille 6×6.** Les **6 paires-miroir** (Spec↔Doc, Comportement↔Résultats, Scénarios↔Tests, Modèle↔Projection-données, Contrat↔Code, Evidence-attendue↔Evidence-observée) **en lignes** × les **facettes en colonnes**. Le chat remplit le **haut** de chaque cellule (la **spec**, au-dessus du mur) ; la **machine** (le **bas** — le miroir/test) est ce qui se génère/change à droite. Sélectionner une cellule **scope le chat dessus** (son ContextPack devient le contexte) — c'est la seule « navigation », au service de la génération, jamais une zone séparée.
 
-Le chat n'est jamais juste un chat : c'est l'entrée du **Raw Signal Store** + le dialogue du **cerveau gauche**. La règle d'or : **le chat ne change jamais une vérité**. Il produit des signaux bruts puis des **slots proposés** (amber, au-dessus du mur). La seule façon de muter la vérité est un **clic dans la zone droite** (decision card → ChangeSet → approbation). Les écarts montrés à droite sont **calculés** (SemanticDiff, blast radius, red wave), jamais l'avis d'un LLM.
-
-**Le mur, à l'écran.** Le centre est coupé en deux par le **Mur d'Intention** : au-dessus, les slots **déclarés** (éditables via proposition) ; en-dessous, les **reflets prouvés** (lecture seule — émis/écrits par l'agent ; on ne hand-édite jamais le code ni les tests depuis l'écran, on change la vérité d'au-dessus qu'ils reflètent). Chaque paire porte son **voyant** (🟢 aligné / 🔴 diverge / 🟡 sous-prouvé) — la conscience (§FKE-6.3) en direct. Le **mur Sécurité/Police** est la porte de toute action (allow/block/audit/approval), ambiante.
-
-**Ce que l'écran montre toujours d'un coup d'œil :** OÙ vous êtes (le fil d'ariane de la verticale), CE QUI est proposé (amber, dessus), CE QUI est prouvé (🟢) ou diverge (🔴), CE QUI attend votre décision (la file de droite), et la **position dans le macro pipeline** (la bande du bas). Le **Loopback ciblé** s'y voit : une paire 🔴 surligne exactement le slot d'au-dessus à reconsidérer.
-
-**Mapping AIDOS / atterrissage.** C'est l'évolution du `GraphCockpit` actuel (`front/web`, route `/`, aujourd'hui lecture seule) vers une route **`/ai-lab`** active. Il **compose** des briques déjà au plan : la passerelle MCP-over-HTTP (S58) + le streaming red-set/BlockReason (S60) + la boucle KRD par écran (E4 : capture → grill → goal → miroir, S64-S66) + l'autorat de miroirs (E5) + la conscience (FK05) + les decision cards (§FKE-31). Il **n'introduit aucun nouveau pouvoir** : tout passe par le mur existant. À construire comme **route Workbench dédiée** (step FK ou épic E4 étendu), thémée + bilingue, avec son e2e Playwright (chatter → voir un slot proposé → valider une card → voir la paire passer 🔴→🟢).
+**Mapping AIDOS / atterrissage.** Route **`/ai-lab`** : à **gauche** le chat (génère les specs), à **droite** la grille 6×6 dont chaque cellule montre la **spec** (haut) et sa **machine/miroir** (bas) avec le voyant de la conscience. Il **compose** des briques déjà au plan : la passerelle MCP-over-HTTP (S58) + le streaming red-set/BlockReason (S60) + la boucle KRD par écran (E4 : capture → grill → goal → miroir, S64-S66) + l'autorat de miroirs (E5) + la conscience (FK05) + les decision cards (§FKE-31). Il **n'introduit aucun nouveau pouvoir** : tout passe par le mur existant. e2e Playwright : **chatter en langage naturel → voir des specs générées au-dessus du mur dans la 6×6 → voir les machines (miroirs) apparaître/changer à droite → une décision promeut via /goal** ; une écriture-vérité directe depuis le chat est refusée.
 
 ---
 

@@ -4,32 +4,29 @@ import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { CockpitPanel } from "./CockpitPanel";
 
 export const metadata: Metadata = {
-	title: "AI Lab — le cockpit trialogue — AIDOS Workbench",
+	title:
+		"AI Lab — le générateur de specs (chat → 6×6 → machines) — AIDOS Workbench",
 	description:
-		"FK11 : le cockpit trialogue. GAUCHE le chat scopé au nœud (propose des slots, jamais de vérité) ; CENTRE la couche navigable = kernel + anatomie 1-pour-1, le mur dessiné, un voyant 🟢/🔴/🟡 par paire de toutes les facettes (la conscience live) ; DROITE les decision cards + blast radius + red wave + promotion gate. Deux modes (conversationnel/navigationnel) = le même écran à zoom différent. LE MUR : le chat propose, il n'écrit jamais la vérité ; le bas du mur est read-only.",
+		"FK11 (FKE-38) : l'AI Lab est un générateur de specs à deux volets. GAUCHE — un chat en langage naturel qui GÉNÈRE les specs au-dessus du mur, sur les 6 paires-miroir de la facette choisie (une colonne de la grille 6×6). DROITE — la grille 6×6 (6 paires × facettes) : chaque cellule montre la spec générée (au-dessus du mur) et sa machine (le miroir/test exécutable, en-dessous) avec le voyant 🟢/🔴/🟡 de la conscience. LE MUR : le chat propose, il n'écrit jamais la vérité ; la promotion passe par /goal.",
 };
 
 export const dynamic = "force-dynamic";
 
 /**
- * /ai-lab — « AI Lab : le cockpit trialogue » (FK11, piste FKE — FKE-38).
- * Le cockpit COMPOSE les vérités EXISTANTES (la conscience FK09, le squelette de facettes FK08, la
- * navigation graphe S58/S60, la passerelle de promotion FK10) en UN écran zoomable :
- *   - GAUCHE — le chat/vibe scopé au nœud (le « cerveau gauche ») : il PROPOSE des slots (amber),
- *     il n'écrit JAMAIS la vérité — une écriture-vérité directe est refusée au mur (§2).
- *   - CENTRE — la couche navigable : le kernel + son anatomie 1-pour-1, le MUR dessiné entre
- *     au-dessus-de-la-ligne (kernel/mirrors, propose-only) et en-dessous (projections, read-only
- *     depuis le cockpit), et un voyant 🟢/🔴/🟡 par PAIRE de chaque facette (la conscience live).
- *   - DROITE — les decision cards (FK09) + le blast radius + la red wave (S22) + la promotion gate
- *     (FK10).
- * Deux modes (conversationnel/navigationnel) = le même écran à un zoom différent.
+ * /ai-lab — « AI Lab : le générateur de specs » (FK11, piste FKE — FKE-38, corrigé).
+ * L'AI Lab n'est PAS un cockpit de navigation : c'est un GÉNÉRATEUR DE SPECS à deux volets.
+ *   - GAUCHE — un chat en LANGAGE NATUREL (le « cerveau gauche ») : ce qu'on écrit GÉNÈRE les
+ *     specs AU-DESSUS DU MUR, sur les 6 paires-miroir de la facette choisie (une COLONNE de la
+ *     grille 6×6). Le chat PROPOSE (amber) ; il n'écrit JAMAIS la vérité — une écriture-vérité
+ *     directe est refusée au mur (§2).
+ *   - DROITE — la GRILLE 6×6 (6 paires-miroir × facettes) : chaque cellule porte la spec générée
+ *     (au-dessus du mur) et sa MACHINE — le miroir/test exécutable (en-dessous) — avec le voyant
+ *     🟢/🔴/🟡 de la conscience (FK09). « Les machines que ça change » = exactement ces miroirs.
  *
- * Action-capable (ui-completeness, CLAUDE.md §7) : chaque op du cockpit a un contrôle lié au
- * moteur pur lib/ai-lab — charger un cockpit, chatter un slot, cliquer une paire pour scoper
- * gauche+droite, valider une carte pour faire passer une paire 🔴→🟢. THE WALL (§2) : l'écran
- * n'écrit AUCUNE vérité ; une écriture-vérité depuis le chat est refusée ; une option au-dessus du
- * mur ouvre un /goal. DETERMINISM-FIRST (§8) : aucun LLM — les écarts sont SemanticDiff/blast, le
- * juge est un calcul. Thème ADR 0010, bilingue 0011.
+ * Action-capable (ui-completeness, CLAUDE.md §7) : la génération est liée au moteur pur lib/ai-lab
+ * (generateSpecs + buildGrid). THE WALL (§2) : le chat génère au-dessus, les machines en-dessous
+ * sont read-only ; une écriture-vérité depuis le chat est refusée ; la promotion passe par /goal.
+ * DETERMINISM-FIRST (§8) : aucun LLM dans le twin — même message → même grille. ADR 0010/0011.
  */
 export default async function AiLabPage() {
 	const t = await getTranslations("aiLab");
