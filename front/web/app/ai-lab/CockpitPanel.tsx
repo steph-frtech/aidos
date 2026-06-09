@@ -4,28 +4,26 @@ import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import {
+	ALL_FACETS,
 	type AssistantReply,
 	type ChatTurn,
+	cellPlacements,
 	EXISTING_DAG,
 	type Level,
-	placementsByLevel,
+	MIRROR_PAIRS,
+	nextPairId,
+	type Placement,
+	VERTICAL_LEVELS,
 } from "@/lib/ai-lab";
 import { leftBrainAction } from "./actions";
 import { emptyLab, type LabView } from "./fixtures";
 
 /**
- * CockpitPanel makes /ai-lab action-capable (ui-completeness, CLAUDE.md §7): the corrected
- * FKE-38 AI Lab — a CONVERSATION wired to the REAL left brain (Claude).
- *  - GAUCHE : a multi-turn natural-language chat. You discuss; the message is NOT scoped — the
- *    left brain (Claude, gated) decides WHERE each spec goes across the whole verticale
- *    (produit → entité) × facet × mirror-pair. A direct truth-write is REFUSED at the wall (§2).
- *  - DROITE : the VERTICALE — the 7 levels, each showing the specs the intelligence PLACED there
- *    (facet · pair · spec). « Le chat agit sur tout niveau ; l'intelligence trouve où le mettre. »
- *
- * THE WALL (§2): the chat proposes; placements are clamped to the declared space (validatePlacements)
- * and never written to truth (promotion = /goal). DETERMINISM-FIRST (§6/§8): the LLM is the gated
- * exception (irreducible placement judgment), VERIFIED; a deterministic twin answers on failure
- * (mode "fallback", honestly flagged). Themed ADR 0010, i18n 0011.
+ * CockpitPanel — the FKE-38 AI Lab. GAUCHE: a conversation wired to Claude (the left brain),
+ * which fans a need across the verticale. DROITE: the NAVIGABLE big table (level × facet); click a
+ * cell to open its ANATOMY DESCENT — validate a pair (Spec) → it generates the next (Comportement)
+ * → Scénarios → Modèle → Contrat → Evidence, per facet (§6: the pair-to-pair chain is deterministic
+ * code, never an LLM). Plus the impact on the EXISTING DAG. The wall §2 holds (propose-only; /goal).
  */
 
 const LEVEL_KEY: Record<Level, string> = {
@@ -37,20 +35,6 @@ const LEVEL_KEY: Record<Level, string> = {
 	opération: "level_operation",
 	entité: "level_entite",
 };
-
-function SendButton({ label, working }: { label: string; working: string }) {
-	const { pending } = useFormStatus();
-	return (
-		<button
-			type="submit"
-			disabled={pending}
-			data-testid="generate"
-			className="inline-flex shrink-0 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-		>
-			{pending ? working : label}
-		</button>
-	);
-}
 
 function useReplyText() {
 	const t = useTranslations("aiLab");
@@ -67,6 +51,34 @@ function useReplyText() {
 	};
 }
 
+function SubmitButton({
+	label,
+	working,
+	testid,
+	variant = "primary",
+}: {
+	label: string;
+	working: string;
+	testid?: string;
+	variant?: "primary" | "ghost";
+}) {
+	const { pending } = useFormStatus();
+	const cls =
+		variant === "primary"
+			? "bg-primary text-primary-foreground hover:bg-primary/90"
+			: "border border-border bg-background text-foreground hover:bg-muted";
+	return (
+		<button
+			type="submit"
+			disabled={pending}
+			data-testid={testid}
+			className={`inline-flex shrink-0 items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${cls}`}
+		>
+			{pending ? working : label}
+		</button>
+	);
+}
+
 function Bubble({ turn, text }: { turn: ChatTurn; text: string }) {
 	const isUser = turn.role === "user";
 	const refused = turn.reply?.kind === "refused";
@@ -76,7 +88,6 @@ function Bubble({ turn, text }: { turn: ChatTurn; text: string }) {
 				data-testid={
 					refused ? "wall-refused" : isUser ? "turn-user" : "turn-assistant"
 				}
-				data-role={turn.role}
 				className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
 					isUser
 						? "rounded-br-sm bg-primary text-primary-foreground"
@@ -91,6 +102,23 @@ function Bubble({ turn, text }: { turn: ChatTurn; text: string }) {
 	);
 }
 
+function statusBadge(status: Placement["status"], t: (k: string) => string) {
+	if (status === "validated")
+		return {
+			label: t("statusValidated"),
+			cls: "bg-green-500/15 text-green-700 dark:text-green-300",
+		};
+	if (status === "realized")
+		return {
+			label: t("statusRealized"),
+			cls: "bg-blue-600/15 text-blue-700 dark:text-blue-300",
+		};
+	return {
+		label: t("statusProposed"),
+		cls: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+	};
+}
+
 export function CockpitPanel() {
 	const t = useTranslations("aiLab");
 	const replyText = useReplyText();
@@ -100,18 +128,19 @@ export function CockpitPanel() {
 	);
 
 	const placements = view.placements ?? [];
-	const byLevel = placementsByLevel(placements);
 	const thread = view.thread ?? [];
 	const impactById = new Map(
 		(view.impacts ?? []).map((i) => [i.specId, i.reason]),
 	);
+	const sel = view.selectedCell;
+	const selPairs = sel ? cellPlacements(placements, sel.level, sel.facet) : [];
 
 	return (
-		<div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[34rem_1fr]">
-			{/* ─────────────── GAUCHE — the conversation (real Claude), agrandie ─────────────── */}
+		<div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[36rem_1fr]">
+			{/* ─────────────── GAUCHE — the conversation (Claude), large ─────────────── */}
 			<section
 				aria-label={t("leftHeading")}
-				className="flex h-[46rem] flex-col rounded-xl border border-border bg-card"
+				className="flex h-[48rem] flex-col rounded-xl border border-border bg-card"
 			>
 				<div className="flex items-center justify-between gap-2 border-b border-border p-4">
 					<div className="space-y-1">
@@ -154,6 +183,7 @@ export function CockpitPanel() {
 					action={action}
 					className="flex items-end gap-2 border-t border-border p-3"
 				>
+					<input type="hidden" name="intent" value="chat" />
 					<textarea
 						name="message"
 						rows={2}
@@ -163,87 +193,197 @@ export function CockpitPanel() {
 						placeholder={t("chatPlaceholder")}
 						className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
 					/>
-					<SendButton label={t("chatCta")} working={t("working")} />
+					<SubmitButton
+						label={t("chatCta")}
+						working={t("working")}
+						testid="generate"
+					/>
 				</form>
 			</section>
 
-			{/* ─────────── DROITE — la verticale : où l'intelligence a placé les specs ─────────── */}
+			{/* ─────────── DROITE — la grande table navigable + descente + impact ─────────── */}
 			<section
-				aria-label={t("placementsHeading")}
-				className="space-y-3 rounded-xl border border-border bg-card p-5"
+				aria-label={t("gridTableHeading")}
+				className="space-y-4 rounded-xl border border-border bg-card p-5"
 			>
-				<div className="flex flex-wrap items-center justify-between gap-2">
+				{/* 1) the navigable big table: niveau × facette */}
+				<div className="space-y-2">
 					<h2 className="text-sm font-semibold tracking-tight text-foreground">
-						{t("placementsHeading")}
+						{t("gridTableHeading")}
 					</h2>
-					<span
-						data-testid="spec-count"
-						className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
-					>
-						{t("specsCount", { n: placements.length })}
-					</span>
+					<p className="text-xs text-muted-foreground">{t("gridTableHint")}</p>
+					<div className="overflow-x-auto">
+						<table className="w-full border-separate border-spacing-1 text-xs">
+							<thead>
+								<tr>
+									<th className="p-1" />
+									{ALL_FACETS.map((f) => (
+										<th
+											key={f}
+											title={t(`facet_${f}`)}
+											className="p-1 text-center font-semibold text-foreground"
+										>
+											{f}
+										</th>
+									))}
+								</tr>
+							</thead>
+							<tbody>
+								{VERTICAL_LEVELS.map((level) => (
+									<tr key={level}>
+										<th className="whitespace-nowrap p-1 text-right text-[11px] font-medium text-muted-foreground">
+											{t(LEVEL_KEY[level])}
+										</th>
+										{ALL_FACETS.map((facet) => {
+											const cells = cellPlacements(placements, level, facet);
+											const count = cells.length;
+											const validated = cells.filter(
+												(c) =>
+													c.status === "validated" || c.status === "realized",
+											).length;
+											const active =
+												sel?.level === level && sel?.facet === facet;
+											return (
+												<td key={facet} className="p-0.5">
+													<form action={action}>
+														<input type="hidden" name="intent" value="select" />
+														<input type="hidden" name="level" value={level} />
+														<input type="hidden" name="facet" value={facet} />
+														<button
+															type="submit"
+															data-testid={`cell-${LEVEL_KEY[level]}-${facet}`}
+															data-count={count}
+															className={`flex h-8 w-full items-center justify-center rounded border text-[10px] transition-colors ${
+																active
+																	? "border-primary bg-primary/15 font-semibold text-primary ring-1 ring-primary"
+																	: count
+																		? "border-border bg-amber-500/10 text-foreground hover:bg-amber-500/20"
+																		: "border-dashed border-border/50 bg-muted/20 text-muted-foreground hover:bg-muted/40"
+															}`}
+														>
+															{count ? `${validated}/${count}` : "·"}
+														</button>
+													</form>
+												</td>
+											);
+										})}
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
 				</div>
 
-				<ol className="space-y-2">
-					{byLevel.map(({ level, items }) => (
-						<li
-							key={level}
-							data-testid={`level-${LEVEL_KEY[level]}`}
-							data-count={items.length}
-							className={`rounded-lg border p-3 ${
-								items.length
-									? "border-border bg-background"
-									: "border-dashed border-border/60 bg-muted/20"
-							}`}
-						>
-							<div className="flex items-center gap-2">
-								<span className="text-xs font-semibold tracking-tight text-foreground">
-									{t(LEVEL_KEY[level])}
-								</span>
-								{items.length ? (
-									<span className="rounded-full bg-primary/10 px-1.5 text-[10px] font-medium text-primary">
-										{items.length}
-									</span>
-								) : (
-									<span className="text-[10px] text-muted-foreground">
-										{t("levelEmpty")}
-									</span>
-								)}
-							</div>
-							{items.length ? (
-								<ul className="mt-2 space-y-1.5">
-									{items.map((p) => (
-										<li
-											key={`${p.facet}-${p.pairId}-${p.kernel ?? ""}`}
-											className="flex items-start gap-2 text-xs"
-										>
-											<span
-												title={t(`facet_${p.facet}`)}
-												className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-foreground/10 font-mono text-[10px] font-bold text-foreground"
-											>
-												{p.facet}
-											</span>
-											<span className="text-muted-foreground">
-												<span className="font-medium text-foreground">
-													{p.pairId}
+				{/* 2) the anatomy descent of the selected cell */}
+				{sel ? (
+					<div
+						data-testid="anatomy"
+						className="space-y-2 rounded-lg border border-border bg-background p-3"
+					>
+						<h3 className="text-sm font-semibold tracking-tight text-foreground">
+							{t("anatomyHeading", {
+								level: t(LEVEL_KEY[sel.level]),
+								facet: t(`facet_${sel.facet}`),
+							})}
+						</h3>
+						<ol className="space-y-1.5">
+							{MIRROR_PAIRS.map((pair) => {
+								const placed = selPairs.find((p) => p.pairId === pair.id);
+								const badge = placed ? statusBadge(placed.status, t) : null;
+								const canValidate = placed && placed.status !== "realized";
+								const isLast = !nextPairId(pair.id);
+								return (
+									<li
+										key={pair.id}
+										data-testid={`pair-${pair.id}`}
+										data-status={
+											placed?.status ?? (placed ? "proposed" : "pending")
+										}
+										className={`rounded-md border p-2 text-xs ${
+											placed
+												? "border-border bg-card"
+												: "border-dashed border-border/50 bg-muted/10 opacity-60"
+										}`}
+									>
+										<div className="flex items-center justify-between gap-2">
+											<span className="font-medium text-foreground">
+												{pair.above}
+												<span className="text-muted-foreground">
+													{" "}
+													↔ {pair.below}
 												</span>
-												{p.kernel ? (
-													<span className="text-muted-foreground">
-														{" "}
-														· {p.kernel}
-													</span>
-												) : null}{" "}
-												— {p.spec}
 											</span>
-										</li>
-									))}
-								</ul>
-							) : null}
-						</li>
-					))}
-				</ol>
+											{badge ? (
+												<span
+													className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${badge.cls}`}
+												>
+													{badge.label}
+												</span>
+											) : (
+												<span className="text-[10px] text-muted-foreground">
+													{t("pairPending")}
+												</span>
+											)}
+										</div>
+										{placed ? (
+											<>
+												<details className="mt-1">
+													<summary className="cursor-pointer text-muted-foreground">
+														{placed.spec}
+													</summary>
+													<p className="mt-1 border-l-2 border-border pl-2 text-muted-foreground">
+														{placed.detail || t("detailNone")}
+													</p>
+												</details>
+												{canValidate ? (
+													<form action={action} className="mt-1.5">
+														<input
+															type="hidden"
+															name="intent"
+															value="validate"
+														/>
+														<input
+															type="hidden"
+															name="level"
+															value={sel.level}
+														/>
+														<input
+															type="hidden"
+															name="facet"
+															value={sel.facet}
+														/>
+														<input
+															type="hidden"
+															name="pairId"
+															value={pair.id}
+														/>
+														<SubmitButton
+															label={
+																isLast ? t("realizeCta") : t("validateCta")
+															}
+															working={t("working")}
+															testid={`validate-${pair.id}`}
+															variant="ghost"
+														/>
+													</form>
+												) : null}
+											</>
+										) : null}
+									</li>
+								);
+							})}
+						</ol>
+					</div>
+				) : (
+					<p
+						data-testid="select-hint"
+						className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground"
+					>
+						{t("selectCellHint")}
+					</p>
+				)}
 
-				{/* ─── Impact sur le DAG existant — la vague de rouge sur ce qui existe déjà ─── */}
+				{/* 3) impact on the existing DAG */}
 				<div className="space-y-2 border-t border-border pt-3">
 					<div className="flex flex-wrap items-center justify-between gap-2">
 						<h3 className="text-sm font-semibold tracking-tight text-foreground">
@@ -271,29 +411,16 @@ export function CockpitPanel() {
 											: "border-border/60 bg-muted/10 opacity-70"
 									}`}
 								>
-									<div className="flex items-start gap-2">
-										<span
-											title={t(`facet_${s.facet}`)}
-											className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-foreground/10 font-mono text-[10px] font-bold text-foreground"
-										>
-											{s.facet}
-										</span>
-										<div className="min-w-0">
-											<span className="font-medium text-foreground">
-												{s.title}
-											</span>
-											<span className="text-muted-foreground">
-												{" "}
-												· {t(LEVEL_KEY[s.level])} · {s.pairId}
-											</span>
-											{impacted ? (
-												<div className="mt-0.5 flex items-start gap-1 text-destructive">
-													<span aria-hidden>🔴</span>
-													<span>{reason || t("impactReasonless")}</span>
-												</div>
-											) : null}
+									<span className="font-medium text-foreground">{s.title}</span>
+									<span className="text-muted-foreground">
+										{" "}
+										· {t(LEVEL_KEY[s.level])} · {s.facet}·{s.pairId}
+									</span>
+									{impacted ? (
+										<div className="mt-0.5 text-destructive">
+											🔴 {reason || t("impactReasonless")}
 										</div>
-									</div>
+									) : null}
 								</li>
 							);
 						})}

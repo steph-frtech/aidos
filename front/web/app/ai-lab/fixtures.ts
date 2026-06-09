@@ -2,6 +2,7 @@ import {
 	type ChatTurn,
 	type CockpitState,
 	type DagImpact,
+	type Level,
 	type Mode,
 	type PairScope,
 	type Placement,
@@ -159,6 +160,8 @@ export interface LabView {
 	placements: Placement[];
 	/** the EXISTING DAG specs the need impacts (the red wave on what is already there). */
 	impacts: DagImpact[];
+	/** the navigable big-table cell currently open (level × facet) — its anatomy descent is shown. */
+	selectedCell?: { level: Level; facet: Facet };
 	mode: "idle" | "llm" | "fallback";
 	error?: string;
 }

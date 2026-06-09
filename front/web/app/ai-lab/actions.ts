@@ -10,6 +10,7 @@ import {
 	type DagImpact,
 	EXISTING_DAG,
 	isTruthWriteRequest,
+	type Level,
 	MIRROR_PAIRS,
 	type Mode,
 	mergeImpacts,
@@ -19,6 +20,7 @@ import {
 	scopeForPair,
 	turnId,
 	VERTICAL_LEVELS,
+	validateAndDescend,
 	validateImpacts,
 	validatePlacements,
 } from "@/lib/ai-lab";
@@ -123,6 +125,30 @@ export async function leftBrainAction(
 	prev: LabView,
 	formData: FormData,
 ): Promise<LabView> {
+	const intent = String(formData.get("intent") ?? "chat");
+
+	// NAVIGATION — open a cell of the big table (level × facet); its anatomy descent is shown.
+	if (intent === "select") {
+		const level = String(formData.get("level") ?? "") as Level;
+		const facet = String(formData.get("facet") ?? "") as Facet;
+		if (!VERTICAL_LEVELS.includes(level)) return prev;
+		return { ...prev, selectedCell: { level, facet }, error: undefined };
+	}
+
+	// DESCENT — validate a pair (level × facet × pairId) → generate the next pair down the anatomy.
+	if (intent === "validate") {
+		const level = String(formData.get("level") ?? "") as Level;
+		const facet = String(formData.get("facet") ?? "") as Facet;
+		const pairId = String(formData.get("pairId") ?? "");
+		return {
+			...prev,
+			placements: validateAndDescend(prev.placements, level, facet, pairId),
+			selectedCell: { level, facet },
+			error: undefined,
+		};
+	}
+
+	// CHAT — a need → Claude places specs across the verticale + impacts the existing DAG.
 	const message = String(formData.get("message") ?? "")
 		.trim()
 		.slice(0, 600);

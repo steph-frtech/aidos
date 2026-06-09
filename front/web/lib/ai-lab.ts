@@ -635,13 +635,21 @@ export type Level = (typeof VERTICAL_LEVELS)[number];
 /** The full facet set the left brain may target (F·I·S·B·R·V·M·X). */
 export const ALL_FACETS: Facet[] = ["F", "I", "S", "B", "R", "V", "M", "X"];
 
+/** The lifecycle of a placed spec: proposed (above the wall) → validated (descends a notch) →
+ *  realized (crossed the wall, at the bottom of the verticale). DECLARED. */
+export type SpecStatus = "proposed" | "validated" | "realized";
+
 /** A placement the left brain PROPOSES: a generated spec dropped at level × facet × pair. */
 export interface Placement {
 	level: Level;
 	facet: Facet;
 	pairId: string;
-	/** the spec text (above the wall) the left brain compiled for this cell. */
+	/** the spec text (above the wall) the left brain compiled for this cell (the short form). */
 	spec: string;
+	/** the DETAILED spec (criteria / longer text) — shown when the spec is expanded. */
+	detail?: string;
+	/** the lifecycle status — defaults to "proposed". Validating descends it a notch. */
+	status?: SpecStatus;
 	/** an optional fractal sub-kernel the placement nests under (e.g. "checkout/cart"). */
 	kernel?: string;
 }
@@ -678,6 +686,10 @@ export function validatePlacements(raw: unknown): Placement[] {
 			pairId: o.pairId as string,
 			spec,
 		};
+		if (typeof o.detail === "string" && o.detail.trim())
+			placement.detail = o.detail.trim().slice(0, 600);
+		if (o.status === "validated" || o.status === "realized")
+			placement.status = o.status;
 		if (typeof o.kernel === "string" && o.kernel.trim())
 			placement.kernel = o.kernel.trim().slice(0, 60);
 		kept.push(placement);
@@ -857,4 +869,84 @@ export function mergePlacements(
 	for (const p of prev) byKey.set(placementKey(p), p);
 	for (const p of next) byKey.set(placementKey(p), p);
 	return validatePlacements([...byKey.values()]);
+}
+
+// ── The DESCENT — validate a pair → generate the next pair DOWN THE ANATOMY ──
+//
+// « Descendre un cran » = descend the 6 mirror-pairs (NOT the verticale): valider Spec → génère
+// Comportement → valider Comportement → Scénarios → Modèle → Contrat → Evidence. Per facet
+// (F·I·S·B·R·V·M·X), per (level × facet) CELL of the big table. DETERMINISM-FIRST (§6): the
+// pair-to-pair refinement is a PURE function (a known chain), so it MUST be code — never an LLM.
+// (The irreducible NL→placement stays Claude's job ; the descent is mechanical.)
+
+/** The next mirror-pair down the anatomy, or undefined if pairId is the last (evidence). */
+export function nextPairId(pairId: string): string | undefined {
+	const i = MIRROR_PAIRS.findIndex((p) => p.id === pairId);
+	return i >= 0 && i < MIRROR_PAIRS.length - 1
+		? MIRROR_PAIRS[i + 1].id
+		: undefined;
+}
+
+/** The label of the spec a pair carries when DERIVED from the pair above it (deterministic chain). */
+const PAIR_DERIVATION: Record<string, string> = {
+	behavior: "Comportement attendu",
+	scenarios: "Scénarios Given/When/Then",
+	model: "Modèle de données",
+	contract: "Contrat (in/out, pré/post, invariants)",
+	evidence: "Evidence attendue",
+};
+
+/** deriveNextSpec — the pure derivation of the next pair's spec from the validated one. */
+export function deriveNextSpec(toPairId: string, parentSpec: string): string {
+	const label = PAIR_DERIVATION[toPairId] ?? toPairId;
+	return `${label} — dérivé de : ${parentSpec}`;
+}
+
+/** The ordered 6-pair anatomy of one CELL (level × facet), in MIRROR_PAIRS order. */
+export function cellPlacements(
+	placements: Placement[],
+	level: Level,
+	facet: Facet,
+): Placement[] {
+	return placements
+		.filter((p) => p.level === level && p.facet === facet)
+		.sort(
+			(a, b) =>
+				MIRROR_PAIRS.findIndex((m) => m.id === a.pairId) -
+				MIRROR_PAIRS.findIndex((m) => m.id === b.pairId),
+		);
+}
+
+/**
+ * validateAndDescend — validate the pair (level × facet × pairId) and GENERATE the next pair down
+ * the anatomy (deterministic). At the last pair (evidence) it marks the pair "realized" (descent
+ * complete, crossed the wall). PURE + TOTAL + idempotent: re-validating yields the same result; an
+ * unknown cell is a no-op. The wall §2: this stages a lab proposal, it writes NO truth (promotion
+ * stays /goal). matched by (level, facet, pairId), ignoring the fractal kernel.
+ */
+export function validateAndDescend(
+	placements: Placement[],
+	level: Level,
+	facet: Facet,
+	pairId: string,
+): Placement[] {
+	const target = placements.find(
+		(p) => p.level === level && p.facet === facet && p.pairId === pairId,
+	);
+	if (!target) return placements;
+	const next = nextPairId(pairId);
+	const updated = placements.map((p) =>
+		p.level === level && p.facet === facet && p.pairId === pairId
+			? { ...p, status: (next ? "validated" : "realized") as SpecStatus }
+			: p,
+	);
+	if (!next) return mergePlacements(updated, []);
+	const child: Placement = {
+		level,
+		facet,
+		pairId: next,
+		spec: deriveNextSpec(next, target.spec),
+		status: "proposed",
+	};
+	return mergePlacements(updated, [child]);
 }

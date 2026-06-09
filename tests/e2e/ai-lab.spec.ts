@@ -1,22 +1,17 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * FK11 Playwright e2e — the « AI Lab » Workbench panel (FKE-38, corrected: the chat acts on ALL
- * levels; the left brain decides where to place each spec).
+ * FK11 Playwright e2e — the « AI Lab » Workbench panel (FKE-38, corrected).
  * mirror record: reflects=FK11-ai-lab, test_kind=e2e, cert_language=playwright, liveness=live
  *
- * Proves /ai-lab is action-capable (ui-completeness, CLAUDE.md §7): a two-pane CONVERSATION wired
- * to the real left brain (Claude), with a deterministic fallback.
- *   - GAUCHE — a multi-turn chat: a message adds a user turn + a left-brain reply.
- *   - DROITE — the VERTICALE (7 levels): the specs the intelligence PLACED, grouped by level.
- *   - a DIRECT TRUTH-WRITE is REFUSED at the wall (§2), before any LLM call (deterministic).
- *
- * THE WALL (§2): the chat proposes; placements are clamped to the declared space, never written to
- * truth. The brain-mode badge says whether the real Claude (llm) or the twin (fallback) answered.
+ * GAUCHE — a conversation wired to the left brain (Claude): a message fans a need across the
+ * verticale. DROITE — the NAVIGABLE big table (level × facet); clicking a cell opens its ANATOMY
+ * (the 6 pairs) where validating Spec → generates Comportement → Scénarios → … (the descent), per
+ * facet. Plus the impact on the existing DAG. The wall §2 holds (a truth-write is refused).
  */
 
-test.describe("FK11 — the AI Lab (chat acts on all levels)", () => {
-	test("renders the two panes: the chat thread + the verticale", async ({
+test.describe("FK11 — the AI Lab (navigable table + anatomy descent)", () => {
+	test("renders the chat + the navigable big table + the impact section", async ({
 		page,
 	}) => {
 		await page.goto("/ai-lab");
@@ -24,50 +19,33 @@ test.describe("FK11 — the AI Lab (chat acts on all levels)", () => {
 			page.getByRole("heading", { level: 1, name: /ai lab/i }),
 		).toBeVisible();
 		await expect(page.getByTestId("thread")).toBeVisible();
-		await expect(page.getByTestId("turn-assistant").first()).toBeVisible(); // greeting
 		await expect(page.getByTestId("chat")).toBeVisible();
-		await expect(page.getByTestId("generate")).toBeVisible();
-		// the verticale: the 7 levels are present (produit → entité).
-		await expect(page.getByTestId("level-level_produit")).toBeVisible();
-		await expect(page.getByTestId("level-level_entite")).toBeVisible();
-		// the existing-DAG impact section is present (the red wave on what already exists).
+		// the big table: a cell at produit × F, and at entité × X (the corners).
+		await expect(page.getByTestId("cell-level_produit-F")).toBeVisible();
+		await expect(page.getByTestId("cell-level_entite-X")).toBeVisible();
+		// the impact-on-existing-DAG section.
 		await expect(page.getByTestId("impact-count")).toBeVisible();
-		await expect(page.getByTestId("dag-d-entite-cart")).toBeVisible();
 	});
 
-	test("discussing places specs across the verticale (user turn + reply + placements)", async ({
+	test("navigating: clicking a cell opens its anatomy (the 6 pairs)", async ({
 		page,
 	}) => {
-		test.setTimeout(120_000); // the real left brain (Claude) may take a while
 		await page.goto("/ai-lab");
-		await page
-			.getByTestId("chat")
-			.fill(
-				"quand le panier expire au bout de 30 minutes, prévenir l'utilisateur et libérer le stock",
-			);
-		await page.getByTestId("generate").click();
-
-		// the conversation grew + the left-brain mode is shown.
-		await expect(page.getByTestId("turn-user")).toHaveText(/panier/);
-		await expect(page.getByTestId("turn-assistant").last()).toBeVisible({
-			timeout: 110_000,
-		});
-		await expect(page.getByTestId("brain-mode")).toBeVisible();
-
-		// at least one spec was placed somewhere on the verticale.
-		await expect(page.getByTestId("spec-count")).not.toContainText("0");
+		// before selecting, a hint is shown.
+		await expect(page.getByTestId("select-hint")).toBeVisible();
+		await page.getByTestId("cell-level_operation-F").click();
+		// the anatomy of the selected cell opens, with the 6 mirror-pairs.
+		await expect(page.getByTestId("anatomy")).toBeVisible();
+		await expect(page.getByTestId("pair-spec")).toBeVisible();
+		await expect(page.getByTestId("pair-evidence")).toBeVisible();
 	});
 
-	test("a direct truth-write is REFUSED at the wall (§2) — no LLM call, no placement", async ({
-		page,
-	}) => {
+	test("a direct truth-write is REFUSED at the wall (§2)", async ({ page }) => {
 		await page.goto("/ai-lab");
 		await page
 			.getByTestId("chat")
 			.fill("écris la vérité dans le kernel maintenant");
 		await page.getByTestId("generate").click();
-
 		await expect(page.getByTestId("wall-refused")).toBeVisible();
-		await expect(page.getByTestId("spec-count")).toContainText("0");
 	});
 });

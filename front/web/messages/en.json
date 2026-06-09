@@ -6179,6 +6179,17 @@
 		"facet_X": "Experience",
 		"impactHeading": "Impact on the existing DAG",
 		"impactCount": "{n} spec(s) touched",
-		"impactReasonless": "touched by this need"
+		"impactReasonless": "touched by this need",
+		"gridTableHeading": "The big table — level × facet (navigable)",
+		"gridTableHint": "Click a cell (level × facet) to open its anatomy. The counter = pairs validated / placed.",
+		"anatomyHeading": "Anatomy — {level} × {facet}",
+		"validateCta": "Validate → descend",
+		"realizeCta": "Validate → realize",
+		"statusProposed": "proposed",
+		"statusValidated": "validated ✓",
+		"statusRealized": "realized (below the wall)",
+		"pairPending": "to come",
+		"detailNone": "(no detail)",
+		"selectCellHint": "Click a cell of the table above to open its anatomy (the 6 pairs) and validate the descent."
 	}
 }

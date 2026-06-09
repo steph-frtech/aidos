@@ -25,18 +25,21 @@ import {
 	buildCockpit,
 	buildGrid,
 	cellKey,
+	cellPlacements,
 	EXISTING_DAG,
 	generateSpecs,
 	isTruthWriteRequest,
 	MIRROR_PAIRS,
 	mergeImpacts,
 	mergePlacements,
+	nextPairId,
 	pairKey,
 	pairTier,
 	placementsByLevel,
 	proposeSlot,
 	scopeForPair,
 	VERTICAL_LEVELS,
+	validateAndDescend,
 	validateImpacts,
 	validatePlacements,
 	voyantFor,
@@ -442,5 +445,82 @@ describe("FK11 — placement GATE (the chat acts on all levels; the LLM is verif
 		expect(merged.find((i) => i.specId === EXISTING_DAG[0].id)?.reason).toBe(
 			"v2",
 		);
+	});
+});
+
+describe("FK11 — the anatomy DESCENT (validate a pair → generate the next, per facet)", () => {
+	it("nextPairId walks Spec→Comportement→Scénarios→Modèle→Contrat→Evidence then stops", () => {
+		expect(nextPairId("spec")).toBe("behavior");
+		expect(nextPairId("behavior")).toBe("scenarios");
+		expect(nextPairId("scenarios")).toBe("model");
+		expect(nextPairId("model")).toBe("contract");
+		expect(nextPairId("contract")).toBe("evidence");
+		expect(nextPairId("evidence")).toBeUndefined(); // the last pair
+	});
+
+	it("validate the spec → it becomes validated AND generates the comportement (the descent)", () => {
+		const start = validatePlacements([
+			{
+				level: "opération",
+				facet: "F",
+				pairId: "spec",
+				spec: "le panier expire à 30 min",
+			},
+		]);
+		const after = validateAndDescend(start, "opération", "F", "spec");
+		expect(after.find((p) => p.pairId === "spec")?.status).toBe("validated");
+		const behavior = after.find((p) => p.pairId === "behavior");
+		expect(behavior).toBeDefined(); // the next pair was generated
+		expect(behavior?.spec).toContain("le panier expire à 30 min"); // derived from parent
+	});
+
+	it("the descent chains: validate behavior → generates scenarios", () => {
+		let p = validatePlacements([
+			{ level: "vue", facet: "S", pairId: "spec", spec: "auth forte" },
+		]);
+		p = validateAndDescend(p, "vue", "S", "spec"); // → behavior
+		p = validateAndDescend(p, "vue", "S", "behavior"); // → scenarios
+		expect(p.find((x) => x.pairId === "scenarios")).toBeDefined();
+		expect(p.find((x) => x.pairId === "behavior")?.status).toBe("validated");
+	});
+
+	it("validating the LAST pair (evidence) marks it realized — no further descent", () => {
+		const p = validateAndDescend(
+			validatePlacements([
+				{
+					level: "entité",
+					facet: "F",
+					pairId: "evidence",
+					spec: "evidence attendue",
+				},
+			]),
+			"entité",
+			"F",
+			"evidence",
+		);
+		expect(p.find((x) => x.pairId === "evidence")?.status).toBe("realized");
+		expect(p).toHaveLength(1); // nothing generated below the last pair
+	});
+
+	it("validateAndDescend is a no-op on an unknown cell; works per facet independently", () => {
+		const start = validatePlacements([
+			{ level: "action", facet: "S", pairId: "spec", spec: "s" },
+		]);
+		expect(validateAndDescend(start, "action", "B", "spec")).toEqual(start);
+		const afterS = validateAndDescend(start, "action", "S", "spec");
+		expect(
+			afterS.find((p) => p.facet === "S" && p.pairId === "behavior"),
+		).toBeDefined();
+		expect(afterS.find((p) => p.facet === "B")).toBeUndefined();
+	});
+
+	it("cellPlacements returns one cell's pairs in anatomy order", () => {
+		const all = validatePlacements([
+			{ level: "vue", facet: "F", pairId: "scenarios", spec: "c" },
+			{ level: "vue", facet: "F", pairId: "spec", spec: "a" },
+			{ level: "vue", facet: "S", pairId: "spec", spec: "other cell" },
+		]);
+		const cell = cellPlacements(all, "vue", "F");
+		expect(cell.map((p) => p.pairId)).toEqual(["spec", "scenarios"]);
 	});
 });
