@@ -96,3 +96,5 @@ next-env.d.ts
 /back/reality-ingest
 /back/strangler
 /back/federation
+/back/truth-approval
+/back/reality-evolution
