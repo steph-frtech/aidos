@@ -179,26 +179,32 @@ describe("S116 — erasure (crypto-shred + tombstone)", () => {
 	});
 });
 
-const arbCells = fc.array(
-	fc.record({
-		plan: fc.constantFrom<Plan>(...PLANS),
-		subject: fc.constantFrom("s1", "s2", "s3"),
-		project: fc.constantFrom("p1", "p2"),
-		app: fc.constantFrom("app1", "app2", ""),
-		rowId: fc.string({ minLength: 1, maxLength: 5 }),
-		structure: fc.constant("shape"),
-		pii: fc.array(
-			fc.record({
-				path: fc.constantFrom("f0", "f1", "f2"),
-				ciphertext: fc.constant("enc"),
-				keyId: fc.constant("k"),
-				plaintext: fc.constantFrom("v0", "v1", "v2"),
-			}),
-			{ maxLength: 3 },
-		),
-	}),
-	{ maxLength: 12 },
-);
+const arbCells = fc
+	.array(
+		fc.record({
+			plan: fc.constantFrom<Plan>(...PLANS),
+			subject: fc.constantFrom("s1", "s2", "s3"),
+			project: fc.constantFrom("p1", "p2"),
+			app: fc.constantFrom("app1", "app2", ""),
+			structure: fc.constant("shape"),
+			pii: fc.array(
+				fc.record({
+					path: fc.constantFrom("f0", "f1", "f2"),
+					ciphertext: fc.constant("enc"),
+					keyId: fc.constant("k"),
+					plaintext: fc.constantFrom("v0", "v1", "v2"),
+				}),
+				{ maxLength: 3 },
+			),
+		}),
+		{ maxLength: 12 },
+	)
+	// RowID is a STABLE append-only id — "never reused, never deleted" (back/runtime/erasure
+	// Cell.RowID) — hence GLOBALLY UNIQUE. The Go authority's genCells assigns r0,r1,… by index;
+	// mirror that here. An un-indexed arbitrary could collide two cells on one rowId, an INVALID
+	// (unreachable) store state that ApplyErasure's rowId-keyed map — byte-identical in Go —
+	// is not required to represent. The twin stays faithful to the authority.
+	.map((cells) => cells.map((c, i) => ({ ...c, rowId: `r${i}` })));
 
 describe("S116 — reproducibility & determinism (∀)", () => {
 	it("erase is reproducible: same input ⇒ byte-identical result", () => {

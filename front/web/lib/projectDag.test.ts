@@ -30,8 +30,14 @@ describe("projectDag — S56 per-project DAG + namespace + frontier", () => {
 	});
 
 	it("distinct projects have disjoint namespaces", () => {
+		// Project ids are SLUGS (mirror back/archive/projectdag slugGen + project.New
+		// validation: [a-z0-9]{1,6} segments joined by "-"), NEVER arbitrary strings with
+		// "/". With slug ids the prefix membership check cannot false-positive; fc.string()
+		// would inject unreachable "/"-bearing ids — a path-prefix collision (a="u-v" vs
+		// b="u") that the domain forbids and the Go authority's generator never produces.
+		const projectId = fc.stringMatching(/^[a-z0-9]{1,6}(-[a-z0-9]{1,6}){0,3}$/);
 		fc.assert(
-			fc.property(fc.string(), fc.string(), (a, b) => {
+			fc.property(projectId, projectId, (a, b) => {
 				fc.pre(a !== b);
 				expect(sameNamespace(b, namespaceKey(a, "k"))).toBe(false);
 			}),

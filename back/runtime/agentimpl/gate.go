@@ -8,16 +8,16 @@
 // THE PRECEDENCE (the roadmap, verbatim). The order is NOT cosmetic — it decides which
 // BlockReason a multiply-violating action returns, so it is part of the contract:
 //
-//	1. Arbitrate  — does this action even have the RIGHT to be LLM-driven, or does a
-//	                deterministic tool govern it? (the determinism axis, FIRST — gap D3)
-//	2. zone       — Classify deny-list (kernel / mirrors / fitness above the waterline)
-//	3. path       — PathAllowed allow-list (the agent's writable root — confinement)
-//	4. egress     — EgressAllowed (declared network hosts; empty ⇒ no egress)
-//	5. exec       — ExecAllowed (declared subprocess allow-list; empty ⇒ no exec)
-//	6. capacity   — ToolAllowed (the bound MCP (server, tool))
-//	7. skill      — SkillAllowed (the bound skill)
-//	8. budget     — CheckBudget (min() of the two declared caps — the tightest wins)
-//	9. hook       — HooksSatisfied (every mandatory hook ran AND is green)
+//  1. Arbitrate  — does this action even have the RIGHT to be LLM-driven, or does a
+//     deterministic tool govern it? (the determinism axis, FIRST — gap D3)
+//  2. zone       — Classify deny-list (kernel / mirrors / fitness above the waterline)
+//  3. path       — PathAllowed allow-list (the agent's writable root — confinement)
+//  4. egress     — EgressAllowed (declared network hosts; empty ⇒ no egress)
+//  5. exec       — ExecAllowed (declared subprocess allow-list; empty ⇒ no exec)
+//  6. capacity   — ToolAllowed (the bound MCP (server, tool))
+//  7. skill      — SkillAllowed (the bound skill)
+//  8. budget     — CheckBudget (min() of the two declared caps — the tightest wins)
+//  9. hook       — HooksSatisfied (every mandatory hook ran AND is green)
 //
 // Arbitrate is INSIDE GateAction, not beside it — the determinism axis is part of the
 // single verdict, not a separate pass. The zone deny-list precedes the path allow-list

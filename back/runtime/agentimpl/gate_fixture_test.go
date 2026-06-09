@@ -48,8 +48,8 @@ func happyAction() Action {
 	return Action{
 		Target: "app/main.go",
 		Server: "store", Tool: "read",
-		Skill:        "tdd",
-		AgentAction:  AgentAction{Tool: "bash", Args: []string{"rg", "foo"}},
+		Skill:       "tdd",
+		AgentAction: AgentAction{Tool: "bash", Args: []string{"rg", "foo"}},
 	}
 }
 

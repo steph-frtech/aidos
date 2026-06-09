@@ -3,12 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
 	type Battery,
 	CODE_BUILD_LOOP_SENSOR_RED,
-	type SensorKind,
-	type SensorVerdict,
-	SENSOR_KINDS,
 	certify,
 	gateGreen,
 	redSensors,
+	SENSOR_KINDS,
+	type SensorKind,
+	type SensorVerdict,
 	toStopSensors,
 } from "./self-cert";
 

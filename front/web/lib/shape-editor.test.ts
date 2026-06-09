@@ -68,13 +68,18 @@ describe("parse — a pure function per shape", () => {
 });
 
 describe("mergeEdits — draft-level concurrency, never last-write-wins", () => {
-	const draft = () => openDraft("proj-1", "Order.discount", "v1", "workflow").draft!;
+	const draft = () =>
+		openDraft("proj-1", "Order.discount", "v1", "workflow").draft!;
 
 	it("merges disjoint edits", () => {
 		const r = mergeEdits(
 			draft(),
 			{ author: "alice", baseVersion: 0, title: "T" },
-			{ author: "bob", baseVersion: 0, source: "fixture: f\nstate: s\ncommand: c\nevent: e" },
+			{
+				author: "bob",
+				baseVersion: 0,
+				source: "fixture: f\nstate: s\ncommand: c\nevent: e",
+			},
 		);
 		expect(r.error).toBeNull();
 		expect(r.merged.title).toBe("T");
@@ -131,7 +136,9 @@ describe("proposeMirror — red, project-scoped, DRAFT, no write (the wall)", ()
 			fc.property(fc.constantFrom(...natures()), (nat) => {
 				const d = openDraft("proj-1", "Order", "v1", nat).draft!;
 				d.source = SOURCE[nat];
-				expect(proposeMirror(d, "phase-0")).toEqual(proposeMirror(d, "phase-0"));
+				expect(proposeMirror(d, "phase-0")).toEqual(
+					proposeMirror(d, "phase-0"),
+				);
 			}),
 		);
 	});

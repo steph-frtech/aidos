@@ -1843,14 +1843,23 @@ const builderImpl: AgentImplementation = {
 	forbiddenPaths: wallForbiddenPaths(),
 	allowedNetworkHosts: [],
 	allowedExec: ["go"],
-	resourceLimits: { maxMemoryMb: 4096, maxCpuMillis: 8000, maxWallSeconds: 1800 },
+	resourceLimits: {
+		maxMemoryMb: 4096,
+		maxCpuMillis: 8000,
+		maxWallSeconds: 1800,
+	},
 	maxConcurrency: 1,
 };
 const boundTarget = { server: "mirror-runner", tool: "run_mirror" };
 
 describe("driveAgentloop — the agentloop MCP Run control (BA19)", () => {
 	it("a bound tool drives the happy scenario to green, no truth written", () => {
-		const r = driveAgentloop(builderImpl, "happy", "redset:checkout#1", boundTarget);
+		const r = driveAgentloop(
+			builderImpl,
+			"happy",
+			"redset:checkout#1",
+			boundTarget,
+		);
 		expect(r.refused).toBe(false);
 		expect(r.run?.result).toBe("green");
 		expect(r.run?.redWorkItem).toBe("redset:checkout#1");
@@ -1859,7 +1868,12 @@ describe("driveAgentloop — the agentloop MCP Run control (BA19)", () => {
 	});
 
 	it("a kernel-write turn is refused IN PLACE with AGENT_WRITE_ABOVE_WATERLINE, no truth lands", () => {
-		const r = driveAgentloop(builderImpl, "kernel-write", "redset:checkout#1", boundTarget);
+		const r = driveAgentloop(
+			builderImpl,
+			"kernel-write",
+			"redset:checkout#1",
+			boundTarget,
+		);
 		expect(r.refused).toBe(false);
 		const refused = r.run?.actions.find((a) => !a.autorisee);
 		expect(refused?.raisonBlocage?.code).toBe("AGENT_WRITE_ABOVE_WATERLINE");
@@ -1867,7 +1881,12 @@ describe("driveAgentloop — the agentloop MCP Run control (BA19)", () => {
 	});
 
 	it("the over-budget scenario abandons, no truth written", () => {
-		const r = driveAgentloop(builderImpl, "over-budget", "redset:checkout#1", boundTarget);
+		const r = driveAgentloop(
+			builderImpl,
+			"over-budget",
+			"redset:checkout#1",
+			boundTarget,
+		);
 		expect(r.refused).toBe(false);
 		expect(r.run?.result).toBe("abandoned");
 		expect(r.run && agentloopWroteNoTruth(r.run)).toBe(true);
@@ -1885,20 +1904,41 @@ describe("driveAgentloop — the agentloop MCP Run control (BA19)", () => {
 
 	it("is reproducible: same input ⇒ same { refused, run } over every scenario", () => {
 		fc.assert(
-			fc.property(fc.constantFrom(...AGENTLOOP_SCENARIOS), (sc: AgentloopScenario) => {
-				const a = driveAgentloop(builderImpl, sc, "redset:checkout#1", boundTarget);
-				const b = driveAgentloop(builderImpl, sc, "redset:checkout#1", boundTarget);
-				expect(JSON.stringify(a)).toBe(JSON.stringify(b));
-			}),
+			fc.property(
+				fc.constantFrom(...AGENTLOOP_SCENARIOS),
+				(sc: AgentloopScenario) => {
+					const a = driveAgentloop(
+						builderImpl,
+						sc,
+						"redset:checkout#1",
+						boundTarget,
+					);
+					const b = driveAgentloop(
+						builderImpl,
+						sc,
+						"redset:checkout#1",
+						boundTarget,
+					);
+					expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+				},
+			),
 		);
 	});
 
 	it("never writes truth across every scenario (the wall)", () => {
 		fc.assert(
-			fc.property(fc.constantFrom(...AGENTLOOP_SCENARIOS), (sc: AgentloopScenario) => {
-				const r = driveAgentloop(builderImpl, sc, "redset:checkout#1", boundTarget);
-				if (r.run) expect(agentloopWroteNoTruth(r.run)).toBe(true);
-			}),
+			fc.property(
+				fc.constantFrom(...AGENTLOOP_SCENARIOS),
+				(sc: AgentloopScenario) => {
+					const r = driveAgentloop(
+						builderImpl,
+						sc,
+						"redset:checkout#1",
+						boundTarget,
+					);
+					if (r.run) expect(agentloopWroteNoTruth(r.run)).toBe(true);
+				},
+			),
 		);
 	});
 });

@@ -18,10 +18,10 @@ import (
 // conceptually lives in the mirrors schema, materialized to tests/ (bootstrap exception, S06).
 
 type captureBDDState struct {
-	ideaRef     string
-	library     []behaviorcapture.Behavior
-	proposal    behaviorcapture.Proposal
-	attachErr   error
+	ideaRef   string
+	library   []behaviorcapture.Behavior
+	proposal  behaviorcapture.Proposal
+	attachErr error
 }
 
 func TestBehaviorCaptureBDD(t *testing.T) {
