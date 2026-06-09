@@ -25,9 +25,11 @@ import {
 	buildCockpit,
 	buildGrid,
 	cellKey,
+	EXISTING_DAG,
 	generateSpecs,
 	isTruthWriteRequest,
 	MIRROR_PAIRS,
+	mergeImpacts,
 	mergePlacements,
 	pairKey,
 	pairTier,
@@ -35,6 +37,7 @@ import {
 	proposeSlot,
 	scopeForPair,
 	VERTICAL_LEVELS,
+	validateImpacts,
 	validatePlacements,
 	voyantFor,
 } from "./ai-lab";
@@ -398,5 +401,46 @@ describe("FK11 — placement GATE (the chat acts on all levels; the LLM is verif
 		expect(grouped.map((g) => g.level)).toEqual([...VERTICAL_LEVELS]);
 		expect(grouped.find((g) => g.level === "entité")?.items).toHaveLength(1);
 		expect(grouped.find((g) => g.level === "produit")?.items).toHaveLength(0);
+	});
+
+	it("validateImpacts keeps only REAL existing-DAG ids, drops invented ones + dedupes", () => {
+		const real = EXISTING_DAG[0].id;
+		const kept = validateImpacts([
+			{ specId: real, reason: "touché" },
+			{ specId: "d-INVENTÉ", reason: "fantôme" },
+			{ specId: real, reason: "doublon" }, // deduped
+			{ specId: EXISTING_DAG[2].id, reason: "x".repeat(400) }, // capped
+		]);
+		expect(kept).toHaveLength(2);
+		expect(kept.every((i) => EXISTING_DAG.some((s) => s.id === i.specId))).toBe(
+			true,
+		);
+		expect(
+			kept.find((i) => i.specId === EXISTING_DAG[2].id)?.reason.length,
+		).toBeLessThanOrEqual(200);
+	});
+
+	it("validateImpacts is deterministic + ordered by the DAG order; tolerates garbage", () => {
+		expect(validateImpacts(null)).toEqual([]);
+		const a = validateImpacts([
+			{ specId: EXISTING_DAG[3].id, reason: "b" },
+			{ specId: EXISTING_DAG[1].id, reason: "a" },
+		]);
+		expect(a[0].specId).toBe(EXISTING_DAG[1].id); // earlier in the DAG sorts first
+	});
+
+	it("mergeImpacts: a later reason for the same spec OVERRIDES; others kept", () => {
+		const prev = validateImpacts([
+			{ specId: EXISTING_DAG[0].id, reason: "v1" },
+		]);
+		const next = validateImpacts([
+			{ specId: EXISTING_DAG[0].id, reason: "v2" },
+			{ specId: EXISTING_DAG[1].id, reason: "new" },
+		]);
+		const merged = mergeImpacts(prev, next);
+		expect(merged).toHaveLength(2);
+		expect(merged.find((i) => i.specId === EXISTING_DAG[0].id)?.reason).toBe(
+			"v2",
+		);
 	});
 });

@@ -30,6 +30,9 @@ test.describe("FK11 — the AI Lab (chat acts on all levels)", () => {
 		// the verticale: the 7 levels are present (produit → entité).
 		await expect(page.getByTestId("level-level_produit")).toBeVisible();
 		await expect(page.getByTestId("level-level_entite")).toBeVisible();
+		// the existing-DAG impact section is present (the red wave on what already exists).
+		await expect(page.getByTestId("impact-count")).toBeVisible();
+		await expect(page.getByTestId("dag-d-entite-cart")).toBeVisible();
 	});
 
 	test("discussing places specs across the verticale (user turn + reply + placements)", async ({

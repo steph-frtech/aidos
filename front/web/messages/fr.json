@@ -6163,7 +6163,7 @@
 		"replyGreeting": "Bonjour 👋 Décrivez en langage naturel ce que vous voulez — je génère les specs au-dessus du mur, sur les 6 paires-miroir de la facette choisie, et vous voyez les machines (à droite) réagir. Le chat propose ; la promotion en vérité passe par un /goal.",
 		"replyRefused": "Je ne peux pas écrire la vérité depuis le chat — c’est le mur (§2). Je propose, je ne décide pas : la promotion passe par idée → miroir → /goal. Reformulez en intention et je génère les specs.",
 		"replyGenerated": "J’ai posé {n} spec(s) au-dessus du mur pour la facette {facet} (les 6 paires-miroir). {divergent, plural, =0 {Les machines correspondantes passent au vert 🟢.} one {# machine diverge encore 🔴 — la conscience l’a calculé ; précisez sa paire pour la réaligner.} other {# machines divergent encore 🔴 — la conscience l’a calculé ; précisez leurs paires pour les réaligner.}}",
-		"placementsHeading": "Où l’intelligence a placé vos specs — la verticale",
+		"placementsHeading": "Ce que l’intelligence génère et impacte",
 		"modeLlm": "Claude branché en direct",
 		"modeFallback": "mode déterministe — Claude indisponible",
 		"levelEmpty": "rien ici pour l’instant",
@@ -6176,6 +6176,9 @@
 		"level_operation": "Opération",
 		"level_entite": "Entité",
 		"facet_I": "Invariants",
-		"facet_X": "Expérience"
+		"facet_X": "Expérience",
+		"impactHeading": "Impact sur le DAG existant",
+		"impactCount": "{n} spec(s) touchée(s)",
+		"impactReasonless": "touchée par ce besoin"
 	}
 }

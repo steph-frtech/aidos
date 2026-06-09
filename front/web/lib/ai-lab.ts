@@ -709,6 +709,141 @@ export function placementKey(p: Placement): string {
 	return `${p.level}|${p.facet}|${p.pairId}|${p.kernel ?? ""}`;
 }
 
+// ── The EXISTING DAG — where a need impacts what is ALREADY there (the red wave) ──
+//
+// A need does not only CREATE specs ; it can TOUCH the existing DAG (S22 impact / S24 version DAG).
+// The left brain identifies WHICH existing specs the need impacts ; the right pane shows the new
+// specs AND the impacted existing ones (the red wave on the existing graph). VERIFIED: an impact is
+// kept only if it names a REAL existing spec id (no invented node), the wall holds (propose-only).
+
+/** An existing spec already in the project's DAG (a demo seed of the checkout project). */
+export interface ExistingSpec {
+	id: string;
+	level: Level;
+	facet: Facet;
+	pairId: string;
+	title: string;
+}
+
+/**
+ * EXISTING_DAG — a representative seed of the CURRENT project's specs across the verticale (the
+ * checkout app). DECLARED + deterministic. (Wiring the real versioned DAG — S24 — is a follow-up.)
+ */
+export const EXISTING_DAG: ExistingSpec[] = [
+	{
+		id: "d-produit-shop",
+		level: "produit",
+		facet: "F",
+		pairId: "spec",
+		title: "Boutique — vendre des articles en ligne",
+	},
+	{
+		id: "d-parcours-buy",
+		level: "parcours",
+		facet: "F",
+		pairId: "scenarios",
+		title: "Parcours d'achat — du panier au reçu",
+	},
+	{
+		id: "d-vue-cart",
+		level: "vue",
+		facet: "X",
+		pairId: "spec",
+		title: "Vue panier — liste des articles + total",
+	},
+	{
+		id: "d-controle-pay",
+		level: "contrôle",
+		facet: "F",
+		pairId: "contract",
+		title: "Bouton Payer — déclenche le checkout",
+	},
+	{
+		id: "d-action-checkout",
+		level: "action",
+		facet: "S",
+		pairId: "behavior",
+		title: "Checkout — paiement atomique",
+	},
+	{
+		id: "d-operation-createorder",
+		level: "opération",
+		facet: "F",
+		pairId: "behavior",
+		title: "createOrder — valider + persister la commande",
+	},
+	{
+		id: "d-operation-reserve",
+		level: "opération",
+		facet: "B",
+		pairId: "behavior",
+		title: "reserveStock — réserver le stock à l'ajout au panier",
+	},
+	{
+		id: "d-entite-order",
+		level: "entité",
+		facet: "F",
+		pairId: "model",
+		title: "Order — id, total, lignes",
+	},
+	{
+		id: "d-entite-cart",
+		level: "entité",
+		facet: "V",
+		pairId: "model",
+		title: "Cart — articles, propriétaire",
+	},
+];
+
+/** An impact the left brain PROPOSES: a need touches an EXISTING DAG spec (the red wave). */
+export interface DagImpact {
+	/** the id of the impacted existing spec (must be a real EXISTING_DAG id). */
+	specId: string;
+	/** why the need touches it (the left brain's reason). */
+	reason: string;
+}
+
+/**
+ * validateImpacts GATES the left brain's impact list: an impact is kept ONLY if its specId names a
+ * REAL existing spec (an invented node is dropped, never coerced) ; the reason is trimmed + capped.
+ * PURE + TOTAL + deterministic (ordered by the EXISTING_DAG order). The wall §2: nothing written.
+ */
+export function validateImpacts(raw: unknown): DagImpact[] {
+	if (!Array.isArray(raw)) return [];
+	const ids = new Set(EXISTING_DAG.map((s) => s.id));
+	const seen = new Set<string>();
+	const kept: DagImpact[] = [];
+	for (const r of raw) {
+		if (!r || typeof r !== "object") continue;
+		const o = r as Record<string, unknown>;
+		if (typeof o.specId !== "string" || !ids.has(o.specId)) continue;
+		if (seen.has(o.specId)) continue;
+		seen.add(o.specId);
+		const reason =
+			typeof o.reason === "string" ? o.reason.trim().slice(0, 200) : "";
+		kept.push({ specId: o.specId, reason });
+	}
+	const order = (id: string) => EXISTING_DAG.findIndex((s) => s.id === id);
+	kept.sort((a, b) => order(a.specId) - order(b.specId));
+	return kept;
+}
+
+/** Merge impacts across turns (dedupe by specId, latest reason wins, re-ordered). Pure. */
+export function mergeImpacts(
+	prev: DagImpact[],
+	next: DagImpact[],
+): DagImpact[] {
+	const byId = new Map<string, DagImpact>();
+	for (const i of prev) byId.set(i.specId, i);
+	for (const i of next) byId.set(i.specId, i);
+	return validateImpacts([...byId.values()]);
+}
+
+/** Look up an existing spec by id (for the right-pane render). */
+export function existingSpec(id: string): ExistingSpec | undefined {
+	return EXISTING_DAG.find((s) => s.id === id);
+}
+
 /**
  * mergePlacements accumulates the conversation's placements: a later turn's placement for the
  * SAME cell (level × facet × pair × kernel) OVERRIDES the earlier spec (the chat refines), others

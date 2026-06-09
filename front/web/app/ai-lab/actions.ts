@@ -7,15 +7,19 @@ import {
 	buildCockpit,
 	type ChatTurn,
 	type CockpitNode,
+	type DagImpact,
+	EXISTING_DAG,
 	isTruthWriteRequest,
 	MIRROR_PAIRS,
 	type Mode,
+	mergeImpacts,
 	mergePlacements,
 	type Placement,
 	proposeSlot,
 	scopeForPair,
 	turnId,
 	VERTICAL_LEVELS,
+	validateImpacts,
 	validatePlacements,
 } from "@/lib/ai-lab";
 import type { Facet } from "@/lib/facetwire";
@@ -46,8 +50,13 @@ function leftBrainPrompt(message: string): string {
 		`- PAIRE-MIROIR ∈ {${MIRROR_PAIRS.map((p) => p.id).join(", ")}}`,
 		"",
 		"Décide À QUELS niveaux le besoin touche (souvent plusieurs), et pour chacun la facette + la paire-miroir, avec un texte de spec court (1 phrase, en français).",
+		"",
+		"Le besoin peut aussi IMPACTER des specs DÉJÀ présentes dans le DAG du projet. En voici la liste (id — titre) :",
+		...EXISTING_DAG.map((s) => `  • ${s.id} — ${s.title}`),
+		"Identifie lesquelles ce besoin touche (la « vague de rouge ») avec une raison courte. N'invente aucun id ; n'en mets aucune si rien n'est touché.",
+		"",
 		"Réponds UNIQUEMENT par un objet JSON valide, sans aucun texte autour, de la forme :",
-		'{"reply":"<1-2 phrases conversationnelles en français>","placements":[{"level":"...","facet":"F","pairId":"spec","spec":"..."}]}',
+		'{"reply":"<1-2 phrases conversationnelles en français>","placements":[{"level":"...","facet":"F","pairId":"spec","spec":"..."}],"impacts":[{"specId":"d-entite-cart","reason":"..."}]}',
 		"",
 		`Besoin : "${message.replace(/"/g, "'")}"`,
 	].join("\n");
@@ -61,9 +70,11 @@ function extractJson(text: string): string {
 }
 
 /** Call the real Claude (CLI) — returns null on any failure (caller falls back). */
-async function callClaude(
-	message: string,
-): Promise<{ reply: string; placements: Placement[] } | null> {
+async function callClaude(message: string): Promise<{
+	reply: string;
+	placements: Placement[];
+	impacts: DagImpact[];
+} | null> {
 	try {
 		const { stdout } = await execFileP(
 			CLAUDE_BIN,
@@ -81,9 +92,10 @@ async function callClaude(
 		const text = typeof outer?.result === "string" ? outer.result : "";
 		const inner = JSON.parse(extractJson(text));
 		const placements = validatePlacements(inner?.placements);
+		const impacts = validateImpacts(inner?.impacts);
 		const reply = typeof inner?.reply === "string" ? inner.reply.trim() : "";
-		if (!reply && placements.length === 0) return null;
-		return { reply, placements };
+		if (!reply && placements.length === 0 && impacts.length === 0) return null;
+		return { reply, placements, impacts };
 	} catch {
 		return null;
 	}
@@ -141,13 +153,15 @@ export async function leftBrainAction(
 	const out = await callClaude(message);
 	if (out) {
 		const placements = mergePlacements(prev.placements, out.placements);
+		const impacts = mergeImpacts(prev.impacts, out.impacts);
 		const reply =
 			out.reply ||
-			`J'ai placé ${out.placements.length} spec(s) sur la verticale.`;
+			`J'ai placé ${out.placements.length} spec(s) sur la verticale, et touché ${out.impacts.length} spec(s) du DAG existant.`;
 		return {
 			ok: true,
 			thread: [...prev.thread, userTurn, asst({ text: reply })],
 			placements,
+			impacts,
 			mode: "llm",
 			error: undefined,
 		};
@@ -163,6 +177,7 @@ export async function leftBrainAction(
 			asst({ reply: { kind: "fallback", placed: fb.length } }),
 		],
 		placements: mergePlacements(prev.placements, fb),
+		impacts: prev.impacts,
 		mode: "fallback",
 		error: undefined,
 	};

@@ -1,6 +1,7 @@
 import {
 	type ChatTurn,
 	type CockpitState,
+	type DagImpact,
 	type Mode,
 	type PairScope,
 	type Placement,
@@ -154,8 +155,10 @@ export interface LabView {
 	ok: boolean;
 	/** the multi-turn conversation (user + left-brain assistant turns). */
 	thread: ChatTurn[];
-	/** every spec the left brain placed, across all levels (the fan-out). */
+	/** every spec the left brain placed, across all levels (the fan-out — the NEW specs). */
 	placements: Placement[];
+	/** the EXISTING DAG specs the need impacts (the red wave on what is already there). */
+	impacts: DagImpact[];
 	mode: "idle" | "llm" | "fallback";
 	error?: string;
 }
@@ -172,6 +175,7 @@ export function emptyLab(): LabView {
 			},
 		],
 		placements: [],
+		impacts: [],
 		mode: "idle",
 	};
 }

@@ -6163,7 +6163,7 @@
 		"replyGreeting": "Hi 👋 Describe in natural language what you want — I generate the specs above the wall, across the 6 mirror-pairs of the chosen facet, and you watch the machines (on the right) react. The chat proposes; promotion to truth goes through a /goal.",
 		"replyRefused": "I can’t write truth from the chat — that’s the wall (§2). I propose, I don’t decide: promotion goes idea → mirror → /goal. Rephrase as intent and I’ll generate the specs.",
 		"replyGenerated": "I posted {n} spec(s) above the wall for the {facet} facet (the 6 mirror-pairs). {divergent, plural, =0 {Their machines turn green 🟢.} one {# machine still diverges 🔴 — the conscience computed it; refine its pair to realign it.} other {# machines still diverge 🔴 — the conscience computed it; refine their pairs to realign them.}}",
-		"placementsHeading": "Where the intelligence placed your specs — the verticale",
+		"placementsHeading": "What the intelligence generates and impacts",
 		"modeLlm": "Claude wired live",
 		"modeFallback": "deterministic mode — Claude unavailable",
 		"levelEmpty": "nothing here yet",
@@ -6176,6 +6176,9 @@
 		"level_operation": "Operation",
 		"level_entite": "Entity",
 		"facet_I": "Invariants",
-		"facet_X": "Experience"
+		"facet_X": "Experience",
+		"impactHeading": "Impact on the existing DAG",
+		"impactCount": "{n} spec(s) touched",
+		"impactReasonless": "touched by this need"
 	}
 }

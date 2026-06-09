@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 import {
 	type AssistantReply,
 	type ChatTurn,
+	EXISTING_DAG,
 	type Level,
 	placementsByLevel,
 } from "@/lib/ai-lab";
@@ -101,13 +102,16 @@ export function CockpitPanel() {
 	const placements = view.placements ?? [];
 	const byLevel = placementsByLevel(placements);
 	const thread = view.thread ?? [];
+	const impactById = new Map(
+		(view.impacts ?? []).map((i) => [i.specId, i.reason]),
+	);
 
 	return (
-		<div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[24rem_1fr]">
-			{/* ─────────────── GAUCHE — the conversation (real Claude) ─────────────── */}
+		<div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[34rem_1fr]">
+			{/* ─────────────── GAUCHE — the conversation (real Claude), agrandie ─────────────── */}
 			<section
 				aria-label={t("leftHeading")}
-				className="flex h-[36rem] flex-col rounded-xl border border-border bg-card"
+				className="flex h-[46rem] flex-col rounded-xl border border-border bg-card"
 			>
 				<div className="flex items-center justify-between gap-2 border-b border-border p-4">
 					<div className="space-y-1">
@@ -238,6 +242,63 @@ export function CockpitPanel() {
 						</li>
 					))}
 				</ol>
+
+				{/* ─── Impact sur le DAG existant — la vague de rouge sur ce qui existe déjà ─── */}
+				<div className="space-y-2 border-t border-border pt-3">
+					<div className="flex flex-wrap items-center justify-between gap-2">
+						<h3 className="text-sm font-semibold tracking-tight text-foreground">
+							{t("impactHeading")}
+						</h3>
+						<span
+							data-testid="impact-count"
+							className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+						>
+							{t("impactCount", { n: impactById.size })}
+						</span>
+					</div>
+					<ul className="space-y-1.5">
+						{EXISTING_DAG.map((s) => {
+							const impacted = impactById.has(s.id);
+							const reason = impactById.get(s.id);
+							return (
+								<li
+									key={s.id}
+									data-testid={`dag-${s.id}`}
+									data-impacted={impacted ? "1" : "0"}
+									className={`rounded-md border p-2 text-xs ${
+										impacted
+											? "border-destructive/40 bg-destructive/5"
+											: "border-border/60 bg-muted/10 opacity-70"
+									}`}
+								>
+									<div className="flex items-start gap-2">
+										<span
+											title={t(`facet_${s.facet}`)}
+											className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-foreground/10 font-mono text-[10px] font-bold text-foreground"
+										>
+											{s.facet}
+										</span>
+										<div className="min-w-0">
+											<span className="font-medium text-foreground">
+												{s.title}
+											</span>
+											<span className="text-muted-foreground">
+												{" "}
+												· {t(LEVEL_KEY[s.level])} · {s.pairId}
+											</span>
+											{impacted ? (
+												<div className="mt-0.5 flex items-start gap-1 text-destructive">
+													<span aria-hidden>🔴</span>
+													<span>{reason || t("impactReasonless")}</span>
+												</div>
+											) : null}
+										</div>
+									</div>
+								</li>
+							);
+						})}
+					</ul>
+				</div>
 
 				<p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
 					{t("wallNote")}
