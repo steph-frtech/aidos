@@ -1,0 +1,51 @@
+# 2026/06/09 07:57:25.104840 [TestDeriveDoc_OrderInvariant] [rapid] draw nctl: 1
+# 2026/06/09 07:57:25.104843 [TestDeriveDoc_OrderInvariant] [rapid] draw nop: 1
+# 2026/06/09 07:57:25.104844 [TestDeriveDoc_OrderInvariant] [rapid] draw nact: 2
+# 2026/06/09 07:57:25.104845 [TestDeriveDoc_OrderInvariant] [rapid] draw kid: "k1"
+# 2026/06/09 07:57:25.104846 [TestDeriveDoc_OrderInvariant] [rapid] draw ctlname: "checkout-button"
+# 2026/06/09 07:57:25.104847 [TestDeriveDoc_OrderInvariant] [rapid] draw vw: expr.LitNode{Value:true}
+# 2026/06/09 07:57:25.104855 [TestDeriveDoc_OrderInvariant] [rapid] draw ew: expr.LitNode{Value:true}
+# 2026/06/09 07:57:25.104856 [TestDeriveDoc_OrderInvariant] [rapid] draw trig: "checkout-submit"
+# 2026/06/09 07:57:25.104857 [TestDeriveDoc_OrderInvariant] [rapid] draw opname: "createOrder"
+# 2026/06/09 07:57:25.104858 [TestDeriveDoc_OrderInvariant] [rapid] draw opinput: "CreateOrderInput"
+# 2026/06/09 07:57:25.104859 [TestDeriveDoc_OrderInvariant] [rapid] draw emits: []string{"OrderCreated", "CartCleared"}
+# 2026/06/09 07:57:25.104861 [TestDeriveDoc_OrderInvariant] [rapid] draw actname: "checkout-submit"
+# 2026/06/09 07:57:25.104908 [TestDeriveDoc_OrderInvariant] [rapid] draw invoke: "createOrder"
+# 2026/06/09 07:57:25.104911 [TestDeriveDoc_OrderInvariant] [rapid] draw actname: "checkout-submit"
+# 2026/06/09 07:57:25.104915 [TestDeriveDoc_OrderInvariant] [rapid] draw invoke: "clearCart"
+# 2026/06/09 07:57:25.105207 [TestDeriveDoc_OrderInvariant] DeriveDoc not invariant under input ordering — emitter is not canonicalizing
+# 
+v0.4.8#1265539713112247256
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x38e38e38e38e4
+0x2
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1

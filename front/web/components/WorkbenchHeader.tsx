@@ -200,6 +200,11 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/grid", k: "grid" },
 			{ href: "/facet-completeness", k: "facetCompleteness" },
 			{ href: "/proof-type", k: "proofType" },
+			{ href: "/derive-doc", k: "deriveDocNav" },
+			{ href: "/doc-mirror", k: "docMirrorNav" },
+			{ href: "/facet-wire", k: "facetWireNav" },
+			{ href: "/conscience", k: "conscienceNav" },
+			{ href: "/autonomy", k: "autonomyNav" },
 		],
 	},
 	{

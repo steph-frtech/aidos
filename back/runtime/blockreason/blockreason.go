@@ -395,6 +395,20 @@ const (
 	// actionable BlockReason. The ordering and stability are COMPUTED over the DAG, never an LLM
 	// judgment (§6/§8). ADDED at S98 — additive enum extension.
 	CodeRollbackNotEarlier Code = "ROLLBACK_NOT_EARLIER"
+	// CodeAgentAutonomyExceeded — the FK10 AUTONOMY enforcer (back/kernel/autonomy,
+	// ROADMAP-fke FKE-11/34) refused an action whose REQUIRED autonomy level is strictly
+	// greater than the level the CoucheAgent DECLARED — fail-closed. autonomy_level ∈
+	// {A0..A8} is a CLOSED, DECLARED axis of the governed layer (the 6th axis of the
+	// agentlayer): A0 = read-only/propose-only, rising to A8 = fully autonomous; A8 is
+	// NEVER permitted on a critical action (a merge, a deploy, an irreversible truth
+	// write). An action above the declared level (an A1 agent attempting a merge that
+	// requires A6) is refused with this actionable BlockReason — the autonomy is never
+	// self-widened below the line: the only door to a higher level is the PROMOTION
+	// computed from the AgentRun history (N green E4+ runs without incident), itself
+	// frozen above the line via idea → mirror → /goal. The verdict is a PURE comparison
+	// (required ≤ declared, and never A8-on-critical), never an LLM judgment (§6/§8).
+	// ADDED at FK10 — additive enum extension (change_type: refine, never a removal).
+	CodeAgentAutonomyExceeded Code = "AGENT_AUTONOMY_EXCEEDED"
 )
 
 // Severity is the gravity marker of a refusal. The KRD §44.5 example uses
@@ -1025,6 +1039,24 @@ var reasons = map[Code]BlockReason{
 			"rollback_is_re_projection : le rollback RÉ-ÉMET l'app depuis la phase antérieure (S78), réconcilie le datastore (migration inverse expand-contract / Doltgres as-of), et ENREGISTRE la décision (append-only, provenance §9) — il ne restaure JAMAIS un artefact sandbox tel quel.",
 		},
 	},
+	CodeAgentAutonomyExceeded: {
+		Code:     CodeAgentAutonomyExceeded,
+		Severity: SeverityBlocking,
+		Explanation: "Refus de l'enforcer d'autonomie (FK10, back/kernel/autonomy, FKE-11/34) : l'action exige un " +
+			"niveau d'autonomie strictement supérieur à celui que le CoucheAgent a DÉCLARÉ — fail-closed. " +
+			"autonomy_level ∈ {A0..A8} est un axe FERMÉ et DÉCLARÉ de la couche gouvernée (le 6ᵉ axe de l'agentlayer) : " +
+			"A0 = lecture/proposition seule, jusqu'à A8 = pleinement autonome ; A8 n'est JAMAIS permis sur une action " +
+			"critique (un merge, un deploy, une écriture-vérité irréversible). Une action au-dessus du niveau déclaré " +
+			"(un agent A1 tentant un merge qui exige A6) est refusée. L'autonomie ne s'auto-élargit JAMAIS sous la ligne : " +
+			"la seule porte vers un niveau supérieur est la MONTÉE calculée depuis l'historique AgentRun (N runs verts E4+ " +
+			"sans incident), elle-même gelée au-dessus de la ligne via idée → miroir → /goal. Le verdict est une " +
+			"comparaison PURE (requis ≤ déclaré, et jamais A8-sur-critique), jamais un jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"stay_within_declared_level : ramenez l'action sous le niveau d'autonomie déclaré du CoucheAgent — une action critique reste toujours sous-A8 (escalade humaine obligatoire).",
+			"earn_promotion_from_history : pour qu'un agent monte d'un cran, accumulez N runs verts E4+ sans incident — la montée est CALCULÉE par PromotionFromHistory, jamais déclarée à la main.",
+			"freeze_the_higher_level_via_goal : la montée calculée est une PROPOSITION ; le nouveau niveau n'est figé qu'au-dessus de la ligne via idée → miroir → /goal → approbation (le mur §2).",
+		},
+	},
 }
 
 // codeOrder is the canonical enumeration order of the Code enum. Declared, never
@@ -1067,6 +1099,7 @@ var codeOrder = []Code{
 	CodeDomainAlreadyBound,
 	CodeEnvPromoteNotStable,
 	CodeRollbackNotEarlier,
+	CodeAgentAutonomyExceeded,
 }
 
 // Codes returns every Code in the closed enum, in canonical order.
