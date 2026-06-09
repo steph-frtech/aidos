@@ -101,3 +101,5 @@ next-env.d.ts
 /back/billing
 /back/erasure
 /back/collab
+/back/truth-level
+/back/grid

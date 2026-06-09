@@ -195,6 +195,11 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/adoption", k: "adoption" },
 			{ href: "/account-release", k: "accountRelease" },
 			{ href: "/governance", k: "governance" },
+			{ href: "/truth-level", k: "truthLevel" },
+			{ href: "/facets", k: "facets" },
+			{ href: "/grid", k: "grid" },
+			{ href: "/facet-completeness", k: "facetCompleteness" },
+			{ href: "/proof-type", k: "proofType" },
 		],
 	},
 	{

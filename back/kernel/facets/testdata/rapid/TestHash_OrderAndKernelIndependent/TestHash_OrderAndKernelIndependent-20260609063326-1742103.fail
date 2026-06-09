@@ -1,0 +1,37 @@
+# 2026/06/09 06:33:26.812528 [TestHash_OrderAndKernelIndependent] [rapid] draw n: 3
+# 2026/06/09 06:33:26.812531 [TestHash_OrderAndKernelIndependent] [rapid] draw inst-facet: 0
+# 2026/06/09 06:33:26.812532 [TestHash_OrderAndKernelIndependent] [rapid] draw inst-intent: false
+# 2026/06/09 06:33:26.812534 [TestHash_OrderAndKernelIndependent] [rapid] draw inst-proof: false
+# 2026/06/09 06:33:26.812534 [TestHash_OrderAndKernelIndependent] [rapid] draw inst-facet: 0
+# 2026/06/09 06:33:26.812535 [TestHash_OrderAndKernelIndependent] [rapid] draw inst-intent: false
+# 2026/06/09 06:33:26.812535 [TestHash_OrderAndKernelIndependent] [rapid] draw inst-proof: false
+# 2026/06/09 06:33:26.812536 [TestHash_OrderAndKernelIndependent] [rapid] draw inst-facet: 0
+# 2026/06/09 06:33:26.812536 [TestHash_OrderAndKernelIndependent] [rapid] draw inst-intent: false
+# 2026/06/09 06:33:26.812537 [TestHash_OrderAndKernelIndependent] [rapid] draw inst-proof: true
+# 2026/06/09 06:33:26.812539 [TestHash_OrderAndKernelIndependent] [rapid] draw kernel: ""
+# 2026/06/09 06:33:26.812543 [TestHash_OrderAndKernelIndependent] [rapid] draw seed: -1
+# 2026/06/09 06:33:26.812554 [TestHash_OrderAndKernelIndependent] Hash not order/kernel-independent: base=fff7fb3b14e2196e522452f9a2a9ddb1f525f8b9541835b629a8389a93c5f158 permuted=db51c55a31289928ff7c1b71a0d37a0f8599a86187ba814c2a4d5bcb995f07e6
+# 
+v0.4.8#1240458829386502507
+0x0
+0x38e38e38e38e4
+0x3
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x10000000000000
+0x0
+0x0
