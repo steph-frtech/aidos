@@ -3229,6 +3229,59 @@
 				"verdict": "The AI self-certifies.",
 				"pos": "below"
 			}
+		},
+		"bascule": {
+			"title": "The proof layers — E0 to E7",
+			"subtitle": "FK16, the evidence-first switch. Re-label an N0-N5 mirror corpus onto the E0-E7 ladder without any loss: each mirror gains its E derived from the test it actually runs, while keeping its old N — deprecated via lifecycle, never deleted (append-only).",
+			"ladderTitle": "The proof ladder E0 → E7",
+			"ladder": {
+				"e0": {
+					"name": "No evidence",
+					"desc": "nothing proves it — the floor (prose alone does not count)."
+				},
+				"e1": {
+					"name": "Syntax / typecheck / lint",
+					"desc": "the code compiles and passes strict typing + lint."
+				},
+				"e2": {
+					"name": "Unit tests",
+					"desc": "a function does what its signature promises."
+				},
+				"e3": {
+					"name": "Contract / integration",
+					"desc": "journey, workflow, port contract — the integration proof."
+				},
+				"e4": {
+					"name": "Security / regression",
+					"desc": "gosec / gitleaks / evals-injection + non-regression."
+				},
+				"e5": {
+					"name": "Fuzz / mutation / benchmark / evals",
+					"desc": "a ∀ invariant proven by property/fuzz/mutation."
+				},
+				"e6": {
+					"name": "Runtime / monitoring / rollback",
+					"desc": "production observation + rollback capability."
+				},
+				"e7": {
+					"name": "Formal / quasi-formal proof",
+					"desc": "Z3 / TLA+ — the rare catastrophic, unsampleable cap."
+				}
+			},
+			"relabelTitle": "Switch a corpus N → E",
+			"relabelHint": "Submit an N-typed mirror corpus (or leave empty for the sample). The switch derives each E and deprecates its N — losing nothing.",
+			"corpusLabel": "Corpus (JSON, empty = sample)",
+			"relabelBtn": "Switch to E0-E7",
+			"noLossOk": "Zero loss — every N mirror now carries its E, its N preserved and deprecated.",
+			"noLossBad": "Loss detected — a mirror or an N-label vanished. Switch refused.",
+			"colMirror": "Mirror",
+			"colN": "N (preserved)",
+			"colLifecycle": "N lifecycle",
+			"colE": "Derived E",
+			"histTitle": "Histogram by E-level",
+			"deprecatedNote": "The N-label is never deleted: its lifecycle moves to \"deprecated\" (kept for provenance), the typing authority moves to E. Anti-overwrite (§9): we deprecate, we do not destroy.",
+			"legacyTitle": "Show the old N0-N5 ladder (deprecated)",
+			"legacyNote": "The original N0-N5 ladder, preserved for provenance. It stays inspectable; the proof authority is now E0-E7."
 		}
 	},
 	"contextCompression": {

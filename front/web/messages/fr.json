@@ -3229,6 +3229,59 @@
 				"verdict": "L'IA s'auto-certifie.",
 				"pos": "below"
 			}
+		},
+		"bascule": {
+			"title": "Les couches de preuve — E0 à E7",
+			"subtitle": "FK16, la bascule evidence-first. Re-étiquetez un corpus de miroirs N0-N5 vers l'échelle E0-E7 sans aucune perte : chaque miroir gagne son E dérivé du test qu'il exécute réellement, tout en conservant son ancien N — déprécié par cycle de vie, jamais supprimé (append-only).",
+			"ladderTitle": "L'échelle de preuve E0 → E7",
+			"ladder": {
+				"e0": {
+					"name": "Aucune preuve",
+					"desc": "rien ne le prouve — le plancher (la prose seule ne compte pas)."
+				},
+				"e1": {
+					"name": "Syntaxe / typecheck / lint",
+					"desc": "le code compile et passe le typage strict + le lint."
+				},
+				"e2": {
+					"name": "Tests unitaires",
+					"desc": "une fonction fait ce que sa signature promet."
+				},
+				"e3": {
+					"name": "Contrat / intégration",
+					"desc": "parcours, workflow, contrat de port — la preuve d'intégration."
+				},
+				"e4": {
+					"name": "Sécurité / régression",
+					"desc": "gosec / gitleaks / evals-injection + non-régression."
+				},
+				"e5": {
+					"name": "Fuzz / mutation / benchmark / evals",
+					"desc": "un invariant ∀ prouvé par propriété/fuzz/mutation."
+				},
+				"e6": {
+					"name": "Runtime / monitoring / rollback",
+					"desc": "observation en production + capacité de rollback."
+				},
+				"e7": {
+					"name": "Preuve formelle / quasi-formelle",
+					"desc": "Z3 / TLA+ — la rare borne catastrophique non échantillonnable."
+				}
+			},
+			"relabelTitle": "Basculer un corpus N → E",
+			"relabelHint": "Soumettez un corpus de miroirs N-typés (ou laissez vide pour l'exemple). La bascule dérive le E de chacun et déprécie son N — sans rien perdre.",
+			"corpusLabel": "Corpus (JSON, vide = exemple)",
+			"relabelBtn": "Basculer vers E0-E7",
+			"noLossOk": "Zéro perte — chaque miroir N porte désormais son E, son N préservé et déprécié.",
+			"noLossBad": "Perte détectée — un miroir ou un N-label a disparu. Bascule refusée.",
+			"colMirror": "Miroir",
+			"colN": "N (préservé)",
+			"colLifecycle": "Cycle de vie N",
+			"colE": "E dérivé",
+			"histTitle": "Histogramme par niveau E",
+			"deprecatedNote": "Le N-label n'est jamais supprimé : son cycle de vie passe à « deprecated » (conservé pour la provenance), l'autorité de typage passe à E. Anti-overwrite (§9) : on déprécie, on ne détruit pas.",
+			"legacyTitle": "Voir l'ancienne échelle N0-N5 (dépréciée)",
+			"legacyNote": "L'échelle N0-N5 d'origine, préservée pour la provenance. Elle reste consultable ; l'autorité de preuve est désormais E0-E7."
 		}
 	},
 	"contextCompression": {

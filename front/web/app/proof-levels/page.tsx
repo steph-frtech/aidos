@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import {
+	type BasculeLabels,
+	type ELadderItem,
+	EvidenceBascule,
+} from "./EvidenceBascule";
 import { type Level, ProofLevelsExplorer } from "./ProofLevelsExplorer";
 
 export const metadata: Metadata = {
-	title: "Les couches de preuve (N0–N5) — AIDOS Workbench",
+	title: "Les couches de preuve (E0–E7) — AIDOS Workbench",
 	description:
-		"Un explorateur interactif des six niveaux de preuve de KRD : cliquez une couche pour voir sa langue de certification, sa forme de preuve et qui certifie (humain au-dessus de la ligne de flottaison, agent en dessous).",
+		"L'échelle de preuve evidence-first E0-E7 (FK16, la bascule). Re-étiquetez un corpus de miroirs N vers E sans perte : chaque miroir gagne son E dérivé tout en conservant (et dépréciant, jamais supprimant) son ancien N.",
 };
 
 /**
@@ -17,6 +22,29 @@ export const metadata: Metadata = {
  */
 export default async function ProofLevelsPage() {
 	const t = await getTranslations("proofLevels");
+	const te = await getTranslations("proofLevels.bascule");
+
+	const eLadder: ELadderItem[] = [0, 1, 2, 3, 4, 5, 6, 7].map((n) => ({
+		level: n,
+		name: te(`ladder.e${n}.name`),
+		desc: te(`ladder.e${n}.desc`),
+	}));
+
+	const basculeLabels: BasculeLabels = {
+		ladderTitle: te("ladderTitle"),
+		relabelTitle: te("relabelTitle"),
+		relabelHint: te("relabelHint"),
+		corpusLabel: te("corpusLabel"),
+		relabelBtn: te("relabelBtn"),
+		noLossOk: te("noLossOk"),
+		noLossBad: te("noLossBad"),
+		colMirror: te("colMirror"),
+		colN: te("colN"),
+		colLifecycle: te("colLifecycle"),
+		colE: te("colE"),
+		histTitle: te("histTitle"),
+		deprecatedNote: te("deprecatedNote"),
+	};
 
 	const levels: Level[] = ["n0", "n1", "n2", "n3", "n4", "n5"].map((k) => ({
 		key: k,
@@ -51,16 +79,31 @@ export default async function ProofLevelsPage() {
 						{t("eyebrow")}
 					</span>
 					<h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-						{t("title")}
+						{te("title")}
 					</h1>
 					<p className="max-w-2xl text-base leading-relaxed text-muted-foreground">
-						{t("subtitle")}
+						{te("subtitle")}
 					</p>
 				</header>
 
+				{/* FK16 — la bascule E0-E7 (primary, action-capable) */}
 				<div className="mt-10">
-					<ProofLevelsExplorer levels={levels} labels={labels} />
+					<EvidenceBascule ladder={eLadder} labels={basculeLabels} />
 				</div>
+
+				{/* The legacy N0-N5 explorer — PRESERVED (anti-overwrite §9), now the deprecated lens */}
+				<details className="mt-12 rounded-xl border border-border bg-muted/30 p-4">
+					<summary
+						data-testid="legacy-n-toggle"
+						className="cursor-pointer text-sm font-semibold text-muted-foreground"
+					>
+						{te("legacyTitle")}
+					</summary>
+					<p className="mt-2 mb-4 text-xs text-muted-foreground">
+						{te("legacyNote")}
+					</p>
+					<ProofLevelsExplorer levels={levels} labels={labels} />
+				</details>
 
 				<footer className="mt-10 border-t border-border pt-6 text-xs text-muted-foreground">
 					<a
