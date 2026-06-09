@@ -93,3 +93,6 @@ next-env.d.ts
 /back/provision
 /back/apisurface
 /back/deploy
+/back/reality-ingest
+/back/strangler
+/back/federation
