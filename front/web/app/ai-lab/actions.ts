@@ -104,6 +104,33 @@ async function callClaude(message: string): Promise<{
 	}
 }
 
+// ── Deploy — launch the project's associated docker and show the live result ──
+//
+// The « Déployer & voir » button runs `docker compose up -d` on the project's FIXED stack
+// (idempotent ; no user input → no injection) and reports the live URL. THE WALL §2: this is a
+// below-the-line projection action (run the emitted app's container), never a truth write.
+// OpenQuestion (sécurité) : a public button that execs docker — gate it (auth/rate-limit) before
+// real exposure ; here it targets one fixed demo stack only.
+const DEMO_STACK =
+	process.env.AIDOS_DEMO_STACK ||
+	"/data/dev/aidos/.deploy-demo/app/docker-compose.yml";
+const DEMO_URL = process.env.AIDOS_DEMO_URL || "https://guestbook.sagedesk.fr";
+
+async function deployStack(): Promise<{
+	status: "up" | "error";
+	detail: string;
+}> {
+	try {
+		await execFileP("docker", ["compose", "-f", DEMO_STACK, "up", "-d"], {
+			timeout: 120_000,
+			maxBuffer: 8 * 1024 * 1024,
+		});
+		return { status: "up", detail: "docker compose up -d — conteneurs lancés" };
+	} catch (e) {
+		return { status: "error", detail: String(e).slice(0, 240) };
+	}
+}
+
 /** Deterministic fallback when Claude is unavailable: place the 6 pairs at opération/F. */
 function fallbackPlacements(message: string): Placement[] {
 	const intent = message.trim().slice(0, 120);
@@ -213,6 +240,23 @@ export async function leftBrainAction(
 				override,
 			),
 			selectedCell: { level, facet },
+			error: undefined,
+		};
+	}
+
+	// DEPLOY — launch the project's associated docker stack and show the live result.
+	if (intent === "deploy") {
+		const res = await deployStack();
+		return {
+			...prev,
+			deploy: {
+				status: res.status,
+				url: DEMO_URL,
+				app: "guestbook",
+				db: "app_de908ecc3159",
+				image: "postgres:16-alpine",
+				detail: res.detail,
+			},
 			error: undefined,
 		};
 	}

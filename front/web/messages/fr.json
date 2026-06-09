@@ -6197,6 +6197,11 @@
 		"graphAxisX": "X → verticale (produit → entité)",
 		"graphAxisY": "Y → facette (F·I·S·B·R·V·M·X)",
 		"graphAxisZ": "Z → profondeur (spec → sous-specs)",
-		"impactResolved": "résolu (la cellule qui l’adresse est validée)"
+		"impactResolved": "résolu (la cellule qui l’adresse est validée)",
+		"deployHeading": "Déployer & voir",
+		"deployHint": "Lance le docker associé au projet (postgres + app émise) et affiche le résultat en live.",
+		"deployCta": "Déployer & voir",
+		"deployWorking": "Déploiement…",
+		"deployPreview": "Aperçu de l’app déployée"
 	}
 }

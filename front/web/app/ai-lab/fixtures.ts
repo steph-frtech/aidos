@@ -162,6 +162,15 @@ export interface LabView {
 	impacts: DagImpact[];
 	/** the navigable big-table cell currently open (level × facet) — its anatomy descent is shown. */
 	selectedCell?: { level: Level; facet: Facet };
+	/** the result of the « Déployer & voir » button: the associated docker + its live URL. */
+	deploy?: {
+		status: "up" | "error";
+		url: string;
+		app: string;
+		db: string;
+		image: string;
+		detail: string;
+	};
 	mode: "idle" | "llm" | "fallback";
 	error?: string;
 }

@@ -501,6 +501,66 @@ export function CockpitPanel() {
 				<p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
 					{t("wallNote")}
 				</p>
+
+				{/* ── DÉPLOIEMENT — lancer le docker associé et voir le résultat live ── */}
+				<div
+					data-testid="deploy"
+					className="space-y-2 rounded-lg border border-border bg-muted/20 p-3"
+				>
+					<div className="flex flex-wrap items-center justify-between gap-2">
+						<div>
+							<h3 className="text-sm font-semibold tracking-tight text-foreground">
+								{t("deployHeading")}
+							</h3>
+							<p className="text-xs text-muted-foreground">{t("deployHint")}</p>
+						</div>
+						<form action={action}>
+							<input type="hidden" name="intent" value="deploy" />
+							<SubmitButton
+								label={t("deployCta")}
+								working={t("deployWorking")}
+								testid="deploy-btn"
+							/>
+						</form>
+					</div>
+
+					{view.deploy ? (
+						<div
+							data-testid="deploy-result"
+							data-status={view.deploy.status}
+							className={`space-y-2 rounded-md border p-2 text-xs ${
+								view.deploy.status === "up"
+									? "border-green-500/40 bg-green-500/5"
+									: "border-destructive/40 bg-destructive/5"
+							}`}
+						>
+							<div className="font-medium text-foreground">
+								{view.deploy.status === "up" ? "🟢 " : "🔴 "}
+								{view.deploy.app} · {view.deploy.image} ·{" "}
+								<span className="font-mono">{view.deploy.db}</span>
+							</div>
+							<div className="text-muted-foreground">{view.deploy.detail}</div>
+							{view.deploy.status === "up" ? (
+								<>
+									<a
+										href={view.deploy.url}
+										target="_blank"
+										rel="noopener noreferrer"
+										data-testid="deploy-url"
+										className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+									>
+										{view.deploy.url} ↗
+									</a>
+									<iframe
+										src={view.deploy.url}
+										title={t("deployPreview")}
+										className="h-64 w-full rounded-md border border-border bg-background"
+									/>
+								</>
+							) : null}
+						</div>
+					) : null}
+				</div>
 			</section>
 		</div>
 	);
