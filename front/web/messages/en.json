@@ -6190,6 +6190,12 @@
 		"statusRealized": "realized (below the wall)",
 		"pairPending": "to come",
 		"detailNone": "(no detail)",
-		"selectCellHint": "Click a cell of the table above to open its anatomy (the 6 pairs) and validate the descent."
+		"selectCellHint": "Click a cell of the table above to open its anatomy (the 6 pairs) and validate the descent.",
+		"viewTable": "Table",
+		"viewGraph": "3D graph",
+		"graphEmpty": "No spec to graph yet — describe a need in the chat, the nodes will appear here.",
+		"graphAxisX": "X → verticale (product → entity)",
+		"graphAxisY": "Y → facet (F·I·S·B·R·V·M·X)",
+		"graphAxisZ": "Z → depth (spec → sub-specs)"
 	}
 }

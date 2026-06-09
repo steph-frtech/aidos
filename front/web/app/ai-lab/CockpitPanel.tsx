@@ -1,11 +1,12 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
 	ALL_FACETS,
 	type AssistantReply,
+	buildSpecGraph,
 	type ChatTurn,
 	cellPlacements,
 	EXISTING_DAG,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/ai-lab";
 import { leftBrainAction } from "./actions";
 import { emptyLab, type LabView } from "./fixtures";
+import { SpecGraph3D } from "./SpecGraph3D";
 
 /**
  * CockpitPanel — the FKE-38 AI Lab. GAUCHE: a conversation wired to Claude (the left brain),
@@ -134,6 +136,8 @@ export function CockpitPanel() {
 	);
 	const sel = view.selectedCell;
 	const selPairs = sel ? cellPlacements(placements, sel.level, sel.facet) : [];
+	const [rightView, setRightView] = useState<"table" | "graph">("table");
+	const graph = buildSpecGraph(placements, EXISTING_DAG, view.impacts ?? []);
 
 	return (
 		<div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[36rem_1fr]">
@@ -206,226 +210,275 @@ export function CockpitPanel() {
 				aria-label={t("gridTableHeading")}
 				className="space-y-4 rounded-xl border border-border bg-card p-5"
 			>
-				{/* 1) the navigable big table: niveau × facette */}
-				<div className="space-y-2">
-					<h2 className="text-sm font-semibold tracking-tight text-foreground">
-						{t("gridTableHeading")}
-					</h2>
-					<p className="text-xs text-muted-foreground">{t("gridTableHint")}</p>
-					<div className="overflow-x-auto">
-						<table className="w-full border-separate border-spacing-1 text-xs">
-							<thead>
-								<tr>
-									<th className="p-1" />
-									{ALL_FACETS.map((f) => (
-										<th
-											key={f}
-											title={t(`facet_${f}`)}
-											className="p-1 text-center font-semibold text-foreground"
-										>
-											{f}
-										</th>
-									))}
-								</tr>
-							</thead>
-							<tbody>
-								{VERTICAL_LEVELS.map((level) => (
-									<tr key={level}>
-										<th className="whitespace-nowrap p-1 text-right text-[11px] font-medium text-muted-foreground">
-											{t(LEVEL_KEY[level])}
-										</th>
-										{ALL_FACETS.map((facet) => {
-											const cells = cellPlacements(placements, level, facet);
-											const count = cells.length;
-											const validated = cells.filter(
-												(c) =>
-													c.status === "validated" || c.status === "realized",
-											).length;
-											const active =
-												sel?.level === level && sel?.facet === facet;
-											return (
-												<td key={facet} className="p-0.5">
-													<form action={action}>
-														<input type="hidden" name="intent" value="select" />
-														<input type="hidden" name="level" value={level} />
-														<input type="hidden" name="facet" value={facet} />
-														<button
-															type="submit"
-															data-testid={`cell-${LEVEL_KEY[level]}-${facet}`}
-															data-count={count}
-															className={`flex h-8 w-full items-center justify-center rounded border text-[10px] transition-colors ${
-																active
-																	? "border-primary bg-primary/15 font-semibold text-primary ring-1 ring-primary"
-																	: count
-																		? "border-border bg-amber-500/10 text-foreground hover:bg-amber-500/20"
-																		: "border-dashed border-border/50 bg-muted/20 text-muted-foreground hover:bg-muted/40"
-															}`}
-														>
-															{count ? `${validated}/${count}` : "·"}
-														</button>
-													</form>
-												</td>
-											);
-										})}
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-				</div>
-
-				{/* 2) the anatomy descent of the selected cell */}
-				{sel ? (
-					<div
-						data-testid="anatomy"
-						className="space-y-2 rounded-lg border border-border bg-background p-3"
-					>
-						<h3 className="text-sm font-semibold tracking-tight text-foreground">
-							{t("anatomyHeading", {
-								level: t(LEVEL_KEY[sel.level]),
-								facet: t(`facet_${sel.facet}`),
-							})}
-						</h3>
-						<ol className="space-y-1.5">
-							{MIRROR_PAIRS.map((pair) => {
-								const placed = selPairs.find((p) => p.pairId === pair.id);
-								const badge = placed ? statusBadge(placed.status, t) : null;
-								const canValidate = placed && placed.status !== "realized";
-								const isLast = !nextPairId(pair.id);
-								return (
-									<li
-										key={pair.id}
-										data-testid={`pair-${pair.id}`}
-										data-status={
-											placed?.status ?? (placed ? "proposed" : "pending")
-										}
-										className={`rounded-md border p-2 text-xs ${
-											placed
-												? "border-border bg-card"
-												: "border-dashed border-border/50 bg-muted/10 opacity-60"
-										}`}
-									>
-										<div className="flex items-center justify-between gap-2">
-											<span className="font-medium text-foreground">
-												{pair.above}
-												<span className="text-muted-foreground">
-													{" "}
-													↔ {pair.below}
-												</span>
-											</span>
-											{badge ? (
-												<span
-													className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${badge.cls}`}
-												>
-													{badge.label}
-												</span>
-											) : (
-												<span className="text-[10px] text-muted-foreground">
-													{t("pairPending")}
-												</span>
-											)}
-										</div>
-										{placed ? (
-											<>
-												<details className="mt-1">
-													<summary className="cursor-pointer text-muted-foreground">
-														{placed.spec}
-													</summary>
-													<p className="mt-1 border-l-2 border-border pl-2 text-muted-foreground">
-														{placed.detail || t("detailNone")}
-													</p>
-												</details>
-												{canValidate ? (
-													<form action={action} className="mt-1.5">
-														<input
-															type="hidden"
-															name="intent"
-															value="validate"
-														/>
-														<input
-															type="hidden"
-															name="level"
-															value={sel.level}
-														/>
-														<input
-															type="hidden"
-															name="facet"
-															value={sel.facet}
-														/>
-														<input
-															type="hidden"
-															name="pairId"
-															value={pair.id}
-														/>
-														<SubmitButton
-															label={
-																isLast ? t("realizeCta") : t("validateCta")
-															}
-															working={t("working")}
-															testid={`validate-${pair.id}`}
-															variant="ghost"
-														/>
-													</form>
-												) : null}
-											</>
-										) : null}
-									</li>
-								);
-							})}
-						</ol>
-					</div>
-				) : (
-					<p
-						data-testid="select-hint"
-						className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground"
-					>
-						{t("selectCellHint")}
-					</p>
-				)}
-
-				{/* 3) impact on the existing DAG */}
-				<div className="space-y-2 border-t border-border pt-3">
-					<div className="flex flex-wrap items-center justify-between gap-2">
-						<h3 className="text-sm font-semibold tracking-tight text-foreground">
-							{t("impactHeading")}
-						</h3>
-						<span
-							data-testid="impact-count"
-							className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+				{/* view toggle: the navigable table ↔ the 3D spec graph */}
+				<div
+					data-testid="view-toggle"
+					className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1"
+				>
+					{(["table", "graph"] as const).map((v) => (
+						<button
+							key={v}
+							type="button"
+							onClick={() => setRightView(v)}
+							data-testid={`view-${v}`}
+							className={`flex-1 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+								rightView === v
+									? "bg-card text-foreground shadow-sm"
+									: "text-muted-foreground hover:text-foreground"
+							}`}
 						>
-							{t("impactCount", { n: impactById.size })}
-						</span>
-					</div>
-					<ul className="space-y-1.5">
-						{EXISTING_DAG.map((s) => {
-							const impacted = impactById.has(s.id);
-							const reason = impactById.get(s.id);
-							return (
-								<li
-									key={s.id}
-									data-testid={`dag-${s.id}`}
-									data-impacted={impacted ? "1" : "0"}
-									className={`rounded-md border p-2 text-xs ${
-										impacted
-											? "border-destructive/40 bg-destructive/5"
-											: "border-border/60 bg-muted/10 opacity-70"
-									}`}
-								>
-									<span className="font-medium text-foreground">{s.title}</span>
-									<span className="text-muted-foreground">
-										{" "}
-										· {t(LEVEL_KEY[s.level])} · {s.facet}·{s.pairId}
-									</span>
-									{impacted ? (
-										<div className="mt-0.5 text-destructive">
-											🔴 {reason || t("impactReasonless")}
-										</div>
-									) : null}
-								</li>
-							);
-						})}
-					</ul>
+							{v === "table" ? t("viewTable") : t("viewGraph")}
+						</button>
+					))}
 				</div>
+
+				{rightView === "graph" ? (
+					<SpecGraph3D graph={graph} />
+				) : (
+					<>
+						{/* 1) the navigable big table: niveau × facette */}
+						<div className="space-y-2">
+							<h2 className="text-sm font-semibold tracking-tight text-foreground">
+								{t("gridTableHeading")}
+							</h2>
+							<p className="text-xs text-muted-foreground">
+								{t("gridTableHint")}
+							</p>
+							<div className="overflow-x-auto">
+								<table className="w-full border-separate border-spacing-1 text-xs">
+									<thead>
+										<tr>
+											<th className="p-1" />
+											{ALL_FACETS.map((f) => (
+												<th
+													key={f}
+													title={t(`facet_${f}`)}
+													className="p-1 text-center font-semibold text-foreground"
+												>
+													{f}
+												</th>
+											))}
+										</tr>
+									</thead>
+									<tbody>
+										{VERTICAL_LEVELS.map((level) => (
+											<tr key={level}>
+												<th className="whitespace-nowrap p-1 text-right text-[11px] font-medium text-muted-foreground">
+													{t(LEVEL_KEY[level])}
+												</th>
+												{ALL_FACETS.map((facet) => {
+													const cells = cellPlacements(
+														placements,
+														level,
+														facet,
+													);
+													const count = cells.length;
+													const validated = cells.filter(
+														(c) =>
+															c.status === "validated" ||
+															c.status === "realized",
+													).length;
+													const active =
+														sel?.level === level && sel?.facet === facet;
+													return (
+														<td key={facet} className="p-0.5">
+															<form action={action}>
+																<input
+																	type="hidden"
+																	name="intent"
+																	value="select"
+																/>
+																<input
+																	type="hidden"
+																	name="level"
+																	value={level}
+																/>
+																<input
+																	type="hidden"
+																	name="facet"
+																	value={facet}
+																/>
+																<button
+																	type="submit"
+																	data-testid={`cell-${LEVEL_KEY[level]}-${facet}`}
+																	data-count={count}
+																	className={`flex h-8 w-full items-center justify-center rounded border text-[10px] transition-colors ${
+																		active
+																			? "border-primary bg-primary/15 font-semibold text-primary ring-1 ring-primary"
+																			: count
+																				? "border-border bg-amber-500/10 text-foreground hover:bg-amber-500/20"
+																				: "border-dashed border-border/50 bg-muted/20 text-muted-foreground hover:bg-muted/40"
+																	}`}
+																>
+																	{count ? `${validated}/${count}` : "·"}
+																</button>
+															</form>
+														</td>
+													);
+												})}
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+						</div>
+
+						{/* 2) the anatomy descent of the selected cell */}
+						{sel ? (
+							<div
+								data-testid="anatomy"
+								className="space-y-2 rounded-lg border border-border bg-background p-3"
+							>
+								<h3 className="text-sm font-semibold tracking-tight text-foreground">
+									{t("anatomyHeading", {
+										level: t(LEVEL_KEY[sel.level]),
+										facet: t(`facet_${sel.facet}`),
+									})}
+								</h3>
+								<ol className="space-y-1.5">
+									{MIRROR_PAIRS.map((pair) => {
+										const placed = selPairs.find((p) => p.pairId === pair.id);
+										const badge = placed ? statusBadge(placed.status, t) : null;
+										const canValidate = placed && placed.status !== "realized";
+										const isLast = !nextPairId(pair.id);
+										return (
+											<li
+												key={pair.id}
+												data-testid={`pair-${pair.id}`}
+												data-status={
+													placed?.status ?? (placed ? "proposed" : "pending")
+												}
+												className={`rounded-md border p-2 text-xs ${
+													placed
+														? "border-border bg-card"
+														: "border-dashed border-border/50 bg-muted/10 opacity-60"
+												}`}
+											>
+												<div className="flex items-center justify-between gap-2">
+													<span className="font-medium text-foreground">
+														{pair.above}
+														<span className="text-muted-foreground">
+															{" "}
+															↔ {pair.below}
+														</span>
+													</span>
+													{badge ? (
+														<span
+															className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${badge.cls}`}
+														>
+															{badge.label}
+														</span>
+													) : (
+														<span className="text-[10px] text-muted-foreground">
+															{t("pairPending")}
+														</span>
+													)}
+												</div>
+												{placed ? (
+													<>
+														<details className="mt-1">
+															<summary className="cursor-pointer text-muted-foreground">
+																{placed.spec}
+															</summary>
+															<p className="mt-1 border-l-2 border-border pl-2 text-muted-foreground">
+																{placed.detail || t("detailNone")}
+															</p>
+														</details>
+														{canValidate ? (
+															<form action={action} className="mt-1.5">
+																<input
+																	type="hidden"
+																	name="intent"
+																	value="validate"
+																/>
+																<input
+																	type="hidden"
+																	name="level"
+																	value={sel.level}
+																/>
+																<input
+																	type="hidden"
+																	name="facet"
+																	value={sel.facet}
+																/>
+																<input
+																	type="hidden"
+																	name="pairId"
+																	value={pair.id}
+																/>
+																<SubmitButton
+																	label={
+																		isLast ? t("realizeCta") : t("validateCta")
+																	}
+																	working={t("working")}
+																	testid={`validate-${pair.id}`}
+																	variant="ghost"
+																/>
+															</form>
+														) : null}
+													</>
+												) : null}
+											</li>
+										);
+									})}
+								</ol>
+							</div>
+						) : (
+							<p
+								data-testid="select-hint"
+								className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground"
+							>
+								{t("selectCellHint")}
+							</p>
+						)}
+
+						{/* 3) impact on the existing DAG */}
+						<div className="space-y-2 border-t border-border pt-3">
+							<div className="flex flex-wrap items-center justify-between gap-2">
+								<h3 className="text-sm font-semibold tracking-tight text-foreground">
+									{t("impactHeading")}
+								</h3>
+								<span
+									data-testid="impact-count"
+									className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+								>
+									{t("impactCount", { n: impactById.size })}
+								</span>
+							</div>
+							<ul className="space-y-1.5">
+								{EXISTING_DAG.map((s) => {
+									const impacted = impactById.has(s.id);
+									const reason = impactById.get(s.id);
+									return (
+										<li
+											key={s.id}
+											data-testid={`dag-${s.id}`}
+											data-impacted={impacted ? "1" : "0"}
+											className={`rounded-md border p-2 text-xs ${
+												impacted
+													? "border-destructive/40 bg-destructive/5"
+													: "border-border/60 bg-muted/10 opacity-70"
+											}`}
+										>
+											<span className="font-medium text-foreground">
+												{s.title}
+											</span>
+											<span className="text-muted-foreground">
+												{" "}
+												· {t(LEVEL_KEY[s.level])} · {s.facet}·{s.pairId}
+											</span>
+											{impacted ? (
+												<div className="mt-0.5 text-destructive">
+													🔴 {reason || t("impactReasonless")}
+												</div>
+											) : null}
+										</li>
+									);
+								})}
+							</ul>
+						</div>
+					</>
+				)}
 
 				<p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
 					{t("wallNote")}

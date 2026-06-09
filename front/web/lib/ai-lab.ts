@@ -950,3 +950,135 @@ export function validateAndDescend(
 	};
 	return mergePlacements(updated, [child]);
 }
+
+// ── The 3D spec graph — navigate « plein de specs » like Obsidian, on the 3 axes ──
+//
+// When there are many specs, lists/tables don't scale ; a GRAPH does. buildSpecGraph is the PURE,
+// deterministic data of an Obsidian-style 3D graph: every spec (placed) and every existing-DAG
+// spec is a NODE positioned on the THREE FKE axes — x = verticale (level), y = facette,
+// z = profondeur d'anatomie (spec → sous-spec : Spec→Comportement→…→Evidence). LINKS = the
+// anatomy descent (spec→sous-spec within a cell) + the impact on the existing DAG. The 3D RENDER
+// is a lib (react-force-graph-3d) ; this data is pure + tested (same input ⇒ same graph).
+
+/** A node of the 3D spec graph, positioned on the 3 FKE axes. */
+export interface SpecGraphNode {
+	id: string;
+	label: string;
+	level: Level;
+	facet: Facet;
+	/** anatomy depth 0..5 (spec → … → evidence) = the sous-spec axis. */
+	depth: number;
+	kind: "spec" | "dag";
+	status?: SpecStatus;
+	/** whether an existing-DAG node is impacted by the current need (the red wave). */
+	impacted?: boolean;
+	/** deterministic 3-axis position (x = verticale, y = facette, z = profondeur). */
+	x: number;
+	y: number;
+	z: number;
+}
+
+/** A link of the 3D spec graph. */
+export interface SpecGraphLink {
+	source: string;
+	target: string;
+	kind: "descent" | "impact";
+}
+
+export interface SpecGraph {
+	nodes: SpecGraphNode[];
+	links: SpecGraphLink[];
+}
+
+/** Axis spacing (world units) — declared, so positions are reproducible. */
+const GRAPH_AXIS = 70;
+
+/**
+ * buildSpecGraph — the PURE, deterministic data of the 3D spec graph. Nodes = placed specs +
+ * existing-DAG specs, positioned by (verticale level × facette × anatomy depth). Links = the
+ * anatomy descent (consecutive pairs of a cell) + the impact on the existing DAG (an impacted DAG
+ * node linked to the lowest-depth placement of the same cell, when one exists). Same input ⇒ same
+ * graph (ordered nodes + links). NO LLM ; the wall §2: it reads, writes nothing.
+ */
+export function buildSpecGraph(
+	placements: Placement[],
+	dag: ExistingSpec[],
+	impacts: DagImpact[],
+): SpecGraph {
+	const lvl = (l: Level) => VERTICAL_LEVELS.indexOf(l);
+	const fct = (f: Facet) => ALL_FACETS.indexOf(f);
+	const dep = (p: string) =>
+		Math.max(
+			0,
+			MIRROR_PAIRS.findIndex((m) => m.id === p),
+		);
+	const pos = (level: Level, facet: Facet, pairId: string) => ({
+		x: lvl(level) * GRAPH_AXIS,
+		y: fct(facet) * GRAPH_AXIS,
+		z: dep(pairId) * GRAPH_AXIS,
+	});
+
+	const nodes: SpecGraphNode[] = [];
+	for (const p of placements) {
+		nodes.push({
+			id: `p:${placementKey(p)}`,
+			label: p.spec.slice(0, 60),
+			level: p.level,
+			facet: p.facet,
+			depth: dep(p.pairId),
+			kind: "spec",
+			status: p.status,
+			...pos(p.level, p.facet, p.pairId),
+		});
+	}
+	const impactedIds = new Set(impacts.map((i) => i.specId));
+	for (const s of dag) {
+		nodes.push({
+			id: `d:${s.id}`,
+			label: s.title.slice(0, 60),
+			level: s.level,
+			facet: s.facet,
+			depth: dep(s.pairId),
+			kind: "dag",
+			impacted: impactedIds.has(s.id),
+			...pos(s.level, s.facet, s.pairId),
+		});
+	}
+	nodes.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+	const links: SpecGraphLink[] = [];
+	// descent links: consecutive anatomy pairs within each (level × facet) cell.
+	const byCell = new Map<string, Placement[]>();
+	for (const p of placements) {
+		const k = `${p.level}|${p.facet}`;
+		const arr = byCell.get(k) ?? [];
+		arr.push(p);
+		byCell.set(k, arr);
+	}
+	for (const arr of byCell.values()) {
+		const sorted = [...arr].sort((a, b) => dep(a.pairId) - dep(b.pairId));
+		for (let i = 0; i + 1 < sorted.length; i++)
+			links.push({
+				source: `p:${placementKey(sorted[i])}`,
+				target: `p:${placementKey(sorted[i + 1])}`,
+				kind: "descent",
+			});
+	}
+	// impact links: an impacted DAG node ↔ the lowest-depth placement of its (level × facet) cell.
+	for (const s of dag) {
+		if (!impactedIds.has(s.id)) continue;
+		const sameCell = placements
+			.filter((p) => p.level === s.level && p.facet === s.facet)
+			.sort((a, b) => dep(a.pairId) - dep(b.pairId));
+		if (sameCell.length)
+			links.push({
+				source: `p:${placementKey(sameCell[0])}`,
+				target: `d:${s.id}`,
+				kind: "impact",
+			});
+	}
+	links.sort((a, b) =>
+		`${a.source}>${a.target}` < `${b.source}>${b.target}` ? -1 : 1,
+	);
+	return { nodes, links };
+}

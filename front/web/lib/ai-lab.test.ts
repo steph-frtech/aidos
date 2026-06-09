@@ -24,6 +24,7 @@ import {
 	assistantReply,
 	buildCockpit,
 	buildGrid,
+	buildSpecGraph,
 	cellKey,
 	cellPlacements,
 	EXISTING_DAG,
@@ -522,5 +523,63 @@ describe("FK11 — the anatomy DESCENT (validate a pair → generate the next, p
 		]);
 		const cell = cellPlacements(all, "vue", "F");
 		expect(cell.map((p) => p.pairId)).toEqual(["spec", "scenarios"]);
+	});
+});
+
+describe("FK11 — the 3D spec graph (positions on the 3 axes, deterministic)", () => {
+	it("places each spec on the 3 axes (x=verticale, y=facette, z=depth) + the existing DAG", () => {
+		const placements = validatePlacements([
+			{ level: "produit", facet: "F", pairId: "spec", spec: "racine" },
+			{
+				level: "produit",
+				facet: "F",
+				pairId: "behavior",
+				spec: "comportement",
+			},
+		]);
+		const g = buildSpecGraph(placements, EXISTING_DAG, []);
+		expect(g.nodes.length).toBe(placements.length + EXISTING_DAG.length);
+		const root = g.nodes.find((n) => n.label === "racine");
+		expect(root).toBeDefined();
+		// produit is the first level (x=0), F the first facet (y=0), spec depth 0 (z=0).
+		expect(root?.x).toBe(0);
+		expect(root?.y).toBe(0);
+		expect(root?.z).toBe(0);
+		const beh = g.nodes.find((n) => n.depth === 1 && n.kind === "spec");
+		expect(beh?.z).toBeGreaterThan(0); // a sous-spec sits deeper on z
+	});
+
+	it("links the anatomy descent (spec→sous-spec) within a cell", () => {
+		const placements = validatePlacements([
+			{ level: "vue", facet: "S", pairId: "spec", spec: "a" },
+			{ level: "vue", facet: "S", pairId: "behavior", spec: "b" },
+			{ level: "vue", facet: "S", pairId: "scenarios", spec: "c" },
+		]);
+		const g = buildSpecGraph(placements, [], []);
+		const descent = g.links.filter((l) => l.kind === "descent");
+		expect(descent).toHaveLength(2); // spec→behavior, behavior→scenarios
+	});
+
+	it("links an impacted DAG node to the placement of its cell + is deterministic", () => {
+		const dagNode = EXISTING_DAG[0]; // produit/F/spec
+		const placements = validatePlacements([
+			{
+				level: dagNode.level,
+				facet: dagNode.facet,
+				pairId: "spec",
+				spec: "touche",
+			},
+		]);
+		const g1 = buildSpecGraph(placements, EXISTING_DAG, [
+			{ specId: dagNode.id, reason: "impacté" },
+		]);
+		const g2 = buildSpecGraph(placements, EXISTING_DAG, [
+			{ specId: dagNode.id, reason: "impacté" },
+		]);
+		expect(g1.links.some((l) => l.kind === "impact")).toBe(true);
+		expect(g1.nodes.find((n) => n.id === `d:${dagNode.id}`)?.impacted).toBe(
+			true,
+		);
+		expect(JSON.stringify(g1)).toBe(JSON.stringify(g2)); // deterministic
 	});
 });

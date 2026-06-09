@@ -6190,6 +6190,12 @@
 		"statusRealized": "réalisé (sous le mur)",
 		"pairPending": "à venir",
 		"detailNone": "(pas de détail)",
-		"selectCellHint": "Cliquez une cellule de la table ci-dessus pour ouvrir son anatomie (les 6 paires) et valider la descente."
+		"selectCellHint": "Cliquez une cellule de la table ci-dessus pour ouvrir son anatomie (les 6 paires) et valider la descente.",
+		"viewTable": "Table",
+		"viewGraph": "Graphe 3D",
+		"graphEmpty": "Aucune spec à grapher pour l’instant — décrivez un besoin dans le chat, les nœuds apparaîtront ici.",
+		"graphAxisX": "X → verticale (produit → entité)",
+		"graphAxisY": "Y → facette (F·I·S·B·R·V·M·X)",
+		"graphAxisZ": "Z → profondeur (spec → sous-specs)"
 	}
 }
