@@ -6354,7 +6354,8 @@
 		"levelAxis": "Level",
 		"facetAxis": "Facet",
 		"specsHere": "specs at this coordinate",
-		"emptyCell": "No spec at this coordinate (a legal, empty cell) — never a dead link."
+		"emptyCell": "No spec at this coordinate (a legal, empty cell) — never a dead link.",
+		"gestureOperations": "Replay the Operation fixtures (state → command → events)"
 	},
 	"v2Dag": {
 		"eyebrow": "Workbench V2 — the version space",
@@ -6512,5 +6513,26 @@
 		"errFormUnknown": "The mirror form is unknown (outside the closed EL10 set).",
 		"errTextEmpty": "The mirror has no text (a wish, not a proof).",
 		"errMismatch": "The written form ≠ the form expected by the idea's coordinate."
+	},
+	"v2Operations": {
+		"eyebrow": "Workbench V2 — Operation DSL fixtures",
+		"title": "Replay a fixture: state → command → events",
+		"homeTitle": "Workbench V2",
+		"subtitle": "An Operation DSL fixture (S10, KRD §24.3, §93) is a workflow's N2 truth form: an initial state, a command, and the events emitted in order. You replay it STEP BY STEP as an XState machine — each verb is a command that may emit an event — and visualize the state graph (React Flow).",
+		"indexSubtitle": "The known fixtures (the closed registry). Each fixture replays: step through it, watch the events appear, see its state graph.",
+		"wallNote": "The wall (§2): replaying a fixture writes NO truth — it is a read of behaviour (a mutate reaches the world via a mocked Mutator, below the waterline).",
+		"deniedHint": "denied (no events)",
+		"pass": "PASS",
+		"fail": "FAIL",
+		"givenLabel": "Initial state (given)",
+		"commandLabel": "Command",
+		"expectedEventsLabel": "Expected events",
+		"currentStateHeading": "The current replay state",
+		"stateLabel": "machine state",
+		"initState": "initial state (idle)",
+		"emittedLabel": "Events emitted so far",
+		"stepBtn": "Advance (play next step)",
+		"replayAllBtn": "Replay all",
+		"restartBtn": "Restart"
 	}
 }

@@ -6354,7 +6354,8 @@
 		"levelAxis": "Niveau",
 		"facetAxis": "Facette",
 		"specsHere": "specs à cette coordonnée",
-		"emptyCell": "Aucune spec à cette coordonnée (cellule légale, vide) — jamais un lien mort."
+		"emptyCell": "Aucune spec à cette coordonnée (cellule légale, vide) — jamais un lien mort.",
+		"gestureOperations": "Rejouer les fixtures Operation (état → commande → events)"
 	},
 	"v2Dag": {
 		"eyebrow": "Workbench V2 — l'espace des versions",
@@ -6512,5 +6513,26 @@
 		"errFormUnknown": "La forme du miroir est inconnue (hors du jeu clos EL10).",
 		"errTextEmpty": "Le miroir n'a pas de texte (un vœu, pas une preuve).",
 		"errMismatch": "La forme écrite ≠ la forme attendue par la coordonnée de l'idée."
+	},
+	"v2Operations": {
+		"eyebrow": "Workbench V2 — les fixtures Operation DSL",
+		"title": "Rejouer une fixture : état → commande → events",
+		"homeTitle": "Workbench V2",
+		"subtitle": "Une fixture Operation DSL (S10, KRD §24.3, §93) est la forme N2 de vérité d'un workflow : un état initial, une commande, et les events émis dans l'ordre. On la rejoue PAS-À-PAS comme une machine XState — chaque verbe est une commande qui peut émettre un event — et on visualise le graphe d'états (React Flow).",
+		"indexSubtitle": "Les fixtures connues (le registre clos). Chaque fixture se rejoue : on avance pas-à-pas, on voit les events apparaître, on visualise son graphe d'états.",
+		"wallNote": "Le mur (§2) : rejouer une fixture n'écrit AUCUNE vérité — c'est une lecture du comportement (un mutate atteint le monde via un Mutator mocké, sous la ligne de flottaison).",
+		"deniedHint": "refusé (aucun event)",
+		"pass": "PASS",
+		"fail": "FAIL",
+		"givenLabel": "État initial (given)",
+		"commandLabel": "Commande",
+		"expectedEventsLabel": "Events attendus",
+		"currentStateHeading": "L'état courant du rejeu",
+		"stateLabel": "état de la machine",
+		"initState": "état initial (idle)",
+		"emittedLabel": "Events émis jusqu'ici",
+		"stepBtn": "Avancer (jouer le pas suivant)",
+		"replayAllBtn": "Rejouer tout",
+		"restartBtn": "Recommencer"
 	}
 }
