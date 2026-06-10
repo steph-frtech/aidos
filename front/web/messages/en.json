@@ -6355,7 +6355,8 @@
 		"facetAxis": "Facet",
 		"specsHere": "specs at this coordinate",
 		"emptyCell": "No spec at this coordinate (a legal, empty cell) — never a dead link.",
-		"gestureOperations": "Replay the Operation fixtures (state → command → events)"
+		"gestureOperations": "Replay the Operation fixtures (state → command → events)",
+		"gestureWorkflows": "See a scenario's pipeline (step · gate · decision)"
 	},
 	"v2Dag": {
 		"eyebrow": "Workbench V2 — the version space",
@@ -6534,5 +6535,33 @@
 		"stepBtn": "Advance (play next step)",
 		"replayAllBtn": "Replay all",
 		"restartBtn": "Restart"
+	},
+	"v2Workflows": {
+		"eyebrow": "Workbench V2 — scenarios & workflows",
+		"title": "A scenario's pipeline: step · gate · decision",
+		"homeTitle": "Workbench V2",
+		"subtitle": "A verticale scenario (the FKE-3 pipeline) is a flow: its verbs become STEPS, the `authorize` becomes a GATE that may deny, and the gate BRANCHES on a DECISION (allow → the rest → success; deny → stop, §93 'every DENY blocks'). It renders in React Flow (custom nodes, pan/zoom); you drag a node — a PROPOSED edit, never written.",
+		"indexSubtitle": "The known scenarios (the closed registry, reuses the Operation DSL fixtures). Each scenario opens as a branched pipeline: steps, gate, allow/deny decision.",
+		"wallNote": "The wall (§2): displaying and DRAGGING a node writes NO truth — the edit is PROPOSED (a local layout), never applied to the kernel.",
+		"deniedHint": "denied (short-circuit, stop)",
+		"successHint": "success",
+		"pass": "PASS",
+		"fail": "FAIL",
+		"open": "Open the pipeline",
+		"legendHeading": "Node legend",
+		"legendStep": "Step (a verb of the flow)",
+		"legendGate": "Gate (authorize — may deny)",
+		"legendDecision": "Decision (allow ? / deny)",
+		"legendEnd": "Terminal (start / end / stop)",
+		"countsHeading": "Pipeline composition",
+		"stepsLabel": "steps",
+		"gateLabel": "gate",
+		"decisionLabel": "decision",
+		"endLabel": "terminals",
+		"moveHint": "Drag a node with the mouse (proposed edit). The button below proposes a deterministic move and shows the new position — without writing anything.",
+		"proposeMoveBtn": "Propose a move of the start node",
+		"resetMoveBtn": "Reset the layout",
+		"proposedAt": "Proposed position of the start node",
+		"notProposed": "no move proposed (default layout)"
 	}
 }

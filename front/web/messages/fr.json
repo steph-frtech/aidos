@@ -6355,7 +6355,8 @@
 		"facetAxis": "Facette",
 		"specsHere": "specs à cette coordonnée",
 		"emptyCell": "Aucune spec à cette coordonnée (cellule légale, vide) — jamais un lien mort.",
-		"gestureOperations": "Rejouer les fixtures Operation (état → commande → events)"
+		"gestureOperations": "Rejouer les fixtures Operation (état → commande → events)",
+		"gestureWorkflows": "Voir le pipeline (étape · gate · décision) d'un scénario"
 	},
 	"v2Dag": {
 		"eyebrow": "Workbench V2 — l'espace des versions",
@@ -6534,5 +6535,33 @@
 		"stepBtn": "Avancer (jouer le pas suivant)",
 		"replayAllBtn": "Rejouer tout",
 		"restartBtn": "Recommencer"
+	},
+	"v2Workflows": {
+		"eyebrow": "Workbench V2 — scénarios & workflows",
+		"title": "Le pipeline d'un scénario : étape · gate · décision",
+		"homeTitle": "Workbench V2",
+		"subtitle": "Un scénario de la verticale (le pipeline FKE-3) est un flux : ses verbes deviennent des ÉTAPES, le `authorize` devient un GATE qui peut refuser, et le gate BRANCHE sur une DÉCISION (allow → la suite → succès ; deny → l'arrêt, §93 « tout DENY bloque »). On l'affiche en React Flow (nœuds custom, pan/zoom) ; on déplace un nœud — une édition PROPOSÉE, jamais écrite.",
+		"indexSubtitle": "Les scénarios connus (le registre clos, réutilise les fixtures Operation DSL). Chaque scénario s'ouvre comme un pipeline branché : étapes, gate, décision allow/deny.",
+		"wallNote": "Le mur (§2) : afficher et DÉPLACER un nœud n'écrit AUCUNE vérité — l'édition est PROPOSÉE (un layout local), jamais appliquée au kernel.",
+		"deniedHint": "refusé (court-circuit, arrêt)",
+		"successHint": "succès",
+		"pass": "PASS",
+		"fail": "FAIL",
+		"open": "Ouvrir le pipeline",
+		"legendHeading": "Légende des nœuds",
+		"legendStep": "Étape (un verbe du flux)",
+		"legendGate": "Gate (authorize — peut refuser)",
+		"legendDecision": "Décision (allow ? / deny)",
+		"legendEnd": "Borne (début / fin / arrêt)",
+		"countsHeading": "Composition du pipeline",
+		"stepsLabel": "étapes",
+		"gateLabel": "gate",
+		"decisionLabel": "décision",
+		"endLabel": "bornes",
+		"moveHint": "Déplacez un nœud à la souris (édition proposée). Le bouton ci-dessous propose un déplacement déterministe et affiche la nouvelle position — sans rien écrire.",
+		"proposeMoveBtn": "Proposer un déplacement du nœud de départ",
+		"resetMoveBtn": "Réinitialiser le layout",
+		"proposedAt": "Position proposée du nœud de départ",
+		"notProposed": "aucun déplacement proposé (layout par défaut)"
 	}
 }
