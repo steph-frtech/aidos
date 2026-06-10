@@ -6588,5 +6588,26 @@
 		"legendAny": "any (∨) — au moins un enfant tient",
 		"legendNot": "not (¬) — l'inverse de l'enfant",
 		"legendLeaf": "feuille (eq/gt/lt, exists, matches)"
+	},
+	"v2AiLab": {
+		"eyebrow": "Workbench V2 — AI Lab (cerveau gauche)",
+		"title": "Le besoin placé sur la verticale (niveau × facette × paire)",
+		"subtitle": "À GAUCHE le CERVEAU GAUCHE — un chat en langage naturel (Claude). Un besoin y est PLACÉ sur la VERTICALE (§23) : chaque morceau tombe à un (niveau × facette × paire). Le placement est le seul jugement irréductible du LLM ; il est GATÉ + VÉRIFIÉ — CLAMPÉ à l'espace déclaré (un niveau/facette/paire inventé est jeté). Le mur tient : le chat PROPOSE (ambre), il n'écrit jamais la vérité. Un FALLBACK DÉTERMINISTE répond quand Claude est indisponible.",
+		"homeTitle": "Workbench V2",
+		"wallNote": "Le mur (§2) : placer un besoin n'écrit AUCUNE vérité — les placements sont AMBRE (proposés). La promotion passe par idée → miroir → /goal.",
+		"leftHeading": "Cerveau gauche — décrivez le besoin",
+		"leftHint": "Tapez un besoin en langage naturel, ou choisissez un besoin d'exemple. Le cerveau gauche le place sur la verticale ; le code VÉRIFIE chaque placement (clamp).",
+		"inputLabel": "Le besoin en langage naturel",
+		"inputPlaceholder": "Ex. « Je veux un tunnel de paiement sécurisé du panier au reçu »",
+		"placeBtn": "Placer sur la verticale",
+		"fallbackBtn": "Fallback déterministe",
+		"fallbackNote": "Fallback déterministe : Claude indisponible — le twin pur a posé un placement par défaut (produit · F · spec). Honnête sur le cerveau.",
+		"samplesHeading": "Besoins d'exemple (incluent une cellule inventée — clampée)",
+		"rightHeading": "La verticale — specs placées",
+		"rightHint": "Chaque spec placée porte son (facette · paire) ; les cellules inventées par le cerveau gauche sont JETÉES par le clamp (jamais coercées).",
+		"levelsShort": "niveaux",
+		"proposed": "PROPOSÉ",
+		"emptyHint": "Aucun placement. Décrivez un besoin (ou choisissez un exemple) puis cliquez « Placer ».",
+		"spaceNote": "Espace déclaré : 7 niveaux × 8 facettes × 6 paires-miroir = 336 cellules. Le clamp ne garde QUE ce qui y tombe."
 	}
 }

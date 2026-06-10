@@ -6588,5 +6588,26 @@
 		"legendAny": "any (∨) — at least one child holds",
 		"legendNot": "not (¬) — the inverse of its child",
 		"legendLeaf": "leaf (eq/gt/lt, exists, matches)"
+	},
+	"v2AiLab": {
+		"eyebrow": "Workbench V2 — AI Lab (left brain)",
+		"title": "The need placed on the verticale (level × facet × pair)",
+		"subtitle": "On the LEFT, the LEFT BRAIN — a natural-language chat (Claude). A need is PLACED on the VERTICALE (§23): each piece lands at a (level × facet × pair). The placement is the LLM's only irreducible judgment; it is GATED + VERIFIED — CLAMPED to the declared space (an invented level/facet/pair is dropped). The wall holds: the chat PROPOSES (amber), it never writes truth. A DETERMINISTIC FALLBACK answers when Claude is unavailable.",
+		"homeTitle": "Workbench V2",
+		"wallNote": "The wall (§2): placing a need writes NO truth — placements are AMBER (proposed). Promotion goes idea → mirror → /goal.",
+		"leftHeading": "Left brain — describe the need",
+		"leftHint": "Type a need in natural language, or pick an example need. The left brain places it on the verticale; the code VERIFIES each placement (clamp).",
+		"inputLabel": "The need in natural language",
+		"inputPlaceholder": "e.g. \"I want a secure checkout from cart to receipt\"",
+		"placeBtn": "Place on the verticale",
+		"fallbackBtn": "Deterministic fallback",
+		"fallbackNote": "Deterministic fallback: Claude unavailable — the pure twin placed a default (product · F · spec). Honest about the brain.",
+		"samplesHeading": "Example needs (include an invented cell — clamped)",
+		"rightHeading": "The verticale — placed specs",
+		"rightHint": "Each placed spec carries its (facet · pair); cells invented by the left brain are DROPPED by the clamp (never coerced).",
+		"levelsShort": "levels",
+		"proposed": "PROPOSED",
+		"emptyHint": "No placement. Describe a need (or pick an example) then click \"Place\".",
+		"spaceNote": "Declared space: 7 levels × 8 facets × 6 mirror-pairs = 336 cells. The clamp keeps ONLY what falls into it."
 	}
 }
