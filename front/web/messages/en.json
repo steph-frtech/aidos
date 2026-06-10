@@ -6563,5 +6563,29 @@
 		"resetMoveBtn": "Reset the layout",
 		"proposedAt": "Proposed position of the start node",
 		"notProposed": "no move proposed (default layout)"
+	},
+	"v2Policy": {
+		"eyebrow": "Workbench V2 — Policy DSL",
+		"title": "The rule tree: ALLOW / DENY (all · any · not)",
+		"homeTitle": "Workbench V2",
+		"subtitle": "An authorization (KRD §24.4) is a RECURSIVE TREE: the combinators `all` (∧ — all must hold), `any` (∨ — at least one) and `not` (¬ — the inverse) over leaves (eq/gt/lt, exists, matches), with a scope (RESOURCE / OPERATION / ENTITY / FIELD) and an effect (ALLOW / DENY). It unfolds in React Arborist; pick a sample context → the tree is EVALUATED: each node HOLD/FAIL, and the §93 decision « every ALLOW passes, any DENY blocks ».",
+		"indexSubtitle": "The known policies (the closed registry, reuses the §93 anchor canPlaceOrder + a FIELD-scope example with any/not). Each policy opens as a recursive tree you unfold and evaluate.",
+		"wallNote": "The wall (§2): showing and EVALUATING a policy against a sample context writes NO truth — the policy AST is written only by the `aidos` CLI through an approved ChangeSet.",
+		"nodesShort": "nodes",
+		"scopeLabel": "scope",
+		"targetLabel": "target",
+		"effectLabel": "effect",
+		"combinatorsLabel": "combinators",
+		"leavesLabel": "leaves",
+		"evalHeading": "Evaluate the policy",
+		"evalHint": "Pick a sample context: the tree is evaluated (each node HOLD/FAIL) and the §93 decision computed — writing nothing.",
+		"decisionLabel": "Decision",
+		"holdLabel": "HOLDS",
+		"failLabel": "FAILS",
+		"legendHeading": "Node legend",
+		"legendAll": "all (∧) — every child must hold",
+		"legendAny": "any (∨) — at least one child holds",
+		"legendNot": "not (¬) — the inverse of its child",
+		"legendLeaf": "leaf (eq/gt/lt, exists, matches)"
 	}
 }

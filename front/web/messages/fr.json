@@ -6563,5 +6563,29 @@
 		"resetMoveBtn": "Réinitialiser le layout",
 		"proposedAt": "Position proposée du nœud de départ",
 		"notProposed": "aucun déplacement proposé (layout par défaut)"
+	},
+	"v2Policy": {
+		"eyebrow": "Workbench V2 — Policy DSL",
+		"title": "L'arbre de règles : ALLOW / DENY (all · any · not)",
+		"homeTitle": "Workbench V2",
+		"subtitle": "Une autorisation (KRD §24.4) est un ARBRE RÉCURSIF : les combinateurs `all` (∧ — tout doit tenir), `any` (∨ — au moins un) et `not` (¬ — l'inverse) au-dessus de feuilles (eq/gt/lt, exists, matches), avec un scope (RESOURCE / OPERATION / ENTITY / FIELD) et un effet (ALLOW / DENY). On le déplie en React Arborist ; on choisit un contexte d'exemple → l'arbre est ÉVALUÉ : chaque nœud HOLD/FAIL, et la décision §93 « tout ALLOW passe, n'importe quel DENY bloque ».",
+		"indexSubtitle": "Les policies connues (le registre clos, réutilise l'anchor §93 canPlaceOrder + un exemple de scope FIELD avec any/not). Chaque policy s'ouvre comme un arbre récursif que l'on déplie et évalue.",
+		"wallNote": "Le mur (§2) : afficher et ÉVALUER une policy contre un contexte d'exemple n'écrit AUCUNE vérité — l'AST de la policy n'est écrit que par le CLI `aidos` via un ChangeSet approuvé.",
+		"nodesShort": "nœuds",
+		"scopeLabel": "scope",
+		"targetLabel": "cible",
+		"effectLabel": "effet",
+		"combinatorsLabel": "combinateurs",
+		"leavesLabel": "feuilles",
+		"evalHeading": "Évaluer la policy",
+		"evalHint": "Choisissez un contexte d'exemple : l'arbre est évalué (chaque nœud HOLD/FAIL) et la décision §93 calculée — sans rien écrire.",
+		"decisionLabel": "Décision",
+		"holdLabel": "TIENT",
+		"failLabel": "ÉCHOUE",
+		"legendHeading": "Légende des nœuds",
+		"legendAll": "all (∧) — tous les enfants doivent tenir",
+		"legendAny": "any (∨) — au moins un enfant tient",
+		"legendNot": "not (¬) — l'inverse de l'enfant",
+		"legendLeaf": "feuille (eq/gt/lt, exists, matches)"
 	}
 }
