@@ -25,6 +25,8 @@ import {
 	descendPair,
 	EXISTING_DAG,
 	fallbackPlacements,
+	GRAPH_AXES,
+	graphTally,
 	impactRows,
 	impactTally,
 	isDeclaredCell,
@@ -33,6 +35,7 @@ import {
 	levelsTouched,
 	MIRROR_PAIRS,
 	NEED_SAMPLES,
+	needGraph,
 	needImpacts,
 	needSampleById,
 	needSampleIds,
@@ -560,5 +563,100 @@ describe("WB2-17 — impactResolved + impactRows : rouge tant que non validé, v
 		expect(out).toHaveLength(2);
 		expect(out.find((p) => p.pairId === "spec")?.status).toBe("validated");
 		expect(out.find((p) => p.pairId === "evidence")?.status).toBe("realized");
+	});
+});
+
+// ── WB2-18 — LE GRAPHE 3D façon Obsidian : positions déterministes + axes + résolution cohérente ──
+//
+// Le critère de done : « twin buildSpecGraph pur + property (positions déterministes) ». Ce miroir
+// épingle, sur l'espace des besoins d'exemple :
+//   - DÉTERMINISME : `needGraph(sample, v)` deux fois → le MÊME graphe (positions identiques) ;
+//   - LES 3 AXES : chaque nœud porte (x = niveau, y = facette, z = profondeur d'anatomie), positions
+//     content-adressées (mêmes coordonnées pour la même cellule) ;
+//   - LE DAG EXISTANT y est : tout EXISTING_DAG est un nœud du graphe ;
+//   - LA VAGUE DE ROUGE : au placement le DAG impacté est ROUGE (impacted ∧ ¬resolved) ; après
+//     « VALIDER TOUT » il passe VERT (resolved) — le MÊME `impactResolved` que liste/grille/cellules.
+describe("WB2-18 — le graphe 3D (buildSpecGraph pur, positions déterministes)", () => {
+	const sampleArb = fc.constantFrom(...NEED_SAMPLES);
+
+	it("DÉTERMINISME : needGraph deux fois → le MÊME graphe (positions identiques)", () => {
+		fc.assert(
+			fc.property(sampleArb, fc.boolean(), (sample, validated) => {
+				const a = needGraph(sample, validated);
+				const b = needGraph(sample, validated);
+				expect(a).toEqual(b);
+			}),
+		);
+	});
+
+	it("LES 3 AXES : chaque nœud porte (x niveau, y facette, z profondeur) — finis et déterministes", () => {
+		fc.assert(
+			fc.property(sampleArb, (sample) => {
+				const g = needGraph(sample);
+				expect(g.nodes.length).toBeGreaterThan(0);
+				for (const n of g.nodes) {
+					expect(Number.isFinite(n.x)).toBe(true);
+					expect(Number.isFinite(n.y)).toBe(true);
+					expect(Number.isFinite(n.z)).toBe(true);
+					expect(n.depth).toBeGreaterThanOrEqual(0);
+				}
+			}),
+		);
+	});
+
+	it("MÊME CELLULE → MÊME POSITION : deux nœuds de même (niveau × facette × profondeur) coïncident", () => {
+		const g = needGraph(NEED_SAMPLES[0], true);
+		const byCell = new Map<string, { x: number; y: number; z: number }>();
+		for (const n of g.nodes) {
+			const k = `${n.level}|${n.facet}|${n.depth}`;
+			const prev = byCell.get(k);
+			if (prev) {
+				expect(n.x).toBe(prev.x);
+				expect(n.y).toBe(prev.y);
+				expect(n.z).toBe(prev.z);
+			} else byCell.set(k, { x: n.x, y: n.y, z: n.z });
+		}
+	});
+
+	it("LE DAG EXISTANT y est : tout EXISTING_DAG est un nœud du graphe", () => {
+		const g = needGraph(NEED_SAMPLES[0]);
+		const dagIds = new Set(
+			g.nodes.filter((n) => n.kind === "dag").map((n) => n.id),
+		);
+		for (const s of EXISTING_DAG) expect(dagIds.has(`d:${s.id}`)).toBe(true);
+	});
+
+	it("LA VAGUE DE ROUGE : au placement le DAG impacté est ROUGE, après VALIDER TOUT il passe VERT", () => {
+		const red = needGraph(NEED_SAMPLES[0], false);
+		const impactedRed = red.nodes.filter((n) => n.kind === "dag" && n.impacted);
+		expect(impactedRed.length).toBeGreaterThan(0);
+		for (const n of impactedRed) expect(n.resolved).toBe(false);
+
+		const green = needGraph(NEED_SAMPLES[0], true);
+		const impactedGreen = green.nodes.filter(
+			(n) => n.kind === "dag" && n.impacted,
+		);
+		expect(impactedGreen.length).toBe(impactedRed.length);
+		for (const n of impactedGreen) expect(n.resolved).toBe(true);
+	});
+
+	it("graphTally : compte specs / dag / impactés / résolus / liens, cohérent avec les nœuds", () => {
+		fc.assert(
+			fc.property(sampleArb, fc.boolean(), (sample, validated) => {
+				const g = needGraph(sample, validated);
+				const t = graphTally(g);
+				expect(t.specs + t.dag).toBe(g.nodes.length);
+				expect(t.links).toBe(g.links.length);
+				expect(t.resolved).toBeLessThanOrEqual(t.impacted);
+				if (validated) expect(t.resolved).toBe(t.impacted);
+			}),
+		);
+	});
+
+	it("les 3 axes sont déclarés bilingues (légende de l'écran)", () => {
+		expect(GRAPH_AXES.x.fr).toContain("verticale");
+		expect(GRAPH_AXES.y.fr).toContain("facette");
+		expect(GRAPH_AXES.z.fr).toContain("anatomie");
+		expect(GRAPH_AXES.x.en).toContain("verticale");
 	});
 });

@@ -37,6 +37,7 @@
 import {
 	ALL_FACETS,
 	allPlacementsHandled,
+	buildSpecGraph,
 	cellFullyHandled,
 	cellPlacements,
 	type DagImpact,
@@ -53,6 +54,9 @@ import {
 	type Placement,
 	placementKey,
 	placementsByLevel,
+	type SpecGraph,
+	type SpecGraphLink,
+	type SpecGraphNode,
 	type SpecStatus,
 	type Level as V1Level,
 	VERTICAL_LEVELS,
@@ -68,6 +72,7 @@ import type { Facet } from "../facetwire";
 export {
 	ALL_FACETS,
 	allPlacementsHandled,
+	buildSpecGraph,
 	cellFullyHandled,
 	cellPlacements,
 	type DagImpact,
@@ -85,6 +90,9 @@ export {
 	type Placement,
 	placementKey,
 	placementsByLevel,
+	type SpecGraph,
+	type SpecGraphLink,
+	type SpecGraphNode,
 	type SpecStatus,
 	VERTICAL_LEVELS,
 	validateAndDescend,
@@ -547,4 +555,78 @@ export function validateAllPlacements(placements: Placement[]): Placement[] {
 			? p
 			: ({ ...p, status: "validated" as SpecStatus } as Placement),
 	);
+}
+
+// ── WB2-18 — LE GRAPHE 3D façon Obsidian : naviguer « plein de specs » sur 3 axes ──
+//
+// WB2-15 PLACE le besoin, WB2-16 DESCEND l'anatomie, WB2-17 montre la vague de rouge en LISTE.
+// WB2-18 montre TOUT EN UN GRAPHE 3D façon Obsidian : chaque spec (placée) + chaque spec du DAG
+// existant est un NŒUD posé sur les TROIS axes FKE — x = la VERTICALE (niveau), y = la FACETTE,
+// z = la PROFONDEUR d'anatomie (spec → sous-spec : Spec→Comportement→…→Evidence). Les LIENS = la
+// descente d'anatomie (spec→sous-spec d'une cellule) + l'IMPACT sur le DAG existant. Les COULEURS
+// portent l'état : proposé / validé / réalisé (les specs placées) ; impacté / résolu (le DAG).
+//
+// RÉUTILISATION (pas de fork, ADR 0007) : la donnée du graphe est `buildSpecGraph` de v1 (FK11) —
+// une FONCTION PURE & TOTALE & DÉTERMINISTE (positions content-adressées par (niveau × facette ×
+// profondeur), nœuds + liens ordonnés). AUCUNE règle inventée : la résolution rouge → vert lit le
+// MÊME `impactResolved` que la grille / les cellules / la liste (cohérent PARTOUT). Ce module ne fait
+// que RÉ-EXPORTER `buildSpecGraph` et ajouter `needGraph(sample)` — la porte UNIFIÉE qui construit le
+// graphe d'un besoin d'exemple (placements clampés × DAG existant × impacts clampés).
+//
+// DÉTERMINISME-FIRST (CLAUDE.md §6/§8) : aucune horloge, aucun aléa, aucun LLM n'entre dans la donnée
+// du graphe — `needGraph(sample, validated)` deux fois → le MÊME graphe (positions identiques). Le
+// RENDU 3D (react-force-graph-3d) est une lib ; la DONNÉE est ce twin pur, épinglé par le miroir de
+// reproductibilité (lib/v2/ai-lab.test.ts) : positions déterministes + axes + résolution cohérente.
+//
+// LE MUR (§2) : le graphe LIT (placements proposés/validés + DAG existant + impacts proposés) ; il
+// n'écrit AUCUNE vérité — c'est une vue de lab (proposition). La promotion passe par idée → /goal.
+// (Les types SpecGraph / SpecGraphNode / SpecGraphLink sont déjà ré-exportés en tête de module.)
+
+/** L'étiquette FR + EN d'un axe du graphe 3D (pour la légende de l'écran). DÉCLARÉ. */
+export const GRAPH_AXES = {
+	x: { fr: "x — la verticale (niveau)", en: "x — the verticale (level)" },
+	y: { fr: "y — la facette", en: "y — the facet" },
+	z: {
+		fr: "z — la profondeur d'anatomie (sous-spec)",
+		en: "z — anatomy depth (sub-spec)",
+	},
+} as const;
+
+/**
+ * `needGraph` — la porte UNIFIÉE de WB2-18 : construit le GRAPHE 3D d'un besoin d'exemple. Les
+ * placements viennent de `placeNeed` (clampés à l'espace déclaré) ; le DAG est `EXISTING_DAG` ; les
+ * impacts de `needImpacts` (clampés aux ids réels). Si `validated` est vrai, on VALIDE d'abord tous les
+ * placements (« j'ai tout validé » → la vague de rouge se résout, rouge → vert dans le graphe). Délègue
+ * la DONNÉE à `buildSpecGraph` (v1, pur). PURE + TOTALE + DÉTERMINISTE : (sample, validated) → même
+ * graphe (positions identiques). NO LLM. Le mur §2 : lit, n'écrit rien.
+ */
+export function needGraph(sample: NeedSample, validated = false): SpecGraph {
+	const placed = placeNeed(sample.message, sample.raw);
+	let placements = placed.refused ? [] : placed.placements;
+	if (validated) placements = validateAllPlacements(placements);
+	const impacts = needImpacts(sample.impactsRaw);
+	return buildSpecGraph(placements, [...EXISTING_DAG], impacts);
+}
+
+/** Le compte de nœuds spec / DAG / impactés / résolus d'un graphe (le résumé de l'en-tête). PURE & TOTALE. */
+export function graphTally(graph: SpecGraph): {
+	specs: number;
+	dag: number;
+	impacted: number;
+	resolved: number;
+	links: number;
+} {
+	let specs = 0;
+	let dag = 0;
+	let impacted = 0;
+	let resolved = 0;
+	for (const n of graph.nodes) {
+		if (n.kind === "spec") specs++;
+		else {
+			dag++;
+			if (n.impacted) impacted++;
+			if (n.resolved) resolved++;
+		}
+	}
+	return { specs, dag, impacted, resolved, links: graph.links.length };
 }
