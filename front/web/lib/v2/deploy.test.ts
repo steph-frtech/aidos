@@ -26,7 +26,6 @@ import {
 	buildDeployPlan,
 	CONTAINER_SERVICES,
 	DEFAULT_RATE_LIMIT,
-	type DeployGateContext,
 	deployGate,
 	ENTITY_CASES,
 	type Entity,
