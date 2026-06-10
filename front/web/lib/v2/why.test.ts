@@ -223,7 +223,9 @@ describe("WB2-19 — causes hors-graphe : reproduite gardée, rejetée élaguée
 
 describe("WB2-19 — arboristWhyTree + whyTally (cohérence)", () => {
 	it("arboristWhyTree projette la même structure (mêmes ids, content-adressés)", () => {
-		const r = caseWhyTree(whyCaseById("chain")!);
+		const chain = whyCaseById("chain");
+		if (chain === undefined) throw new Error("cas 'chain' introuvable");
+		const r = caseWhyTree(chain);
 		expect(r.ok).toBe(true);
 		if (r.ok) {
 			const forest = arboristWhyTree(r.root);
@@ -234,7 +236,9 @@ describe("WB2-19 — arboristWhyTree + whyTally (cohérence)", () => {
 	});
 
 	it("whyTally compte nœuds/feuilles/hors-graphe de façon cohérente", () => {
-		const r = caseWhyTree(whyCaseById("off-graph")!);
+		const offGraph = whyCaseById("off-graph");
+		if (offGraph === undefined) throw new Error("cas 'off-graph' introuvable");
+		const r = caseWhyTree(offGraph);
 		expect(r.ok).toBe(true);
 		if (r.ok) {
 			const t = whyTally(r.root);
@@ -265,7 +269,9 @@ describe("WB2-19 — le registre clos WHY_CASES", () => {
 	});
 
 	it("le cas off-graph garde la cause reproduite et élague la rejetée", () => {
-		const r = caseWhyTree(whyCaseById("off-graph")!);
+		const offGraph = whyCaseById("off-graph");
+		if (offGraph === undefined) throw new Error("cas 'off-graph' introuvable");
+		const r = caseWhyTree(offGraph);
 		expect(r.ok).toBe(true);
 		if (r.ok) {
 			expect(causeIds(r.root).has("pgx-pool-exhausted")).toBe(true);
