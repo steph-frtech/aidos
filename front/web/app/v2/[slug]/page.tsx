@@ -17,6 +17,15 @@ import { entry, type Locale, SLUGS } from "@/lib/v2/glossary";
  */
 const DEDICATED_SLUGS = new Set<string>(["liens", "cellules"]);
 
+/**
+ * Les GESTES liés à un concept : un concept au-dessus du mur expose son geste action-capable
+ * (une route dédiée). « mur » → /v2/goal (idée → miroir → /goal → gel, WB2-11) ; le lien rend le
+ * geste REACHABLE depuis l'écran du concept (ui-completeness, CLAUDE.md §6).
+ */
+const CONCEPT_GESTURES: Record<string, { href: string; key: string }> = {
+	mur: { href: "/v2/goal", key: "gestureGoal" },
+};
+
 export function generateStaticParams() {
 	return SLUGS.filter((slug) => !DEDICATED_SLUGS.has(slug)).map((slug) => ({
 		slug,
@@ -61,6 +70,15 @@ export default async function ConceptScreen({
 			<div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
 				{t("wallNote")}
 			</div>
+			{CONCEPT_GESTURES[slug] && (
+				<Link
+					href={CONCEPT_GESTURES[slug].href}
+					data-testid={`v2-concept-gesture-${slug}`}
+					className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+				>
+					{t(CONCEPT_GESTURES[slug].key)} →
+				</Link>
+			)}
 		</div>
 	);
 }
