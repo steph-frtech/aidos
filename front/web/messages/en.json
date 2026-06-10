@@ -6356,7 +6356,8 @@
 		"specsHere": "specs at this coordinate",
 		"emptyCell": "No spec at this coordinate (a legal, empty cell) — never a dead link.",
 		"gestureOperations": "Replay the Operation fixtures (state → command → events)",
-		"gestureWorkflows": "See a scenario's pipeline (step · gate · decision)"
+		"gestureWorkflows": "See a scenario's pipeline (step · gate · decision)",
+		"gesturePolicy": "Evaluate an authorization policy (ALLOW/DENY tree · §93)"
 	},
 	"v2Dag": {
 		"eyebrow": "Workbench V2 — the version space",

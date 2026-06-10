@@ -72,14 +72,30 @@ export async function GrilleScreen() {
 				>
 					{t("wallNote")}
 				</div>
-				{/* Le geste du niveau « operation » : rejouer ses fixtures état → commande → events (WB2-12). */}
-				<Link
-					href="/v2/operations"
-					data-testid="v2-grille-gesture-operations"
-					className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-				>
-					{t("gestureOperations")} →
-				</Link>
+				{/* Les gestes du niveau « operation » : rejouer ses fixtures (WB2-12) + voir leur pipeline (WB2-13). */}
+				<div className="flex flex-wrap gap-3">
+					<Link
+						href="/v2/operations"
+						data-testid="v2-grille-gesture-operations"
+						className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+					>
+						{t("gestureOperations")} →
+					</Link>
+					<Link
+						href="/v2/workflows"
+						data-testid="v2-grille-gesture-workflows"
+						className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+					>
+						{t("gestureWorkflows")} →
+					</Link>
+					<Link
+						href="/v2/policy"
+						data-testid="v2-grille-gesture-policy"
+						className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+					>
+						{t("gesturePolicy")} →
+					</Link>
+				</div>
 			</section>
 
 			<GridClient t={strings} />

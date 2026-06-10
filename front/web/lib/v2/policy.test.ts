@@ -28,7 +28,6 @@ import {
 	holds,
 	nodeCounts,
 	POLICIES,
-	type Policy,
 	policyBySlug,
 	policySlug,
 	policySlugs,
