@@ -72,7 +72,7 @@ export async function GrilleScreen() {
 				>
 					{t("wallNote")}
 				</div>
-				{/* Les gestes du niveau « operation » : rejouer ses fixtures (WB2-12) + voir leur pipeline (WB2-13). */}
+				{/* Les gestes : rejouer les fixtures (WB2-12) · pipeline (WB2-13) · policy (WB2-14) · AI Lab (WB2-15). */}
 				<div className="flex flex-wrap gap-3">
 					<Link
 						href="/v2/operations"
@@ -94,6 +94,13 @@ export async function GrilleScreen() {
 						className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
 					>
 						{t("gesturePolicy")} →
+					</Link>
+					<Link
+						href="/v2/ai-lab"
+						data-testid="v2-grille-gesture-ai-lab"
+						className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+					>
+						{t("gestureAiLab")} →
 					</Link>
 				</div>
 			</section>
