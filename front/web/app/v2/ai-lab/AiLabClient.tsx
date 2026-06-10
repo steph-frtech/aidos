@@ -4,11 +4,14 @@ import { useMemo, useState } from "react";
 import {
 	ALL_FACETS,
 	countsByLevel,
+	descendPair,
 	fallbackPlacements,
+	isLastPair,
 	levelsTouched,
 	MIRROR_PAIRS,
 	type NeedSample,
 	type Placement,
+	pairLabel,
 	placementKey,
 	placementsByLevel,
 	placeNeed,
@@ -99,6 +102,24 @@ export function AiLabClient({
 		runPlace(s.message, s.raw);
 	}
 
+	// WB2-16 — l'enrichissement Claude est GATÉ : ON → Claude écrit le texte de la fille (ici simulé
+	// par un override déterministe, honnête : le runtime branchera Claude) ; OFF → le fallback template.
+	const [enrich, setEnrich] = useState(false);
+
+	/**
+	 * WB2-16 — DESCENDRE l'anatomie : valider une paire (niveau × facette × pairId) → générer la paire
+	 * SUIVANTE (Spec→Comportement→…→Evidence). Délégué au twin pur `descendPair`. Enrichissement gaté
+	 * (override) ou fallback template déterministe. Le mur §2 : aucune écriture, on STAGE une proposition.
+	 */
+	function onDescend(p: Placement) {
+		const override = enrich
+			? { spec: `Comportement enrichi (Claude) — « ${p.spec} »` }
+			: undefined;
+		const r = descendPair(placements, p.level, p.facet, p.pairId, override);
+		setPlacements(r.placements);
+		setUsedFallback(false);
+	}
+
 	const placedCount = placements.length;
 
 	return (
@@ -147,6 +168,18 @@ export function AiLabClient({
 							{t.fallbackBtn}
 						</button>
 					</div>
+
+					{/* WB2-16 — le gate de l'enrichissement Claude (ON) vs le fallback template (OFF). */}
+					<label className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+						<input
+							type="checkbox"
+							data-testid="v2-ai-lab-enrich-toggle"
+							checked={enrich}
+							onChange={(e) => setEnrich(e.target.checked)}
+							className="h-3.5 w-3.5 accent-primary"
+						/>
+						{t.enrichToggle}
+					</label>
 
 					<div className="space-y-2 pt-2">
 						<p className="text-xs font-medium text-muted-foreground">
@@ -243,29 +276,57 @@ export function AiLabClient({
 												(PAIR_RANK.get(a.pairId) ?? 0) -
 													(PAIR_RANK.get(b.pairId) ?? 0),
 										)
-										.map((p) => (
-											<li
-												key={placementKey(p)}
-												data-testid={`v2-ai-lab-placement-${placementKey(p)}`}
-												data-level={p.level}
-												data-facet={p.facet}
-												data-pair={p.pairId}
-												className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5"
-											>
-												<span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary">
-													{p.facet}
-												</span>
-												<span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-													{p.pairId}
-												</span>
-												<span className="truncate text-xs text-foreground">
-													{p.spec}
-												</span>
-												<span className="ml-auto shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary">
-													{t.proposed}
-												</span>
-											</li>
-										))}
+										.map((p) => {
+											const realized = p.status === "realized";
+											const validated = p.status === "validated";
+											const last = isLastPair(p.pairId);
+											const statusLabel = realized
+												? t.realized
+												: validated
+													? t.validated
+													: t.proposed;
+											return (
+												<li
+													key={placementKey(p)}
+													data-testid={`v2-ai-lab-placement-${placementKey(p)}`}
+													data-level={p.level}
+													data-facet={p.facet}
+													data-pair={p.pairId}
+													data-status={p.status ?? "proposed"}
+													className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5"
+												>
+													<span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary">
+														{p.facet}
+													</span>
+													<span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+														{pairLabel(p.pairId)}
+													</span>
+													<span className="truncate text-xs text-foreground">
+														{p.spec}
+													</span>
+													<span
+														data-testid={`v2-ai-lab-status-${placementKey(p)}`}
+														className={`ml-auto shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
+															realized
+																? "bg-primary text-primary-foreground"
+																: "text-primary"
+														}`}
+													>
+														{statusLabel}
+													</span>
+													{!realized && (
+														<button
+															type="button"
+															data-testid={`v2-ai-lab-descend-${placementKey(p)}`}
+															onClick={() => onDescend(p)}
+															className="shrink-0 rounded border border-border bg-card px-2 py-0.5 font-mono text-[10px] font-medium text-foreground transition-colors hover:bg-muted"
+														>
+															{last ? t.realizeBtn : t.descendBtn}
+														</button>
+													)}
+												</li>
+											);
+										})}
 								</ul>
 							</div>
 						))}

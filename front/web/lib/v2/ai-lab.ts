@@ -36,15 +36,19 @@
 
 import {
 	ALL_FACETS,
+	cellPlacements,
+	deriveNextSpec,
 	isTruthWriteRequest,
 	MIRROR_PAIRS,
 	type MirrorPair,
+	nextPairId,
 	type Placement,
 	placementKey,
 	placementsByLevel,
 	type SpecStatus,
 	type Level as V1Level,
 	VERTICAL_LEVELS,
+	validateAndDescend,
 	validatePlacements,
 	type WallRefusal,
 } from "../ai-lab";
@@ -54,15 +58,19 @@ import type { Facet } from "../facetwire";
 // module v2 — aucune duplication, aucune nouvelle vérité.
 export {
 	ALL_FACETS,
+	cellPlacements,
+	deriveNextSpec,
 	type Facet,
 	isTruthWriteRequest,
 	MIRROR_PAIRS,
 	type MirrorPair,
+	nextPairId,
 	type Placement,
 	placementKey,
 	placementsByLevel,
 	type SpecStatus,
 	VERTICAL_LEVELS,
+	validateAndDescend,
 	type WallRefusal,
 };
 
@@ -292,3 +300,104 @@ export function needSampleById(id: string): NeedSample | undefined {
 
 /** Le slug d'étape canonique de WB2-15 (pour la seed de doc de l'écran). */
 export const STEP_SLUG = "wb2-15-ai-lab";
+
+// ── WB2-16 — LA DESCENTE de l'anatomie (valider une spec → la paire SUIVANTE) ──
+//
+// WB2-15 PLACE le besoin (NL → cellule). WB2-16 DESCEND la cellule : valider une paire-miroir
+// GÉNÈRE la paire SUIVANTE de l'anatomie — Spec → Comportement → Scénarios → Modèle → Contrat →
+// Evidence (les 6 MIRROR_PAIRS, en ordre). La descente est PER FACETTE, PER cellule (niveau × facette).
+//
+// DÉTERMINISME-FIRST (CLAUDE.md §6/§8) : le « WHICH-PAIR » — quelle paire vient après, et le
+// template de sa spec dérivée — est une FONCTION PURE (`nextPairId` + `deriveNextSpec`, réutilisés
+// VERBATIM de FK11, AUCUNE règle inventée). Le SEUL morceau irréductible est l'ENRICHISSEMENT du
+// texte de la paire fille (Claude écrit un VRAI comportement à partir de la spec) — c'est l'exception
+// gated : quand un `override` (la sortie Claude) est fourni, son TEXTE est utilisé ; SINON le FALLBACK
+// TEMPLATE déterministe (`deriveNextSpec`) répond. Dans les DEUX cas la STRUCTURE (quelle paire, le
+// placement, le statut) est du CODE déterministe — Claude ne décide JAMAIS de la structure.
+//
+// LE MUR (§2) : descendre une paire STAGE une proposition de lab (la fille est AMBRE/proposée), à la
+// DERNIÈRE paire (evidence) la paire est « réalisée » (la descente est complète) — mais AUCUNE vérité
+// n'est écrite ; la promotion passe par idée → miroir → /goal.
+
+/** Les 6 paires de l'anatomie, en ordre (Spec → Comportement → … → Evidence). PURE & TOTALE. */
+export const ANATOMY_ORDER: readonly string[] = MIRROR_PAIRS.map((p) => p.id);
+
+/** L'étiquette FR lisible d'une paire de l'anatomie (pour l'écran). PURE & TOTALE. */
+const PAIR_LABEL_FR: Record<string, string> = {
+	spec: "Spec",
+	behavior: "Comportement",
+	scenarios: "Scénarios",
+	model: "Modèle",
+	contract: "Contrat",
+	evidence: "Evidence",
+};
+
+/** L'étiquette FR d'une paire (totalité : l'id brut pour une paire inconnue). */
+export function pairLabel(pairId: string): string {
+	return PAIR_LABEL_FR[pairId] ?? pairId;
+}
+
+/** Le rang d'une paire dans l'anatomie (0 = spec … 5 = evidence). -1 si inconnue. PURE & TOTALE. */
+export function pairRank(pairId: string): number {
+	return ANATOMY_ORDER.indexOf(pairId);
+}
+
+/** Une paire est-elle la DERNIÈRE de l'anatomie (evidence) → la descente y est RÉALISÉE ? */
+export function isLastPair(pairId: string): boolean {
+	return nextPairId(pairId) === undefined && pairRank(pairId) >= 0;
+}
+
+/** Le résultat d'une descente : l'état des placements + la paire générée (ou « réalisé » à la fin). */
+export interface DescendResult {
+	/** les placements après la descente (le parent validé/réalisé + la fille proposée si non-dernière). */
+	readonly placements: Placement[];
+	/** la paire générée par la descente, ou undefined à la dernière paire (descente réalisée). */
+	readonly nextPair: string | undefined;
+	/** true à la dernière paire (evidence) : la cellule a atteint le bout de l'anatomie. */
+	readonly realized: boolean;
+	/** true si l'enrichissement Claude (override) a été utilisé ; false si le fallback template. */
+	readonly enriched: boolean;
+}
+
+/**
+ * `descendPair` est la porte WB2-16 : valider la paire (niveau × facette × pairId) et générer la
+ * paire SUIVANTE de l'anatomie. RÉUTILISE `validateAndDescend` (FK11) — AUCUNE règle inventée : le
+ * which-pair (`nextPairId`) et le template (`deriveNextSpec`) sont ceux de v1. L'ENRICHISSEMENT est
+ * gaté : `override` non-vide (sortie Claude) → son texte ; sinon le FALLBACK TEMPLATE déterministe.
+ * PURE + TOTALE + DÉTERMINISTE : mêmes (placements, cellule, override) → même résultat. Cellule
+ * inconnue = no-op (la liste inchangée, nextPair undefined). Le mur §2 : aucune vérité écrite.
+ */
+export function descendPair(
+	placements: Placement[],
+	level: Level,
+	facet: Facet,
+	pairId: string,
+	override?: { spec: string; detail?: string },
+): DescendResult {
+	const target = placements.find(
+		(p) => p.level === level && p.facet === facet && p.pairId === pairId,
+	);
+	if (!target) {
+		return {
+			placements,
+			nextPair: undefined,
+			realized: false,
+			enriched: false,
+		};
+	}
+	const next = nextPairId(pairId);
+	const enriched = Boolean(override?.spec?.trim());
+	const updated = validateAndDescend(
+		placements,
+		level,
+		facet,
+		pairId,
+		override,
+	);
+	return {
+		placements: updated,
+		nextPair: next,
+		realized: next === undefined,
+		enriched: enriched && next !== undefined,
+	};
+}

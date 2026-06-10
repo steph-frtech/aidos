@@ -87,4 +87,60 @@ test.describe("WB2-15 /v2/ai-lab — le cerveau gauche place le besoin sur la ve
 		// aucun placement n'a été créé (l'espace verticale reste vide).
 		await expect(page.getByTestId("v2-ai-lab-empty")).toBeVisible();
 	});
+
+	// WB2-16 — la DESCENTE de l'anatomie : valider une spec → la paire suivante, chaîner jusqu'au bout.
+	test("WB2-16 : la descente chaîne Spec→…→Evidence, la dernière paire est RÉALISÉE (aucune écriture)", async ({
+		page,
+	}) => {
+		const writes: string[] = [];
+		page.on("request", (req) => {
+			const m = req.method();
+			if (["POST", "PUT", "PATCH", "DELETE"].includes(m)) {
+				writes.push(`${m} ${req.url()}`);
+			}
+		});
+
+		await page.goto("/v2/ai-lab");
+
+		// poser une cellule racine (spec seule) via le fallback déterministe : produit · F · spec.
+		await page.getByTestId("v2-ai-lab-input").fill("Un besoin à descendre");
+		await page.getByTestId("v2-ai-lab-fallback").click();
+
+		const rootSpec = page.getByTestId("v2-ai-lab-placement-produit|F|spec|");
+		await expect(rootSpec).toBeVisible();
+		await expect(rootSpec).toHaveAttribute("data-status", "proposed");
+
+		// DESCENDRE l'anatomie : Spec → Comportement → Scénarios → Modèle → Contrat → Evidence.
+		// On clique « Valider ↓ » sur chaque paire jusqu'à evidence ; à evidence on clique « Réaliser ✓ ».
+		const pairs = ["spec", "behavior", "scenarios", "model", "contract"];
+		for (const pair of pairs) {
+			await page.getByTestId(`v2-ai-lab-descend-produit|F|${pair}|`).click();
+			// le parent passe à VALIDÉ ; la paire suivante apparaît (proposée).
+			await expect(
+				page.getByTestId(`v2-ai-lab-placement-produit|F|${pair}|`),
+			).toHaveAttribute("data-status", "validated");
+		}
+
+		// la dernière paire (evidence) est apparue : la RÉALISER.
+		const evidence = page.getByTestId(
+			"v2-ai-lab-placement-produit|F|evidence|",
+		);
+		await expect(evidence).toBeVisible();
+		await page.getByTestId("v2-ai-lab-descend-produit|F|evidence|").click();
+		// la descente est RÉALISÉE : evidence porte le statut « realized ».
+		await expect(evidence).toHaveAttribute("data-status", "realized");
+		await expect(
+			page.getByTestId("v2-ai-lab-status-produit|F|evidence|"),
+		).toContainText("RÉALISÉ");
+
+		// les 6 paires de l'anatomie sont présentes dans la cellule.
+		for (const pair of [...pairs, "evidence"]) {
+			await expect(
+				page.getByTestId(`v2-ai-lab-placement-produit|F|${pair}|`),
+			).toBeVisible();
+		}
+
+		// LE MUR : descendre l'anatomie n'écrit AUCUNE vérité (aucune requête d'écriture).
+		expect(writes).toEqual([]);
+	});
 });

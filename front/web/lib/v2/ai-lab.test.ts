@@ -17,17 +17,25 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
 	ALL_FACETS,
+	ANATOMY_ORDER,
 	cellBySlug,
+	cellPlacements,
 	countsByLevel,
+	descendPair,
 	fallbackPlacements,
 	isDeclaredCell,
+	isLastPair,
 	isTruthWriteRequest,
 	levelsTouched,
 	MIRROR_PAIRS,
 	NEED_SAMPLES,
 	needSampleById,
 	needSampleIds,
+	nextPairId,
 	PLACEMENT_SPACE,
+	type Placement,
+	pairLabel,
+	pairRank,
 	placementSlug,
 	placeNeed,
 	SPACE_COUNTS,
@@ -248,5 +256,175 @@ describe("WB2-15 — registre clos des besoins d'exemple", () => {
 				expect(r.placements.length).toBeLessThan((s.raw as unknown[]).length);
 			}
 		}
+	});
+});
+
+// ── WB2-16 — LA DESCENTE de l'anatomie (valider une spec → la paire suivante) ──
+
+const PAIR_IDS = MIRROR_PAIRS.map((p) => p.id);
+
+/** une cellule racine (spec seule) sur un (niveau, facette) — le point de départ d'une descente. */
+function rootCell(level: string, facet: string): Placement[] {
+	return [
+		{
+			level: level as Placement["level"],
+			facet: facet as Placement["facet"],
+			pairId: "spec",
+			spec: "racine de la descente",
+		},
+	];
+}
+
+describe("WB2-16 — which-pair déterministe (l'ordre de l'anatomie)", () => {
+	it("l'anatomie a 6 paires en ordre Spec→Comportement→Scénarios→Modèle→Contrat→Evidence", () => {
+		expect(ANATOMY_ORDER).toEqual([
+			"spec",
+			"behavior",
+			"scenarios",
+			"model",
+			"contract",
+			"evidence",
+		]);
+		expect(ANATOMY_ORDER).toHaveLength(6);
+	});
+
+	it("nextPairId chaîne chaque paire à la suivante, et undefined à la dernière", () => {
+		for (let i = 0; i < PAIR_IDS.length - 1; i++) {
+			expect(nextPairId(PAIR_IDS[i])).toBe(PAIR_IDS[i + 1]);
+			expect(isLastPair(PAIR_IDS[i])).toBe(false);
+		}
+		expect(nextPairId("evidence")).toBeUndefined();
+		expect(isLastPair("evidence")).toBe(true);
+		expect(nextPairId("inconnu")).toBeUndefined();
+		expect(isLastPair("inconnu")).toBe(false);
+	});
+
+	it("pairRank + pairLabel sont totaux et stables", () => {
+		expect(pairRank("spec")).toBe(0);
+		expect(pairRank("evidence")).toBe(5);
+		expect(pairRank("inconnu")).toBe(-1);
+		expect(pairLabel("spec")).toBe("Spec");
+		expect(pairLabel("evidence")).toBe("Evidence");
+		expect(pairLabel("inconnu")).toBe("inconnu");
+	});
+
+	it("WHICH-PAIR DÉTERMINISTE (property) : nextPairId(p) ne dépend QUE de p", () => {
+		fc.assert(
+			fc.property(
+				fc.oneof(
+					fc.constantFrom(...PAIR_IDS),
+					fc.constantFrom("inconnu", "ghost", "spec2"),
+				),
+				(pairId) => {
+					expect(nextPairId(pairId)).toBe(nextPairId(pairId));
+					const i = ANATOMY_ORDER.indexOf(pairId);
+					const expected =
+						i >= 0 && i < ANATOMY_ORDER.length - 1
+							? ANATOMY_ORDER[i + 1]
+							: undefined;
+					expect(nextPairId(pairId)).toBe(expected);
+				},
+			),
+		);
+	});
+});
+
+describe("WB2-16 — descendPair : gaté, déterministe, le mur tient", () => {
+	it("DÉTERMINISME (property) : descendPair deux fois → le même résultat", () => {
+		fc.assert(
+			fc.property(
+				fc.constantFrom(...VERTICAL_LEVELS),
+				fc.constantFrom(...ALL_FACETS),
+				fc.constantFrom(...PAIR_IDS),
+				(level, facet, pairId) => {
+					const cell: Placement[] = [
+						{
+							level,
+							facet,
+							pairId,
+							spec: "x",
+						},
+					];
+					const a = descendPair(cell, level, facet, pairId);
+					const b = descendPair(cell, level, facet, pairId);
+					expect(a).toEqual(b);
+				},
+			),
+		);
+	});
+
+	it("valider spec → génère behavior (la paire suivante), parent validé", () => {
+		const r = descendPair(rootCell("produit", "F"), "produit", "F", "spec");
+		expect(r.nextPair).toBe("behavior");
+		expect(r.realized).toBe(false);
+		const cell = cellPlacements(r.placements, "produit", "F");
+		expect(cell.map((p) => p.pairId)).toEqual(["spec", "behavior"]);
+		expect(cell[0].status).toBe("validated");
+		// la fille est PROPOSÉE : v1 n'encode pas le statut « proposed » par défaut (undefined = proposé).
+		expect(cell[1].status ?? "proposed").toBe("proposed");
+	});
+
+	it("LA DESCENTE CHAÎNE : spec→…→evidence, la dernière paire est RÉALISÉE", () => {
+		let placements = rootCell("entité", "F");
+		let realized = false;
+		for (const pairId of PAIR_IDS) {
+			const r = descendPair(placements, "entité", "F", pairId);
+			placements = r.placements;
+			realized = r.realized;
+		}
+		// les 6 paires de l'anatomie ont été générées dans la cellule.
+		const cell = cellPlacements(placements, "entité", "F");
+		expect(cell.map((p) => p.pairId)).toEqual(PAIR_IDS);
+		// la descente est complète : la dernière paire (evidence) est « réalisée ».
+		expect(realized).toBe(true);
+		expect(cell[cell.length - 1].status).toBe("realized");
+	});
+
+	it("ENRICHISSEMENT GATÉ vs FALLBACK TEMPLATE : Claude écrit le texte, sinon le template", () => {
+		// fallback déterministe : pas d'override → la spec dérivée (deriveNextSpec).
+		const fb = descendPair(
+			rootCell("opération", "F"),
+			"opération",
+			"F",
+			"spec",
+		);
+		expect(fb.enriched).toBe(false);
+		const fbChild = cellPlacements(fb.placements, "opération", "F").find(
+			(p) => p.pairId === "behavior",
+		);
+		expect(fbChild?.spec).toContain("dérivé de");
+		// enrichi : override Claude → son texte EXACT.
+		const en = descendPair(
+			rootCell("opération", "F"),
+			"opération",
+			"F",
+			"spec",
+			{
+				spec: "Le panier doit rester cohérent à chaque ajout",
+			},
+		);
+		expect(en.enriched).toBe(true);
+		const enChild = cellPlacements(en.placements, "opération", "F").find(
+			(p) => p.pairId === "behavior",
+		);
+		expect(enChild?.spec).toBe("Le panier doit rester cohérent à chaque ajout");
+	});
+
+	it("LE MUR : la dernière paire ne génère PAS de fille (réalisé), enriched=false à evidence", () => {
+		const cell: Placement[] = [
+			{ level: "entité", facet: "F", pairId: "evidence", spec: "evidence" },
+		];
+		const r = descendPair(cell, "entité", "F", "evidence", { spec: "ignoré" });
+		expect(r.nextPair).toBeUndefined();
+		expect(r.realized).toBe(true);
+		expect(r.enriched).toBe(false); // à la dernière paire l'override ne crée aucune fille.
+	});
+
+	it("cellule inconnue = no-op (le mur §2 : aucune écriture, liste inchangée)", () => {
+		const cell = rootCell("produit", "F");
+		const r = descendPair(cell, "galaxie" as never, "F", "spec");
+		expect(r.placements).toEqual(cell);
+		expect(r.nextPair).toBeUndefined();
+		expect(r.realized).toBe(false);
 	});
 });

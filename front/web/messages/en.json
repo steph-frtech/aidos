@@ -6608,7 +6608,12 @@
 		"rightHint": "Each placed spec carries its (facet · pair); cells invented by the left brain are DROPPED by the clamp (never coerced).",
 		"levelsShort": "levels",
 		"proposed": "PROPOSED",
+		"validated": "VALIDATED",
+		"realized": "REALIZED",
+		"descendBtn": "Validate ↓",
+		"realizeBtn": "Realize ✓",
+		"enrichToggle": "Claude enrichment (else deterministic template fallback)",
 		"emptyHint": "No placement. Describe a need (or pick an example) then click \"Place\".",
-		"spaceNote": "Declared space: 7 levels × 8 facets × 6 mirror-pairs = 336 cells. The clamp keeps ONLY what falls into it."
+		"spaceNote": "Declared space: 7 levels × 8 facets × 6 mirror-pairs = 336 cells. The clamp keeps ONLY what falls into it. WB2-16: validating a spec descends the anatomy (Spec→Behavior→Scenarios→Model→Contract→Evidence); the last pair is REALIZED."
 	}
 }

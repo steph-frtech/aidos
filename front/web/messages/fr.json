@@ -6608,7 +6608,12 @@
 		"rightHint": "Chaque spec placée porte son (facette · paire) ; les cellules inventées par le cerveau gauche sont JETÉES par le clamp (jamais coercées).",
 		"levelsShort": "niveaux",
 		"proposed": "PROPOSÉ",
+		"validated": "VALIDÉ",
+		"realized": "RÉALISÉ",
+		"descendBtn": "Valider ↓",
+		"realizeBtn": "Réaliser ✓",
+		"enrichToggle": "Enrichissement Claude (sinon fallback template déterministe)",
 		"emptyHint": "Aucun placement. Décrivez un besoin (ou choisissez un exemple) puis cliquez « Placer ».",
-		"spaceNote": "Espace déclaré : 7 niveaux × 8 facettes × 6 paires-miroir = 336 cellules. Le clamp ne garde QUE ce qui y tombe."
+		"spaceNote": "Espace déclaré : 7 niveaux × 8 facettes × 6 paires-miroir = 336 cellules. Le clamp ne garde QUE ce qui y tombe. WB2-16 : valider une spec descend l'anatomie (Spec→Comportement→Scénarios→Modèle→Contrat→Evidence) ; la dernière paire est RÉALISÉE."
 	}
 }

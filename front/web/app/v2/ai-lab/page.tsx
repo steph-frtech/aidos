@@ -32,6 +32,11 @@ const KEYS = [
 	"rightHint",
 	"levelsShort",
 	"proposed",
+	"validated",
+	"realized",
+	"descendBtn",
+	"realizeBtn",
+	"enrichToggle",
 	"emptyHint",
 	"spaceNote",
 ] as const;
