@@ -194,7 +194,7 @@ export function withContracts(
  * liens, dans l'ordre stable (from, to). C'est ce que le drill-down d'une cellule consomme.
  */
 export function internalComposes(
-	cellId: string,
+	_cellId: string,
 	cellKernelIds: readonly string[],
 	links: readonly Link[],
 ): readonly Link[] {
