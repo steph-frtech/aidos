@@ -39,6 +39,11 @@ const KEYS = [
 	"enrichToggle",
 	"emptyHint",
 	"spaceNote",
+	"impactHeading",
+	"impactHint",
+	"validateAllBtn",
+	"impactRed",
+	"impactGreen",
 ] as const;
 
 export default async function V2AiLabScreen() {

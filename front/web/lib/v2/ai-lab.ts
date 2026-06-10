@@ -36,11 +36,19 @@
 
 import {
 	ALL_FACETS,
+	allPlacementsHandled,
+	cellFullyHandled,
 	cellPlacements,
+	type DagImpact,
 	deriveNextSpec,
+	EXISTING_DAG,
+	type ExistingSpec,
+	existingSpec,
+	impactResolved,
 	isTruthWriteRequest,
 	MIRROR_PAIRS,
 	type MirrorPair,
+	mergeImpacts,
 	nextPairId,
 	type Placement,
 	placementKey,
@@ -49,6 +57,7 @@ import {
 	type Level as V1Level,
 	VERTICAL_LEVELS,
 	validateAndDescend,
+	validateImpacts,
 	validatePlacements,
 	type WallRefusal,
 } from "../ai-lab";
@@ -58,12 +67,20 @@ import type { Facet } from "../facetwire";
 // module v2 — aucune duplication, aucune nouvelle vérité.
 export {
 	ALL_FACETS,
+	allPlacementsHandled,
+	cellFullyHandled,
 	cellPlacements,
+	type DagImpact,
 	deriveNextSpec,
+	EXISTING_DAG,
+	type ExistingSpec,
+	existingSpec,
 	type Facet,
+	impactResolved,
 	isTruthWriteRequest,
 	MIRROR_PAIRS,
 	type MirrorPair,
+	mergeImpacts,
 	nextPairId,
 	type Placement,
 	placementKey,
@@ -71,6 +88,7 @@ export {
 	type SpecStatus,
 	VERTICAL_LEVELS,
 	validateAndDescend,
+	validateImpacts,
 	type WallRefusal,
 };
 
@@ -208,6 +226,11 @@ export interface NeedSample {
 	readonly message: string;
 	/** la sortie brute du cerveau gauche — INCLUT volontairement une cellule INVENTÉE (clampée). */
 	readonly raw: unknown;
+	/**
+	 * WB2-17 — la sortie BRUTE des IMPACTS du cerveau gauche : quelles specs EXISTANTES (du DAG) le
+	 * besoin touche (la vague de rouge). INCLUT volontairement un id INVENTÉ (jeté par `validateImpacts`).
+	 */
+	readonly impactsRaw?: unknown;
 }
 
 /**
@@ -265,6 +288,20 @@ export const NEED_SAMPLES: readonly NeedSample[] = [
 				spec: "(niveau inventé — clampé)",
 			},
 		],
+		// WB2-17 — les specs EXISTANTES que ce besoin IMPACTE (la vague de rouge), alignées sur les
+		// cellules placées ci-dessus (elles se RÉSOLVENT quand le besoin est validé). + 1 id inventé.
+		impactsRaw: [
+			{ specId: "d-produit-shop", reason: "Le tunnel touche la boutique" },
+			{
+				specId: "d-controle-pay",
+				reason: "Le bouton Payer déclenche le checkout",
+			},
+			{ specId: "d-action-checkout", reason: "Le paiement atomique change" },
+			{ specId: "d-operation-createorder", reason: "createOrder est impacté" },
+			{ specId: "d-entite-order", reason: "Order évolue" },
+			// ↓ id INVENTÉ (pas dans le DAG) → JETÉ par validateImpacts.
+			{ specId: "d-inexistant-ghost", reason: "(spec inventée — clampée)" },
+		],
 	},
 	{
 		id: "secret-field",
@@ -284,6 +321,15 @@ export const NEED_SAMPLES: readonly NeedSample[] = [
 				pairId: "model",
 				spec: "(facette inventée — clampée)",
 			},
+		],
+		// WB2-17 — la spec EXISTANTE Payment (entité × sécurité) que le champ secret impacte. Elle se
+		// résout quand la cellule entité×S est validée. + 1 id inventé (clampé).
+		impactsRaw: [
+			{
+				specId: "d-entite-payment",
+				reason: "Payment ne doit jamais fuiter le secret",
+			},
+			{ specId: "d-inexistant-ghost", reason: "(spec inventée — clampée)" },
 		],
 	},
 ];
@@ -400,4 +446,105 @@ export function descendPair(
 		realized: next === undefined,
 		enriched: enriched && next !== undefined,
 	};
+}
+
+// ── WB2-17 — LA VAGUE DE ROUGE : les specs EXISTANTES que le besoin IMPACTE ──────
+//
+// WB2-15 PLACE le besoin (NL → nouvelles cellules). WB2-16 DESCEND l'anatomie. WB2-17 montre l'AUTRE
+// face : à DROITE, les specs DÉJÀ là (le DAG existant) que le besoin TOUCHE — en ROUGE (impactées,
+// non résolues) — puis leur RÉSOLUTION (rouge → vert) quand le besoin est validé. CONSISTENT PARTOUT :
+// la liste (ici), la grille, les cellules et le graphe lisent le MÊME prédicat `impactResolved`.
+//
+// DÉTERMINISME-FIRST (CLAUDE.md §6/§8) : `needImpacts` (le clamp des impacts) et `impactRows` (la vue
+// liste) sont des FONCTIONS PURES & TOTALES — aucune horloge, aucun aléa, aucun LLM. Le « quelles specs
+// impactées » BRUT est le jugement irréductible du cerveau gauche, mais il est VÉRIFIÉ ici : un id
+// inventé est JETÉ (`validateImpacts`), jamais coercé. La RÉSOLUTION (rouge → vert) est PURE CODE — le
+// MÊME `impactResolved` que v1 (le DAG, la grille, le graphe), AUCUNE règle inventée. Le miroir de
+// reproductibilité épingle : déterminisme, le clamp, et « valider TOUT → tout impact RÉSOLU (vert) ».
+//
+// LE MUR (§2) : la vague de rouge est une PROPOSITION (le cerveau gauche identifie l'impact) ; résoudre
+// = valider les nouvelles specs (au-dessus du mur) ; AUCUNE vérité du DAG n'est écrite (promotion /goal).
+
+/** Le voyant d'un impact : rouge (touché, non résolu) → vert (résolu une fois le besoin validé). */
+export type ImpactVoyant = "red" | "green";
+
+/** Une ligne d'impact pour la vue : la spec existante touchée, sa raison, et son état (résolu ?). */
+export interface ImpactRow {
+	/** la spec EXISTANTE (du DAG) que le besoin impacte. */
+	readonly spec: ExistingSpec;
+	/** la raison du cerveau gauche (pourquoi le besoin la touche). */
+	readonly reason: string;
+	/** résolu ? — calculé par le MÊME `impactResolved` que le DAG/la grille/le graphe (consistant). */
+	readonly resolved: boolean;
+	/** le voyant : rouge si non résolu, vert si résolu. */
+	readonly voyant: ImpactVoyant;
+}
+
+/**
+ * `needImpacts` — le CLAMP des impacts BRUTS du cerveau gauche (la vague de rouge proposée) : ne garde
+ * QUE les ids qui nomment une spec EXISTANTE réelle du DAG (un id inventé est JETÉ, jamais coercé),
+ * dédupliqué + ordonné (l'ordre du DAG). RÉUTILISE `validateImpacts` (FK11) — AUCUNE règle inventée.
+ * PURE + TOTALE + DÉTERMINISTE : même `impactsRaw` → mêmes impacts.
+ */
+export function needImpacts(impactsRaw: unknown): DagImpact[] {
+	return validateImpacts(impactsRaw);
+}
+
+/**
+ * `impactRows` — la VUE LISTE de la vague de rouge : pour chaque impact gardé, la spec existante + sa
+ * raison + son état RÉSOLU (le MÊME `impactResolved` que le DAG/la grille/le graphe → consistant
+ * PARTOUT) + son voyant (rouge → vert). Tout impact dont la spec n'existe plus est ignoré (totalité).
+ * PURE + TOTALE + DÉTERMINISTE : (placements, impacts) → mêmes lignes, dans l'ordre du DAG.
+ */
+export function impactRows(
+	placements: readonly Placement[],
+	impacts: readonly DagImpact[],
+): ImpactRow[] {
+	const rows: ImpactRow[] = [];
+	for (const imp of impacts) {
+		const spec = existingSpec(imp.specId);
+		if (!spec) continue;
+		const resolved = impactResolved([...placements], spec.level, spec.facet);
+		rows.push({
+			spec,
+			reason: imp.reason,
+			resolved,
+			voyant: resolved ? "green" : "red",
+		});
+	}
+	return rows;
+}
+
+/** Le compte rouge / vert / total d'une liste de lignes d'impact (le résumé de l'en-tête). PURE & TOTALE. */
+export function impactTally(rows: readonly ImpactRow[]): {
+	red: number;
+	green: number;
+	total: number;
+} {
+	let red = 0;
+	let green = 0;
+	for (const r of rows) {
+		if (r.resolved) green++;
+		else red++;
+	}
+	return { red, green, total: rows.length };
+}
+
+/** Tout le rouge est-il passé au vert ? (le critère de done : valider tout → 0 rouge). PURE & TOTALE. */
+export function allImpactsResolved(rows: readonly ImpactRow[]): boolean {
+	return rows.length > 0 && rows.every((r) => r.resolved);
+}
+
+/**
+ * `validateAllPlacements` — VALIDER TOUT le besoin d'un coup : chaque placement encore proposé passe à
+ * « validated » (les déjà-réalisés restent réalisés). C'est ce que « j'ai tout validé » fait — après
+ * quoi `allPlacementsHandled` est vrai et TOUS les impacts se RÉSOLVENT (rouge → vert). PURE + TOTALE +
+ * DÉTERMINISTE. Le mur §2 : aucune vérité écrite, c'est un état de lab (proposition).
+ */
+export function validateAllPlacements(placements: Placement[]): Placement[] {
+	return placements.map((p) =>
+		p.status === "realized"
+			? p
+			: ({ ...p, status: "validated" as SpecStatus } as Placement),
+	);
 }

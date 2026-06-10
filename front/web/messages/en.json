@@ -6614,6 +6614,11 @@
 		"realizeBtn": "Realize ✓",
 		"enrichToggle": "Claude enrichment (else deterministic template fallback)",
 		"emptyHint": "No placement. Describe a need (or pick an example) then click \"Place\".",
-		"spaceNote": "Declared space: 7 levels × 8 facets × 6 mirror-pairs = 336 cells. The clamp keeps ONLY what falls into it. WB2-16: validating a spec descends the anatomy (Spec→Behavior→Scenarios→Model→Contract→Evidence); the last pair is REALIZED."
+		"spaceNote": "Declared space: 7 levels × 8 facets × 6 mirror-pairs = 336 cells. The clamp keeps ONLY what falls into it. WB2-16: validating a spec descends the anatomy (Spec→Behavior→Scenarios→Model→Contract→Evidence); the last pair is REALIZED.",
+		"impactHeading": "The red wave — impacted existing specs",
+		"impactHint": "On the RIGHT too: the specs ALREADY there that this need TOUCHES (red). Validate the need (\"Validate all\" or pair by pair) → they RESOLVE (red → green). Consistent everywhere: list, grid, cells, graph read the same verdict.",
+		"validateAllBtn": "Validate all → resolve the red wave",
+		"impactRed": "RED",
+		"impactGreen": "GREEN"
 	}
 }

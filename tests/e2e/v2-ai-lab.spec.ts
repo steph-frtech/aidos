@@ -143,4 +143,68 @@ test.describe("WB2-15 /v2/ai-lab — le cerveau gauche place le besoin sur la ve
 		// LE MUR : descendre l'anatomie n'écrit AUCUNE vérité (aucune requête d'écriture).
 		expect(writes).toEqual([]);
 	});
+
+	// WB2-17 — la VAGUE DE ROUGE : les specs EXISTANTES impactées (rouge) → résolution (rouge → vert)
+	// quand le besoin est validé. Le critère de done : valider TOUT → tout le rouge passe vert.
+	test("WB2-17 : le besoin impacte des specs existantes (rouge) ; valider tout → tout passe vert (aucune écriture)", async ({
+		page,
+	}) => {
+		const writes: string[] = [];
+		page.on("request", (req) => {
+			const m = req.method();
+			if (["POST", "PUT", "PATCH", "DELETE"].includes(m)) {
+				writes.push(`${m} ${req.url()}`);
+			}
+		});
+
+		await page.goto("/v2/ai-lab");
+
+		// CHOISIR le besoin « tunnel de paiement » → il PLACE des specs ET impacte des specs existantes.
+		await page.getByTestId("v2-ai-lab-sample-checkout-multi").click();
+
+		// la vague de rouge apparaît : les specs existantes impactées sont listées.
+		const impacts = page.getByTestId("v2-ai-lab-impacts");
+		await expect(impacts).toBeVisible();
+		// AU PLACEMENT (rien de validé) : TOUTES les specs impactées sont ROUGES.
+		await expect(impacts).toHaveAttribute("data-all-green", "false");
+		const tally = page.getByTestId("v2-ai-lab-impact-tally");
+		const greenBefore = Number(await tally.getAttribute("data-green"));
+		const redBefore = Number(await tally.getAttribute("data-red"));
+		expect(greenBefore).toBe(0);
+		expect(redBefore).toBeGreaterThan(0);
+
+		// CLAMP : l'id inventé « d-inexistant-ghost » n'apparaît PAS dans la vague de rouge.
+		await expect(
+			page.getByTestId("v2-ai-lab-impact-d-inexistant-ghost"),
+		).toHaveCount(0);
+
+		// chaque ligne d'impact porte le voyant ROUGE (non résolu).
+		const rowCount = await page
+			.locator('[data-testid^="v2-ai-lab-impact-d-"]')
+			.count();
+		expect(rowCount).toBe(redBefore);
+		for (const el of await page
+			.locator('[data-testid^="v2-ai-lab-impact-d-"]')
+			.all()) {
+			await expect(el).toHaveAttribute("data-voyant", "red");
+		}
+
+		// VALIDER TOUT → la RÉSOLUTION : tout le rouge passe au VERT (rouge → vert).
+		await page.getByTestId("v2-ai-lab-validate-all").click();
+
+		await expect(impacts).toHaveAttribute("data-all-green", "true");
+		await expect(tally).toHaveAttribute("data-red", "0");
+		await expect(tally).toHaveAttribute("data-green", String(redBefore));
+		// chaque ligne d'impact est maintenant VERTE (résolue) — consistant partout.
+		for (const el of await page
+			.locator('[data-testid^="v2-ai-lab-impact-d-"]')
+			.all()) {
+			await expect(el).toHaveAttribute("data-voyant", "green");
+		}
+		// le bouton « Valider tout » est désormais désactivé (plus rien à résoudre).
+		await expect(page.getByTestId("v2-ai-lab-validate-all")).toBeDisabled();
+
+		// LE MUR : résoudre la vague de rouge n'écrit AUCUNE vérité (aucune requête d'écriture).
+		expect(writes).toEqual([]);
+	});
 });

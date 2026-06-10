@@ -6614,6 +6614,11 @@
 		"realizeBtn": "Réaliser ✓",
 		"enrichToggle": "Enrichissement Claude (sinon fallback template déterministe)",
 		"emptyHint": "Aucun placement. Décrivez un besoin (ou choisissez un exemple) puis cliquez « Placer ».",
-		"spaceNote": "Espace déclaré : 7 niveaux × 8 facettes × 6 paires-miroir = 336 cellules. Le clamp ne garde QUE ce qui y tombe. WB2-16 : valider une spec descend l'anatomie (Spec→Comportement→Scénarios→Modèle→Contrat→Evidence) ; la dernière paire est RÉALISÉE."
+		"spaceNote": "Espace déclaré : 7 niveaux × 8 facettes × 6 paires-miroir = 336 cellules. Le clamp ne garde QUE ce qui y tombe. WB2-16 : valider une spec descend l'anatomie (Spec→Comportement→Scénarios→Modèle→Contrat→Evidence) ; la dernière paire est RÉALISÉE.",
+		"impactHeading": "La vague de rouge — specs existantes impactées",
+		"impactHint": "À DROITE aussi : les specs DÉJÀ là que ce besoin TOUCHE (rouge). Validez le besoin (« Valider tout » ou paire par paire) → elles se RÉSOLVENT (rouge → vert). Consistant partout : liste, grille, cellules, graphe lisent le même verdict.",
+		"validateAllBtn": "Valider tout → résoudre la vague de rouge",
+		"impactRed": "ROUGE",
+		"impactGreen": "VERT"
 	}
 }

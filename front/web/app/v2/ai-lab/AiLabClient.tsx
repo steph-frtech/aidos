@@ -3,18 +3,24 @@
 import { useMemo, useState } from "react";
 import {
 	ALL_FACETS,
+	allImpactsResolved,
 	countsByLevel,
+	type DagImpact,
 	descendPair,
 	fallbackPlacements,
+	impactRows,
+	impactTally,
 	isLastPair,
 	levelsTouched,
 	MIRROR_PAIRS,
 	type NeedSample,
+	needImpacts,
 	type Placement,
 	pairLabel,
 	placementKey,
 	placementsByLevel,
 	placeNeed,
+	validateAllPlacements,
 	type WallRefusal,
 } from "@/lib/v2/ai-lab";
 
@@ -56,20 +62,35 @@ export function AiLabClient({
 	// le besoin d'exemple sélectionné (la sortie brute du cerveau gauche, déjà déclarée + 1 inventée).
 	const [rawForSample, setRawForSample] = useState<unknown>(null);
 
+	// WB2-17 — les IMPACTS gardés (la vague de rouge) : les specs EXISTANTES que le besoin touche.
+	const [impacts, setImpacts] = useState<DagImpact[]>([]);
+
 	const byLevel = useMemo(() => placementsByLevel(placements), [placements]);
 	const levels = useMemo(() => levelsTouched(placements), [placements]);
 	const counts = useMemo(() => countsByLevel(placements), [placements]);
 
-	function runPlace(msg: string, raw: unknown) {
+	// WB2-17 — la VUE de la vague de rouge : chaque impact + son état (rouge → vert), CONSISTANT avec
+	// le DAG/la grille/le graphe (le MÊME `impactResolved`). Recalculée à chaque validation.
+	const rows = useMemo(
+		() => impactRows(placements, impacts),
+		[placements, impacts],
+	);
+	const tally = useMemo(() => impactTally(rows), [rows]);
+	const allGreen = useMemo(() => allImpactsResolved(rows), [rows]);
+
+	function runPlace(msg: string, raw: unknown, impactsRaw?: unknown) {
 		const r = placeNeed(msg, raw);
 		if (r.refused) {
 			setRefusal(r);
 			setPlacements([]);
+			setImpacts([]);
 			setUsedFallback(false);
 			return;
 		}
 		setRefusal(null);
 		setPlacements(r.placements);
+		// WB2-17 — clamper les impacts BRUTS du cerveau gauche (un id inventé est jeté).
+		setImpacts(needImpacts(impactsRaw));
 		setUsedFallback(false);
 	}
 
@@ -88,18 +109,28 @@ export function AiLabClient({
 		if (r.refused) {
 			setRefusal(r);
 			setPlacements([]);
+			setImpacts([]);
 			setUsedFallback(false);
 			return;
 		}
 		setRefusal(null);
 		setPlacements(fallbackPlacements(message));
+		setImpacts([]); // le fallback ne propose aucun impact (pas de cerveau gauche).
 		setUsedFallback(true);
 	}
 
 	function onPickSample(s: NeedSample) {
 		setMessage(s.message);
 		setRawForSample(s.raw);
-		runPlace(s.message, s.raw);
+		// WB2-17 — un exemple porte ses IMPACTS BRUTS (la vague de rouge proposée par le cerveau gauche).
+		runPlace(s.message, s.raw, s.impactsRaw);
+	}
+
+	// WB2-17 — VALIDER TOUT le besoin d'un coup : chaque placement proposé passe à validé → TOUS les
+	// impacts se RÉSOLVENT (rouge → vert), consistant avec le DAG/la grille/le graphe (`impactResolved`).
+	function onValidateAll() {
+		setPlacements((prev) => validateAllPlacements(prev));
+		setUsedFallback(false);
 	}
 
 	// WB2-16 — l'enrichissement Claude est GATÉ : ON → Claude écrit le texte de la fille (ici simulé
@@ -339,6 +370,91 @@ export function AiLabClient({
 						</p>
 					)}
 				</div>
+
+				{/* WB2-17 — LA VAGUE DE ROUGE : les specs EXISTANTES que le besoin impacte (rouge → vert) */}
+				{rows.length > 0 && (
+					<div
+						data-testid="v2-ai-lab-impacts"
+						data-all-green={allGreen ? "true" : "false"}
+						className="rounded-xl border border-border bg-card p-4 space-y-3"
+					>
+						<div className="flex items-baseline justify-between">
+							<h3 className="text-sm font-semibold text-foreground">
+								{t.impactHeading}
+							</h3>
+							<span
+								data-testid="v2-ai-lab-impact-tally"
+								data-red={tally.red}
+								data-green={tally.green}
+								data-total={tally.total}
+								className="font-mono text-xs font-semibold"
+							>
+								<span
+									className={
+										tally.red > 0 ? "text-destructive" : "text-muted-foreground"
+									}
+								>
+									{tally.red} ●
+								</span>{" "}
+								<span className="text-primary">{tally.green} ✓</span>
+							</span>
+						</div>
+						<p className="text-xs text-muted-foreground">{t.impactHint}</p>
+
+						<button
+							type="button"
+							data-testid="v2-ai-lab-validate-all"
+							onClick={onValidateAll}
+							disabled={allGreen}
+							className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
+						>
+							{t.validateAllBtn}
+						</button>
+
+						<ul className="space-y-1.5">
+							{rows.map((row) => (
+								<li
+									key={row.spec.id}
+									data-testid={`v2-ai-lab-impact-${row.spec.id}`}
+									data-spec={row.spec.id}
+									data-voyant={row.voyant}
+									data-resolved={row.resolved ? "true" : "false"}
+									className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 ${
+										row.resolved
+											? "border-primary/30 bg-primary/5"
+											: "border-destructive/40 bg-destructive/5"
+									}`}
+								>
+									<span
+										className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
+											row.resolved
+												? "bg-primary/10 text-primary"
+												: "bg-destructive/10 text-destructive"
+										}`}
+									>
+										{row.spec.facet}
+									</span>
+									<span className="shrink-0 font-mono text-[10px] uppercase text-muted-foreground">
+										{row.spec.level}
+									</span>
+									<span className="truncate text-xs text-foreground">
+										{row.spec.title}
+									</span>
+									<span
+										data-testid={`v2-ai-lab-impact-voyant-${row.spec.id}`}
+										className={`ml-auto shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
+											row.resolved
+												? "bg-primary text-primary-foreground"
+												: "bg-destructive text-destructive-foreground"
+										}`}
+									>
+										{row.resolved ? t.impactGreen : t.impactRed}
+									</span>
+								</li>
+							))}
+						</ul>
+					</div>
+				)}
 
 				<div
 					data-testid="v2-ai-lab-wall-note"

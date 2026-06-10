@@ -18,17 +18,22 @@ import { describe, expect, it } from "vitest";
 import {
 	ALL_FACETS,
 	ANATOMY_ORDER,
+	allImpactsResolved,
 	cellBySlug,
 	cellPlacements,
 	countsByLevel,
 	descendPair,
+	EXISTING_DAG,
 	fallbackPlacements,
+	impactRows,
+	impactTally,
 	isDeclaredCell,
 	isLastPair,
 	isTruthWriteRequest,
 	levelsTouched,
 	MIRROR_PAIRS,
 	NEED_SAMPLES,
+	needImpacts,
 	needSampleById,
 	needSampleIds,
 	nextPairId,
@@ -40,6 +45,7 @@ import {
 	placeNeed,
 	SPACE_COUNTS,
 	VERTICAL_LEVELS,
+	validateAllPlacements,
 } from "./ai-lab";
 
 const TRUTH_WRITE_MESSAGES = [
@@ -426,5 +432,133 @@ describe("WB2-16 — descendPair : gaté, déterministe, le mur tient", () => {
 		expect(r.placements).toEqual(cell);
 		expect(r.nextPair).toBeUndefined();
 		expect(r.realized).toBe(false);
+	});
+});
+
+// ── WB2-17 — LA VAGUE DE ROUGE : impactResolved pur + « valider tout → tout vert » ──
+
+describe("WB2-17 — needImpacts : le clamp des impacts (id existant seul)", () => {
+	it("ne garde QUE les ids du DAG existant (un id inventé est JETÉ)", () => {
+		const sample = needSampleById("checkout-multi");
+		if (!sample) return;
+		const impacts = needImpacts(sample.impactsRaw);
+		// tous les impacts gardés nomment une spec EXISTANTE réelle.
+		const dagIds = new Set(EXISTING_DAG.map((s) => s.id));
+		for (const i of impacts) expect(dagIds.has(i.specId)).toBe(true);
+		// l'id inventé « d-inexistant-ghost » a été clampé.
+		expect(impacts.every((i) => i.specId !== "d-inexistant-ghost")).toBe(true);
+		expect(impacts.length).toBeGreaterThan(0);
+	});
+
+	it("DÉTERMINISME (property) : needImpacts deux fois → le même résultat", () => {
+		fc.assert(
+			fc.property(
+				fc.array(
+					fc.record({
+						specId: fc.oneof(
+							fc.constantFrom(...EXISTING_DAG.map((s) => s.id)),
+							fc.constantFrom("ghost-1", "ghost-2"),
+						),
+						reason: fc.string({ maxLength: 30 }),
+					}),
+					{ maxLength: 8 },
+				),
+				(raw) => {
+					expect(needImpacts(raw)).toEqual(needImpacts(raw));
+				},
+			),
+		);
+	});
+});
+
+describe("WB2-17 — impactResolved + impactRows : rouge tant que non validé, vert sinon", () => {
+	it("DÉTERMINISME (property) : impactRows deux fois → les mêmes lignes", () => {
+		const sample = needSampleById("checkout-multi");
+		if (!sample) return;
+		const r = placeNeed(sample.message, sample.raw);
+		if (r.refused) return;
+		const impacts = needImpacts(sample.impactsRaw);
+		fc.assert(
+			fc.property(fc.constantFrom("none", "all"), (mode) => {
+				const placements =
+					mode === "all" ? validateAllPlacements(r.placements) : r.placements;
+				expect(impactRows(placements, impacts)).toEqual(
+					impactRows(placements, impacts),
+				);
+			}),
+		);
+	});
+
+	it("AU PLACEMENT (rien de validé) : TOUS les impacts sont ROUGES", () => {
+		const sample = needSampleById("checkout-multi");
+		if (!sample) return;
+		const r = placeNeed(sample.message, sample.raw);
+		if (r.refused) return;
+		const impacts = needImpacts(sample.impactsRaw);
+		const rows = impactRows(r.placements, impacts);
+		expect(rows.length).toBeGreaterThan(0);
+		// aucune cellule n'est validée → aucun impact résolu (tout rouge).
+		expect(rows.every((row) => row.voyant === "red")).toBe(true);
+		expect(allImpactsResolved(rows)).toBe(false);
+		const tally = impactTally(rows);
+		expect(tally.red).toBe(rows.length);
+		expect(tally.green).toBe(0);
+	});
+
+	it("VALIDER TOUT → TOUT le rouge passe VERT (le critère de done)", () => {
+		const sample = needSampleById("checkout-multi");
+		if (!sample) return;
+		const r = placeNeed(sample.message, sample.raw);
+		if (r.refused) return;
+		const impacts = needImpacts(sample.impactsRaw);
+		// « j'ai tout validé » : chaque placement proposé passe à validé.
+		const validated = validateAllPlacements(r.placements);
+		const rows = impactRows(validated, impacts);
+		expect(rows.length).toBeGreaterThan(0);
+		expect(rows.every((row) => row.voyant === "green")).toBe(true);
+		expect(allImpactsResolved(rows)).toBe(true);
+		const tally = impactTally(rows);
+		expect(tally.green).toBe(rows.length);
+		expect(tally.red).toBe(0);
+	});
+
+	it("CONSISTANT : un impact dont la cellule est validée vire au vert même les autres rouges", () => {
+		// le besoin « secret-field » impacte Payment (entité × S). Tant que entité×S n'est pas
+		// validée, c'est rouge ; une fois validée, c'est vert.
+		const sample = needSampleById("secret-field");
+		if (!sample) return;
+		const r = placeNeed(sample.message, sample.raw);
+		if (r.refused) return;
+		const impacts = needImpacts(sample.impactsRaw);
+		const before = impactRows(r.placements, impacts);
+		expect(before.some((row) => row.spec.id === "d-entite-payment")).toBe(true);
+		expect(before.every((row) => row.voyant === "red")).toBe(true);
+		// valider la cellule entité×S (la seule cellule du besoin) → l'impact se résout.
+		const validated = validateAllPlacements(r.placements);
+		const after = impactRows(validated, impacts);
+		expect(after.every((row) => row.voyant === "green")).toBe(true);
+	});
+
+	it("validateAllPlacements préserve les réalisés et n'altère pas la cardinalité", () => {
+		const placements: Placement[] = [
+			{
+				level: "produit",
+				facet: "F",
+				pairId: "spec",
+				spec: "a",
+				status: "proposed",
+			},
+			{
+				level: "entité",
+				facet: "F",
+				pairId: "evidence",
+				spec: "b",
+				status: "realized",
+			},
+		];
+		const out = validateAllPlacements(placements);
+		expect(out).toHaveLength(2);
+		expect(out.find((p) => p.pairId === "spec")?.status).toBe("validated");
+		expect(out.find((p) => p.pairId === "evidence")?.status).toBe("realized");
 	});
 });
