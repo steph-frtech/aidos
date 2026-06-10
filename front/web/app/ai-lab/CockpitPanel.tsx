@@ -20,6 +20,7 @@ import {
 } from "@/lib/ai-lab";
 import { leftBrainAction } from "./actions";
 import { emptyLab, type LabView } from "./fixtures";
+import { RequirementsView } from "./RequirementsView";
 import { SpecGraph3D } from "./SpecGraph3D";
 
 /**
@@ -138,7 +139,9 @@ export function CockpitPanel() {
 	);
 	const sel = view.selectedCell;
 	const selPairs = sel ? cellPlacements(placements, sel.level, sel.facet) : [];
-	const [rightView, setRightView] = useState<"table" | "graph">("table");
+	const [rightView, setRightView] = useState<
+		"table" | "graph" | "requirements"
+	>("table");
 	const graph = buildSpecGraph(placements, EXISTING_DAG, view.impacts ?? []);
 
 	return (
@@ -218,7 +221,7 @@ export function CockpitPanel() {
 						data-testid="view-toggle"
 						className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1"
 					>
-						{(["table", "graph"] as const).map((v) => (
+						{(["table", "graph", "requirements"] as const).map((v) => (
 							<button
 								key={v}
 								type="button"
@@ -230,13 +233,19 @@ export function CockpitPanel() {
 										: "text-muted-foreground hover:text-foreground"
 								}`}
 							>
-								{v === "table" ? t("viewTable") : t("viewGraph")}
+								{v === "table"
+									? t("viewTable")
+									: v === "graph"
+										? t("viewGraph")
+										: t("viewRequirements")}
 							</button>
 						))}
 					</div>
 
 					{rightView === "graph" ? (
 						<SpecGraph3D graph={graph} />
+					) : rightView === "requirements" ? (
+						<RequirementsView impacts={view.impacts ?? []} />
 					) : (
 						<>
 							{/* 1) the navigable big table: niveau × facette */}

@@ -6204,6 +6204,11 @@
 		"deployWorking": "Déploiement…",
 		"deployPreview": "Aperçu de l’app déployée",
 		"overviewHeading": "Vue d’ensemble — tout le graphe",
-		"overviewHint": "Toutes les specs (placées + DAG existant) + les liens + les impacts. Tournez/zoomez."
+		"overviewHint": "Toutes les specs (placées + DAG existant) + les liens + les impacts. Tournez/zoomez.",
+		"viewRequirements": "Requirements",
+		"reqHeading": "Les requirements du projet",
+		"reqHint": "Chaque requirement = une feature, avec sa grille niveau × facette. Cliquez-en un : sa somme (Σ par niveau/facette) + ses liens + ses specs.",
+		"reqLinks": "Dépend de",
+		"reqNoLink": "aucune dépendance"
 	}
 }

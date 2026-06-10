@@ -39,6 +39,11 @@ import {
 	pairTier,
 	placementsByLevel,
 	proposeSlot,
+	REQUIREMENTS,
+	requirementGrid,
+	requirementOf,
+	requirementSpecs,
+	requirementsRollup,
 	scopeForPair,
 	VERTICAL_LEVELS,
 	validateAndDescend,
@@ -603,6 +608,37 @@ describe("FK11 — the 3D spec graph (positions on the 3 axes, deterministic)", 
 		expect(g.nodes.find((n) => n.id === `d:${dagNode.id}`)?.resolved).toBe(
 			true,
 		);
+	});
+
+	it("requirements: every existing spec maps to a requirement; rollup sums are consistent", () => {
+		const rollups = requirementsRollup(EXISTING_DAG, []);
+		// every requirement is present + the totals sum to the whole DAG.
+		expect(rollups.length).toBe(REQUIREMENTS.length);
+		const totalSpecs = rollups.reduce((a, r) => a + r.total, 0);
+		expect(totalSpecs).toBe(EXISTING_DAG.length); // no spec lost
+		// per-rollup: byLevel and byFacet each sum to the requirement total (the Σ).
+		for (const r of rollups) {
+			const byLevelSum = Object.values(r.byLevel).reduce((a, b) => a + b, 0);
+			const byFacetSum = Object.values(r.byFacet).reduce((a, b) => a + b, 0);
+			expect(byLevelSum).toBe(r.total);
+			expect(byFacetSum).toBe(r.total);
+		}
+	});
+
+	it("requirementGrid: the niveau×facette counts sum to the requirement's spec total", () => {
+		const cart = requirementSpecs(EXISTING_DAG, "panier");
+		const grid = requirementGrid(EXISTING_DAG, "panier");
+		const gridSum = grid.reduce((a, c) => a + c.count, 0);
+		expect(gridSum).toBe(cart.length); // the Σ over the grid = the total
+	});
+
+	it("requirementsRollup counts impacted specs per requirement", () => {
+		const cartSpec = EXISTING_DAG.find((s) => requirementOf(s) === "panier");
+		if (!cartSpec) throw new Error("seed changed");
+		const rollups = requirementsRollup(EXISTING_DAG, [
+			{ specId: cartSpec.id, reason: "x" },
+		]);
+		expect(rollups.find((r) => r.id === "panier")?.impacted).toBeGreaterThan(0);
 	});
 
 	it("links an impacted DAG node to the placement of its cell + is deterministic", () => {

@@ -1265,3 +1265,109 @@ export function buildSpecGraph(
 	);
 	return { nodes, links };
 }
+
+// ── Requirements — navigate the project by feature: each requirement, its sum, the links ──
+//
+// A big app has MANY requirements (features) ; each is a fractal kernel carrying the FULL
+// niveau × facette anatomy. This layer lets one navigate the project BY requirement, see the SUM
+// of each (specs per niveau / per facette), and the LINKS between requirements. Pure + deterministic.
+
+/** A project requirement (feature) — a fractal kernel with its own niveau × facette grid. */
+export interface Requirement {
+	id: string;
+	title: string;
+	/** the other requirements it depends on (the links). */
+	deps: string[];
+}
+
+/** The project's requirements (seed for the demo checkout project). DECLARED + deterministic. */
+export const REQUIREMENTS: Requirement[] = [
+	{ id: "catalogue", title: "Catalogue", deps: ["stock"] },
+	{ id: "panier", title: "Panier", deps: ["catalogue", "stock"] },
+	{ id: "paiement", title: "Paiement", deps: ["panier"] },
+	{ id: "commande", title: "Commande", deps: ["paiement", "stock"] },
+	{ id: "stock", title: "Stock", deps: [] },
+	{ id: "compte", title: "Compte & confiance", deps: [] },
+];
+
+/** Derive the requirement an existing spec belongs to (deterministic keyword match over id+title). */
+export function requirementOf(spec: ExistingSpec): string {
+	const s = `${spec.id} ${spec.title}`.toLowerCase();
+	if (/\bcart\b|panier/.test(s)) return "panier";
+	if (/pay|checkout|paiement|payment|refund/.test(s)) return "paiement";
+	if (/order|commande/.test(s)) return "commande";
+	if (/stock|reserve|inventory/.test(s)) return "stock";
+	if (/product|produit|catalog|browse|boutique|shop/.test(s))
+		return "catalogue";
+	if (/trust|confiance|a11y|access|compte/.test(s)) return "compte";
+	return "catalogue";
+}
+
+/** The existing specs that belong to a requirement, in canonical order (level, then facet). */
+export function requirementSpecs(
+	dag: ExistingSpec[],
+	reqId: string,
+): ExistingSpec[] {
+	const lvl = (l: Level) => VERTICAL_LEVELS.indexOf(l);
+	const fct = (f: Facet) => ALL_FACETS.indexOf(f);
+	return dag
+		.filter((s) => requirementOf(s) === reqId)
+		.sort((a, b) => lvl(a.level) - lvl(b.level) || fct(a.facet) - fct(b.facet));
+}
+
+/** The rollup of ONE requirement: the SUMS (per level, per facet, total) + impacted count + links. */
+export interface RequirementRollup {
+	id: string;
+	title: string;
+	deps: string[];
+	total: number;
+	impacted: number;
+	byLevel: Record<string, number>;
+	byFacet: Record<string, number>;
+}
+
+/** requirementsRollup — per requirement, the deterministic SUMS over the existing DAG. */
+export function requirementsRollup(
+	dag: ExistingSpec[],
+	impacts: DagImpact[],
+): RequirementRollup[] {
+	const impactedIds = new Set(impacts.map((i) => i.specId));
+	return REQUIREMENTS.map((r) => {
+		const specs = requirementSpecs(dag, r.id);
+		const byLevel: Record<string, number> = {};
+		const byFacet: Record<string, number> = {};
+		let impacted = 0;
+		for (const s of specs) {
+			byLevel[s.level] = (byLevel[s.level] ?? 0) + 1;
+			byFacet[s.facet] = (byFacet[s.facet] ?? 0) + 1;
+			if (impactedIds.has(s.id)) impacted++;
+		}
+		return {
+			id: r.id,
+			title: r.title,
+			deps: r.deps,
+			total: specs.length,
+			impacted,
+			byLevel,
+			byFacet,
+		};
+	});
+}
+
+/** The niveau × facette count grid of a requirement (a cell = #specs there). For the per-req sum view. */
+export function requirementGrid(
+	dag: ExistingSpec[],
+	reqId: string,
+): { level: Level; facet: Facet; count: number }[] {
+	const specs = requirementSpecs(dag, reqId);
+	const out: { level: Level; facet: Facet; count: number }[] = [];
+	for (const level of VERTICAL_LEVELS)
+		for (const facet of ALL_FACETS)
+			out.push({
+				level,
+				facet,
+				count: specs.filter((s) => s.level === level && s.facet === facet)
+					.length,
+			});
+	return out;
+}
