@@ -6209,6 +6209,9 @@
 		"reqHeading": "Les requirements du projet",
 		"reqHint": "Chaque requirement = une feature, avec sa grille niveau × facette. Cliquez-en un : sa somme (Σ par niveau/facette) + ses liens + ses specs.",
 		"reqLinks": "Dépend de",
-		"reqNoLink": "aucune dépendance"
+		"reqNoLink": "aucune dépendance",
+		"reqAllSpecs": "Toutes les specs ({n})",
+		"reqCellSpecs": "Specs · {level} × {facet}",
+		"reqShowAll": "tout afficher"
 	}
 }

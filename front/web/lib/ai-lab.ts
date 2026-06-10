@@ -1326,10 +1326,15 @@ export interface RequirementRollup {
 	byFacet: Record<string, number>;
 }
 
-/** requirementsRollup — per requirement, the deterministic SUMS over the existing DAG. */
+/**
+ * requirementsRollup — per requirement, the deterministic SUMS over the existing DAG. `impacted`
+ * counts only the specs the current need touches AND that are NOT yet RESOLVED (consistent with the
+ * impact list + the 3D graph): once the need is fully validated, the red clears here too.
+ */
 export function requirementsRollup(
 	dag: ExistingSpec[],
 	impacts: DagImpact[],
+	placements: Placement[] = [],
 ): RequirementRollup[] {
 	const impactedIds = new Set(impacts.map((i) => i.specId));
 	return REQUIREMENTS.map((r) => {
@@ -1340,7 +1345,11 @@ export function requirementsRollup(
 		for (const s of specs) {
 			byLevel[s.level] = (byLevel[s.level] ?? 0) + 1;
 			byFacet[s.facet] = (byFacet[s.facet] ?? 0) + 1;
-			if (impactedIds.has(s.id)) impacted++;
+			if (
+				impactedIds.has(s.id) &&
+				!impactResolved(placements, s.level, s.facet)
+			)
+				impacted++;
 		}
 		return {
 			id: r.id,

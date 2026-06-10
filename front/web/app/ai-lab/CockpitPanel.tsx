@@ -245,7 +245,10 @@ export function CockpitPanel() {
 					{rightView === "graph" ? (
 						<SpecGraph3D graph={graph} />
 					) : rightView === "requirements" ? (
-						<RequirementsView impacts={view.impacts ?? []} />
+						<RequirementsView
+							impacts={view.impacts ?? []}
+							placements={placements}
+						/>
 					) : (
 						<>
 							{/* 1) the navigable big table: niveau × facette */}
