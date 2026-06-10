@@ -6397,5 +6397,30 @@
 		"detailCanon": "canonical S17 kind",
 		"pinnedNote": "Every link points at a version (id@version), never a bare identity (§41).",
 		"readOnlyNote": "Read-only below the wall: no truth-write from this screen."
+	},
+	"v2Cellules": {
+		"eyebrow": "Workbench V2 — the cells (bounded contexts)",
+		"title": "The cells + Pact (§49)",
+		"subtitle": "A large app is NEVER a single indivisible Kernel: it is a deliberate federation of small cells (bounded contexts = features = coarse kernels). Each cell holds its kernels, joined INSIDE by composes ↓ (the vertical), and joined OUTSIDE, toward other cells, ONLY by a depends_on/Pact contract. Click a cell to drill down; click a cell (level × facet) to open its specs.",
+		"wallNote": "The wall (§2): the federation is a read-only projection. No kernel/mirrors/fitness write — promoting a contract stays idea → mirror → /goal.",
+		"cells": "cells",
+		"kernels": "kernels",
+		"contracts": "cross-cell contracts",
+		"total": "total kernels",
+		"selectCell": "Pick a cell",
+		"federationHeading": "The federation: cells + their contracts",
+		"cellHeading": "Cell",
+		"gridHeading": "Level × facet grid (Σ rollup)",
+		"internalHeading": "Internal composes ↓ links",
+		"contractsHeading": "depends_on / Pact contracts → other cells",
+		"noInternal": "No internal link in this cell.",
+		"noContracts": "No cross-cell contract for this cell.",
+		"specsHere": "specs here",
+		"emptyCell": "No spec in this cell (empty cell, legal).",
+		"levelAxis": "level",
+		"facetAxis": "facet",
+		"contractOut": "outgoing →",
+		"contractIn": "← incoming",
+		"openSpecs": "Open the cell's specs"
 	}
 }

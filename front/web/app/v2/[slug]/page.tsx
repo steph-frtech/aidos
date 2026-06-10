@@ -15,7 +15,7 @@ import { entry, type Locale, SLUGS } from "@/lib/v2/glossary";
  * ces slugs, la route dédiée fait AUTORITÉ : on les EXCLUT du catch-all (et un accès via [slug] →
  * 404) pour qu'il n'y ait aucune ambiguïté de routage (un segment statique doit primer le dynamique).
  */
-const DEDICATED_SLUGS = new Set<string>(["liens"]);
+const DEDICATED_SLUGS = new Set<string>(["liens", "cellules"]);
 
 export function generateStaticParams() {
 	return SLUGS.filter((slug) => !DEDICATED_SLUGS.has(slug)).map((slug) => ({

@@ -6397,5 +6397,30 @@
 		"detailCanon": "kind canonique S17",
 		"pinnedNote": "Tout lien pointe une version (id@version), jamais une identité nue (§41).",
 		"readOnlyNote": "Lecture seule sous le mur : aucune écriture-vérité depuis cet écran."
+	},
+	"v2Cellules": {
+		"eyebrow": "Workbench V2 — les cellules (bounded contexts)",
+		"title": "Les cellules + Pact (§49)",
+		"subtitle": "Une grosse app n'est JAMAIS un seul Kernel indivis : c'est une fédération délibérée de petites cellules (bounded contexts = features = kernels grossiers). Chaque cellule porte ses kernels, reliés DEDANS par composes ↓ (la verticale), et reliés DEHORS, vers d'autres cellules, UNIQUEMENT par contrat depends_on/Pact. Cliquez une cellule pour descendre ; cliquez une case (niveau × facette) pour ouvrir ses specs.",
+		"wallNote": "Le mur (§2) : la fédération est une projection de lecture. Aucune écriture kernel/mirrors/fitness — la promotion d'un contrat reste idée → miroir → /goal.",
+		"cells": "cellules",
+		"kernels": "kernels",
+		"contracts": "contrats inter-cellules",
+		"total": "total des kernels",
+		"selectCell": "Choisir une cellule",
+		"federationHeading": "La fédération : les cellules + leurs contrats",
+		"cellHeading": "Cellule",
+		"gridHeading": "Grille niveau × facette (rollup Σ)",
+		"internalHeading": "Liens internes composes ↓",
+		"contractsHeading": "Contrats depends_on / Pact → autres cellules",
+		"noInternal": "Aucun lien interne dans cette cellule.",
+		"noContracts": "Aucun contrat inter-cellules pour cette cellule.",
+		"specsHere": "specs ici",
+		"emptyCell": "Aucune spec dans cette case (case vide, légale).",
+		"levelAxis": "niveau",
+		"facetAxis": "facette",
+		"contractOut": "sortant →",
+		"contractIn": "← entrant",
+		"openSpecs": "Ouvrir les specs de la case"
 	}
 }
