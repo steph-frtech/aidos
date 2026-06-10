@@ -6232,7 +6232,11 @@
 		"labTitle": "Le banc de sondes des librairies",
 		"labSubtitle": "Chaque librairie V2 (arbre, primitives accessibles, machine à états, formulaire validé, diagramme) monte ici, client-only, et s’exécute. Une preuve de montage, pas une fonctionnalité.",
 		"labRegistryHash": "empreinte du registre",
-		"labDeferred": "Différé (OpenQuestion)"
+		"labDeferred": "Différé (OpenQuestion)",
+		"allScreensHeading": "Tous les écrans (nav complète)",
+		"allScreensSubtitle": "Le registre des écrans V2 (WB2-25) : un écran = sa route. Chacun est cliquable et exécutable, du bon mot partout (issu du glossaire), aucun écran orphelin.",
+		"allScreensHash": "empreinte du registre des écrans",
+		"openScreen": "Ouvrir l’écran"
 	},
 	"v2Idee": {
 		"eyebrow": "Workbench V2 — l'idée",

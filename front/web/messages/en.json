@@ -6232,7 +6232,11 @@
 		"labTitle": "The library smoke bench",
 		"labSubtitle": "Each V2 library (tree, accessible primitives, state machine, validated form, diagram) mounts here, client-only, and runs. A mount proof, not a feature.",
 		"labRegistryHash": "registry hash",
-		"labDeferred": "Deferred (OpenQuestion)"
+		"labDeferred": "Deferred (OpenQuestion)",
+		"allScreensHeading": "All screens (complete nav)",
+		"allScreensSubtitle": "The V2 screen registry (WB2-25): one screen = its route. Each is clickable and executable, the right word everywhere (from the glossary), no orphan screen.",
+		"allScreensHash": "screen registry hash",
+		"openScreen": "Open the screen"
 	},
 	"v2Idee": {
 		"eyebrow": "Workbench V2 — the idea",
