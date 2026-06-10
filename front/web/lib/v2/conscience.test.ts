@@ -25,7 +25,6 @@ import {
 	AXES,
 	axisLights,
 	axisOf,
-	CONSCIENCE_CASES,
 	caseReport,
 	conscienceCaseById,
 	conscienceCaseIds,
