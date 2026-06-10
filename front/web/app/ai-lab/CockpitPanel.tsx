@@ -557,8 +557,12 @@ export function CockpitPanel() {
 							>
 								<div className="font-medium text-foreground">
 									{view.deploy.status === "up" ? "🟢 " : "🔴 "}
-									{view.deploy.app} · {view.deploy.image} ·{" "}
-									<span className="font-mono">{view.deploy.db}</span>
+									{view.deploy.app} · {view.deploy.image}
+								</div>
+								<div className="text-muted-foreground">
+									{view.deploy.entities?.length
+										? `Entités émises : ${view.deploy.entities.join(" · ")}`
+										: null}
 								</div>
 								<div className="text-muted-foreground">
 									{view.deploy.detail}

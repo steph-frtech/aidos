@@ -104,28 +104,44 @@ async function callClaude(message: string): Promise<{
 	}
 }
 
-// ── Deploy — launch the project's associated docker and show the live result ──
+// ── Deploy — EMIT the app from the project specs, then launch its docker, show the live result ──
 //
-// The « Déployer & voir » button runs `docker compose up -d` on the project's FIXED stack
-// (idempotent ; no user input → no injection) and reports the live URL. THE WALL §2: this is a
-// below-the-line projection action (run the emitted app's container), never a truth write.
-// OpenQuestion (sécurité) : a public button that execs docker — gate it (auth/rate-limit) before
-// real exposure ; here it targets one fixed demo stack only.
-const DEMO_STACK =
-	process.env.AIDOS_DEMO_STACK ||
-	"/data/dev/aidos/.deploy-demo/app/docker-compose.yml";
-const DEMO_URL = process.env.AIDOS_DEMO_URL || "https://guestbook.sagedesk.fr";
+// The « Déployer & voir » button (1) RE-EMITS the app's data layer from the project's entité specs
+// (the AIDOS emitter `aidosappemit` → DDL + entities.json, best-effort), then (2) runs
+// `docker compose up -d` on the emitted app's FIXED stack (idempotent ; no user input → no
+// injection). It reports the live URL. THE WALL §2: a below-the-line projection action (emit +
+// run the emitted app), never a truth write. OpenQuestion (sécurité) : a public button that execs
+// emit/docker — gate it (auth/rate-limit) before real exposure ; here it targets one fixed stack.
+const APP_STACK =
+	process.env.AIDOS_APP_STACK ||
+	"/data/dev/aidos/.deploy-app/app/docker-compose.yml";
+const APP_URL = process.env.AIDOS_APP_URL || "https://alphashop.sagedesk.fr";
+const APP_REPO = process.env.AIDOS_REPO || "/data/dev/aidos";
 
 async function deployStack(): Promise<{
 	status: "up" | "error";
 	detail: string;
 }> {
+	// (1) re-emit the app's data layer from the project's entity specs (best-effort).
+	let emitNote = "réémission ignorée";
 	try {
-		await execFileP("docker", ["compose", "-f", DEMO_STACK, "up", "-d"], {
+		await execFileP("go", ["run", "./cmd/aidosappemit"], {
+			cwd: `${APP_REPO}/back`,
 			timeout: 120_000,
 			maxBuffer: 8 * 1024 * 1024,
+			env: { ...process.env, GOTOOLCHAIN: "auto" },
 		});
-		return { status: "up", detail: "docker compose up -d — conteneurs lancés" };
+		emitNote = "specs → DDL + entities.json (aidosappemit)";
+	} catch {
+		emitNote = "app déjà émise (réémission indisponible)";
+	}
+	// (2) launch the emitted app's stack.
+	try {
+		await execFileP("docker", ["compose", "-f", APP_STACK, "up", "-d"], {
+			timeout: 180_000,
+			maxBuffer: 8 * 1024 * 1024,
+		});
+		return { status: "up", detail: `${emitNote} · docker compose up -d` };
 	} catch (e) {
 		return { status: "error", detail: String(e).slice(0, 240) };
 	}
@@ -244,16 +260,16 @@ export async function leftBrainAction(
 		};
 	}
 
-	// DEPLOY — launch the project's associated docker stack and show the live result.
+	// DEPLOY — emit the app from the project specs, launch its docker, show the live result.
 	if (intent === "deploy") {
 		const res = await deployStack();
 		return {
 			...prev,
 			deploy: {
 				status: res.status,
-				url: DEMO_URL,
-				app: "guestbook",
-				db: "app_de908ecc3159",
+				url: APP_URL,
+				app: "Alpha Shop",
+				entities: ["Product", "Cart", "Order", "Payment", "Stock"],
 				image: "postgres:16-alpine",
 				detail: res.detail,
 			},
