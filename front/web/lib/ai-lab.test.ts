@@ -561,6 +561,21 @@ describe("FK11 — the 3D spec graph (positions on the 3 axes, deterministic)", 
 		expect(descent).toHaveLength(2); // spec→behavior, behavior→scenarios
 	});
 
+	it("an impact RESOLVES even cross-facet once the whole need is validated (« tout validé »)", () => {
+		// Cart is impacted at (entité, V) but the addressing spec is an invariant at (entité, I).
+		const cart = EXISTING_DAG.find((s) => s.id === "d-entite-cart");
+		if (!cart) throw new Error("seed changed");
+		const impacts = [{ specId: cart.id, reason: "invariant quantité ≤ 2" }];
+		// placements live on OTHER cells (none at entité × V) and are all validated.
+		const placements = validatePlacements([
+			{ level: "entité", facet: "I", pairId: "model", spec: "qty ≤ 2" },
+			{ level: "action", facet: "F", pairId: "behavior", spec: "addLine" },
+		]).map((p) => ({ ...p, status: "validated" as const }));
+		const g = buildSpecGraph(placements, EXISTING_DAG, impacts);
+		// even though no placement sits at (entité, V), the whole need is validated → resolved.
+		expect(g.nodes.find((n) => n.id === `d:${cart.id}`)?.resolved).toBe(true);
+	});
+
 	it("cellFullyHandled: true iff ≥1 placement and all validated/realized", () => {
 		expect(cellFullyHandled([], "produit", "F")).toBe(false);
 		const proposed = validatePlacements([

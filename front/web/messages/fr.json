@@ -6202,6 +6202,8 @@
 		"deployHint": "Lance le docker associé au projet (postgres + app émise) et affiche le résultat en live.",
 		"deployCta": "Déployer & voir",
 		"deployWorking": "Déploiement…",
-		"deployPreview": "Aperçu de l’app déployée"
+		"deployPreview": "Aperçu de l’app déployée",
+		"overviewHeading": "Vue d’ensemble — tout le graphe",
+		"overviewHint": "Toutes les specs (placées + DAG existant) + les liens + les impacts. Tournez/zoomez."
 	}
 }

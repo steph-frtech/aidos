@@ -1069,6 +1069,31 @@ export function cellFullyHandled(
 }
 
 /**
+ * allPlacementsHandled — is the WHOLE need worked through? True iff there is ≥1 placement and EVERY
+ * placement is validated or realized. This is what « j'ai tout validé » means: once every new spec
+ * the need created is validated, the need is done — so its impacts on the existing DAG RESOLVE
+ * (red → green), even those whose addressing spec landed on a different facet than the impacted node.
+ */
+export function allPlacementsHandled(placements: Placement[]): boolean {
+	return (
+		placements.length > 0 &&
+		placements.every((p) => p.status === "validated" || p.status === "realized")
+	);
+}
+
+/** Is an impacted existing-DAG spec RESOLVED? Its own cell is done, OR the whole need is validated. */
+export function impactResolved(
+	placements: Placement[],
+	level: Level,
+	facet: Facet,
+): boolean {
+	return (
+		cellFullyHandled(placements, level, facet) ||
+		allPlacementsHandled(placements)
+	);
+}
+
+/**
  * validateAndDescend — validate the pair (level × facet × pairId) and GENERATE the next pair down
  * the anatomy. At the last pair (evidence) it marks the pair "realized" (descent complete, crossed
  * the wall). The child's CONTENT is `override` when given (Claude enriched it — a real comportement
@@ -1198,7 +1223,7 @@ export function buildSpecGraph(
 			depth: dep(s.pairId),
 			kind: "dag",
 			impacted,
-			resolved: impacted && cellFullyHandled(placements, s.level, s.facet),
+			resolved: impacted && impactResolved(placements, s.level, s.facet),
 			...pos(s.level, s.facet, s.pairId),
 		});
 	}

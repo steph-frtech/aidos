@@ -27,11 +27,16 @@ function nodeColor(n: SpecGraphNode): string {
 	return "#f59e0b";
 }
 
-export function SpecGraph3D({ graph }: { graph: SpecGraph }) {
+export function SpecGraph3D({
+	graph,
+	height = 560,
+}: {
+	graph: SpecGraph;
+	height?: number;
+}) {
 	const t = useTranslations("aiLab");
 	const ref = useRef<HTMLDivElement>(null);
 	const [width, setWidth] = useState(800);
-	const height = 560;
 
 	useEffect(() => {
 		const el = ref.current;
