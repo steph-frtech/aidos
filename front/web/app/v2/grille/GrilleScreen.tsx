@@ -123,6 +123,13 @@ export async function GrilleScreen() {
 					>
 						{t("gestureConscience")} →
 					</Link>
+					<Link
+						href="/v2/emetteurs"
+						data-testid="v2-grille-gesture-emetteurs"
+						className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+					>
+						{t("gestureEmetteurs")} →
+					</Link>
 				</div>
 			</section>
 
