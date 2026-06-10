@@ -116,6 +116,13 @@ export async function GrilleScreen() {
 					>
 						{t("gestureWhy")} →
 					</Link>
+					<Link
+						href="/v2/conscience"
+						data-testid="v2-grille-gesture-conscience"
+						className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+					>
+						{t("gestureConscience")} →
+					</Link>
 				</div>
 			</section>
 
