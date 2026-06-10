@@ -6359,7 +6359,8 @@
 		"gestureWorkflows": "Voir le pipeline (étape · gate · décision) d'un scénario",
 		"gesturePolicy": "Évaluer une policy d'autorisation (arbre ALLOW/DENY · §93)",
 		"gestureAiLab": "Placer un besoin sur la verticale (le cerveau gauche · niveau × facette × paire)",
-		"gestureGraphe": "Le graphe 3D façon Obsidian"
+		"gestureGraphe": "Le graphe 3D façon Obsidian",
+		"gestureWhy": "Le WhyTree — d'un symptôme à la cause racine"
 	},
 	"v2Dag": {
 		"eyebrow": "Workbench V2 — l'espace des versions",
@@ -6652,5 +6653,32 @@
 		"linkDescent": "Lien de descente (spec → sous-spec)",
 		"linkImpact": "Lien d'impact (sur le DAG existant)",
 		"determinismNote": "Twin pur (déterminisme-first §8) : la donnée du graphe est buildSpecGraph (réutilisé de v1, ADR 0007) — positions content-adressées, mêmes entrées → même graphe. Le rendu 3D est react-force-graph-3d ; la donnée est épinglée par un miroir de reproductibilité."
+	},
+	"v2Why": {
+		"eyebrow": "Workbench V2 — le WhyTree (le 5-pourquoi redressé)",
+		"title": "D'un symptôme à la cause racine — l'arbre caused_by",
+		"subtitle": "Un miroir ROUGE est un SYMPTÔME. Le WhyTree remonte DÉTERMINISTIQUEMENT les arêtes caused_by (l'inverse de la vague de rouge), hop par hop, du symptôme à la cause RACINE. Chaque cause du graphe est reproductible par construction ; une cause HORS-graphe proposée par le LLM n'entre QUE si elle est VÉRIFIÉE (reproduite — une cause rejetée est élaguée). L'arbre se TERMINE OBLIGATOIREMENT en miroir (la racine → /learn → un miroir d'anti-récurrence).",
+		"homeTitle": "Workbench V2",
+		"wallNote": "Le mur (§2) : le WhyTree LIT le graphe caused_by ; il n'écrit AUCUNE vérité. La terminaison en miroir est une exigence de forme — promouvoir le miroir d'anti-récurrence passe par /learn → idée → miroir → /goal.",
+		"samplesHeading": "Symptôme à expliquer",
+		"samplesHint": "Choisissez un symptôme : la remontée caused_by MONTE en arbre (fishbone), chaque cause un nœud, jusqu'à la racine. Un cas cyclique est refusé ; un cas sans miroir terminal est refusé.",
+		"buildBtn": "Construire le WhyTree",
+		"resetBtn": "Réinitialiser",
+		"tallyNodes": "nœuds",
+		"tallyLeaves": "feuilles (causes racine)",
+		"tallyOffGraph": "causes hors-graphe (vérifiées)",
+		"tallyDepth": "profondeur max",
+		"treeEmpty": "Aucun arbre. Choisissez un symptôme.",
+		"treeHint": "Dépliez / repliez chaque cause. La remontée est déterministe (BFS nearest-first).",
+		"refusedCycle": "REFUSÉ — un cycle caused_by atteignable depuis le symptôme (CAUSED_BY_CYCLE). Jamais un arbre partiel.",
+		"refusedNoMirror": "REFUSÉ — pas de miroir terminal (WHYTREE_NO_MIRROR). Un pourquoi sans terminaison ne se clôt pas.",
+		"terminalHeading": "Miroir terminal (la terminaison obligatoire)",
+		"terminalCovers": "couvre la cause racine",
+		"prunedHeading": "Causes hors-graphe ÉLAGUÉES (non reproduites)",
+		"legendHeading": "Statuts",
+		"legendInGraph": "Dans le graphe (reproductible par construction)",
+		"legendReproduced": "Hors-graphe reproduite (LLM, vérifiée)",
+		"legendLeaf": "Feuille — cause racine candidate",
+		"determinismNote": "Twin pur (déterminisme-first §8) : la remontée est trace (réutilisé de FK12, ADR 0007) — BFS déterministe nearest-first, refus de cycle, content-adressée. Le seul morceau LLM (le « pourquoi » hors-graphe) n'entre QUE déjà vérifié ; le code juge la STRUCTURE. Épinglé par un miroir de reproductibilité."
 	}
 }

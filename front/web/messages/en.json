@@ -6359,7 +6359,8 @@
 		"gestureWorkflows": "See a scenario's pipeline (step · gate · decision)",
 		"gesturePolicy": "Evaluate an authorization policy (ALLOW/DENY tree · §93)",
 		"gestureAiLab": "Place a need on the verticale (the left brain · level × facet × pair)",
-		"gestureGraphe": "The 3D graph, Obsidian-style"
+		"gestureGraphe": "The 3D graph, Obsidian-style",
+		"gestureWhy": "The WhyTree — from a symptom to the root cause"
 	},
 	"v2Dag": {
 		"eyebrow": "Workbench V2 — the version space",
@@ -6652,5 +6653,32 @@
 		"linkDescent": "Descent link (spec → sub-spec)",
 		"linkImpact": "Impact link (on the existing DAG)",
 		"determinismNote": "Pure twin (determinism-first §8): the graph data is buildSpecGraph (reused from v1, ADR 0007) — content-addressed positions, same inputs → same graph. The 3D render is react-force-graph-3d; the data is pinned by a reproducibility mirror."
+	},
+	"v2Why": {
+		"eyebrow": "Workbench V2 — the WhyTree (the straightened 5-whys)",
+		"title": "From a symptom to the root cause — the caused_by tree",
+		"subtitle": "A RED mirror is a SYMPTOM. The WhyTree walks the caused_by edges DETERMINISTICALLY upward (the inverse of the red wave), hop by hop, from the symptom to the ROOT cause. Every in-graph cause is reproducible by construction; an OFF-graph cause proposed by the LLM only enters if it is VERIFIED (reproduced — a rejected cause is pruned). The tree MUST terminate in a mirror (the root → /learn → an anti-recurrence mirror).",
+		"homeTitle": "Workbench V2",
+		"wallNote": "The wall (§2): the WhyTree READS the caused_by graph; it writes NO truth. Mirror termination is a shape requirement — promoting the anti-recurrence mirror goes through /learn → idea → mirror → /goal.",
+		"samplesHeading": "Symptom to explain",
+		"samplesHint": "Pick a symptom: the caused_by walk grows into a tree (fishbone), each cause a node, down to the root. A cyclic case is refused; a case with no terminal mirror is refused.",
+		"buildBtn": "Build the WhyTree",
+		"resetBtn": "Reset",
+		"tallyNodes": "nodes",
+		"tallyLeaves": "leaves (root causes)",
+		"tallyOffGraph": "off-graph causes (verified)",
+		"tallyDepth": "max depth",
+		"treeEmpty": "No tree. Pick a symptom.",
+		"treeHint": "Expand / collapse each cause. The walk is deterministic (nearest-first BFS).",
+		"refusedCycle": "REFUSED — a caused_by cycle reachable from the symptom (CAUSED_BY_CYCLE). Never a partial tree.",
+		"refusedNoMirror": "REFUSED — no terminal mirror (WHYTREE_NO_MIRROR). A why without termination does not close.",
+		"terminalHeading": "Terminal mirror (the mandatory termination)",
+		"terminalCovers": "covers the root cause",
+		"prunedHeading": "Off-graph causes PRUNED (not reproduced)",
+		"legendHeading": "Statuses",
+		"legendInGraph": "In the graph (reproducible by construction)",
+		"legendReproduced": "Off-graph reproduced (LLM, verified)",
+		"legendLeaf": "Leaf — candidate root cause",
+		"determinismNote": "Pure twin (determinism-first §8): the walk is trace (reused from FK12, ADR 0007) — deterministic nearest-first BFS, cycle-refusing, content-addressed. The only LLM piece (the off-graph 'why') only enters already verified; the code judges the STRUCTURE. Pinned by a reproducibility mirror."
 	}
 }
