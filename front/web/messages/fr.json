@@ -6213,5 +6213,189 @@
 		"reqAllSpecs": "Toutes les specs ({n})",
 		"reqCellSpecs": "Specs · {level} × {facet}",
 		"reqShowAll": "tout afficher"
+	},
+	"v2Shell": {
+		"eyebrow": "Workbench V2 — le schéma KRD",
+		"title": "Le Workbench, par concept",
+		"subtitle": "La refonte V2 du cockpit, organisée selon le schéma KRD : de l’idée au mur, puis la verticale × la facette × les paires-miroir, les liens du §17, les arbres et les cellules.",
+		"navHeading": "Le parcours",
+		"schemaHeading": "Le schéma KRD",
+		"schemaSubtitle": "Le schéma complet, interactif : l’idée franchit le mur (/goal) vers le kernel, qui porte la verticale, la facette et les paires-miroir, reliés par les liens du §17, organisés en arbres puis en cellules. Chaque bloc s’ouvre sur son écran.",
+		"schemaHash": "empreinte du schéma",
+		"conceptsHeading": "Les concepts du schéma",
+		"coexistence": "V2 — l’ancien Workbench reste servi à /",
+		"backToV1": "Retour au Workbench actuel",
+		"openConcept": "Ouvrir",
+		"wallNote": "Tout écran V2 PROPOSE ; aucune écriture kernel/mirrors/fitness hors idée → miroir → /goal.",
+		"footer": "AIDOS Workbench V2 — projection de lecture, le mur intact (ADR 0010 · 0011 · 0053).",
+		"labTitle": "Le banc de sondes des librairies",
+		"labSubtitle": "Chaque librairie V2 (arbre, primitives accessibles, machine à états, formulaire validé, diagramme) monte ici, client-only, et s’exécute. Une preuve de montage, pas une fonctionnalité.",
+		"labRegistryHash": "empreinte du registre",
+		"labDeferred": "Différé (OpenQuestion)"
+	},
+	"v2Idee": {
+		"eyebrow": "Workbench V2 — l'idée",
+		"title": "Capturer un besoin",
+		"subtitle": "Au-dessus du mur, un besoin devient une idée : un candidat-vérité (§115), sans gel ni miroir. Ce wizard fige sa coordonnée cible et la forme de miroir attendue ; il PROPOSE, il n'écrit aucune vérité.",
+		"wallNote": "Le mur (§2) : capturer une idée n'écrit aucune vérité kernel/mirrors/fitness. La promotion reste idée → miroir → /goal.",
+		"stepIntent": "1 · L'intention",
+		"stepCoordinate": "2 · La coordonnée cible",
+		"stepProvenance": "3 · La provenance",
+		"stepReview": "4 · Revue",
+		"stepProposed": "5 · Idée proposée",
+		"intentLabel": "Le besoin (l'intention)",
+		"intentPlaceholder": "Je veux que…",
+		"intentHint": "Au moins 3 caractères. Repris verbatim — jamais reformulé.",
+		"levelLabel": "Niveau (verticale §23)",
+		"facetLabel": "Facette (FKE-1.3)",
+		"scaleLabel": "Échelle fractale (§49)",
+		"provenanceLabel": "Provenance",
+		"provenanceHumain": "Humain",
+		"provenanceIncident": "Incident",
+		"next": "Suivant",
+		"back": "Précédent",
+		"propose": "Proposer l'idée",
+		"restart": "Capturer un autre besoin",
+		"reviewHeading": "Le besoin capturé",
+		"coordinateHeading": "Coordonnée",
+		"mirrorFormHeading": "Forme de miroir attendue",
+		"proposedHeading": "Idée proposée",
+		"proposedNote": "Cette idée est un candidat-vérité : pas de miroir (hasMirror=false), aucune écriture-vérité (le mur intact). Elle attend idée → miroir → /goal.",
+		"ideaId": "empreinte de l'idée",
+		"hasMirrorLabel": "a un miroir",
+		"wroteKernelLabel": "a écrit une vérité",
+		"no": "non",
+		"errIntent": "Au moins 3 caractères.",
+		"errLevel": "Niveau hors grammaire.",
+		"errFacet": "Facette inconnue.",
+		"errScale": "Échelle inconnue.",
+		"errProvenance": "Provenance inconnue.",
+		"scaleCellule": "Cellule",
+		"scaleKernel": "Kernel",
+		"scaleFeuille": "Feuille",
+		"stateLabel": "état du wizard"
+	},
+	"v2Kernels": {
+		"eyebrow": "Workbench V2 — les arbres",
+		"title": "L'arbre de composition des kernels",
+		"subtitle": "La relation composes (§17) projetée en arbre fractal : produit → parcours → … → entité. Chaque nœud est un kernel à son niveau ; dépliez/repliez pour descendre, cliquez un kernel pour ouvrir son anatomie. L'arbre est virtualisé (200+ nœuds).",
+		"wallNote": "Le mur (§2) : l'arbre est une projection de lecture. Aucune écriture kernel/mirrors/fitness — la promotion reste idée → miroir → /goal.",
+		"nodeCount": "nœuds dans l'arbre",
+		"openAnatomy": "Ouvrir l'anatomie"
+	},
+	"v2Anatomie": {
+		"title": "L'anatomie du kernel",
+		"subtitle": "Les six paires-miroir d'un kernel autour du mur : au-dessus on DÉCLARE (l'humain, l'intention), en dessous la MACHINE PROUVE (l'exécuté, vérifié). Un voyant 🟢/🔴/🟡 par paire, computé jamais déclaré : vert = déclaré ∧ prouvé qui passe ; rouge = déclaré ∧ preuve qui échoue (divergence) ; ambre = pas encore réfléchi. Cliquez une paire pour l'ouvrir.",
+		"backToTree": "Retour à l'arbre de composition",
+		"kernelLabel": "Kernel ciblé",
+		"wallNote": "Le mur (§2) : l'anatomie est une projection de lecture. En dessous du mur, tout est read-only (la machine prouve) ; aucune écriture kernel/mirrors/fitness — la promotion reste idée → miroir → /goal.",
+		"overall": "Voyant global (le pire des six)",
+		"aboveWall": "Au-dessus",
+		"belowWall": "En dessous",
+		"wall": "le mur",
+		"declaredSide": "déclaré",
+		"provenSide": "prouvé",
+		"readOnlyNote": "En dessous du mur, la machine prouve : read-only, jamais un contrôle d'écriture.",
+		"voyant": {
+			"green": "vert — déclaré et prouvé qui passe",
+			"red": "rouge — déclaré mais la preuve échoue (divergence)",
+			"amber": "ambre — pas encore réfléchi (preuve absente, en attente, ou orphelin)"
+		},
+		"declared": {
+			"declared": "déclaré",
+			"absent": "non déclaré"
+		},
+		"proven": {
+			"pass": "passe",
+			"fail": "échoue",
+			"pending": "en attente",
+			"absent": "absent"
+		},
+		"pair": {
+			"spec_doc": "Spec ↔ Doc",
+			"behavior_results": "Comportement ↔ Résultats",
+			"scenarios_tests": "Scénarios ↔ Tests",
+			"model_projection": "Modèle ↔ Projection",
+			"contract_code": "Contrat ↔ Code",
+			"evidence": "Evidence attendue ↔ Evidence observée"
+		},
+		"specDoc": {
+			"above": "La spec déclarée",
+			"below": "La doc rendue / matérialisée"
+		},
+		"behaviorResults": {
+			"above": "Le comportement déclaré",
+			"below": "Les résultats observés"
+		},
+		"scenariosTests": {
+			"above": "Les scénarios (Gherkin)",
+			"below": "Les tests qui les exécutent"
+		},
+		"modelProjection": {
+			"above": "Le modèle (entité / AST)",
+			"below": "La projection émise (Go / DDL / TS)"
+		},
+		"contractCode": {
+			"above": "Le contrat (Pact)",
+			"below": "Le code qui l'honore"
+		},
+		"evidence": {
+			"above": "L'évidence attendue",
+			"below": "L'évidence observée"
+		}
+	},
+	"v2Grille": {
+		"eyebrow": "Workbench V2 — les deux axes",
+		"title": "La grille niveau × facette",
+		"subtitle": "Toute vérité porte ses deux coordonnées (FKE-1.4) : son niveau (la verticale couplante §23) et sa facette (l'axe orthogonal F·I·S·B·R·V·M·X). La matrice 7×8 compte les kernels par cellule ; les sommes Σ par ligne, par colonne et au total sont cohérentes (Σ = total). Cliquez une cellule pour descendre vers ses specs ; chaque spec ouvre son anatomie.",
+		"wallNote": "Le mur (§2) : la grille est une projection de lecture. Aucune écriture kernel/mirrors/fitness — la promotion reste idée → miroir → /goal.",
+		"total": "kernels dans la grille",
+		"levelAxis": "Niveau",
+		"facetAxis": "Facette",
+		"specsHere": "specs à cette coordonnée",
+		"emptyCell": "Aucune spec à cette coordonnée (cellule légale, vide) — jamais un lien mort."
+	},
+	"v2Dag": {
+		"eyebrow": "Workbench V2 — l'espace des versions",
+		"title": "Le DAG de versions",
+		"subtitle": "L'espace des versions est un DAG, pas une ligne (S24, §120-§125) : les nœuds sont des versions (phases stables, identité = hash content-addressé), les arêtes sont des ChangeSets. APPEND-ONLY : une ligne abandonnée n'est jamais détruite — elle reste dessinée (dimmée) comme un stepping-stone. La ligne de flottaison (§124) stratifie en deux bandes : au-dessus la vérité humaine, en-dessous l'évolutionnaire. Naviguez (pan/zoom) ; cliquez une version pour voir son détail.",
+		"wallNote": "Le mur (§2) : le DAG est une projection de lecture. Aucune écriture kernel/mirrors/fitness — la promotion reste idée → miroir → /goal ; un branch/checkout/rebranch passe par le CLI aidos.",
+		"versions": "versions (nœuds)",
+		"changesets": "ChangeSets (arêtes)",
+		"head": "tête courante",
+		"bandAbove": "above — vérité humaine",
+		"bandBelow": "below — évolutionnaire",
+		"canvasLabel": "Le DAG de versions, navigable (pan/zoom)",
+		"hash": "hash (identité)",
+		"parents": "parents",
+		"root": "racine (aucun parent)",
+		"stratum": "strate",
+		"reachableFromRoot": "atteignable depuis la racine",
+		"yes": "oui",
+		"no": "non",
+		"readOnlyNote": "Lecture seule sous le mur : aucune écriture-vérité depuis cet écran (append-only ; la ligne abandonnée n'est jamais détruite)."
+	},
+	"v2Liens": {
+		"eyebrow": "Workbench V2 — les six liens",
+		"title": "Les six liens (§17/§41)",
+		"subtitle": "Un kernel ne flotte jamais seul : il est relié aux autres par six familles de liens typés (§17/§41). Chaque lien pointe une VERSION (id@version), JAMAIS une identité nue — c'est tout l'enjeu : quand la tête de la cible bouge, le lien pinné devient périmé (la vague de rouge §42). Filtrez par famille pour ne voir qu'un type d'arête à la fois ; cliquez un lien pour voir sa cible pinnée.",
+		"wallNote": "Le mur (§2) : les liens sont une projection de lecture. Aucune écriture kernel/mirrors/fitness — la promotion d'un lien reste idée → miroir → /goal.",
+		"links": "liens (arêtes)",
+		"kernels": "kernels (nœuds)",
+		"filterLabel": "Filtrer par famille de lien",
+		"all": "toutes les familles",
+		"composes": "composes (verticaux ↓)",
+		"depends_on": "depends_on (horizontaux, Pact)",
+		"supersedes": "supersedes (généalogiques)",
+		"provenance": "provenance (origine)",
+		"triggers_binds": "triggers/binds (control)",
+		"mirrors": "mirrors (paires-miroir)",
+		"canvasLabel": "Le graphe des six liens entre kernels, navigable (pan/zoom)",
+		"detailKind": "famille",
+		"detailFrom": "depuis (from)",
+		"detailTo": "cible pinnée (to)",
+		"detailCanon": "kind canonique S17",
+		"pinnedNote": "Tout lien pointe une version (id@version), jamais une identité nue (§41).",
+		"readOnlyNote": "Lecture seule sous le mur : aucune écriture-vérité depuis cet écran."
 	}
 }
