@@ -1,4 +1,5 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
+import { entry, type Locale } from "@/lib/v2/glossary";
 import { LINK_KINDS } from "@/lib/v2/links";
 import { LinksClient } from "./LinksClient";
 
@@ -17,6 +18,11 @@ import { LinksClient } from "./LinksClient";
  */
 export default async function V2LiensPage() {
 	const t = await getTranslations("v2Liens");
+	const locale = (await getLocale()) as Locale;
+	// L'identité CANONIQUE du concept (le glossaire) — préserve le contrat de
+	// navigation /v2 → /v2/liens (le bloc « Liens » mène ici : v2-concept-title +
+	// v2-concept-def), source unique du libellé (WB2-00), au-dessus du détail des liens.
+	const concept = entry("liens");
 
 	const strings: Record<string, string> = {
 		links: t("links"),
@@ -43,11 +49,23 @@ export default async function V2LiensPage() {
 					{t("eyebrow")}
 				</p>
 				<h1
-					data-testid="v2-liens-title"
+					data-testid="v2-concept-title"
 					className="text-3xl font-bold tracking-tight text-foreground"
 				>
-					{t("title")}
+					{concept?.[locale].label}
 				</h1>
+				<p
+					data-testid="v2-concept-def"
+					className="max-w-2xl text-base leading-relaxed text-foreground"
+				>
+					{concept?.[locale].def}
+				</p>
+				<h2
+					data-testid="v2-liens-title"
+					className="pt-2 text-xl font-semibold tracking-tight text-foreground"
+				>
+					{t("title")}
+				</h2>
 				<p className="max-w-2xl text-base leading-relaxed text-muted-foreground">
 					{t("subtitle")}
 				</p>

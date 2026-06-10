@@ -1,4 +1,5 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
+import { entry, type Locale } from "@/lib/v2/glossary";
 import { CellulesClient } from "./CellulesClient";
 
 /**
@@ -15,6 +16,11 @@ import { CellulesClient } from "./CellulesClient";
  */
 export default async function V2CellulesPage() {
 	const t = await getTranslations("v2Cellules");
+	const locale = (await getLocale()) as Locale;
+	// L'identité CANONIQUE du concept (le glossaire) — préserve le contrat de
+	// navigation /v2 → /v2/cellules (le bloc « Cellules » mène ici : v2-concept-title
+	// + v2-concept-def), source unique du libellé (WB2-00), au-dessus de la fédération.
+	const concept = entry("cellules");
 
 	const strings: Record<string, string> = {
 		cells: t("cells"),
@@ -45,11 +51,23 @@ export default async function V2CellulesPage() {
 					{t("eyebrow")}
 				</p>
 				<h1
-					data-testid="v2-cellules-title"
+					data-testid="v2-concept-title"
 					className="text-3xl font-bold tracking-tight text-foreground"
 				>
-					{t("title")}
+					{concept?.[locale].label}
 				</h1>
+				<p
+					data-testid="v2-concept-def"
+					className="max-w-2xl text-base leading-relaxed text-foreground"
+				>
+					{concept?.[locale].def}
+				</p>
+				<h2
+					data-testid="v2-cellules-title"
+					className="pt-2 text-xl font-semibold tracking-tight text-foreground"
+				>
+					{t("title")}
+				</h2>
 				<p className="max-w-2xl text-base leading-relaxed text-muted-foreground">
 					{t("subtitle")}
 				</p>
