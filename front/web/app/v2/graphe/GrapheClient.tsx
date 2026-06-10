@@ -10,9 +10,9 @@ import {
 } from "@/lib/v2/ai-lab";
 
 // react-force-graph-3d uses WebGL/window → client-only, no SSR.
-// biome-ignore lint/suspicious/noExplicitAny: react-force-graph-3d's prop types are loose.
 const ForceGraph3D = dynamic(() => import("react-force-graph-3d"), {
 	ssr: false,
+	// biome-ignore lint/suspicious/noExplicitAny: react-force-graph-3d's prop types are loose.
 }) as any;
 
 /**

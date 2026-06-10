@@ -6358,7 +6358,8 @@
 		"gestureOperations": "Rejouer les fixtures Operation (état → commande → events)",
 		"gestureWorkflows": "Voir le pipeline (étape · gate · décision) d'un scénario",
 		"gesturePolicy": "Évaluer une policy d'autorisation (arbre ALLOW/DENY · §93)",
-		"gestureAiLab": "Placer un besoin sur la verticale (le cerveau gauche · niveau × facette × paire)"
+		"gestureAiLab": "Placer un besoin sur la verticale (le cerveau gauche · niveau × facette × paire)",
+		"gestureGraphe": "Le graphe 3D façon Obsidian"
 	},
 	"v2Dag": {
 		"eyebrow": "Workbench V2 — l'espace des versions",

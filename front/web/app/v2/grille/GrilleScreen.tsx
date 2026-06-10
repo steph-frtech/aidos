@@ -102,6 +102,13 @@ export async function GrilleScreen() {
 					>
 						{t("gestureAiLab")} →
 					</Link>
+					<Link
+						href="/v2/graphe"
+						data-testid="v2-grille-gesture-graphe"
+						className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+					>
+						{t("gestureGraphe")} →
+					</Link>
 				</div>
 			</section>
 

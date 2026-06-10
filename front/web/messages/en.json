@@ -6358,7 +6358,8 @@
 		"gestureOperations": "Replay the Operation fixtures (state → command → events)",
 		"gestureWorkflows": "See a scenario's pipeline (step · gate · decision)",
 		"gesturePolicy": "Evaluate an authorization policy (ALLOW/DENY tree · §93)",
-		"gestureAiLab": "Place a need on the verticale (the left brain · level × facet × pair)"
+		"gestureAiLab": "Place a need on the verticale (the left brain · level × facet × pair)",
+		"gestureGraphe": "The 3D graph, Obsidian-style"
 	},
 	"v2Dag": {
 		"eyebrow": "Workbench V2 — the version space",
