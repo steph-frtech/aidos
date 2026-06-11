@@ -269,19 +269,33 @@ export function GoalWizardClient({ t }: { t: Strings }) {
 				</div>
 			)}
 
-			{/* LE MUR : le refus d'une écriture-vérité directe (BlockReason actionnable) */}
+			{/* LE MUR : le refus d'une écriture-vérité directe — un COMPORTEMENT ATTENDU, pas une panne.
+			    Encadré en ambre (protection), badge « attendu » + une phrase qui lève l'ambiguïté ;
+			    le BlockReason actionnable (code + comment-faire) reste affiché. */}
 			{block && (
 				<div
 					data-testid="v2-goal-block"
-					className="rounded-xl border border-destructive/50 bg-destructive/5 p-6 space-y-2"
+					className="rounded-xl border border-amber-500/50 bg-amber-500/5 p-6 space-y-3"
 				>
-					<h3 className="text-sm font-semibold text-destructive">
-						{t.blockHeading}
-					</h3>
-					<p className="font-mono text-xs text-destructive">
+					<div className="flex flex-wrap items-center gap-2">
+						<span aria-hidden className="text-base">
+							🛡️
+						</span>
+						<h3 className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+							{t.blockHeading}
+						</h3>
+						<span
+							data-testid="v2-goal-block-expected"
+							className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400"
+						>
+							✓ {t.blockExpected}
+						</span>
+					</div>
+					<p className="text-sm text-foreground">{t.blockIntro}</p>
+					<p className="font-mono text-xs text-amber-700 dark:text-amber-400">
 						{t.blockCode} : {block.code}
 					</p>
-					<p className="text-sm text-foreground">{block.explanation}</p>
+					<p className="text-sm text-muted-foreground">{block.explanation}</p>
 					<div>
 						<p className="text-xs text-muted-foreground">{t.blockFix}</p>
 						<ol className="list-decimal space-y-1 pl-5 text-sm text-foreground">
@@ -325,12 +339,13 @@ export function GoalWizardClient({ t }: { t: Strings }) {
 						{t.restart}
 					</button>
 				)}
-				{/* Le geste du MUR : tenter une écriture directe → toujours refusée. */}
+				{/* Le geste du MUR : DÉMONTRER que tenter une écriture directe est toujours refusée
+				    (un comportement attendu, pas une panne) — accent ambre, pas destructive. */}
 				<button
 					type="button"
 					data-testid="v2-goal-direct-write"
 					onClick={() => send({ type: "ECRIRE_DIRECT" })}
-					className="rounded-md border border-destructive/40 bg-card px-4 py-2 text-sm text-destructive hover:bg-destructive/5"
+					className="rounded-md border border-amber-500/40 bg-card px-4 py-2 text-sm text-amber-700 hover:bg-amber-500/5 dark:text-amber-400"
 				>
 					{t.directWrite}
 				</button>
