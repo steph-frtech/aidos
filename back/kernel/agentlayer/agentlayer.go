@@ -102,7 +102,7 @@ func IsKnownProvider(p Provider) bool {
 // fails the gate at projection time (agentimpl.Project), never opaquely at the
 // provider. Mirrors the closed-set discipline of providerOrder/IsKnownProvider.
 var knownModelsByProvider = map[Provider][]string{
-	ProviderAnthropic: {"claude-opus-4-8", "claude-sonnet-4-5", "claude-haiku-4-5"},
+	ProviderAnthropic: {"claude-fable-5", "claude-sonnet-4-5", "claude-haiku-4-5"},
 	ProviderOpenAI:    {"gpt-5", "gpt-5-mini", "o4"},
 	ProviderGoogle:    {"gemini-3-pro", "gemini-3-flash"},
 }
@@ -138,7 +138,7 @@ type AgentSpec struct {
 	Nom      string   `json:"nom"`      // the agent's name
 	Role     string   `json:"role"`     // what it is for (e.g. "bdd-writer", "executor")
 	Objectif string   `json:"objectif"` // its declared objective
-	Modele   string   `json:"modele"`   // the model id (e.g. "claude-opus-4-8")
+	Modele   string   `json:"modele"`   // the model id (e.g. "claude-fable-5")
 	Provider Provider `json:"provider"`
 
 	// Rights above/below the waterline. PeutModifierNoyau and PeutModifierFitness

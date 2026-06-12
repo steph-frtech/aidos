@@ -37,7 +37,7 @@ func TestProject_BddWriter(t *testing.T) {
 		t.Fatal("bdd-writer must be found in the read-only view")
 	}
 	impl := out.Impl
-	if impl.Model != "claude-opus-4-8" {
+	if impl.Model != "claude-fable-5" {
 		t.Errorf("model copied DOWN: got %q", impl.Model)
 	}
 	// The wall is ALWAYS carried — every canonical wall zone is forbidden.

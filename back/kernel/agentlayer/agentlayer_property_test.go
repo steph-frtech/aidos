@@ -68,7 +68,7 @@ func drawAgent(rt *rapid.T) agentlayer.CoucheAgent {
 			Nom:                role,
 			Role:               role,
 			Objectif:           rapid.StringN(0, 20, 20).Draw(rt, "objectif"),
-			Modele:             "claude-opus-4-8",
+			Modele:             "claude-fable-5",
 			Provider:           drawProvider(rt),
 			PeutProposerVerite: rapid.Bool().Draw(rt, "propose"),
 			PeutModifierMiroir: rapid.Bool().Draw(rt, "miroir"),

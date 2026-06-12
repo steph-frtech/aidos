@@ -886,7 +886,7 @@ export function validateImpl(impl: AgentImplementation): string | null {
 
 /** The CLOSED model set per provider — pinned, never discovered (mirrors Go knownModelsByProvider). */
 export const KNOWN_MODELS_BY_PROVIDER: Record<Provider, readonly string[]> = {
-	anthropic: ["claude-opus-4-8", "claude-sonnet-4-5", "claude-haiku-4-5"],
+	anthropic: ["claude-fable-5", "claude-sonnet-4-5", "claude-haiku-4-5"],
 	openai: ["gpt-5", "gpt-5-mini", "o4"],
 	google: ["gemini-3-pro", "gemini-3-flash"],
 };

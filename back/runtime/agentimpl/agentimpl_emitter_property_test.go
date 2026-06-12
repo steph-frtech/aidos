@@ -238,7 +238,7 @@ func drawLayerStatic() (agentlayer.CoucheAgent, agentlayer.Provider, string) {
 			Nom:                "agent-static",
 			Role:               "executor",
 			Objectif:           "static",
-			Modele:             "claude-opus-4-8",
+			Modele:             "claude-fable-5",
 			Provider:           agentlayer.ProviderAnthropic,
 			PeutProposerVerite: true,
 			ZonesEcriture:      []string{"back/gen"},
@@ -251,7 +251,7 @@ func drawLayerStatic() (agentlayer.CoucheAgent, agentlayer.Provider, string) {
 		Scope: scope.TruthScope{Region: scope.RegionEU},
 	}
 	c.Version = c.Spec.Modele
-	return c, agentlayer.ProviderAnthropic, "claude-opus-4-8"
+	return c, agentlayer.ProviderAnthropic, "claude-fable-5"
 }
 
 func mustJSON(rt *rapid.T, a agentimpl.AgentImplementation) []byte {

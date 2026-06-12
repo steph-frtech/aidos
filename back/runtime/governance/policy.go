@@ -120,7 +120,7 @@ func buildImpl(paths, hosts, execs, skills []string, tools []agentimpl.ResolvedT
 		Role:                "executor",
 		Objectif:            "ship the step under a declared policy",
 		Provider:            "anthropic",
-		Model:               "claude-opus-4-8",
+		Model:               "claude-fable-5",
 		Temperature:         0,
 		MaxTurns:            8,
 		AllowedPaths:        append([]string(nil), paths...),

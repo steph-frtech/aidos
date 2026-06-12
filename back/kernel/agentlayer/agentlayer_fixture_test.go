@@ -30,7 +30,7 @@ func bddWriter() agentlayer.CoucheAgent {
 			Nom:                 "bdd-writer",
 			Role:                "bdd-writer",
 			Objectif:            "propose red scenarios",
-			Modele:              "claude-opus-4-8",
+			Modele:              "claude-fable-5",
 			Provider:            agentlayer.ProviderAnthropic,
 			PeutProposerVerite:  true,
 			PeutModifierNoyau:   false,

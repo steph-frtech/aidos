@@ -92,7 +92,7 @@ const bddWriter: CoucheAgent = {
 		nom: "bdd-writer",
 		role: "bdd-writer",
 		objectif: "propose red scenarios",
-		modele: "claude-opus-4-8",
+		modele: "claude-fable-5",
 		provider: "anthropic",
 		peutProposerVerite: true,
 		peutModifierNoyau: false,
@@ -271,7 +271,7 @@ const goldenImpl: AgentImplementation = {
 	objectif: "propose red scenarios",
 	stopConditions: ["red set still red"],
 	provider: "anthropic",
-	model: "claude-opus-4-8",
+	model: "claude-fable-5",
 	temperature: 0,
 	maxTurns: 120,
 	seed: "",
@@ -345,7 +345,7 @@ describe("projection confinement — empty allow-lists deny all (fail-closed)", 
 
 const validCfg: ProviderCfg = {
 	provider: "anthropic",
-	model: "claude-opus-4-8",
+	model: "claude-fable-5",
 	endpoint: "https://api.example.test/v1",
 	apiKey: "sk-resolved-secret",
 };
@@ -404,7 +404,7 @@ describe("project — the deterministic emitter (BA03)", () => {
 
 	it("refuses cfg.model != Spec.modele", () => {
 		expect(
-			project(bddWriter, { ...validCfg, model: "claude-opus-4-8-MUTATED" }, "p")
+			project(bddWriter, { ...validCfg, model: "claude-fable-5-MUTATED" }, "p")
 				.error,
 		).toBeDefined();
 	});
@@ -589,7 +589,7 @@ describe("closed provider/model sets (BA03)", () => {
 		expect(isKnownProvider("megacorp")).toBe(false);
 	});
 	it("isKnownModel is closed per provider, fail-closed", () => {
-		expect(isKnownModel("anthropic", "claude-opus-4-8")).toBe(true);
+		expect(isKnownModel("anthropic", "claude-fable-5")).toBe(true);
 		expect(isKnownModel("anthropic", "gpt-5")).toBe(false);
 		expect(isKnownModel("openai", "gpt-5")).toBe(true);
 	});
@@ -655,7 +655,7 @@ describe("binding resolution (BA05) — the capability surface is a provable sub
 				nom: "ba05",
 				role: "executor",
 				objectif: "code",
-				modele: "claude-opus-4-8",
+				modele: "claude-fable-5",
 				provider: "anthropic",
 				peutProposerVerite: true,
 				peutModifierNoyau: false,
@@ -687,7 +687,7 @@ describe("binding resolution (BA05) — the capability surface is a provable sub
 		};
 		const r = project(
 			layer,
-			{ provider: "anthropic", model: "claude-opus-4-8" },
+			{ provider: "anthropic", model: "claude-fable-5" },
 			"pack",
 		);
 		expect(r.impl).toBeDefined();
@@ -1246,7 +1246,7 @@ describe("gateAction (the composed perimeter)", () => {
 		objectif: "make red green",
 		stopConditions: [],
 		provider: "anthropic",
-		model: "claude-opus-4-8",
+		model: "claude-fable-5",
 		temperature: 0,
 		maxTurns: 10,
 		seed: "s",
@@ -1832,7 +1832,7 @@ const builderImpl: AgentImplementation = {
 	objectif: "drive a red work item to green in the app tree",
 	stopConditions: ["red set still red"],
 	provider: "anthropic",
-	model: "claude-opus-4-8",
+	model: "claude-fable-5",
 	temperature: 0,
 	maxTurns: 80,
 	seed: "",

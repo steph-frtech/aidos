@@ -30,7 +30,7 @@ const permissiveImpl: AgentImplementation = {
 	objectif: "make the app tree green",
 	stopConditions: ["red set still red"],
 	provider: "anthropic",
-	model: "claude-opus-4-8",
+	model: "claude-fable-5",
 	temperature: 0,
 	maxTurns: 64,
 	seed: "",
