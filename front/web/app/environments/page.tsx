@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
+import { hashDemoMatrix } from "@/lib/connections";
 import { bindings, hashBindings } from "@/lib/environments";
+import { ConnectionsMatrix } from "./ConnectionsMatrix";
 import { EnvironmentsPanel } from "./EnvironmentsPanel";
 
 export const metadata: Metadata = {
@@ -32,6 +34,7 @@ export default async function EnvironmentsPage() {
 	const t = await getTranslations("environments");
 	const all = bindings();
 	const seededHash = await hashBindings();
+	const seededMatrixHash = await hashDemoMatrix();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -74,6 +77,11 @@ export default async function EnvironmentsPage() {
 						bindings={all}
 						seededHash={seededHash}
 					/>
+				</div>
+
+				{/* DP07 — the connection-mode matrix (resolveConnection), recomputed on screen */}
+				<div className="mt-8">
+					<ConnectionsMatrix seededHash={seededMatrixHash} />
 				</div>
 			</main>
 		</div>

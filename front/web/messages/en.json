@@ -7435,6 +7435,17 @@
 		"admitted": "Admitted: {datastore} in {environment}.",
 		"sameAsSeededLabel": "Equals the seeded address",
 		"sameYes": "yes — byte-identical",
-		"sameNo": "no — divergence"
+		"sameNo": "no — divergence",
+		"matrixHeading": "Connection matrix — service × environment → mode",
+		"matrixBody": "DP07: resolveConnection(service, environment) → mode ∈ {docker_internal, traefik_url, managed_url} — the pure algorithm (never a prompt) that wires the services without one hardcoded endpoint. Switch environment: the modes recompute on screen via the TS twin, byte-for-byte pinned to the authoritative Go projection.",
+		"matrixEnvLabel": "Environment",
+		"matrixServiceCol": "Service",
+		"matrixRoleCol": "Role",
+		"matrixModeCol": "Mode",
+		"matrixEndpointCol": "Endpoint pattern (${VAR} references)",
+		"matrixEnvVarsCol": "Env vars",
+		"matrixMeasure": "Measure the matrix",
+		"matrixHashLabel": "Matrix address",
+		"matrixWallNote": "The wall (§2): this matrix is a below-the-line projection — the screen measures, writes nothing. Managed URLs come from the secret store (S91) at boot, never from the emitted source; declaring a binding-truth will flow through propose → ChangeSet → approval (DP09)."
 	}
 }
