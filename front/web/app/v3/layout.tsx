@@ -311,6 +311,7 @@ const KEYS = [
 	"envServiceUrl",
 	"envTelemetryLink",
 	"envStackNote",
+	"envStackV0Note",
 	"envTabEmpty",
 	"envBadgeCree",
 	"envBadgeResolu",

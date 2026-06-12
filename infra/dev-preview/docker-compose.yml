@@ -1,0 +1,15 @@
+# docker-compose.yml — AIDOS dev-preview v0.
+# Sert les workspaces émis (.aidos-projects, monté EN LECTURE SEULE) sur :3330,
+# exposé uniquement sur l'IP du pont docker (172.17.0.1) — Traefik y route
+# https://<projectId>-dev.sagedesk.fr (voir traefik/dynamic/aidos-dev-preview.yaml).
+services:
+  aidos-dev-preview:
+    image: node:22-alpine
+    container_name: aidos-dev-preview
+    command: ["node", "/srv/server.js"]
+    ports:
+      - "172.17.0.1:3330:3330"
+    volumes:
+      - /data/dev/aidos/.aidos-projects:/projects:ro
+      - ./server.js:/srv/server.js:ro
+    restart: unless-stopped

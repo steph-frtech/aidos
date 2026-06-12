@@ -11,7 +11,12 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type { BuilderState, ScreenRef } from "@/lib/v2/builder";
+import {
+	applyIntent,
+	type BuilderState,
+	emitApp,
+	type ScreenRef,
+} from "@/lib/v2/builder";
 import type { CodeEdge, CodeNode } from "@/lib/v2/code-graph";
 import { bareTree, nodePath } from "@/lib/v2/composition";
 import type { InstanceConfig } from "@/lib/v3/instance";
@@ -20,6 +25,7 @@ import { replayTo, type SessionTurn, turnsOf } from "@/lib/v3/session";
 import { chatTurnAction } from "./actions";
 import {
 	createProjectAction,
+	emitWorkspaceAction,
 	type ProjectSummary,
 	saveProjectAction,
 	setActiveProjectAction,
@@ -173,13 +179,54 @@ export function V3SessionProvider({
 		setMessages(messagesRef.current);
 	}, []);
 
+	// Le projet actif (chargé côté serveur via le cookie) — l'émission de workspace
+	// et la sauvegarde débondée le ciblent toutes deux.
+	const projectId = initialProject?.id ?? null;
+	const projectName = initialProject?.name ?? null;
+
+	/**
+	 * Le déploiement ÉMET le workspace — l'URL <projet>-<env>.sagedesk.fr devient
+	 * vivante (aperçu v0 ; conteneurs réels = piste DP). Pour chaque tour ajouté qui
+	 * produit un événement « deploiement », on RECONSTRUIT l'app telle que déployée
+	 * depuis les kernels EMBARQUÉS par le déploiement (jamais les courants) via
+	 * emitApp — le même émetteur déterministe, jamais un second chemin — puis on émet
+	 * en tir-et-oublie : une panne d'émission ne casse jamais le tour de chat. LE MUR
+	 * (§2) : des fichiers d'app émise, une PROJECTION sous la ligne — jamais une vérité.
+	 */
+	const emitOnDeploy = useCallback(
+		(prior: readonly string[], appended: readonly string[]) => {
+			if (projectId === null || projectName === null) return;
+			let st = replayTo(prior, prior.length, v1Screens, bareTree(), ladder);
+			for (const msg of appended) {
+				const r = applyIntent(st, msg);
+				for (const ev of r.events) {
+					if (ev.kind !== "deploiement" || ev.env === undefined) continue;
+					const dep = r.state.envs[ev.env];
+					if (dep === null || dep === undefined) continue;
+					const embedded = new Set(dep.kernelVersions);
+					const app = emitApp({
+						...r.state,
+						kernels: r.state.kernels.filter((k) => embedded.has(k.version)),
+					});
+					void emitWorkspaceAction(projectId, ev.env, projectName, app).catch(
+						() => {},
+					);
+				}
+				st = r.state;
+			}
+		},
+		[projectId, projectName, v1Screens, ladder],
+	);
+
 	const send = useCallback(
 		async (raw: string) => {
 			const text = raw.trim();
 			if (text === "") return;
 			// Mode déterministe pur : le message entre tel quel dans le pipeline.
 			if (!aiEnabled) {
+				const prior = messagesRef.current;
 				append([text]);
+				emitOnDeploy(prior, [text]);
 				return;
 			}
 			if (busy) return; // un seul tour IA à la fois
@@ -195,7 +242,9 @@ export function V3SessionProvider({
 				const out = await chatTurnAction(text, summarize(cur));
 				// Panne / réponse invalide → repli déterministe : le texte entre directement.
 				if (out === null) {
+					const prior = messagesRef.current;
 					append([text]);
+					emitOnDeploy(prior, [text]);
 					return;
 				}
 				// Les ACTIONS canoniques deviennent les messages du groupe (chacune RE-JUGÉE
@@ -203,12 +252,14 @@ export function V3SessionProvider({
 				const appended = out.actions.length > 0 ? out.actions : [text];
 				const first = messagesRef.current.length;
 				setReplies((prev) => ({ ...prev, [first]: out.reply }));
+				const prior = messagesRef.current;
 				append(appended);
+				emitOnDeploy(prior, appended);
 			} finally {
 				setBusy(false);
 			}
 		},
-		[aiEnabled, busy, append, v1Screens, ladder],
+		[aiEnabled, busy, append, emitOnDeploy, v1Screens, ladder],
 	);
 
 	/** LE VOYAGE DANS LE TEMPS : tronquer le transcript = rejouer un préfixe (replayTo). */
@@ -228,8 +279,6 @@ export function V3SessionProvider({
 
 	// LA SAUVEGARDE DÉBONCÉE (800 ms) : chaque send/rewindTo (le transcript change) ou
 	// réponse IA relance le compte à rebours ; l'horloge (savedAt) ne vit que côté serveur.
-	const projectId = initialProject?.id ?? null;
-	const projectName = initialProject?.name ?? null;
 	const firstRunRef = useRef(true);
 	const dirtyRef = useRef(false);
 	useEffect(() => {

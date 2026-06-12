@@ -7269,6 +7269,7 @@
 		"envServiceUrl": "The URL for this project and this environment",
 		"envTelemetryLink": "See the instance observability",
 		"envStackNote": "Honestly: real per-project/per-environment provisioning (dedicated Plane, Fumadocs, Doltgres, SigNoz) = the DP track — here, the derived journal and the URLs.",
+		"envStackV0Note": "v0: the dev URL serves the emitted workspace preview (a default certificate may show) — real per-project/env containers: the DP track.",
 		"envTabEmpty": "Nothing here yet — deploy to this environment and the journal will fill up.",
 		"envBadgeCree": "created",
 		"envBadgeResolu": "resolved",

@@ -638,6 +638,17 @@ function EnvDetail({
 								<span className="ml-auto font-mono text-[11px] text-muted-foreground">
 									{row.url === "" ? t.instStackUnprovisioned : row.url}
 								</span>
+								{/* · v0 HONNÊTE sous la ligne « app » : l'URL dev sert l'aperçu ÉMIS
+								    du workspace (certificat par défaut possible) — les conteneurs
+								    réels par projet/env arrivent avec la piste DP. */}
+								{row.key === "app" && (
+									<p
+										data-testid="v3-env-stack-v0-note"
+										className="w-full text-[11px] leading-relaxed text-muted-foreground italic"
+									>
+										{t.envStackV0Note}
+									</p>
+								)}
 							</li>
 						))}
 					</ul>

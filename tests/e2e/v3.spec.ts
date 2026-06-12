@@ -366,11 +366,20 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 			"Application déployée en dev",
 		);
 
-		// LE MUR : la SEULE écriture tolérée est la sauvegarde débondée du projet
+		// LE MUR : les SEULES écritures tolérées sont la sauvegarde débondée du projet
 		// (son corps porte le champ « transcript » — ADR 0061, un transcript de
-		// PROPOSITIONS, jamais une vérité). Tout le reste — la server-action Claude
-		// en tête (un POST sans « transcript ») — est interdit, bascule éteinte.
-		const interdites = writes.filter((w) => !w.corps.includes("transcript"));
+		// PROPOSITIONS, jamais une vérité) ET l'ÉMISSION du workspace au déploiement
+		// (« workspace »/« emitWorkspace », ou la projection émise elle-même —
+		// « entities » + « routes », les clés de l'AppProjection sérialisée) : une
+		// écriture de PROJECTION sous la ligne, comme la sauvegarde du projet — des
+		// fichiers d'app émise, jamais kernel/mirrors/fitness. Tout le reste — la
+		// server-action Claude en tête — est interdit, bascule éteinte.
+		const legale = (corps: string) =>
+			corps.includes("transcript") ||
+			corps.includes("workspace") ||
+			corps.includes("emitWorkspace") ||
+			(corps.includes("entities") && corps.includes("routes"));
+		const interdites = writes.filter((w) => !legale(w.corps));
 		expect(interdites.map((w) => w.ligne)).toEqual([]);
 	});
 });
