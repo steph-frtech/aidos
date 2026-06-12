@@ -360,7 +360,6 @@ export function WorkbenchHeader() {
 			{/* Mobile left drawer + backdrop */}
 			{mobileOpen ? (
 				<div className="sm:hidden">
-					{/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop is a supplementary close affordance; the drawer links and Esc-free toggle remain keyboard-reachable */}
 					<div
 						data-testid="nav-backdrop"
 						onClick={() => setMobileOpen(false)}

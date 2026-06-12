@@ -131,6 +131,7 @@ function renderService(s: SpikeService): string[] {
 			"    labels:",
 			'      - "traefik.enable=true"',
 			"      # HTTPS router",
+			// biome-ignore-start lint/suspicious/noTemplateCurlyInString: literal compose ${VAR} placeholders, interpolated by docker compose (env-var convention)
 			'      - "traefik.http.routers.${APP_NAME}.rule=Host(`${APP_SUBDOMAIN}.${DOMAIN}`)"',
 			'      - "traefik.http.routers.${APP_NAME}.entrypoints=websecure"',
 			'      - "traefik.http.routers.${APP_NAME}.tls=true"',
@@ -141,6 +142,7 @@ function renderService(s: SpikeService): string[] {
 			'      - "traefik.http.routers.${APP_NAME}-http.entrypoints=web"',
 			'      - "traefik.http.routers.${APP_NAME}-http.middlewares=${APP_NAME}-https-redirect"',
 			'      - "traefik.http.middlewares.${APP_NAME}-https-redirect.redirectscheme.scheme=https"',
+			// biome-ignore-end lint/suspicious/noTemplateCurlyInString: literal compose ${VAR} placeholders
 		);
 	} else {
 		out.push(`    # internal_port: ${port}`);
@@ -169,6 +171,7 @@ export async function emit(m: SpikeStackManifest): Promise<string> {
 	if (m.network.external) {
 		b.push("    external: true");
 	}
+	// biome-ignore lint/suspicious/noTemplateCurlyInString: literal compose ${VAR} placeholder, interpolated by docker compose (env-var convention)
 	b.push("    name: ${TRAEFIK_NETWORK_NAME}");
 	if (volumes.length > 0) {
 		b.push("", "volumes:");

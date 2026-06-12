@@ -69,7 +69,9 @@ describe("DP01 stack-spike TS twin", () => {
 		expect(c).not.toContain("sagedesk.fr");
 		expect(c).not.toContain("password");
 		expect(c).not.toContain("ports:");
+		// biome-ignore-start lint/suspicious/noTemplateCurlyInString: asserting literal compose ${VAR} placeholders (env-var convention)
 		expect(c).toContain("name: ${TRAEFIK_NETWORK_NAME}");
 		expect(c).toContain("device: ${APP_DATA_PATH}");
+		// biome-ignore-end lint/suspicious/noTemplateCurlyInString: asserting literal compose ${VAR} placeholders
 	});
 });
