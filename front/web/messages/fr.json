@@ -172,7 +172,8 @@
 		"learn": "/learn — incident → nouvelle dent",
 		"strangler": "Absorption de legacy (strangler-fig)",
 		"accountRelease": "Release v0 (compte)",
-		"aiLabNav": "AI Lab (cockpit)"
+		"aiLabNav": "AI Lab (cockpit)",
+		"environments": "Environnements & bindings (DP06)"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -7404,5 +7405,36 @@
 		"envBadgeSpec": "spec",
 		"envBadgeEbauche": "ébauche",
 		"envBadgePublie": "publiée"
+	},
+	"environments": {
+		"eyebrow": "DP06 · Environnements",
+		"title": "Environnements — les 5 cibles et leurs bindings",
+		"subtitle": "ensemble clos S15 élargi · projection below-the-line",
+		"intro": "L'ensemble clos scope.Environment (S15) s'élargit à CINQ — prod, staging, dev + local, future_cloud — par extension ADDITIVE (ADR 0065, le préfixe S15 préservé, le SemanticDiff classe refine). Chaque environnement DÉCLARE ses bindings de connexion — datastore par défaut et autorisés, motif d'URL en références ${VAR} (jamais une valeur), TLS, réseau, managé — comme projection below-the-line. La porte A1 : prod impose Postgres (« PostgreSQL = la prod. Doltgres = hors prod uniquement. », spec-stack-2026 verbatim).",
+		"tutorialHeading": "Comment lire ce panneau",
+		"tutorialBody": "Le tableau montre les 5 environnements dans l'ordre canonique avec leurs bindings déclarés et l'adresse de contenu de la projection entière (records.Hash, épinglée au Go autoritatif). Le contrôle « tester la liaison » exécute la porte PURE sur le couple (environnement, datastore) choisi : prod + doltgres est REFUSÉ (DOLTGRES_NOT_ALLOWED_IN_PROD), doltgres reste opt-in hors prod, un environnement ou datastore hors ensemble clos est refusé. C'est une mesure — rien n'est écrit : élargir l'ensemble est passé par idée → miroir → /goal (ADR 0065).",
+		"activeProjectLabel": "Projet actif",
+		"noProject": "aucun projet",
+		"bindingsHeading": "Les bindings déclarés (projection par environnement)",
+		"bindingsCount": "{count} environnements",
+		"envCol": "Environnement",
+		"defaultDsCol": "Datastore défaut",
+		"allowedDsCol": "Autorisés",
+		"urlCol": "Motif d'URL",
+		"networkCol": "Réseau",
+		"managedCol": "Managé",
+		"managedYes": "managé",
+		"hashLabel": "Adresse de la projection",
+		"wallNote": "Le mur (§2) : les motifs d'URL sont des références ${VAR} — jamais une valeur. Déclarer un NOUVEAU binding-vérité passera par propose → ChangeSet → approbation (DP09) ; élargir l'ensemble clos est passé par idée → miroir → /goal (ADR 0065).",
+		"gateHeading": "Tester la liaison (la porte A1, pure)",
+		"gateBody": "Choisissez un environnement et un datastore : la porte déterministe valide le couple — prod + doltgres est refusé avec son code clos, doltgres reste opt-in en local/dev/staging, l'inconnu est refusé (fail-closed). La mesure re-hash la projection entière et la compare à l'adresse Go seedée.",
+		"gateTest": "Tester la liaison",
+		"working": "mesure…",
+		"datastoreLabel": "Datastore",
+		"refused": "REFUSÉ",
+		"admitted": "Admis : {datastore} en {environment}.",
+		"sameAsSeededLabel": "Égale à l'adresse seedée",
+		"sameYes": "oui — byte-identique",
+		"sameNo": "non — divergence"
 	}
 }

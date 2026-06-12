@@ -1,4 +1,5 @@
 # Step-Verifier Memory Index
+- [DP05 stackemit](project_dp05_stackemit.md) — EmitStack(phase) verified green after 2 fixes: biome noTemplateCurlyInString RECURRED in NEW e2e spec (executor suppressed lib only, "propre" claim FALSE) + rapid .fail committed AGAIN (DP04 repeat) → always biome-check the e2e spec + grep .fail in HEAD stat; Go hashes re-derived == TS pins; validation_humaine still 0 hits.
 
 - [DP04 envemit](project_dp04_envemit.md) — .env.example+scripts emitter verified green ZERO corrections; verifier re-derived Go hashes (throwaway test) == TS pins; prod /stack-emit 404 = pre-DP03 build expected; validation_humaine still 0 hits.
 - [DP03 composeemit](project_dp03_composeemit.md) — Target additif docker-compose verified green ZERO corrections; noTemplateCurlyInString scar pre-suppressed by executor (1st clean DP biome); validation_humaine STILL 0 hits (report overstated "câblées v3").

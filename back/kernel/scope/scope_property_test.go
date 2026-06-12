@@ -206,11 +206,35 @@ func TestExactEnumCardinality(t *testing.T) {
 	if got := len(scope.UserSegments()); got != 3 {
 		t.Fatalf("UserSegment cardinality = %d, want 3 (premium|standard|guest)", got)
 	}
-	if got := len(scope.Environments()); got != 3 {
-		t.Fatalf("Environment cardinality = %d, want 3 (prod|staging|dev)", got)
+	if got := len(scope.Environments()); got != 5 {
+		t.Fatalf("Environment cardinality = %d, want 5 (prod|staging|dev|local|future_cloud) (KRD §13.7 + ADR 0065/DP06)", got)
 	}
 	if got := len(scope.Statuses()); got != 4 {
 		t.Fatalf("LifecycleStatus cardinality = %d, want 4 (active|deprecated|shadowed|removed) (KRD §44.2)", got)
+	}
+}
+
+// TestEnvironmentWideningIsAdditive — DP06 (ADR 0065, Amendement A6): the S15
+// trio {prod,staging,dev} is PRESERVED as the canonical-order prefix and the two
+// DP06 members {local,future_cloud} are APPENDED — every scope valid before the
+// widening stays valid (additive only, no existing truth invalidated).
+func TestEnvironmentWideningIsAdditive(t *testing.T) {
+	envs := scope.Environments()
+	wantPrefix := []scope.Environment{scope.EnvProd, scope.EnvStaging, scope.EnvDev}
+	for i, e := range wantPrefix {
+		if envs[i] != e {
+			t.Fatalf("the S15 prefix must be preserved: Environments()[%d] = %q, want %q", i, envs[i], e)
+		}
+	}
+	if envs[3] != scope.EnvLocal || envs[4] != scope.EnvFutureCloud {
+		t.Fatalf("the DP06 members must be APPENDED (local, future_cloud), got %v", envs[3:])
+	}
+	// Every member — legacy and new — is a valid shape on an active truth.
+	for _, e := range envs {
+		rec := scope.Record{Status: scope.StatusActive, Scope: scope.TruthScope{Environment: e}}
+		if err := scope.Validate(rec); err != nil {
+			t.Fatalf("an active truth scoped to %q must validate (additivity), got %v", e, err)
+		}
 	}
 }
 

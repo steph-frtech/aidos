@@ -106,26 +106,38 @@ func UserSegments() []UserSegment {
 // IsKnownSegment reports whether s is one of the three §13.7 segments.
 func IsKnownSegment(s UserSegment) bool { return contains(segmentOrder, s) }
 
-// Environment is the deployment environment a truth holds in — exactly the three
-// §13.7 members.
+// Environment is the deployment environment a truth holds in — the CLOSED
+// five-member set: the three §13.7 members (prod, staging, dev) plus the two
+// DP06 additions (local, future_cloud) — an ADDITIVE widening graven by
+// ADR 0065 (Amendement A6, authority = SPEC-stack-2026 verbatim:
+// "stack{environments local/dev/staging/prod/future_cloud, …}"). The S15 trio
+// stays the canonical-order PREFIX; the new members are APPENDED — the
+// SemanticDiff of the widening classifies refine, never override (proved in
+// back/runtime/envbindings/semanticdiff_additivity_test.go).
 type Environment string
 
 const (
 	EnvProd    Environment = "prod"
 	EnvStaging Environment = "staging"
 	EnvDev     Environment = "dev"
+	// EnvLocal — the developer's machine (DP06, ADR 0065). ADDED additively.
+	EnvLocal Environment = "local"
+	// EnvFutureCloud — the managed-cloud portability target (DP06/EPIC G,
+	// ADR 0065). Declared NOW for portability; its bindings are managed-only.
+	EnvFutureCloud Environment = "future_cloud"
 )
 
-var environmentOrder = []Environment{EnvProd, EnvStaging, EnvDev}
+var environmentOrder = []Environment{EnvProd, EnvStaging, EnvDev, EnvLocal, EnvFutureCloud}
 
-// Environments returns the three KRD §13.7 environments in canonical order.
+// Environments returns the five environments (3× KRD §13.7 + 2× DP06/ADR 0065)
+// in canonical order — the S15 prefix preserved, the DP06 members appended.
 func Environments() []Environment {
 	out := make([]Environment, len(environmentOrder))
 	copy(out, environmentOrder)
 	return out
 }
 
-// IsKnownEnvironment reports whether e is one of the three §13.7 environments.
+// IsKnownEnvironment reports whether e is one of the five closed environments.
 func IsKnownEnvironment(e Environment) bool { return contains(environmentOrder, e) }
 
 // TimeWindow is the §13.7 validity window of a truth (from/to). Both bounds are
@@ -281,7 +293,7 @@ func ValidateShape(s TruthScope) error {
 		return fmt.Errorf("scope: unknown user_segment %q (want premium|standard|guest)", s.UserSegment)
 	}
 	if s.Environment != "" && !IsKnownEnvironment(s.Environment) {
-		return fmt.Errorf("scope: unknown environment %q (want prod|staging|dev)", s.Environment)
+		return fmt.Errorf("scope: unknown environment %q (want prod|staging|dev|local|future_cloud)", s.Environment)
 	}
 	return nil
 }

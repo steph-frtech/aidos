@@ -142,6 +142,47 @@ func TestScopeRoundTrips(t *testing.T) {
 	}
 }
 
+// TestWidenedEnvironmentsRoundTrip — DP06 (ADR 0065, Amendement A6): the two
+// ADDED environments (local, future_cloud) round-trip through the SAME
+// kernel.truth.scope jsonb column with NO DDL change — the column carries no
+// environment CHECK constraint, so the widening is purely additive at the
+// persistence layer too (existing rows untouched, expand-only intact).
+func TestWidenedEnvironmentsRoundTrip(t *testing.T) {
+	pool := startScopePostgres(t)
+	ctx := context.Background()
+
+	for _, env := range []scope.Environment{scope.EnvLocal, scope.EnvFutureCloud} {
+		s := scope.TruthScope{Region: scope.RegionEU, Environment: env}
+		body, err := scope.SerializeTruthBody(s)
+		if err != nil {
+			t.Fatalf("serialize (%s): %v", env, err)
+		}
+		var bodyMap map[string]json.RawMessage
+		if err := json.Unmarshal(body, &bodyMap); err != nil {
+			t.Fatalf("unmarshal body (%s): %v", env, err)
+		}
+		id := "t-env-" + string(env)
+		if _, err := pool.Exec(ctx,
+			`INSERT INTO kernel.truth (id, body, version, scope) VALUES ($1, $2::jsonb, $1, $3::jsonb)`,
+			id, string(body), string(bodyMap["scope"]),
+		); err != nil {
+			t.Fatalf("insert truth scoped to the DP06 environment %q must succeed without DDL: %v", env, err)
+		}
+		var raw string
+		if err := pool.QueryRow(ctx,
+			"SELECT scope::text FROM kernel.truth WHERE id = $1", id).Scan(&raw); err != nil {
+			t.Fatalf("select scope (%s): %v", env, err)
+		}
+		var got scope.TruthScope
+		if err := json.Unmarshal([]byte(raw), &got); err != nil {
+			t.Fatalf("unmarshal stored scope (%s): %v", env, err)
+		}
+		if got != s {
+			t.Fatalf("DP06 environment scope did not round-trip: got %+v want %+v", got, s)
+		}
+	}
+}
+
 // TestAgentRoleSelectOnly — the wall (CLAUDE.md §2): the agent role may SELECT
 // kernel.truth (incl. the new scope column) but never INSERT — truth-writes flow through
 // the aidos CLI writer role, not the agent. aidos_agent + the SELECT grant + the write

@@ -172,7 +172,8 @@
 		"learn": "/learn — incident → new tooth",
 		"strangler": "Legacy absorption (strangler-fig)",
 		"accountRelease": "Release v0 (account)",
-		"aiLabNav": "AI Lab (cockpit)"
+		"aiLabNav": "AI Lab (cockpit)",
+		"environments": "Environments & bindings (DP06)"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -7404,5 +7405,36 @@
 		"envBadgeSpec": "spec",
 		"envBadgeEbauche": "draft",
 		"envBadgePublie": "published"
+	},
+	"environments": {
+		"eyebrow": "DP06 · Environments",
+		"title": "Environments — the 5 targets and their bindings",
+		"subtitle": "widened S15 closed set · below-the-line projection",
+		"intro": "The closed scope.Environment set (S15) widens to FIVE — prod, staging, dev + local, future_cloud — as an ADDITIVE extension (ADR 0065, the S15 prefix preserved, the SemanticDiff classifies refine). Each environment DECLARES its connection bindings — default and allowed datastores, ${VAR}-reference URL pattern (never a value), TLS, network, managed — as a below-the-line projection. The A1 gate: prod imposes Postgres (“PostgreSQL = la prod. Doltgres = hors prod uniquement.”, spec-stack-2026 verbatim).",
+		"tutorialHeading": "How to read this panel",
+		"tutorialBody": "The table shows the 5 environments in canonical order with their declared bindings and the content address of the whole projection (records.Hash, pinned to the authoritative Go). The “test the binding” control runs the PURE gate over the picked (environment, datastore) pair: prod + doltgres is REFUSED (DOLTGRES_NOT_ALLOWED_IN_PROD), doltgres stays opt-in off prod, an out-of-set environment or datastore is refused. It is a measure — nothing is written: widening the set went through idea → mirror → /goal (ADR 0065).",
+		"activeProjectLabel": "Active project",
+		"noProject": "no project",
+		"bindingsHeading": "The declared bindings (per-environment projection)",
+		"bindingsCount": "{count} environments",
+		"envCol": "Environment",
+		"defaultDsCol": "Default datastore",
+		"allowedDsCol": "Allowed",
+		"urlCol": "URL pattern",
+		"networkCol": "Network",
+		"managedCol": "Managed",
+		"managedYes": "managed",
+		"hashLabel": "Projection address",
+		"wallNote": "The wall (§2): URL patterns are ${VAR} references — never a value. Declaring a NEW binding-truth will flow through propose → ChangeSet → approval (DP09); widening the closed set went through idea → mirror → /goal (ADR 0065).",
+		"gateHeading": "Test the binding (the pure A1 gate)",
+		"gateBody": "Pick an environment and a datastore: the deterministic gate validates the pair — prod + doltgres is refused with its closed code, doltgres stays opt-in in local/dev/staging, the unknown is refused (fail-closed). The measure re-hashes the whole projection and compares it to the seeded Go address.",
+		"gateTest": "Test the binding",
+		"working": "measuring…",
+		"datastoreLabel": "Datastore",
+		"refused": "REFUSED",
+		"admitted": "Admitted: {datastore} in {environment}.",
+		"sameAsSeededLabel": "Equals the seeded address",
+		"sameYes": "yes — byte-identical",
+		"sameNo": "no — divergence"
 	}
 }
