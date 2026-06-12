@@ -165,6 +165,12 @@ export const SCREENS: readonly ScreenEntry[] = [
 		fr: { title: "Le lab — la verticale d'un besoin, bout en bout" },
 		en: { title: "The lab — a need's verticale, end to end" },
 	},
+	{
+		slug: "code",
+		concept: "arbres",
+		fr: { title: "Code (descente) — la descente continue sous la feuille" },
+		en: { title: "Code (descent) — the descent continues below the leaf" },
+	},
 ];
 
 const BY_SLUG: ReadonlyMap<string, ScreenEntry> = new Map(
