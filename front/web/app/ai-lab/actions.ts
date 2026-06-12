@@ -84,6 +84,8 @@ async function callClaude(message: string): Promise<{
 			[
 				"-p",
 				leftBrainPrompt(message),
+				"--model",
+				"claude-fable-5",
 				"--output-format",
 				"json",
 				"--max-turns",
@@ -190,7 +192,16 @@ async function enrichNextPair(
 	try {
 		const { stdout } = await execFileP(
 			CLAUDE_BIN,
-			["-p", prompt, "--output-format", "json", "--max-turns", "1"],
+			[
+				"-p",
+				prompt,
+				"--model",
+				"claude-fable-5",
+				"--output-format",
+				"json",
+				"--max-turns",
+				"1",
+			],
 			{ cwd: "/tmp", timeout: 90_000, maxBuffer: 8 * 1024 * 1024 },
 		);
 		const outer = JSON.parse(stdout);

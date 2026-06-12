@@ -1,7 +1,7 @@
 ---
 name: step-s17
 description: Dedicated executor for AIDOS step S17 — Links (versioned) (kernel). Runs ONLY this step's KRD loop; delegate S17 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

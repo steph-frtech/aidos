@@ -1,7 +1,7 @@
 ---
 name: step-s24
 description: Dedicated executor for AIDOS step S24 — Version DAG (archive). Runs ONLY this step's KRD loop; delegate S24 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

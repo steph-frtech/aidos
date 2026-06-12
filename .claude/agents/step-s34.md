@@ -1,7 +1,7 @@
 ---
 name: step-s34
 description: Dedicated executor for AIDOS step S34 — Emitters (runtime). Runs ONLY this step's KRD loop; delegate S34 to this agent.
-model: opus
+model: fable
 maxTurns: 120
 effort: high
 color: blue

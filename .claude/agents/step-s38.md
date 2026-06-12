@@ -1,7 +1,7 @@
 ---
 name: step-s38
 description: Dedicated executor for AIDOS step S38 — Web projection (workbench). Runs ONLY this step's KRD loop; delegate S38 to this agent.
-model: opus
+model: fable
 maxTurns: 120
 effort: high
 color: blue

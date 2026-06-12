@@ -1,7 +1,7 @@
 ---
 name: step-s46
 description: Dedicated executor for AIDOS step S46 — Démo checkout (runtime). Runs ONLY this step's KRD loop; delegate S46 to this agent.
-model: opus
+model: fable
 maxTurns: 120
 effort: high
 color: blue

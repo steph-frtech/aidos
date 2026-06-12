@@ -1,7 +1,7 @@
 ---
 name: step-s22
 description: Dedicated executor for AIDOS step S22 — Impact / red wave (mirror). Runs ONLY this step's KRD loop; delegate S22 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

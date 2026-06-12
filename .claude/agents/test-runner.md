@@ -1,7 +1,7 @@
 ---
 name: test-runner
 description: Runs ONE test scenario, returns PASS/FAIL + suggestions, never writes code
-model: opus
+model: fable
 maxTurns: 30
 effort: high
 color: yellow

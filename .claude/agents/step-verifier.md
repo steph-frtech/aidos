@@ -1,7 +1,7 @@
 ---
 name: step-verifier
 description: Verifies and corrects the result of a step finished by step-executor. Use after each step, before advancing.
-model: opus
+model: fable
 maxTurns: 60
 effort: high
 memory: project

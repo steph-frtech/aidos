@@ -1,7 +1,7 @@
 ---
 name: suggestion-compat-checker
 description: Checks that suggestions from passed tests are mutually compatible and do not regress prior green
-model: opus
+model: fable
 maxTurns: 25
 effort: high
 color: orange

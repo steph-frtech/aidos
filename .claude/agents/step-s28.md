@@ -1,7 +1,7 @@
 ---
 name: step-s28
 description: Dedicated executor for AIDOS step S28 — Exploration gestures (runtime). Runs ONLY this step's KRD loop; delegate S28 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

@@ -1,7 +1,7 @@
 ---
 name: step-s03
 description: Dedicated executor for AIDOS step S03 — CLI aidos (runtime). Runs ONLY this step's KRD loop; delegate S03 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

@@ -1,7 +1,7 @@
 ---
 name: step-s14
 description: Dedicated executor for AIDOS step S14 — Truth-typing (kernel). Runs ONLY this step's KRD loop; delegate S14 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

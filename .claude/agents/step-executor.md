@@ -1,7 +1,7 @@
 ---
 name: step-executor
 description: Executes ONE step of a long KRD workflow — single objective, inputs, done criteria. May modify code but nothing out of scope.
-model: opus
+model: fable
 maxTurns: 120
 effort: high
 color: blue

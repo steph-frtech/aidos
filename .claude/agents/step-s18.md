@@ -1,7 +1,7 @@
 ---
 name: step-s18
 description: Dedicated executor for AIDOS step S18 — Composes / aggregate (kernel). Runs ONLY this step's KRD loop; delegate S18 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

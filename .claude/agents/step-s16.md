@@ -1,7 +1,7 @@
 ---
 name: step-s16
 description: Dedicated executor for AIDOS step S16 — Authority graph (kernel). Runs ONLY this step's KRD loop; delegate S16 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

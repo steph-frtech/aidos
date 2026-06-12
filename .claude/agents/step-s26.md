@@ -1,7 +1,7 @@
 ---
 name: step-s26
 description: Dedicated executor for AIDOS step S26 — Curation / QD (archive). Runs ONLY this step's KRD loop; delegate S26 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

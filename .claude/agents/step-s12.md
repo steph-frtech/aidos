@@ -1,7 +1,7 @@
 ---
 name: step-s12
 description: Dedicated executor for AIDOS step S12 — Complétude / monstre (mirror). Runs ONLY this step's KRD loop; delegate S12 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

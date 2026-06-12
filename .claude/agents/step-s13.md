@@ -1,7 +1,7 @@
 ---
 name: step-s13
 description: Dedicated executor for AIDOS step S13 — BlockReason (runtime). Runs ONLY this step's KRD loop; delegate S13 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

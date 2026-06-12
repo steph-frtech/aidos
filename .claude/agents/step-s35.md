@@ -1,7 +1,7 @@
 ---
 name: step-s35
 description: Dedicated executor for AIDOS step S35 — Entity source (kernel). Runs ONLY this step's KRD loop; delegate S35 to this agent.
-model: opus
+model: fable
 maxTurns: 120
 effort: high
 color: blue

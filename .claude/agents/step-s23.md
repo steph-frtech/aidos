@@ -1,7 +1,7 @@
 ---
 name: step-s23
 description: Dedicated executor for AIDOS step S23 — Phase stable (archive). Runs ONLY this step's KRD loop; delegate S23 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

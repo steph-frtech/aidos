@@ -1,7 +1,7 @@
 ---
 name: step-s08
 description: Dedicated executor for AIDOS step S08 — Expr DSL (kernel). Runs ONLY this step's KRD loop; delegate S08 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

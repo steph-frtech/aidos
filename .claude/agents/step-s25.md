@@ -1,7 +1,7 @@
 ---
 name: step-s25
 description: Dedicated executor for AIDOS step S25 — Semantic merge (archive). Runs ONLY this step's KRD loop; delegate S25 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue

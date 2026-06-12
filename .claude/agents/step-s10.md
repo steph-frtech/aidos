@@ -1,7 +1,7 @@
 ---
 name: step-s10
 description: Dedicated executor for AIDOS step S10 — Operation DSL (kernel). Runs ONLY this step's KRD loop; delegate S10 to this agent.
-model: opus
+model: fable
 maxTurns: 80
 effort: high
 color: blue
