@@ -1,0 +1,18 @@
+---
+name: dp01-stack-spike
+description: DP01 first DP-track (provisioning/deploy) SPIKE-gate — StackManifest-as-source verdict GO measured; biome noTemplateCurlyInString scar on literal compose ${VAR} strings
+metadata:
+  type: project
+---
+
+DP01 = first DP-track (ROADMAP provisioning-deploy) SPIKE-gate, same class as [[hr01-spike-headroom]]/[[el01-necessity-spike]] (ratchet OFF, T0, verdict measured never declared; a measured NO-GO would also be a PASS).
+
+**What it proves:** StackManifest content-addressed SOURCE vs static /data/dockers template — GO iff byte-identical ×100 (output_hash 665a8527… stable) ∧ compose round-trip ∧ drift-asymmetry (one-byte hand-edit detected via recorded output-hash on source path, template path blind by construction). 3 candidate forms scored on 4 DECLARED criteria (body/content-addr/wall/append-only) → record-kind 4/4 wins deterministically. Verdict = boolean conjunction in Decide(), no LLM. Harvest = DRAFT record (HasMirror=false, HasVersion=false, RecordHash c1bcdd9d…), proposes entity, persists nothing.
+
+**Verified live by me:** go test -count=1 7/7 + `go run ./cmd/verdict` prints GO with hashes matching report; gofmt -l/vet clean (gofmt scar did NOT recur); module aidos.spike/stackmanifest never imports back/, no time.Now/rand in non-test code. Front twin lib/stack-spike.ts pins GO_SOURCE_HASH/GO_OUTPUT_HASH (cross-twin parity mirror); vitest 2060/2060; tsc clean. E2e PLAYWRIGHT_WEB_PORT=3210: stack-spike 4/4 + v3 16/16 = 20 passed (prod :3000 untouched). Route /stack-spike: server action calls pure decide(), zero fetch/POST/SQL — wall intact. i18n stackSpike fr35==en35 + nav key both locales. Docs 2 pages 3 layers, docs.json:561-562, mint validate+broken-links clean, 86c6f24==origin/main, live 200/200. ADR 0064 present. Code bf4efc4 + verifier fix 9dfe6b9 pushed.
+
+**SCAR (new biome variant):** 12 biome warnings the executor did not surface — `lint/suspicious/noTemplateCurlyInString` on plain strings deliberately containing literal `${VAR}` docker-compose env placeholders (lib/stack-spike.ts emitter + test asserts), plus 1 pre-existing `suppressions/unused` in WorkbenchHeader.tsx:363. Fix = `// biome-ignore-start/end lint/suspicious/noTemplateCurlyInString: reason` ranges (biome 2.4.16 supports ranges) + single-line ignore; removed the dead a11y suppression. Comments only → pinned hashes unchanged (vitest 6/6 re-run). **Pattern:** any emitter that renders compose/Traefik config in TS WILL trip this rule — expect it on DP02+ and suppress with reason, never rewrite the placeholder as a template literal (it must stay literal for docker compose interpolation).
+
+**DP contract specifics:** v3 regression spec = tests/e2e/v3.spec.ts (16 tests); the 2 user requirements (real dev app via Traefik `<projet>-dev.sagedesk.fr`; human validation gate `validation_humaine` in lib/v2/builder.ts) do NOT exist yet in front/web/lib — grep found zero hits — so "not regressed" is vacuously true until the first deploying DP step wires them. Re-check existence each DP step before claiming non-regression.
+
+**OQ (by-design, never residual):** OQ-DP01-1 form score is a proxy (DP02 engraves via records.Hash∘Canonicalize); OQ-DP01-2 throwaway parser paired to throwaway emitter (DP03 real YAML AST); OQ-DP01-3 conventions subset (full 19-layer SPEC-stack-2026 = DP02–DP05/EPIC E); OQ-DP01-4 spike persists nothing (real `ideas` write via idea_capture later); Linear MCP unauth (recurring).
