@@ -10,6 +10,7 @@ import {
 import type { SessionTurn } from "@/lib/v3/session";
 import { friendlyLine, type Strings } from "../friendly";
 import { useV3Session } from "../V3Session";
+import { PreviewPane } from "./PreviewPane";
 
 /**
  * /v3/lab — LE CHAT façon GPT (ADR 0060) : une conversation pleine hauteur, centrée,
@@ -373,148 +374,156 @@ export function LabClient() {
 		submit(s.text);
 	};
 
+	// LE LAB EN DEUX COLONNES : le chat (~60 %) + les 3 prévisualisations EN DIRECT
+	// (~40 %) — empilées sur mobile. La prévisualisation est une LECTURE pure de la
+	// même session (emitApp recalculé à chaque tour) : « voir le site en construction ».
 	return (
-		<div
-			data-testid="v3-chat"
-			className="mx-auto flex h-[calc(100vh-3rem)] w-full max-w-3xl flex-col"
-		>
-			{/* ── la conversation (pleine hauteur, défilante) ── */}
-			<div className="flex-1 space-y-6 overflow-y-auto py-4 pr-1">
-				{turns.length === 0 && !busy ? (
-					/* · le HERO d'accueil — accueillant, sans jargon */
-					<div className="flex h-full flex-col items-center justify-center gap-6 text-center">
-						<div className="space-y-2">
-							<p className="text-2xl font-semibold text-foreground">
-								{t.heroTitle}
-							</p>
-							<p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
-								{t.heroSubtitle}
-							</p>
+		<div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-start gap-6 lg:grid-cols-[3fr_2fr]">
+			<div
+				data-testid="v3-chat"
+				className="mx-auto flex h-[calc(100vh-3rem)] w-full max-w-3xl min-w-0 flex-col"
+			>
+				{/* ── la conversation (pleine hauteur, défilante) ── */}
+				<div className="flex-1 space-y-6 overflow-y-auto py-4 pr-1">
+					{turns.length === 0 && !busy ? (
+						/* · le HERO d'accueil — accueillant, sans jargon */
+						<div className="flex h-full flex-col items-center justify-center gap-6 text-center">
+							<div className="space-y-2">
+								<p className="text-2xl font-semibold text-foreground">
+									{t.heroTitle}
+								</p>
+								<p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
+									{t.heroSubtitle}
+								</p>
+							</div>
+							<div className="w-full max-w-xl space-y-2">
+								<p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+									{t.suggestionsLabel}
+								</p>
+								<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+									{SUGGESTIONS.map((s) => (
+										<button
+											key={s.labelKey}
+											type="button"
+											data-testid="v3-suggestion"
+											data-mode={s.mode}
+											onClick={() => onSuggestion(s)}
+											className="rounded-xl border border-border bg-card p-4 text-left text-sm text-foreground shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
+										>
+											{t[s.labelKey]}
+										</button>
+									))}
+								</div>
+							</div>
 						</div>
-						<div className="w-full max-w-xl space-y-2">
-							<p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-								{t.suggestionsLabel}
-							</p>
-							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-								{SUGGESTIONS.map((s) => (
-									<button
-										key={s.labelKey}
-										type="button"
-										data-testid="v3-suggestion"
-										data-mode={s.mode}
-										onClick={() => onSuggestion(s)}
-										className="rounded-xl border border-border bg-card p-4 text-left text-sm text-foreground shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
+					) : (
+						turns.map((turn, ti) => (
+							<div key={turn.index} className="space-y-2">
+								{/* · la bulle utilisateur */}
+								<div className="flex justify-end">
+									<p
+										data-testid="v3-msg-user"
+										className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground"
 									>
-										{t[s.labelKey]}
-									</button>
+										{turn.msg}
+									</p>
+								</div>
+								{/* · la carte assistant */}
+								<AssistantCard
+									turn={turn}
+									reply={replies[turn.index]}
+									isLast={ti === turns.length - 1}
+									t={t}
+									onChip={submit}
+								/>
+							</div>
+						))
+					)}
+
+					{/* · l'indicateur de frappe animé (pendant le tour IA) */}
+					{busy && (
+						<div className="flex justify-start">
+							<div
+								data-testid="v3-typing"
+								className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-border bg-card px-4 py-3"
+							>
+								<span className="sr-only">{t.typing}</span>
+								{[0, 150, 300].map((d) => (
+									<span
+										key={d}
+										className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60"
+										style={{ animationDelay: `${d}ms` }}
+									/>
 								))}
 							</div>
 						</div>
-					</div>
-				) : (
-					turns.map((turn, ti) => (
-						<div key={turn.index} className="space-y-2">
-							{/* · la bulle utilisateur */}
-							<div className="flex justify-end">
-								<p
-									data-testid="v3-msg-user"
-									className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground"
-								>
-									{turn.msg}
-								</p>
-							</div>
-							{/* · la carte assistant */}
-							<AssistantCard
-								turn={turn}
-								reply={replies[turn.index]}
-								isLast={ti === turns.length - 1}
-								t={t}
-								onChip={submit}
-							/>
-						</div>
-					))
-				)}
-
-				{/* · l'indicateur de frappe animé (pendant le tour IA) */}
-				{busy && (
-					<div className="flex justify-start">
-						<div
-							data-testid="v3-typing"
-							className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-border bg-card px-4 py-3"
-						>
-							<span className="sr-only">{t.typing}</span>
-							{[0, 150, 300].map((d) => (
-								<span
-									key={d}
-									className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60"
-									style={{ animationDelay: `${d}ms` }}
-								/>
-							))}
-						</div>
-					</div>
-				)}
-				<div ref={bottomRef} />
-			</div>
-
-			{/* ── la saisie épinglée en bas (Entrée envoie · Maj+Entrée nouvelle ligne) ── */}
-			<div className="space-y-2 border-t border-border bg-background pt-3 pb-1">
-				<div className="flex items-end gap-2">
-					<textarea
-						ref={taRef}
-						data-testid="v3-input"
-						value={input}
-						rows={1}
-						aria-label={t.inputPlaceholder}
-						onChange={(e) => {
-							setInput(e.target.value);
-							autosize();
-						}}
-						onKeyDown={(e) => {
-							if (e.key === "Enter" && !e.shiftKey) {
-								e.preventDefault();
-								submit(input);
-							}
-						}}
-						placeholder={t.inputPlaceholder}
-						className="max-h-40 min-h-[2.75rem] flex-1 resize-none rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30 focus:outline-none"
-					/>
-					<button
-						type="button"
-						data-testid="v3-send"
-						disabled={input.trim() === "" || busy}
-						onClick={() => submit(input)}
-						className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-					>
-						{t.send}
-					</button>
+					)}
+					<div ref={bottomRef} />
 				</div>
-				{/* · la bascule « IA conversationnelle » (défaut ON) — le mode déterministe pur à un clic */}
-				<div
-					className="flex items-center gap-2 text-xs text-muted-foreground"
-					title={t.aiToggleHint}
-				>
-					<button
-						type="button"
-						role="switch"
-						aria-checked={aiEnabled}
-						aria-label={t.aiToggle}
-						data-testid="v3-ai-toggle"
-						onClick={() => setAiEnabled(!aiEnabled)}
-						className={[
-							"relative h-5 w-9 rounded-full transition-colors",
-							aiEnabled ? "bg-primary" : "bg-muted",
-						].join(" ")}
-					>
-						<span
-							className={[
-								"absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background shadow transition-transform",
-								aiEnabled ? "translate-x-4" : "",
-							].join(" ")}
+
+				{/* ── la saisie épinglée en bas (Entrée envoie · Maj+Entrée nouvelle ligne) ── */}
+				<div className="space-y-2 border-t border-border bg-background pt-3 pb-1">
+					<div className="flex items-end gap-2">
+						<textarea
+							ref={taRef}
+							data-testid="v3-input"
+							value={input}
+							rows={1}
+							aria-label={t.inputPlaceholder}
+							onChange={(e) => {
+								setInput(e.target.value);
+								autosize();
+							}}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" && !e.shiftKey) {
+									e.preventDefault();
+									submit(input);
+								}
+							}}
+							placeholder={t.inputPlaceholder}
+							className="max-h-40 min-h-[2.75rem] flex-1 resize-none rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30 focus:outline-none"
 						/>
-					</button>
-					<span>{t.aiToggle}</span>
+						<button
+							type="button"
+							data-testid="v3-send"
+							disabled={input.trim() === "" || busy}
+							onClick={() => submit(input)}
+							className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{t.send}
+						</button>
+					</div>
+					{/* · la bascule « IA conversationnelle » (défaut ON) — le mode déterministe pur à un clic */}
+					<div
+						className="flex items-center gap-2 text-xs text-muted-foreground"
+						title={t.aiToggleHint}
+					>
+						<button
+							type="button"
+							role="switch"
+							aria-checked={aiEnabled}
+							aria-label={t.aiToggle}
+							data-testid="v3-ai-toggle"
+							onClick={() => setAiEnabled(!aiEnabled)}
+							className={[
+								"relative h-5 w-9 rounded-full transition-colors",
+								aiEnabled ? "bg-primary" : "bg-muted",
+							].join(" ")}
+						>
+							<span
+								className={[
+									"absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background shadow transition-transform",
+									aiEnabled ? "translate-x-4" : "",
+								].join(" ")}
+							/>
+						</button>
+						<span>{t.aiToggle}</span>
+					</div>
 				</div>
 			</div>
+
+			{/* ── la colonne droite : les 3 prévisualisations (web · mobile · desktop) ── */}
+			<PreviewPane />
 		</div>
 	);
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { deployRealAction } from "@/app/v2/builder/actions";
 import {
@@ -10,6 +11,8 @@ import {
 	type EnvName,
 	emitApp,
 } from "@/lib/v2/builder";
+import { envStackOf, type InstanceConfig } from "@/lib/v3/instance";
+import { type StackJournalEntry, stackJournalOf } from "@/lib/v3/stack-journal";
 import { useV3Session } from "../V3Session";
 
 /**
@@ -19,6 +22,12 @@ import { useV3Session } from "../V3Session";
  * ENVOIENT la phrase canonique au chat (send — le tour repasse par le réducteur, la
  * loi) ; le DÉPLOIEMENT RÉEL (ADR 0052) RÉUTILISE deployRealAction (/v2/builder →
  * pipeline /ai-lab), gaté sur envs.prod — le geste humain, jamais avant l'échelle.
+ *
+ * LE PANNEAU D'ENVIRONNEMENT (« Ouvrir l'environnement ») : six onglets — Aperçu ·
+ * BDD · Télémétrie · Docs · Tickets · Stack. Tout y est DÉRIVÉ : le journal de stack
+ * (stackJournalOf — la projection PURE du log, ADR 0063) et les URLs par PROJET/ENV
+ * (envStackOf — le slug du projet dans chaque adresse : l'isolation rendue visible).
+ * HONNÊTE : le provisionnement réel par couple projet/environnement = la piste DP.
  *
  * END-USER FRIENDLY TOTAL : copie amicale (« jamais de saut »), les hashes et fichiers
  * TOUJOURS repliés (<details>). LE MUR (§2) : un déploiement in-model est un tour de
@@ -33,6 +42,70 @@ const DECLARED_ENV_TITLES: Record<string, string> = {
 	staging: "envStagingTitle",
 	prod: "envProdTitle",
 };
+
+/** Les ONGLETS du panneau d'environnement — un jeu DÉCLARÉ et clos (jamais deviné). */
+const ENV_TABS = [
+	"apercu",
+	"db",
+	"telemetry",
+	"docs",
+	"tickets",
+	"stack",
+] as const;
+type EnvTab = (typeof ENV_TABS)[number];
+
+/** Les libellés i18n des onglets (clé déclarée par onglet). */
+const ENV_TAB_LABELS: Record<EnvTab, string> = {
+	apercu: "envTabApercu",
+	db: "envTabDb",
+	telemetry: "envTabTelemetry",
+	docs: "envTabDocs",
+	tickets: "envTabTickets",
+	stack: "envTabStack",
+};
+
+/** Les BADGES d'action du journal de stack — couleur + libellé i18n DÉCLARÉS. */
+const ACTION_BADGES: Partial<
+	Record<StackJournalEntry["action"], { labelKey: string; cls: string }>
+> = {
+	cree: {
+		labelKey: "envBadgeCree",
+		cls: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+	},
+	resolu: {
+		labelKey: "envBadgeResolu",
+		cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-600",
+	},
+	spec: {
+		labelKey: "envBadgeSpec",
+		cls: "border-primary/40 bg-primary/10 text-primary",
+	},
+	ebauche: {
+		labelKey: "envBadgeEbauche",
+		cls: "border-border bg-muted/40 text-muted-foreground",
+	},
+	publie: {
+		labelKey: "envBadgePublie",
+		cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-600",
+	},
+};
+
+/**
+ * CLÉ React STABLE par entrée de journal : l'identité de l'entrée + un compteur
+ * d'occurrence (le journal est APPEND-ONLY — l'ordre suit le log, jamais re-trié).
+ * PURE & DÉTERMINISTE : même liste → mêmes clés.
+ */
+function keyedEntries(
+	entries: readonly StackJournalEntry[],
+): { entry: StackJournalEntry; key: string }[] {
+	const seen = new Map<string, number>();
+	return entries.map((entry) => {
+		const base = `${entry.env}-${entry.service}-${entry.action}-${entry.ref}`;
+		const n = seen.get(base) ?? 0;
+		seen.set(base, n + 1);
+		return { entry, key: `${base}-${n}` };
+	});
+}
 
 /**
  * Le TITRE d'un barreau : la paire FR déclarée pour dev/staging/prod ; un barreau
@@ -75,10 +148,13 @@ export function EnvsClient() {
 		busy,
 		codeNodes,
 		codeEdges,
+		instanceConfig,
+		projectId,
 		strings: t,
 	} = useV3Session();
-	// L'APERÇU « Voir le résultat » : le barreau ouvert (null = replié) — un toggle.
-	const [previewEnv, setPreviewEnv] = useState<EnvName | null>(null);
+	// Le PANNEAU D'ENVIRONNEMENT : le barreau ouvert (null = replié) + l'onglet actif.
+	const [openEnv, setOpenEnv] = useState<EnvName | null>(null);
+	const [tab, setTab] = useState<EnvTab>("apercu");
 	// Le DÉPLOIEMENT RÉEL (ADR 0052) : occupation + résultat (URL live / panne douce).
 	const [realBusy, setRealBusy] = useState(false);
 	const [realResult, setRealResult] = useState<{
@@ -100,6 +176,9 @@ export function EnvsClient() {
 		codeNodes,
 		codeEdges,
 	);
+
+	// Le JOURNAL DE STACK (ADR 0063) — DÉRIVÉ du log à CHAQUE rendu, jamais saisi ni stocké.
+	const journal = stackJournalOf(state);
 
 	/** Le GESTE HUMAIN (ADR 0052) : le pipeline réel /ai-lab, RÉUTILISÉ (jamais un second chemin). */
 	const runRealDeploy = async () => {
@@ -139,10 +218,20 @@ export function EnvsClient() {
 							drift={drift}
 							disabled={state.kernels.length === 0 || busy}
 							onDeploy={() => void send(`déploie l'application en ${name}`)}
-							viewing={previewEnv === name}
-							onView={() =>
-								setPreviewEnv((cur) => (cur === name ? null : name))
-							}
+							opened={openEnv === name}
+							onOpen={() => {
+								setOpenEnv((cur) => (cur === name ? null : name));
+								setTab("apercu");
+							}}
+							viewing={openEnv === name && tab === "apercu"}
+							onView={() => {
+								if (openEnv === name && tab === "apercu") {
+									setOpenEnv(null);
+								} else {
+									setOpenEnv(name);
+									setTab("apercu");
+								}
+							}}
 							t={t}
 						/>
 					);
@@ -154,13 +243,19 @@ export function EnvsClient() {
 				</p>
 			)}
 
-			{/* ── l'APERÇU : l'app TELLE QUE DÉPLOYÉE sur le barreau choisi (versions embarquées) ── */}
-			{previewEnv !== null && (
-				<EnvPreview
-					name={previewEnv}
-					env={state.envs[previewEnv] ?? null}
+			{/* ── le PANNEAU D'ENVIRONNEMENT pleine largeur : Aperçu · BDD · Télémétrie ·
+			    Docs · Tickets · Stack — le journal DÉRIVÉ du log + les URLs par projet/env ── */}
+			{openEnv !== null && (
+				<EnvDetail
+					name={openEnv}
+					env={state.envs[openEnv] ?? null}
 					state={state}
-					onClose={() => setPreviewEnv(null)}
+					journal={journal}
+					instanceConfig={instanceConfig}
+					projectSlug={projectId ?? "app"}
+					tab={tab}
+					onTab={setTab}
+					onClose={() => setOpenEnv(null)}
 					t={t}
 				/>
 			)}
@@ -279,6 +374,8 @@ function EnvCard({
 	drift,
 	disabled,
 	onDeploy,
+	opened,
+	onOpen,
 	viewing,
 	onView,
 	t,
@@ -289,6 +386,8 @@ function EnvCard({
 	drift: number;
 	disabled: boolean;
 	onDeploy: () => void;
+	opened: boolean;
+	onOpen: () => void;
 	viewing: boolean;
 	onView: () => void;
 	t: Strings;
@@ -333,7 +432,18 @@ function EnvCard({
 			>
 				{t.envDeployBtn.replace("%env%", name)}
 			</button>
-			{/* · VOIR le résultat : ouvre l'aperçu de l'app telle que déployée ICI —
+			{/* · OUVRIR l'environnement : le panneau détaillé pleine largeur (Aperçu ·
+			    BDD · Télémétrie · Docs · Tickets · Stack) — une lecture pure du dérivé. */}
+			<button
+				type="button"
+				data-testid={`v3-env-open-${name}`}
+				aria-pressed={opened}
+				onClick={onOpen}
+				className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/40 aria-pressed:border-primary/50 aria-pressed:bg-primary/10"
+			>
+				{t.envOpenBtn}
+			</button>
+			{/* · VOIR le résultat : ouvre l'onglet Aperçu de l'app telle que déployée ICI —
 			    une lecture pure (toujours cliquable : le jamais-déployé a son état vide). */}
 			<button
 				type="button"
@@ -345,6 +455,238 @@ function EnvCard({
 				{t.envViewBtn}
 			</button>
 		</div>
+	);
+}
+
+/**
+ * Le PANNEAU D'ENVIRONNEMENT (pleine largeur) : six onglets. L'Aperçu (l'app telle
+ * que déployée — EnvPreview réutilisé), la BDD (le moteur ADR 0006 — Doltgres hors
+ * prod, le git-for-data ; Postgres en prod — + les POINTS DE RESTAURATION dérivés),
+ * la Télémétrie, les Docs et les Tickets (le journal de stack DÉRIVÉ du log —
+ * stackJournalOf, jamais saisi) et la Stack (envStackOf : les URLs portent le slug du
+ * PROJET — l'isolation par couple projet/environnement rendue visible). HONNÊTE : le
+ * provisionnement réel par couple = la piste DP ; ici, la loi des effets, montrée.
+ */
+function EnvDetail({
+	name,
+	env,
+	state,
+	journal,
+	instanceConfig,
+	projectSlug,
+	tab,
+	onTab,
+	onClose,
+	t,
+}: {
+	name: EnvName;
+	env: Deployment | null;
+	state: BuilderState;
+	journal: readonly StackJournalEntry[];
+	instanceConfig: InstanceConfig;
+	projectSlug: string;
+	tab: EnvTab;
+	onTab: (tab: EnvTab) => void;
+	onClose: () => void;
+	t: Strings;
+}) {
+	// Les entrées du journal pour CE barreau (les effets hors-env — capture/spec — suivent).
+	const entriesFor = (service: StackJournalEntry["service"]) =>
+		journal.filter(
+			(e) => e.service === service && (e.env === name || e.env === ""),
+		);
+	// La stack résolue pour CE projet/environnement — chaque URL porte le slug du projet.
+	const stack = envStackOf(name, instanceConfig, projectSlug);
+	const urlOf = (key: string) => stack.find((s) => s.key === key)?.url ?? "";
+	return (
+		<section
+			data-testid="v3-env-detail"
+			data-env={name}
+			className="w-full space-y-3 rounded-xl border border-border bg-card p-4"
+		>
+			<div className="flex flex-wrap items-center gap-2">
+				<h2 className="text-sm font-semibold text-foreground">
+					{envTitleOf(t, name)}
+				</h2>
+				<button
+					type="button"
+					onClick={onClose}
+					className="ml-auto rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/40"
+				>
+					{t.envDetailClose}
+				</button>
+			</div>
+			{/* · les ONGLETS — le jeu déclaré et clos (ENV_TABS) */}
+			<nav className="flex flex-wrap gap-1 border-b border-border pb-2">
+				{ENV_TABS.map((k) => (
+					<button
+						key={k}
+						type="button"
+						data-testid="v3-env-tab"
+						data-tab={k}
+						aria-pressed={tab === k}
+						onClick={() => onTab(k)}
+						className="rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+					>
+						{t[ENV_TAB_LABELS[k]]}
+					</button>
+				))}
+			</nav>
+			{/* · APERÇU : l'app telle que déployée sur CE barreau (le composant réutilisé) */}
+			{tab === "apercu" && (
+				<EnvPreview
+					name={name}
+					env={env}
+					state={state}
+					onClose={onClose}
+					t={t}
+				/>
+			)}
+			{/* · BDD : le moteur (ADR 0006) + les points de restauration DÉRIVÉS du log */}
+			{tab === "db" && (
+				<div className="space-y-3">
+					<p className="text-xs leading-relaxed text-muted-foreground">
+						{name === "prod" ? t.envDbEnginePostgres : t.envDbEngineDoltgres}
+					</p>
+					<p className="font-mono text-[11px] text-muted-foreground">
+						{urlOf("db")}
+					</p>
+					<h3 className="text-xs font-semibold text-foreground">
+						{t.envDbRestoreHeading}
+					</h3>
+					{entriesFor("db").length === 0 ? (
+						<p className="text-xs text-muted-foreground italic">
+							{t.envTabEmpty}
+						</p>
+					) : (
+						<ul className="space-y-1.5">
+							{keyedEntries(entriesFor("db")).map(({ entry: e, key }) => (
+								<li
+									key={key}
+									data-testid="v3-env-restore-point"
+									className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5"
+								>
+									<span className="font-mono text-[11px] text-foreground">
+										{e.ref}
+									</span>
+									<span className="text-xs text-muted-foreground">
+										{e.detail}
+									</span>
+								</li>
+							))}
+						</ul>
+					)}
+					{/* · revenir dans le temps du projet = l'Historique (le rejeu, ADR 0060) */}
+					<p className="text-xs">
+						<Link
+							href="/v3/history"
+							className="font-medium text-primary hover:underline"
+						>
+							{t.envDbHistoryNote}
+						</Link>
+					</p>
+				</div>
+			)}
+			{/* · TÉLÉMÉTRIE : les traces dérivées + l'URL par projet/env + l'observabilité */}
+			{tab === "telemetry" && (
+				<div className="space-y-3">
+					<p className="text-xs text-muted-foreground">
+						{t.envServiceUrl} :{" "}
+						<span className="font-mono text-[11px] text-foreground">
+							{urlOf("telemetry")}
+						</span>
+					</p>
+					<JournalList entries={entriesFor("telemetry")} t={t} />
+					<p className="text-xs">
+						<Link
+							href="/ops-observability"
+							className="font-medium text-primary hover:underline"
+						>
+							{t.envTelemetryLink}
+						</Link>
+					</p>
+				</div>
+			)}
+			{/* · DOCS : les pages dérivées (ébauche/publiée) + l'URL Fumadocs de CE projet/env */}
+			{tab === "docs" && (
+				<div className="space-y-3">
+					<p className="text-xs text-muted-foreground">
+						{t.envServiceUrl} :{" "}
+						<span className="font-mono text-[11px] text-foreground">
+							{urlOf("docs")}
+						</span>
+					</p>
+					<JournalList entries={entriesFor("docs")} t={t} />
+				</div>
+			)}
+			{/* · TICKETS : les entrées dérivées (créé/résolu/spec), badgées */}
+			{tab === "tickets" && (
+				<JournalList entries={entriesFor("tickets")} t={t} />
+			)}
+			{/* · STACK : les lignes envStackOf de CE projet/env (le slug dans chaque URL) */}
+			{tab === "stack" && (
+				<div className="space-y-3">
+					<ul className="space-y-1.5">
+						{stack.map((row) => (
+							<li
+								key={row.key}
+								className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5"
+							>
+								<span className="text-xs font-medium text-foreground">
+									{t[row.labelKey] ?? row.key}
+								</span>
+								<span className="ml-auto font-mono text-[11px] text-muted-foreground">
+									{row.url === "" ? t.instStackUnprovisioned : row.url}
+								</span>
+							</li>
+						))}
+					</ul>
+					{/* · l'HONNÊTETÉ : le provisionnement réel par couple projet/env = la piste DP */}
+					<p className="text-xs leading-relaxed text-muted-foreground italic">
+						{t.envStackNote}
+					</p>
+				</div>
+			)}
+		</section>
+	);
+}
+
+/** Une LISTE d'entrées du journal de stack — badge d'action déclaré + détail amical + réf mono. */
+function JournalList({
+	entries,
+	t,
+}: {
+	entries: readonly StackJournalEntry[];
+	t: Strings;
+}) {
+	if (entries.length === 0)
+		return (
+			<p className="text-xs text-muted-foreground italic">{t.envTabEmpty}</p>
+		);
+	return (
+		<ul className="space-y-1.5">
+			{keyedEntries(entries).map(({ entry: e, key }) => {
+				const badge = ACTION_BADGES[e.action];
+				return (
+					<li
+						key={key}
+						className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5"
+					>
+						{badge !== undefined && (
+							<span
+								className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${badge.cls}`}
+							>
+								{t[badge.labelKey]}
+							</span>
+						)}
+						<span className="text-xs text-muted-foreground">{e.detail}</span>
+						<span className="ml-auto font-mono text-[10px] text-muted-foreground">
+							{e.ref}
+						</span>
+					</li>
+				);
+			})}
+		</ul>
 	);
 }
 

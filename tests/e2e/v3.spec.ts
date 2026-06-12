@@ -702,3 +702,101 @@ test.describe("V3 — le projet persistant (créer une app crée un projet, ADR 
 		expect(await projetActif(page)).toBe(fraisId);
 	});
 });
+
+test.describe("V3 — l'environnement isolé (ADR 0063) et les trois aperçus live", () => {
+	test("l'environnement isolé : BDD/rollback + le journal dérivé du log", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `envdetail-${testInfo.testId}`);
+
+		// Le SLUG du projet actif (l'id) — chaque couple projet/environnement a SON
+		// adresse (envStackOf × %project%) ; le panneau est refermé aussitôt (toggle).
+		const slug = await projetActif(page);
+		await page.getByTestId("v3-project-name").click();
+		await expect(page.getByTestId("v3-project-panel")).toBeHidden();
+
+		// TROIS tours déterministes : capture → promotion → déploiement en dev.
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await send(page, "déploie l'application en dev");
+		await expect(page.getByTestId("v3-msg-assistant").last()).toContainText(
+			"Application déployée en dev",
+		);
+
+		// La lentille Environnements (nav client) puis « OUVRIR l'environnement » dev :
+		// le panneau pleine largeur s'ouvre sur CE barreau (aria-pressed).
+		await navTo(page, "/v3/environnements");
+		await expect(page.getByTestId("v3-env-dev")).toBeVisible({
+			timeout: 20_000,
+		});
+		await page.getByTestId("v3-env-open-dev").click();
+		await expect(page.getByTestId("v3-env-open-dev")).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+		const detail = page.getByTestId("v3-env-detail");
+		await expect(detail).toBeVisible();
+		await expect(detail).toHaveAttribute("data-env", "dev");
+
+		// ① BDD : le déploiement a POSÉ un point de restauration Doltgres (le
+		// git-for-data hors prod, ADR 0006) — DÉRIVÉ du log, réf content-adressée app:….
+		await detail.locator('[data-testid="v3-env-tab"][data-tab="db"]').click();
+		const restore = page.getByTestId("v3-env-restore-point");
+		await expect(restore.first()).toBeVisible();
+		expect(await restore.count()).toBeGreaterThanOrEqual(1);
+		await expect(restore.first()).toContainText("app:");
+		await expect(restore.first()).toContainText("Doltgres");
+
+		// ② TICKETS : le ticket de déploiement dev CRÉÉ puis RÉSOLU — le journal de
+		// stack (stackJournalOf) est une projection PURE du log, jamais saisi.
+		await detail
+			.locator('[data-testid="v3-env-tab"][data-tab="tickets"]')
+			.click();
+		await expect(detail).toContainText("ticket de déploiement dev créé");
+		await expect(detail).toContainText("ticket de déploiement dev résolu");
+
+		// ③ STACK : l'URL de l'app porte le SLUG DU PROJET — l'isolation par couple
+		// projet/environnement rendue VISIBLE (le provisioning réel = la piste DP).
+		await detail
+			.locator('[data-testid="v3-env-tab"][data-tab="stack"]')
+			.click();
+		await expect(detail).toContainText(`https://${slug}-dev.sagedesk.fr`);
+	});
+
+	test("les 3 aperçus live : web · mobile (Expo Go) · desktop (Electron), UNE projection", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `apercus-${testInfo.testId}`);
+
+		// Deux tours canoniques : la capture puis la promotion — une version émise.
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(2);
+
+		// LE PANNEAU de prévisualisation (colonne droite du lab) : visible, l'onglet
+		// WEB actif par défaut, et la VERSION content-adressée de l'app émise (app:…)
+		// — la MÊME projection pure emitApp(state), recalculée à chaque tour.
+		const preview = page.getByTestId("v3-preview");
+		await expect(preview).toBeVisible();
+		await expect(
+			preview.locator('[data-testid="v3-preview-tab"][data-kind="web"]'),
+		).toHaveAttribute("aria-selected", "true");
+		await expect(preview.locator("span.font-mono").first()).toContainText(
+			"app:",
+		);
+
+		// MOBILE : le cadre téléphone + la note HONNÊTE Expo Go (l'app mobile
+		// réelle = la piste DP) — la même projection, mise en forme seule changée.
+		await preview
+			.locator('[data-testid="v3-preview-tab"][data-kind="mobile"]')
+			.click();
+		await expect(page.getByTestId("v3-preview-expo-note")).toBeVisible();
+
+		// DESKTOP : la fenêtre Electron rendue (la bande de menu du cadre) + sa note.
+		await preview
+			.locator('[data-testid="v3-preview-tab"][data-kind="desktop"]')
+			.click();
+		await expect(preview.getByText("Fichier")).toBeVisible();
+		await expect(page.getByTestId("v3-preview-desktop-note")).toBeVisible();
+	});
+});

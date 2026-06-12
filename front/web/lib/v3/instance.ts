@@ -160,7 +160,7 @@ export const STACK_SERVICES: readonly StackService[] = [
 	{
 		key: "app",
 		labelKey: "stackApp",
-		urlPattern: "https://app-%env%.sagedesk.fr",
+		urlPattern: "https://%project%-%env%.sagedesk.fr",
 		level: 1,
 	},
 	{
@@ -235,7 +235,12 @@ export interface EnvStackEntry {
  * peut surcharger chaque motif via la clé `stack.<service>`). %env% substitué ;
  * la prod prend le motif prod s'il existe (ADR 0006). PURE & TOTALE & DÉTERMINISTE.
  */
-export function envStackOf(env: string, cfg: InstanceConfig): EnvStackEntry[] {
+export function envStackOf(
+	env: string,
+	cfg: InstanceConfig,
+	/** Le slug du PROJET — chaque couple projet/environnement a SA stack et SON URL. */
+	projectSlug = "app",
+): EnvStackEntry[] {
 	return STACK_SERVICES.map((s) => {
 		const override = cfg[`stack.${s.key}`];
 		const pattern =
@@ -247,7 +252,9 @@ export function envStackOf(env: string, cfg: InstanceConfig): EnvStackEntry[] {
 		return {
 			key: s.key,
 			labelKey: s.labelKey,
-			url: pattern.replaceAll("%env%", env),
+			url: pattern
+				.replaceAll("%env%", env)
+				.replaceAll("%project%", projectSlug || "app"),
 		};
 	});
 }
