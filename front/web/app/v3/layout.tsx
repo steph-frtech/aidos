@@ -1,0 +1,226 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { getTranslations } from "next-intl/server";
+import type { ReactNode } from "react";
+import type { ScreenRef } from "@/lib/v2/builder";
+import { assembleGraph, extractFromSource } from "@/lib/v2/code-extract";
+import { V3Nav } from "./V3Nav";
+import { V3SessionProvider } from "./V3Session";
+
+/**
+ * Le layout du groupe de routes /v3 (V3 — ADR 0060) : UNE session, cinq lentilles.
+ *
+ * Le SHELL V3 : une barre latérale gauche fixe (V3Nav) + le contenu, le tout enveloppé
+ * dans la V3SessionProvider — chaque lentille (/v3/lab, /v3/parcours, /v3/history,
+ * /v3/environnements, /v3/parametrage) lit la MÊME session rejouable. ADDITIF : les
+ * V1 et V2 restent intactes. Le layout racine pousse le `<body>` de `sm:pl-64` pour
+ * la barre V1 fixe ; la V3 ayant SA propre nav, on récupère cette gouttière avec
+ * `sm:-ml-64` (le motif du shell V2).
+ *
+ * LA COLLECTE (la seule couche impure, le motif /v2/builder) : l'inventaire des écrans
+ * V1 (fs-scan) + le graphe de code extrait des twins lib/v2 — injectés en DONNÉES.
+ * Themed (tokens shadcn) + bilingue (next-intl, FR par défaut). Le mur intact.
+ */
+
+// Les clés i18n « v3 » passées au client (un composant client ne peut pas appeler getTranslations).
+const KEYS = [
+	"navHeading",
+	"navLogo",
+	"navLab",
+	"navParcours",
+	"navHistory",
+	"navEnvs",
+	"navParams",
+	"navWorkbench",
+	"heroTitle",
+	"heroSubtitle",
+	"suggestionsLabel",
+	"suggestion1",
+	"suggestion2",
+	"suggestion3",
+	"suggestion4",
+	"inputPlaceholder",
+	"send",
+	"aiToggle",
+	"aiToggleHint",
+	"typing",
+	"detailsLabel",
+	"detailsUnderstanding",
+	"detailsEvents",
+	"detailsImpacts",
+	"detailsNone",
+	"openScreenBtn",
+	"ambiguousHint",
+	"aiUnavailable",
+	"tplIdeeCapturee",
+	"tplArbreGreffe",
+	"tplKernelPropose",
+	"tplAppGeneree",
+	"tplDeploiement",
+	"tplDeltaCalcule",
+	"tplImpactCalcule",
+	"tplEcranOuvert",
+	"tplEtatLu",
+	"tplRefus",
+	"chipPromote",
+	"chipGenerate",
+	"chipDeployTest",
+	"chipDeployStaging",
+	"chipDeployProd",
+	"chipDelta",
+	"chipState",
+	"intentCapturerIdee",
+	"intentGreffer",
+	"intentPromouvoir",
+	"intentGenerer",
+	"intentDeployer",
+	"intentDelta",
+	"intentImpacter",
+	"intentInterroger",
+	"intentOuvrir",
+	"parcoursTitle",
+	"parcoursIntro",
+	"parcoursPickLabel",
+	"parcoursAll",
+	"parcoursEmpty",
+	"parcoursPanelHint",
+	"parcoursPanelPosition",
+	"parcoursPanelIdeas",
+	"parcoursPanelNoIdeas",
+	"parcoursPanelChat",
+	"parcoursPanelClose",
+	"parcoursRoot",
+	"parcoursLeaf",
+	"levelProduct",
+	"levelJourney",
+	"levelView",
+	"levelControl",
+	"levelAction",
+	"levelOperation",
+	"levelEntity",
+	"historyTitle",
+	"historyIntro",
+	"historyEmpty",
+	"historyEmptyCta",
+	"historyStepLabel",
+	"historyRewind",
+	"historyConfirm",
+	"historyConfirmBtn",
+	"historyCancel",
+	"envsTitle",
+	"envsIntro",
+	"envTestTitle",
+	"envStagingTitle",
+	"envProdTitle",
+	"envNever",
+	"envUpToDate",
+	"envDrift",
+	"envKernelsLabel",
+	"envDeployBtn",
+	"envNoVersionHint",
+	"envRealTitle",
+	"envRealNote",
+	"envRealBtn",
+	"envRealBusy",
+	"envRealUrl",
+	"envRealFailed",
+	"envDeltaTitle",
+	"envDeltaEmpty",
+	"envDeltaWave",
+	"paramsTitle",
+	"paramsIntro",
+	"paramsWall",
+	"paramsPropose",
+	"paramsProposed",
+	"paramsProposedLink",
+	"paramsSourceLabel",
+	"paramsGestures",
+	"paramsGesturesHint",
+	"paramsLadder",
+	"paramsLadderHint",
+	"paramsLadderOrder",
+	"paramsLevels",
+	"paramsLevelsHint",
+	"paramsLevelsOrder",
+	"paramsFacets",
+	"paramsFacetsHint",
+	"paramsProofs",
+	"paramsProofsHint",
+	"paramsProofGherkin",
+	"paramsProofScreen",
+	"paramsProofFixture",
+	"paramsProofProperty",
+	"paramsThresholds",
+	"paramsThresholdsHint",
+	"paramsMinIntent",
+	"paramsMinMirror",
+	"paramsChars",
+	"paramsScreens",
+	"paramsScreensHint",
+	"paramsScreensSession",
+	"paramsScreensV2",
+] as const;
+
+export default async function V3Layout({ children }: { children: ReactNode }) {
+	const t = await getTranslations("v3");
+	const strings = Object.fromEntries(KEYS.map((k) => [k, t(k)]));
+
+	// Next s'exécute depuis front/web ; le garde-fou couvre un lancement depuis la racine.
+	const cwd = process.cwd();
+	const absBase = cwd.endsWith(join("front", "web"))
+		? cwd
+		: join(cwd, "front", "web");
+
+	// (a) L'INVENTAIRE des écrans V1 : les dossiers d'app/ (hors v2/v3, api et les dossiers
+	// privés `_` non routables), TRIÉS — injectés en DONNÉES dans le twin (le registre V2
+	// déclaré est toujours couvert par initBuilderState).
+	const v1Screens: ScreenRef[] = readdirSync(join(absBase, "app"), {
+		withFileTypes: true,
+	})
+		.filter(
+			(e) =>
+				e.isDirectory() &&
+				e.name !== "v2" &&
+				e.name !== "v3" &&
+				e.name !== "api" &&
+				!e.name.startsWith("_"),
+		)
+		.map((e) => ({ route: `/${e.name}`, label: e.name.replace(/-/g, " ") }))
+		.sort((a, b) => (a.route < b.route ? -1 : 1));
+
+	// (b) Le GRAPHE DE CODE (le motif /v2/code) : extrait des twins lib/v2 RÉELS par l'API
+	// compilateur TypeScript (code-extract, côté serveur seulement), trié.
+	const libDir = join(absBase, "lib", "v2");
+	const { nodes: codeNodes, edges: codeEdges } = assembleGraph(
+		readdirSync(libDir)
+			.filter((n) => n.endsWith(".ts"))
+			.sort()
+			.map((name) =>
+				extractFromSource(
+					`lib/v2/${name}`,
+					readFileSync(join(libDir, name), "utf8"),
+				),
+			),
+	);
+
+	return (
+		<div
+			data-testid="v3-shell"
+			className="flex min-h-screen flex-col bg-background text-foreground sm:-ml-64 sm:flex-row"
+		>
+			<aside className="shrink-0 border-b border-border bg-card/40 p-3 sm:sticky sm:top-0 sm:h-screen sm:w-60 sm:border-b-0 sm:border-r">
+				<V3Nav />
+			</aside>
+			<main className="min-w-0 flex-1 px-4 py-6 sm:px-8">
+				<V3SessionProvider
+					v1Screens={v1Screens}
+					codeNodes={codeNodes}
+					codeEdges={codeEdges}
+					strings={strings}
+				>
+					{children}
+				</V3SessionProvider>
+			</main>
+		</div>
+	);
+}
