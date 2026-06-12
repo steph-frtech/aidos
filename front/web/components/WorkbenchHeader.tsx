@@ -155,6 +155,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/dsl-editor", k: "dslEditor" },
 			{ href: "/relation-emitter", k: "relationEmitter" },
 			{ href: "/doltgres-spike", k: "doltgresSpike" },
+			{ href: "/stack-spike", k: "stackSpike" },
 			{ href: "/provision", k: "provision" },
 			{ href: "/api-surface", k: "apiSurface" },
 			{ href: "/front-emitter", k: "frontEmitter" },
