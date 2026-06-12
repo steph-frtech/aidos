@@ -35,7 +35,10 @@ import { expect, type Page, test } from "@playwright/test";
  *     projets gardent deux histoires isolées ;
  *   - LE MUR : toute une session IA-éteinte n'émet AUCUNE écriture-vérité — la
  *     server-action Claude n'est JAMAIS appelée quand la bascule est off (la seule
- *     écriture légale est la sauvegarde du projet, au-dessous de la ligne).
+ *     écriture légale est la sauvegarde du projet, au-dessous de la ligne) ;
+ *   - LA PALETTE (⌘K) ouvre tout écran ; SPÉCIFICATIONS rend LA GRILLE 7 × 8 et
+ *     allume les impacts du dernier tour ; « Voir le résultat » rend l'app TELLE
+ *     QUE DÉPLOYÉE par barreau ; INSTANCE expose les outils déclarés + les réglages.
  */
 
 /** ÉTEINT l'IA conversationnelle — et PROUVE au passage son défaut ON. */
@@ -139,10 +142,11 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 		// /v3 a REDIRIGÉ vers /v3/lab (la porte d'entrée est le chat).
 		await expect(page).toHaveURL(/\/v3\/lab$/);
 
-		// La nav offre les SIX entrées (AI Lab · Parcours · Historique ·
-		// Environnements · Code · Paramètres) + le retour Workbench V2 en pied.
+		// La nav offre les HUIT entrées (AI Lab · Parcours · Spécifications ·
+		// Historique · Environnements · Code · Instance · Paramètres) + le retour
+		// Workbench V2 en pied.
 		await expect(page.getByTestId("v3-nav")).toBeVisible();
-		await expect(page.getByTestId("v3-nav-item")).toHaveCount(6);
+		await expect(page.getByTestId("v3-nav-item")).toHaveCount(8);
 		await expect(page.getByTestId("v3-nav-workbench")).toBeVisible();
 
 		// Le HERO d'accueil — accueillant, en français simple — et ses 4 amorces.
@@ -196,9 +200,9 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 		});
 		await expect(page.getByTestId("v3-history-turn")).toHaveCount(4);
 
-		// ② ENVIRONNEMENTS : l'échelle entière est rendue (la carte test au moins).
+		// ② ENVIRONNEMENTS : l'échelle entière est rendue (la carte dev au moins).
 		await navTo(page, "/v3/environnements");
-		await expect(page.getByTestId("v3-env-test")).toBeVisible({
+		await expect(page.getByTestId("v3-env-dev")).toBeVisible({
 			timeout: 20_000,
 		});
 		await expect(page.getByTestId("v3-env-staging")).toBeVisible();
@@ -350,16 +354,16 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 			}
 		});
 
-		// TROIS tours déterministes : capture → promotion → déploiement en test.
+		// TROIS tours déterministes : capture → promotion → déploiement en dev.
 		await send(page, CAPTURE);
 		await send(page, "promeus la dernière idée");
-		await send(page, "déploie l'application en test");
+		await send(page, "déploie l'application en dev");
 
 		// La session a bien eu lieu : 3 bulles utilisateur, et le dernier tour est
 		// le déploiement AMICAL (le cliquet a laissé passer le premier barreau).
 		await expect(page.getByTestId("v3-msg-user")).toHaveCount(3);
 		await expect(page.getByTestId("v3-msg-assistant").last()).toContainText(
-			"Application déployée en test",
+			"Application déployée en dev",
 		);
 
 		// LE MUR : la SEULE écriture tolérée est la sauvegarde débondée du projet
@@ -368,6 +372,133 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 		// en tête (un POST sans « transcript ») — est interdit, bascule éteinte.
 		const interdites = writes.filter((w) => !w.corps.includes("transcript"));
 		expect(interdites.map((w) => w.ligne)).toEqual([]);
+	});
+});
+
+test.describe("V3 — la palette, les spécifications, l'aperçu par env, l'instance", () => {
+	test("la palette ouvre tout : ⌘K, filtrer « code », Entrée navigue", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `palette-${testInfo.testId}`);
+
+		// ⌘K / Ctrl+K OUVRE la palette (l'écouteur vit sur window — montée au layout).
+		await page.keyboard.press("Control+k");
+		await expect(page.getByTestId("v3-palette")).toBeVisible();
+
+		// Filtrer « code » : les résultats incluent la lentille Code (data-route) —
+		// les huit lentilles V3 passent D'ABORD, avant les écrans de la session.
+		await page.getByTestId("v3-palette-input").fill("code");
+		await expect(
+			page.locator('[data-testid="v3-palette-item"][data-route="/v3/code"]'),
+		).toBeVisible();
+
+		// Entrée OUVRE le premier résultat : la palette NAVIGUE (router.push — elle
+		// n'écrit rien, le mur §2) puis se referme.
+		await page.getByTestId("v3-palette-input").press("Enter");
+		await expect(page).toHaveURL(/\/v3\/code$/);
+		await expect(page.getByTestId("v3-palette")).toBeHidden();
+	});
+
+	test("les spécifications : la grille s'allume sur les impacts, cliquer filtre", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `specs-${testInfo.testId}`);
+
+		// Deux tours canoniques : la capture puis la promotion — le DERNIER tour
+		// impacte la version gelée + son idée (la même case product × F).
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(2);
+
+		// La lentille Spécifications PAR LA NAV (la même session rejouée).
+		await navTo(page, "/v3/specs");
+		await expect(page.getByTestId("v3-specs-grid")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		// LA GRILLE entière : 7 niveaux (SOURCE_ORDER) × 8 facettes = 56 cases.
+		await expect(page.getByTestId("v3-specs-cell")).toHaveCount(56);
+
+		// LA CASE IMPACTÉE par le dernier tour : product × F (le bare tree place la
+		// capture à la racine « app »), compte ≥ 1, allumée en ambre (data-impacted)
+		// — « quand le chat propose un changement, je VOIS dans la grille les impacts ».
+		const impactee = page.locator(
+			'[data-testid="v3-specs-cell"][data-impacted="true"]',
+		);
+		await expect(impactee).toHaveCount(1);
+		await expect(impactee).toHaveAttribute("data-level", "product");
+		await expect(impactee).toHaveAttribute("data-facet", "F");
+		expect(
+			Number.parseInt((await impactee.textContent()) ?? "0", 10),
+		).toBeGreaterThanOrEqual(1);
+
+		// CLIQUER la case FILTRE la liste : ≥ 1 ligne — la spec promue (statut
+		// kernel), son scénario REPLIÉ présent (« contrôler, voir les scénarios »).
+		await impactee.click();
+		await expect(page.getByTestId("v3-specs-clear")).toBeVisible();
+		const lignes = page.getByTestId("v3-specs-row");
+		expect(await lignes.count()).toBeGreaterThanOrEqual(1);
+		await expect(lignes.first()).toHaveAttribute("data-status", "kernel");
+		await expect(lignes.first()).toContainText("au checkout");
+		await expect(lignes.first().getByTestId("v3-specs-scenario")).toBeVisible();
+	});
+
+	test("voir le résultat par environnement : l'aperçu rend l'app telle que déployée", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `apercu-${testInfo.testId}`);
+
+		// Capture → promotion → déploiement en dev (le premier barreau du cliquet).
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await send(page, "déploie l'application en dev");
+		await expect(page.getByTestId("v3-msg-assistant").last()).toContainText(
+			"Application déployée en dev",
+		);
+
+		// La lentille Environnements (nav client) : la carte dev porte SA version
+		// posée (content-adressée — app:<hash>).
+		await navTo(page, "/v3/environnements");
+		const carteDev = page.getByTestId("v3-env-dev");
+		await expect(carteDev).toBeVisible({ timeout: 20_000 });
+		const version = (await carteDev.locator("p.font-mono").textContent()) ?? "";
+		expect(version).toMatch(/^app:/);
+
+		// « VOIR le résultat » : l'aperçu s'ouvre (aria-pressed) et porte la PUCE DE
+		// VERSION — l'app telle que déployée LÀ, reconstruite des seules versions
+		// embarquées par le déploiement (projectionAt × emitApp), jamais des kernels
+		// courants.
+		await page.getByTestId("v3-env-view-dev").click();
+		await expect(page.getByTestId("v3-env-view-dev")).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+		const apercu = page.getByTestId("v3-env-preview");
+		await expect(apercu).toBeVisible();
+		await expect(apercu).toContainText(version);
+	});
+
+	test("l'instance : les outils déclarés en tuiles + le formulaire de réglages", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `instance-${testInfo.testId}`);
+		await navTo(page, "/v3/instance");
+
+		// La lentille Instance : le jeu DÉCLARÉ d'outils (INSTANCE_TOOLS — 7 tuiles,
+		// ≥ 6 attendues), chacune adressée par sa clé.
+		await expect(page.getByTestId("v3-instance")).toBeVisible({
+			timeout: 20_000,
+		});
+		expect(
+			await page.getByTestId("v3-inst-tool").count(),
+		).toBeGreaterThanOrEqual(6);
+
+		// VOS RÉGLAGES : le formulaire persisté (fail-closed via le twin) — une
+		// entrée par outil déclaré + le bouton Enregistrer, actionnable.
+		const form = page.getByTestId("v3-inst-config");
+		await expect(form).toBeVisible();
+		expect(await form.locator("input").count()).toBeGreaterThanOrEqual(6);
+		await expect(page.getByTestId("v3-inst-save")).toBeEnabled();
 	});
 });
 
@@ -469,7 +600,7 @@ test.describe("V3 — le projet persistant (créer une app crée un projet, ADR 
 		// PARTOUT ② : les environnements rendent l'échelle du MÊME état (rien n'a
 		// été déployé dans ce projet : les trois cartes sont là, inchangées).
 		await navTo(page, "/v3/environnements");
-		await expect(page.getByTestId("v3-env-test")).toBeVisible({
+		await expect(page.getByTestId("v3-env-dev")).toBeVisible({
 			timeout: 20_000,
 		});
 		await expect(page.getByTestId("v3-env-staging")).toBeVisible();

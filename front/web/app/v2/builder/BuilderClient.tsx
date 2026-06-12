@@ -60,14 +60,14 @@ interface Turn {
 /**
  * Les amorces canoniques (prouvées par le miroir) — la grammaire FERMÉE à 9 intentions,
  * FRANÇAISE, verbatim : le CYCLE DE VIE COMPLET (capturer → greffer → promouvoir → générer
- * → déployer test → staging → prod (l'échelle) → delta → impacter/interroger → ouvrir).
+ * → déployer dev → staging → prod (l'échelle) → delta → impacter/interroger → ouvrir).
  */
 const SUGGESTIONS: readonly string[] = [
 	"greffe pommes sous app/catalogue",
 	"capture l'idée : au checkout, débiter le compte une seule fois",
 	"promeus la dernière idée",
 	"génère l'application",
-	"déploie l'application en test",
+	"déploie l'application en dev",
 	"déploie l'application en staging",
 	"déploie l'application en prod",
 	"montre le delta depuis la prod",
@@ -202,7 +202,7 @@ const TAB_IDS = ["arbre", "app", "envs", "journal"] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 /**
- * Une carte d'ENVIRONNEMENT (test ou prod) : la version déployée (ou « jamais déployé »),
+ * Une carte d'ENVIRONNEMENT (dev ou prod) : la version déployée (ou « jamais déployé »),
  * le nombre de kernels embarqués, le badge ÉCART (la dérive vs l'app courante — CALCULÉE à
  * chaque rendu, jamais stockée : vert 0 / ambre N) et le bouton d'action qui ENVOIE la
  * phrase canonique au chat — le geste humain reste un tour de chat (la source unique de
@@ -403,12 +403,12 @@ export function BuilderClient({
 	// Les libellés par BARREAU — l'échelle est une DONNÉE (ENV_LADDER) : ajouter un barreau
 	// au twin n'ajoute ici qu'une entrée de libellé, jamais un cas codé.
 	const envTitle: Record<EnvName, string> = {
-		test: t.envTestTitle,
+		dev: t.envDevTitle,
 		staging: t.envStagingTitle,
 		prod: t.envProdTitle,
 	};
 	const envDeployLabel: Record<EnvName, string> = {
-		test: t.deployTestBtn,
+		dev: t.deployDevBtn,
 		staging: t.deployStagingBtn,
 		prod: t.deployProdBtn,
 	};

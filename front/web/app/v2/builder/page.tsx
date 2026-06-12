@@ -12,7 +12,7 @@ import { BuilderClient } from "./BuilderClient";
  * UN seul écran, UN seul chat — mais « tout » passe par une GRAMMAIRE D'INTENTIONS FERMÉE
  * (le twin pur lib/v2/builder : capturer une idée, greffer, promouvoir, générer l'app,
  * déployer, voir le delta, impacter, interroger, ouvrir un écran — rien d'autre : le CYCLE
- * DE VIE COMPLET, jusqu'au CLIQUET généralisé test→staging→prod et au DÉPLOIEMENT RÉEL gaté
+ * DE VIE COMPLET, jusqu'au CLIQUET généralisé dev→staging→prod et au DÉPLOIEMENT RÉEL gaté
  * ADR 0052). Chaque tour rend VISIBLES : « l'attente » (le verdict understand),
  * « les types de réponse possibles » (TOUS les candidats classés, cliquables), « la réponse »
  * (les événements du réducteur pur, jeu clos) et « les impacts » (la vague calculée). Une
@@ -67,14 +67,14 @@ const KEYS = [
 	"appDeployLink",
 	"envsHeading",
 	"envSendHint",
-	"envTestTitle",
+	"envDevTitle",
 	"envStagingTitle",
 	"envProdTitle",
 	"envNever",
 	"envKernelsLabel",
 	"envEcartLabel",
 	"envNoKernelHint",
-	"deployTestBtn",
+	"deployDevBtn",
 	"deployStagingBtn",
 	"deployProdBtn",
 	"envGateNote",

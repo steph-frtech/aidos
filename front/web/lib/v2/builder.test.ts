@@ -47,7 +47,7 @@ describe("la grammaire d'intentions — un jeu CLOS, déclaré", () => {
 	});
 
 	it("l'ÉCHELLE D'ENVIRONNEMENTS est déclarée, close, ordonnée (le cliquet généralisé)", () => {
-		expect(ENV_LADDER).toEqual(["test", "staging", "prod"]);
+		expect(ENV_LADDER).toEqual(["dev", "staging", "prod"]);
 	});
 
 	it("∀ texte : classifyIntent est TOTAL, DÉTERMINISTE, candidats ⊆ jeu clos, triés par score ↓", () => {
@@ -227,10 +227,10 @@ describe("DÉPLOYER — l'ÉCHELLE déclarée test → staging → prod : le CLI
 		env: string,
 	): boolean => r.events.some((e) => e.kind === "deploiement" && e.env === env);
 
-	it("déployer en test sans kernel → refus (rien à déployer)", () => {
-		const r = applyIntent(S(), "déploie l'application en test");
+	it("déployer en dev sans kernel → refus (rien à déployer)", () => {
+		const r = applyIntent(S(), "déploie l'application en dev");
 		expect(r.events.some((e) => e.kind === "refus")).toBe(true);
-		expect(r.state.envs.test).toBeNull();
+		expect(r.state.envs.dev).toBeNull();
 	});
 
 	it("∀ barreau > 1 : SAUTER UN BARREAU EST REFUSÉ (prod directe, staging directe, test→prod)", () => {
@@ -248,7 +248,7 @@ describe("DÉPLOYER — l'ÉCHELLE déclarée test → staging → prod : le CLI
 			),
 		).toBe(true);
 		// test puis prod en sautant staging
-		const t = applyIntent(st, "déploie l'application en test");
+		const t = applyIntent(st, "déploie l'application en dev");
 		const r = applyIntent(t.state, "déploie l'application en prod");
 		expect(r.events.some((e) => e.kind === "refus")).toBe(true);
 		expect(r.state.envs.prod).toBeNull();
@@ -256,19 +256,19 @@ describe("DÉPLOYER — l'ÉCHELLE déclarée test → staging → prod : le CLI
 
 	it("le chemin légal : test → staging → prod — la MÊME version monte chaque barreau", () => {
 		const st = withKernel();
-		const t = applyIntent(st, "déploie l'application en test");
-		expect(deployedTo(t, "test")).toBe(true);
+		const t = applyIntent(st, "déploie l'application en dev");
+		expect(deployedTo(t, "dev")).toBe(true);
 		const s = applyIntent(t.state, "déploie l'application en staging");
 		expect(deployedTo(s, "staging")).toBe(true);
 		const p = applyIntent(s.state, "déploie l'application en prod");
 		expect(deployedTo(p, "prod")).toBe(true);
-		expect(p.state.envs.prod?.version).toBe(t.state.envs.test?.version);
-		expect(p.state.envs.staging?.version).toBe(t.state.envs.test?.version);
+		expect(p.state.envs.prod?.version).toBe(t.state.envs.dev?.version);
+		expect(p.state.envs.staging?.version).toBe(t.state.envs.dev?.version);
 	});
 
 	it("LE CLIQUET RE-MORD sur TOUTE l'échelle : une promotion invalide chaque barreau supérieur", () => {
 		const st = withKernel();
-		const t = applyIntent(st, "déploie l'application en test");
+		const t = applyIntent(st, "déploie l'application en dev");
 		const s = applyIntent(t.state, "déploie l'application en staging");
 		const p = applyIntent(s.state, "déploie l'application en prod");
 		// une NOUVELLE vérité arrive…
@@ -289,7 +289,7 @@ describe("DÉPLOYER — l'ÉCHELLE déclarée test → staging → prod : le CLI
 			),
 		).toBe(true);
 		// la remontée complète re-passe.
-		const t2 = applyIntent(k.state, "déploie l'application en test");
+		const t2 = applyIntent(k.state, "déploie l'application en dev");
 		const s2 = applyIntent(t2.state, "déploie l'application en staging");
 		const p2 = applyIntent(s2.state, "déploie l'application en prod");
 		expect(deployedTo(p2, "prod")).toBe(true);
@@ -305,7 +305,7 @@ describe("DELTA — « voir les deltas » : l'écart CALCULÉ entre l'état cour
 
 	it("après la prod : delta = 0 écart ; une nouvelle promotion → delta = 1 kernel d'écart", () => {
 		const st = withKernel();
-		const t = applyIntent(st, "déploie l'application en test");
+		const t = applyIntent(st, "déploie l'application en dev");
 		const sg = applyIntent(t.state, "déploie l'application en staging");
 		const p = applyIntent(sg.state, "déploie l'application en prod");
 		const d0 = applyIntent(p.state, "montre le delta depuis la prod");

@@ -6,7 +6,10 @@ import {
 	FolderOpen,
 	History,
 	Layers,
+	ListChecks,
 	Map as MapIcon,
+	Search,
+	Server,
 	Settings,
 	Sparkles,
 } from "lucide-react";
@@ -14,23 +17,28 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { PALETTE_OPEN_EVENT } from "./Palette";
 import { useV3Session } from "./V3Session";
 
 /**
- * La navigation V3 (ADR 0010 thème · ADR 0011 bilingue) : six lentilles sur UNE même
- * session (AI Lab · Parcours produit · Historique · Environnements · Code · Paramètres)
- * + le retour Workbench V2 en pied. Libellés AMICAUX (aucun jargon KRD en copie primaire).
- * LE COMMUTATEUR DE PROJETS (ADR 0061) sous le logo : le projet actif + un petit panneau
- * (la liste — cliquer rouvre AVEC tout l'historique, le rejeu — et « Nouveau projet »).
- * Client Component (route active via usePathname). Le mur intact : la nav LIE, n'écrit rien.
+ * La navigation V3 (ADR 0010 thème · ADR 0011 bilingue) : huit lentilles sur UNE même
+ * session (AI Lab · Parcours produit · Spécifications · Historique · Environnements ·
+ * Code · Instance · Paramètres) + le retour Workbench V2 en pied. Libellés AMICAUX
+ * (aucun jargon KRD en copie primaire). LE COMMUTATEUR DE PROJETS (ADR 0061) sous le
+ * logo : le projet actif + un petit panneau (la liste — cliquer rouvre AVEC tout
+ * l'historique, le rejeu — et « Nouveau projet »). En pied, l'ouverture de la PALETTE
+ * (⌘K — « tous les écrans au meilleur endroit »). Client Component (route active via
+ * usePathname). Le mur intact : la nav LIE, n'écrit rien.
  */
 
-const ENTRIES = [
+export const ENTRIES = [
 	{ route: "/v3/lab", key: "navLab", Icon: Sparkles },
 	{ route: "/v3/parcours", key: "navParcours", Icon: MapIcon },
+	{ route: "/v3/specs", key: "navSpecs", Icon: ListChecks },
 	{ route: "/v3/history", key: "navHistory", Icon: History },
 	{ route: "/v3/environnements", key: "navEnvs", Icon: Layers },
 	{ route: "/v3/code", key: "navCode", Icon: Code },
+	{ route: "/v3/instance", key: "navInstance", Icon: Server },
 	{ route: "/v3/parametrage", key: "navParams", Icon: Settings },
 ] as const;
 
@@ -173,6 +181,22 @@ export function V3Nav() {
 				);
 			})}
 			<div className="mt-auto border-t border-border pt-3">
+				{/* L'OUVERTURE DE LA PALETTE (⌘K) : le bouton DISPATCHE l'événement que la
+				    palette (montée dans le layout) écoute — aucun état partagé de plus. */}
+				<button
+					type="button"
+					data-testid="v3-palette-open"
+					onClick={() => window.dispatchEvent(new Event(PALETTE_OPEN_EVENT))}
+					className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+				>
+					<Search className="h-3.5 w-3.5 shrink-0" aria-hidden />
+					<span className="min-w-0 flex-1 truncate text-left">
+						{t("paletteOpen")}
+					</span>
+					<kbd className="shrink-0 rounded border border-border bg-muted px-1 font-mono text-[10px]">
+						⌘K
+					</kbd>
+				</button>
 				<Link
 					href="/v2"
 					data-testid="v3-nav-workbench"

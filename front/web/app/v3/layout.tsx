@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import type { ScreenRef } from "@/lib/v2/builder";
 import { assembleGraph, extractFromSource } from "@/lib/v2/code-extract";
+import { Palette } from "./Palette";
 import {
 	createProjectAction,
 	listProjectsAction,
@@ -14,11 +15,13 @@ import { V3Nav } from "./V3Nav";
 import { V3SessionProvider } from "./V3Session";
 
 /**
- * Le layout du groupe de routes /v3 (V3 — ADR 0060) : UNE session, cinq lentilles.
+ * Le layout du groupe de routes /v3 (V3 — ADR 0060) : UNE session, huit lentilles.
  *
- * Le SHELL V3 : une barre latérale gauche fixe (V3Nav) + le contenu, le tout enveloppé
- * dans la V3SessionProvider — chaque lentille (/v3/lab, /v3/parcours, /v3/history,
- * /v3/environnements, /v3/parametrage) lit la MÊME session rejouable. ADDITIF : les
+ * Le SHELL V3 : une barre latérale gauche fixe (V3Nav) + le contenu + la PALETTE ⌘K
+ * (Palette — « tous les écrans au meilleur endroit »), le tout enveloppé
+ * dans la V3SessionProvider — chaque lentille (/v3/lab, /v3/parcours, /v3/specs,
+ * /v3/history, /v3/environnements, /v3/code, /v3/instance, /v3/parametrage) lit la
+ * MÊME session rejouable. ADDITIF : les
  * V1 et V2 restent intactes. Le layout racine pousse le `<body>` de `sm:pl-64` pour
  * la barre V1 fixe ; la V3 ayant SA propre nav, on récupère cette gouttière avec
  * `sm:-ml-64` (le motif du shell V2).
@@ -41,11 +44,16 @@ const KEYS = [
 	"navLogo",
 	"navLab",
 	"navParcours",
+	"navSpecs",
 	"navHistory",
 	"navEnvs",
 	"navCode",
+	"navInstance",
 	"navParams",
 	"navWorkbench",
+	"paletteOpen",
+	"palettePlaceholder",
+	"paletteEmpty",
 	"projectsCurrent",
 	"projectsHint",
 	"projectsNew",
@@ -84,7 +92,7 @@ const KEYS = [
 	"tplRefus",
 	"chipPromote",
 	"chipGenerate",
-	"chipDeployTest",
+	"chipDeployDev",
 	"chipDeployStaging",
 	"chipDeployProd",
 	"chipDelta",
@@ -131,7 +139,7 @@ const KEYS = [
 	"historyCancel",
 	"envsTitle",
 	"envsIntro",
-	"envTestTitle",
+	"envDevTitle",
 	"envStagingTitle",
 	"envProdTitle",
 	"envNever",
@@ -194,6 +202,62 @@ const KEYS = [
 	"paramsAnatomyHint",
 	"paramsScreensTitle",
 	"paramsScreensIntro",
+	"specsTitle",
+	"specsIntro",
+	"specsGridHeading",
+	"specsGridHint",
+	"specsCellSelected",
+	"specsCellClear",
+	"specsListHeading",
+	"specsFilterAll",
+	"specsFilterIdeas",
+	"specsFilterVersions",
+	"specsFilterDeployed",
+	"specsBadgeIdee",
+	"specsBadgeKernel",
+	"specsBadgeEnv",
+	"specsScenarioLabel",
+	"specsScenarioFormLabel",
+	"specsMirrorGherkin",
+	"specsMirrorProperty",
+	"specsMirrorFixture",
+	"specsMirrorScreen",
+	"specsMirrorNone",
+	"specsScenarioAutoLabel",
+	"specsVersionLabel",
+	"specsEmpty",
+	"specsEmptyFiltered",
+	"specsSeeGrid",
+	"instanceTitle",
+	"instanceIntro",
+	"instWorkbench",
+	"instDb",
+	"instMonitoring",
+	"instTraefik",
+	"instVscode",
+	"instDocs",
+	"instShop",
+	"instToolsHeading",
+	"instStatusUp",
+	"instStatusDown",
+	"instStatusUnknown",
+	"instProbing",
+	"instDockerHeading",
+	"instDockerHint",
+	"instDockerEmpty",
+	"instConfigHeading",
+	"instConfigNote",
+	"instSave",
+	"instSaved",
+	"envViewBtn",
+	"envPreviewTitle",
+	"envPreviewVersionLabel",
+	"envPreviewEmpty",
+	"envPreviewNoData",
+	"envPreviewPagesLabel",
+	"envPreviewRealApp",
+	"envPreviewRealPipeline",
+	"envPreviewClose",
 ] as const;
 
 export default async function V3Layout({ children }: { children: ReactNode }) {
@@ -283,6 +347,8 @@ export default async function V3Layout({ children }: { children: ReactNode }) {
 				</aside>
 				<main className="min-w-0 flex-1 px-4 py-6 sm:px-8">{children}</main>
 			</div>
+			{/* LA PALETTE ⌘K — montée DANS la provider (elle lit state.screens). */}
+			<Palette />
 		</V3SessionProvider>
 	);
 }

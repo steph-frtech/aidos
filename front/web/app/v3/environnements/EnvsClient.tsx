@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { deployRealAction } from "@/app/v2/builder/actions";
 import {
+	type AppProjection,
+	type BuilderState,
 	codeDeltaFor,
 	type Deployment,
 	ENV_LADDER,
 	type EnvName,
+	emitApp,
 } from "@/lib/v2/builder";
 import { useV3Session } from "../V3Session";
 
@@ -33,6 +36,21 @@ function driftOf(
 	return kernels.filter((k) => !env.kernelVersions.includes(k.version)).length;
 }
 
+/**
+ * L'APP TELLE QUE DÉPLOYÉE sur un barreau — la projection RECONSTRUITE depuis les
+ * versions de kernels EMBARQUÉES par le déploiement (Deployment.kernelVersions),
+ * jamais depuis les kernels courants : on filtre l'état puis on RÉUTILISE emitApp
+ * (le même émetteur déterministe — jamais un second chemin). Pure : même
+ * déploiement → même app, même version.
+ */
+function projectionAt(state: BuilderState, env: Deployment): AppProjection {
+	const embedded = new Set(env.kernelVersions);
+	return emitApp({
+		...state,
+		kernels: state.kernels.filter((k) => embedded.has(k.version)),
+	});
+}
+
 export function EnvsClient() {
 	const {
 		state,
@@ -42,6 +60,8 @@ export function EnvsClient() {
 		codeEdges,
 		strings: t,
 	} = useV3Session();
+	// L'APERÇU « Voir le résultat » : le barreau ouvert (null = replié) — un toggle.
+	const [previewEnv, setPreviewEnv] = useState<EnvName | null>(null);
 	// Le DÉPLOIEMENT RÉEL (ADR 0052) : occupation + résultat (URL live / panne douce).
 	const [realBusy, setRealBusy] = useState(false);
 	const [realResult, setRealResult] = useState<{
@@ -53,7 +73,7 @@ export function EnvsClient() {
 	// Les libellés par BARREAU — l'échelle est une DONNÉE : un barreau de plus ici n'est
 	// qu'une entrée de libellé, jamais un cas codé.
 	const envTitle: Record<EnvName, string> = {
-		test: t.envTestTitle,
+		dev: t.envDevTitle,
 		staging: t.envStagingTitle,
 		prod: t.envProdTitle,
 	};
@@ -103,6 +123,10 @@ export function EnvsClient() {
 							drift={drift}
 							disabled={state.kernels.length === 0 || busy}
 							onDeploy={() => void send(`déploie l'application en ${name}`)}
+							viewing={previewEnv === name}
+							onView={() =>
+								setPreviewEnv((cur) => (cur === name ? null : name))
+							}
 							t={t}
 						/>
 					);
@@ -112,6 +136,17 @@ export function EnvsClient() {
 				<p className="text-xs leading-relaxed text-muted-foreground italic">
 					{t.envNoVersionHint}
 				</p>
+			)}
+
+			{/* ── l'APERÇU : l'app TELLE QUE DÉPLOYÉE sur le barreau choisi (versions embarquées) ── */}
+			{previewEnv !== null && (
+				<EnvPreview
+					name={previewEnv}
+					env={state.envs[previewEnv]}
+					state={state}
+					onClose={() => setPreviewEnv(null)}
+					t={t}
+				/>
 			)}
 
 			{/* ── le DÉPLOIEMENT RÉEL (ADR 0052) — gaté sur l'échelle gravie jusqu'en prod ── */}
@@ -228,6 +263,8 @@ function EnvCard({
 	drift,
 	disabled,
 	onDeploy,
+	viewing,
+	onView,
 	t,
 }: {
 	name: EnvName;
@@ -236,6 +273,8 @@ function EnvCard({
 	drift: number;
 	disabled: boolean;
 	onDeploy: () => void;
+	viewing: boolean;
+	onView: () => void;
 	t: Strings;
 }) {
 	return (
@@ -278,6 +317,166 @@ function EnvCard({
 			>
 				{t.envDeployBtn.replace("%env%", name)}
 			</button>
+			{/* · VOIR le résultat : ouvre l'aperçu de l'app telle que déployée ICI —
+			    une lecture pure (toujours cliquable : le jamais-déployé a son état vide). */}
+			<button
+				type="button"
+				data-testid={`v3-env-view-${name}`}
+				aria-pressed={viewing}
+				onClick={onView}
+				className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/40 aria-pressed:border-primary/50 aria-pressed:bg-primary/10"
+			>
+				{t.envViewBtn}
+			</button>
 		</div>
+	);
+}
+
+/**
+ * L'APERÇU « VOIR le résultat » : l'app TELLE QUE DÉPLOYÉE sur le barreau — une
+ * vitrine simulée (un onglet de navigation par route, une carte par entité)
+ * RECONSTRUITE des seules versions de kernels embarquées par le déploiement, jamais
+ * des kernels courants (projectionAt × emitApp — déterminisme-first). Le barreau
+ * jamais déployé a son état vide amical ; la PROD ajoute le lien vers l'app réelle
+ * (le pipeline réel ADR 0052). Les hashes restent repliés (<details>).
+ */
+function EnvPreview({
+	name,
+	env,
+	state,
+	onClose,
+	t,
+}: {
+	name: EnvName;
+	env: Deployment | null;
+	state: BuilderState;
+	onClose: () => void;
+	t: Strings;
+}) {
+	const app = env === null ? null : projectionAt(state, env);
+	return (
+		<section
+			data-testid="v3-env-preview"
+			className="space-y-3 rounded-xl border border-border bg-card p-4"
+		>
+			<div className="flex flex-wrap items-center gap-2">
+				<h2 className="text-sm font-semibold text-foreground">
+					{t.envPreviewTitle.replace("%env%", name)}
+				</h2>
+				{/* · la PUCE DE VERSION : la version posée par le déploiement (content-adressée) */}
+				{env !== null && (
+					<span
+						title={t.envPreviewVersionLabel}
+						className="rounded-full border border-border bg-muted/40 px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+					>
+						{env.version}
+					</span>
+				)}
+				<button
+					type="button"
+					onClick={onClose}
+					className="ml-auto rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/40"
+				>
+					{t.envPreviewClose}
+				</button>
+			</div>
+			{app === null ? (
+				<p className="text-xs leading-relaxed text-muted-foreground italic">
+					{t.envPreviewEmpty}
+				</p>
+			) : (
+				<>
+					{/* · la FENÊTRE SIMULÉE : la vitrine amicale de l'app émise sur ce barreau */}
+					<div className="overflow-hidden rounded-lg border border-border">
+						<div className="flex items-center gap-1.5 border-b border-border bg-muted/40 px-3 py-2">
+							<span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+							<span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+							<span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+							<span className="ml-2 truncate font-mono text-[10px] text-muted-foreground">
+								app.{name} · {app.version}
+							</span>
+						</div>
+						{app.routes.length === 0 ? (
+							<p className="bg-background p-3 text-xs text-muted-foreground italic">
+								{t.envPreviewNoData}
+							</p>
+						) : (
+							<>
+								{/* un ONGLET par route émise (la première active, purement visuelle) */}
+								<nav
+									aria-label={t.envPreviewPagesLabel}
+									className="flex flex-wrap gap-1 border-b border-border bg-background px-3 py-2"
+								>
+									{app.routes.map((route, i) => (
+										<span
+											key={route}
+											className={[
+												"rounded-md px-2 py-0.5 text-[11px] font-medium capitalize",
+												i === 0
+													? "bg-primary text-primary-foreground"
+													: "text-muted-foreground",
+											].join(" ")}
+										>
+											{route.slice(1)}
+										</span>
+									))}
+								</nav>
+								{/* une CARTE par entité embarquée (le contenu simulé, jamais inventé) */}
+								<div className="grid gap-2 bg-background p-3 sm:grid-cols-2">
+									{app.entities.map((e) => (
+										<div
+											key={e.version}
+											className="space-y-1.5 rounded-md border border-border bg-card p-3"
+										>
+											<p className="text-xs font-medium text-foreground capitalize">
+												{e.name}
+											</p>
+											<div className="h-2 w-3/4 rounded bg-muted" />
+											<div className="h-2 w-1/2 rounded bg-muted" />
+										</div>
+									))}
+								</div>
+							</>
+						)}
+					</div>
+					{/* · la PROD pointe vers l'app réelle (le pipeline réel ADR 0052) */}
+					{name === "prod" && (
+						<p className="text-xs text-foreground">
+							{t.envPreviewRealApp} :{" "}
+							<a
+								href="https://alphashop.sagedesk.fr"
+								target="_blank"
+								rel="noreferrer"
+								className="font-medium text-primary hover:underline"
+							>
+								alphashop.sagedesk.fr
+							</a>{" "}
+							<span className="text-muted-foreground">
+								({t.envPreviewRealPipeline})
+							</span>
+						</p>
+					)}
+					{/* · le détail technique (versions embarquées) — toujours replié */}
+					<details
+						data-testid="v3-details"
+						className="rounded-md border border-border bg-muted/30 px-2.5 py-1.5"
+					>
+						<summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+							{t.detailsLabel}
+						</summary>
+						<ul className="mt-2 space-y-1">
+							{app.entities.map((e) => (
+								<li
+									key={e.version}
+									className="font-mono text-[11px] text-muted-foreground"
+								>
+									{e.name} — {e.version}
+								</li>
+							))}
+						</ul>
+					</details>
+				</>
+			)}
+		</section>
 	);
 }

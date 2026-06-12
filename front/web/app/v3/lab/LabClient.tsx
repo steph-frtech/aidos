@@ -56,7 +56,7 @@ const FORCE_PREFIX: Record<IntentKind, string> = {
 
 /**
  * Les CHIPS de prochaine étape contextuelles — après un événement, le geste canonique
- * suivant du cycle de vie (capture → promotion → génération → l'échelle test→staging→prod
+ * suivant du cycle de vie (capture → promotion → génération → l'échelle dev→staging→prod
  * → delta). Les phrases envoyées sont les canoniques PROUVÉES (françaises, le jeu clos).
  */
 const NEXT_CHIPS: readonly {
@@ -76,11 +76,11 @@ const NEXT_CHIPS: readonly {
 	},
 	{
 		when: (e) => e.kind === "app_generee",
-		labelKey: "chipDeployTest",
-		phrase: "déploie l'application en test",
+		labelKey: "chipDeployDev",
+		phrase: "déploie l'application en dev",
 	},
 	{
-		when: (e) => e.kind === "deploiement" && e.env === "test",
+		when: (e) => e.kind === "deploiement" && e.env === "dev",
 		labelKey: "chipDeployStaging",
 		phrase: "déploie l'application en staging",
 	},
@@ -136,7 +136,7 @@ const SUGGESTIONS: readonly {
 	{
 		labelKey: "suggestion2",
 		mode: "send",
-		text: "déploie l'application en test",
+		text: "déploie l'application en dev",
 	},
 	{ labelKey: "suggestion3", mode: "send", text: "ouvre l'écran v3 parcours" },
 	{ labelKey: "suggestion4", mode: "send", text: "ouvre l'écran v2 code" },
@@ -250,6 +250,17 @@ function AssistantCard({
 							</button>
 						))}
 					</div>
+				)}
+
+				{/* · un tour avec impacts pointe vers LA GRILLE (/v3/specs) — « je VOIS ce qui est touché » */}
+				{turn.impacts.length > 0 && (
+					<Link
+						href="/v3/specs"
+						data-testid="v3-impacts-grid"
+						className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
+					>
+						{t.specsSeeGrid}
+					</Link>
 				)}
 
 				{/* · le DÉTAIL TECHNIQUE — toujours replié, jamais imposé */}

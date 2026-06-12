@@ -14,7 +14,7 @@ import { expect, test } from "@playwright/test";
  *   - l'AMBIGUÏTÉ est OFFERTE (chips), jamais tranchée en silence — cliquer une chip FORCE
  *     l'intention par un texte désambiguïsé qui repasse par le MÊME pipeline déterministe ;
  *   - le CYCLE DE VIE COMPLET est joué sur L'ÉCHELLE ENTIÈRE (ENV_LADDER, une donnée) :
- *     générer → test → staging → prod (LE CLIQUET GÉNÉRALISÉ : le barreau i exige la MÊME
+ *     générer → dev → staging → prod (LE CLIQUET GÉNÉRALISÉ : le barreau i exige la MÊME
  *     version au barreau i-1) → delta — la prod est REFUSÉE tant que la version courante
  *     n'a pas gravi chaque barreau, et une nouvelle promotion RÉARME chaque porte ;
  *   - la COUVERTURE : le chat ouvre N'IMPORTE QUEL écran (le registre V2 déclaré + les
@@ -179,7 +179,7 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		await page.goto("/v2/builder");
 
 		// La session COMPLÈTE : un échantillon de la grammaire fermée + une ambiguïté forcée
-		// (le cycle de vie générer → test → staging → prod → delta a SON test dédié ci-dessous).
+		// (le cycle de vie générer → dev → staging → prod → delta a SON test dédié ci-dessous).
 		await send(page, "greffe pommes sous app/catalogue");
 		await send(
 			page,
@@ -198,7 +198,7 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 			.click();
 
 		// La session a bien eu lieu : 8 tours, et la prod REFUSÉE par le cliquet (pas de
-		// test préalable) — jamais exécutée. Le journal vit dans l'onglet Journal (mêmes
+		// dev préalable) — jamais exécutée. Le journal vit dans l'onglet Journal (mêmes
 		// testids v2-builder-log/-log-entry : un clic d'onglet d'abord).
 		await expect(page.getByTestId("v2-builder-attente")).toHaveCount(8);
 		await page
@@ -212,7 +212,7 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		expect(writes).toEqual([]);
 	});
 
-	test("le CYCLE DE VIE COMPLET — générer → test → staging → prod (le cliquet généralisé) → delta", async ({
+	test("le CYCLE DE VIE COMPLET — générer → dev → staging → prod (le cliquet généralisé) → delta", async ({
 		page,
 	}) => {
 		// Le mur tient sur TOUT le cycle de vie : on capte chaque requête d'écriture.
@@ -242,36 +242,36 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		await expect(refusAvant).toContainText("le cliquet");
 		await expect(refusAvant).toContainText("staging");
 
-		// ③ test d'abord : deploiement · test — l'onglet Environnements montre L'ÉCHELLE
-		// ENTIÈRE (trois cartes), la version app:<hash> posée sur la carte test, ÉCART 0.
-		await send(page, "déploie l'application en test");
+		// ③ dev d'abord : deploiement · dev — l'onglet Environnements montre L'ÉCHELLE
+		// ENTIÈRE (trois cartes), la version app:<hash> posée sur la carte dev, ÉCART 0.
+		await send(page, "déploie l'application en dev");
 		await expect(page.getByTestId("v2-builder-events").last()).toContainText(
-			"deploiement · test",
+			"deploiement · dev",
 		);
 		await page
 			.locator('[data-testid="v2-builder-tab"][data-tab="envs"]')
 			.click();
-		const envTest = page.getByTestId("v2-builder-env-test");
+		const envDev = page.getByTestId("v2-builder-env-dev");
 		const envStaging = page.getByTestId("v2-builder-env-staging");
 		const envProd = page.getByTestId("v2-builder-env-prod");
 		await expect(envStaging).toBeVisible();
 		await expect(envProd).toBeVisible();
-		await expect(envTest).toContainText(/app:[0-9a-f]{8}/);
-		await expect(envTest.locator("[data-drift]")).toHaveAttribute(
+		await expect(envDev).toContainText(/app:[0-9a-f]{8}/);
+		await expect(envDev.locator("[data-drift]")).toHaveAttribute(
 			"data-drift",
 			"0",
 		);
-		const testVersion = ((await envTest.textContent()) ?? "").match(
+		const devVersion = ((await envDev.textContent()) ?? "").match(
 			/app:[0-9a-f]{8}/,
 		)?.[0];
-		expect(testVersion).toBeTruthy();
+		expect(devVersion).toBeTruthy();
 
-		// ④ staging APRÈS test (le barreau intermédiaire) : la MÊME version grimpe d'un cran.
+		// ④ staging APRÈS dev (le barreau intermédiaire) : la MÊME version grimpe d'un cran.
 		await send(page, "déploie l'application en staging");
 		await expect(page.getByTestId("v2-builder-events").last()).toContainText(
 			"deploiement · staging",
 		);
-		await expect(envStaging).toContainText(testVersion as string);
+		await expect(envStaging).toContainText(devVersion as string);
 		await expect(envStaging.locator("[data-drift]")).toHaveAttribute(
 			"data-drift",
 			"0",
@@ -282,7 +282,7 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		await expect(page.getByTestId("v2-builder-events").last()).toContainText(
 			"deploiement · prod",
 		);
-		await expect(envProd).toContainText(testVersion as string);
+		await expect(envProd).toContainText(devVersion as string);
 		await expect(envProd.locator("[data-drift]")).toHaveAttribute(
 			"data-drift",
 			"0",
@@ -301,8 +301,8 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		);
 		await send(page, "promeus la dernière idée");
 		await expect(page.getByTestId("v2-builder-kernel")).toHaveCount(2);
-		const driftTest = Number(
-			await envTest.locator("[data-drift]").getAttribute("data-drift"),
+		const driftDev = Number(
+			await envDev.locator("[data-drift]").getAttribute("data-drift"),
 		);
 		const driftStaging = Number(
 			await envStaging.locator("[data-drift]").getAttribute("data-drift"),
@@ -310,7 +310,7 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		const driftProd = Number(
 			await envProd.locator("[data-drift]").getAttribute("data-drift"),
 		);
-		expect(driftTest).toBeGreaterThanOrEqual(1);
+		expect(driftDev).toBeGreaterThanOrEqual(1);
 		expect(driftStaging).toBeGreaterThanOrEqual(1);
 		expect(driftProd).toBeGreaterThanOrEqual(1);
 
@@ -387,13 +387,13 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		const realBtn = page.getByTestId("v2-builder-deploy-real");
 		await expect(realBtn).toBeDisabled();
 
-		// L'ÉCHELLE ENTIÈRE, barreau par barreau : capture → promotion → test → staging → prod.
+		// L'ÉCHELLE ENTIÈRE, barreau par barreau : capture → promotion → dev → staging → prod.
 		await send(
 			page,
 			"capture l'idée : au checkout, débiter le compte une seule fois",
 		);
 		await send(page, "promeus la dernière idée");
-		await send(page, "déploie l'application en test");
+		await send(page, "déploie l'application en dev");
 		await send(page, "déploie l'application en staging");
 		await send(page, "déploie l'application en prod");
 		await expect(page.getByTestId("v2-builder-events").last()).toContainText(

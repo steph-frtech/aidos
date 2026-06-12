@@ -69,7 +69,7 @@ export type IntentKind = (typeof INTENT_KINDS)[number];
  * nouvelle promotion ré-arme chaque barreau supérieur. Étendre l'échelle = déclarer
  * un barreau ici (une donnée), jamais coder un cas.
  */
-export const ENV_LADDER = ["test", "staging", "prod"] as const;
+export const ENV_LADDER = ["dev", "staging", "prod"] as const;
 export type EnvName = (typeof ENV_LADDER)[number];
 
 /** Une référence d'ÉCRAN du Workbench (v1 ou v2) — l'inventaire est une DONNÉE. */
@@ -174,7 +174,7 @@ export function initBuilderState(
 		tree: tree ?? seedComposes(),
 		ideas: [],
 		kernels: [],
-		envs: { test: null, staging: null, prod: null },
+		envs: { dev: null, staging: null, prod: null },
 		screens: [...v2, ...concepts, ...extraScreens],
 		log: [],
 	};
@@ -237,7 +237,7 @@ const LEXICONS: Record<
 	},
 	deployer: {
 		strong: ["deploie", "deployer", "deploiement", "livre", "livrer"],
-		weak: ["production", "prod", "staging", "ligne", "mettre"],
+		weak: ["production", "prod", "staging", "dev", "ligne", "mettre"],
 	},
 	ouvrir: {
 		strong: ["ouvre", "ouvrir", "ecran", "panneau", "navigue"],

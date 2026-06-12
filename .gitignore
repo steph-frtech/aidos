@@ -117,3 +117,6 @@ back/cmd/aidosappemit/
 
 # V3 persisted projects (replayable transcripts, user data — never committed)
 .aidos-projects/
+
+# V3 instance config (les URLs des outils de VOTRE instance — jamais committé)
+.aidos-instance.json

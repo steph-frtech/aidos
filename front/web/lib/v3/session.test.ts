@@ -17,7 +17,7 @@ const msgsArb = fc.array(
 		),
 		fc.constant("promeus la dernière idée"),
 		fc.constant("greffe pommes sous app/catalogue"),
-		fc.constant("déploie l'application en test"),
+		fc.constant("déploie l'application en dev"),
 		fc.constant("montre-moi l'état du projet"),
 		fc.string({ maxLength: 40 }),
 	),

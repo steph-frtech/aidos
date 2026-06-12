@@ -18,7 +18,7 @@ const PALETTE: readonly string[] = [
 	"greffe <libellé> sous <chemin>",
 	"promeus la dernière idée",
 	"génère l'application",
-	"déploie l'application en test",
+	"déploie l'application en dev",
 	"déploie l'application en staging",
 	"déploie l'application en prod",
 	"montre le delta depuis la prod",

@@ -36,6 +36,6 @@ export function simplify(detail: string): string {
 export function friendlyLine(t: Strings, e: BuilderEvent): string {
 	const raw = t[FRIENDLY_TEMPLATES[e.kind]] ?? e.detail;
 	return raw
-		.replace("%env%", e.env ?? "test")
+		.replace("%env%", e.env ?? "dev")
 		.replace("%detail%", simplify(e.detail));
 }
