@@ -4,7 +4,6 @@ import { Fragment, useMemo, useState } from "react";
 import type { MirrorForm } from "@/lib/besoin-completeness";
 import { SOURCE_ORDER } from "@/lib/besoin-grammar";
 import { FACET_NAME, FACETS, type FacetLetter } from "@/lib/grid";
-import { ENV_LADDER } from "@/lib/v2/builder";
 import { gridOf, type SpecRow, specsOf } from "@/lib/v3/specs";
 import type { Strings } from "../friendly";
 import { useV3Session } from "../V3Session";
@@ -53,12 +52,20 @@ const FILTERS: readonly { id: StatusFilter; labelKey: string }[] = [
 	{ id: "deployees", labelKey: "specsFilterDeployed" },
 ];
 
-/** Une spec passe-t-elle le filtre de statut ? PURE & TOTALE. */
-function matchesFilter(row: SpecRow, filter: StatusFilter): boolean {
+/**
+ * Une spec passe-t-elle le filtre de statut ? « Déployée » = le statut est un
+ * barreau de l'ÉCHELLE COURANTE (state.ladder — paramétrable, jamais une
+ * constante de code). PURE & TOTALE.
+ */
+function matchesFilter(
+	row: SpecRow,
+	filter: StatusFilter,
+	ladder: readonly string[],
+): boolean {
 	if (filter === "tous") return true;
 	if (filter === "idees") return row.status === "idee";
 	if (filter === "versions") return row.status === "kernel";
-	return (ENV_LADDER as readonly string[]).includes(row.status);
+	return ladder.includes(row.status);
 }
 
 /** Le badge de statut AMICAL : 💡 idée · 🧊 version figée · 🚀 <env>. */
@@ -179,7 +186,7 @@ export function SpecsClient() {
 	// La liste visible : le filtre de statut × la case sélectionnée (si une l'est).
 	const visible = rows.filter(
 		(r) =>
-			matchesFilter(r, filter) &&
+			matchesFilter(r, filter, state.ladder) &&
 			(cell === null || (r.level === cell.level && r.facet === cell.facet)),
 	);
 

@@ -500,6 +500,49 @@ test.describe("V3 — la palette, les spécifications, l'aperçu par env, l'inst
 		expect(await form.locator("input").count()).toBeGreaterThanOrEqual(6);
 		await expect(page.getByTestId("v3-inst-save")).toBeEnabled();
 	});
+
+	test("la stack par environnement (spec-2026) : la table résolue, doltgres hors prod, postgres en prod", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `stack-${testInfo.testId}`);
+		await navTo(page, "/v3/instance");
+
+		// La section STACK déclarée (STACK_SERVICES × envStackOf — la spec
+		// docs/plan/SPEC-stack-2026.md) : visible, et la table porte les 13
+		// services déclarés (≥ 10 lignes, « non provisionné » compris).
+		await expect(page.getByTestId("v3-inst-stack")).toBeVisible({
+			timeout: 20_000,
+		});
+		expect(
+			await page.getByTestId("v3-inst-stack-row").count(),
+		).toBeGreaterThanOrEqual(10);
+
+		// LE BARREAU NON-PROD (dev — cliqué explicitement) : la ligne db résout
+		// le motif DOLTGRES (git-for-data hors prod, ADR 0006 / spec-2026).
+		const ligneDb = page.locator(
+			'[data-testid="v3-inst-stack-row"][data-key="db"]',
+		);
+		const chipDev = page.locator(
+			'[data-testid="v3-inst-stack-env"][data-env="dev"]',
+		);
+		await chipDev.click();
+		await expect(chipDev).toHaveAttribute("aria-pressed", "true");
+		await expect(ligneDb).toContainText("doltgres");
+
+		// BASCULER sur le barreau PROD : la même ligne db résout le prodPattern
+		// POSTGRES pur (plus aucun doltgres) — la résolution suit le chip cliqué.
+		const chipProd = page.locator(
+			'[data-testid="v3-inst-stack-env"][data-env="prod"]',
+		);
+		await chipProd.click();
+		await expect(chipProd).toHaveAttribute("aria-pressed", "true");
+		await expect(ligneDb).toContainText("postgres");
+		await expect(ligneDb).not.toContainText("doltgres");
+
+		// Le formulaire de réglages expose l'ÉCHELLE paramétrable (CSV) — en
+		// LECTURE SEULE ici : rien n'est saisi, rien n'est enregistré (hermétique).
+		await expect(page.getByTestId("v3-inst-ladder")).toBeVisible();
+	});
 });
 
 test.describe("V3 — le projet persistant (créer une app crée un projet, ADR 0061)", () => {

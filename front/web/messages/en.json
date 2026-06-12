@@ -7222,6 +7222,27 @@
 		"envPreviewPagesLabel": "App pages",
 		"envPreviewRealApp": "The real app",
 		"envPreviewRealPipeline": "real pipeline ADR 0052",
-		"envPreviewClose": "Close the preview"
+		"envPreviewClose": "Close the preview",
+		"stackApp": "The application",
+		"stackApi": "The API (Hono)",
+		"stackDb": "The data — Doltgres outside prod / Postgres in prod (ADR 0006)",
+		"stackCache": "The cache (Valkey)",
+		"stackWorkflows": "Workflows (Windmill)",
+		"stackBus": "The bus (NATS)",
+		"stackTelemetry": "Telemetry (OTel → SigNoz)",
+		"stackDocs": "The app docs (Fumadocs · Scalar · Pagefind)",
+		"stackAuth": "Authentication (Better-Auth)",
+		"stackErrors": "Errors (GlitchTip)",
+		"stackTickets": "Tickets (Plane)",
+		"stackGit": "Git & CI (Forgejo)",
+		"stackConnectors": "Connectors (MCP Gateway)",
+		"instStackHeading": "The stack per environment",
+		"instStackNote": "The palette follows docs/plan/SPEC-stack-2026.md — the full one-shot is the DP track.",
+		"instStackLevel": "Level %n%",
+		"instStackUnprovisioned": "not provisioned",
+		"instLadderLabel": "The environment ladder",
+		"instLadderHint": "The number of environments is configurable — e.g. dev, preprod, staging, prod",
+		"instStackOverridesHeading": "Stack overrides",
+		"instStackOverridesHint": "One URL per service — leave empty to keep the default pattern (%env% is replaced by the environment)."
 	}
 }

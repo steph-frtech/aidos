@@ -5,6 +5,8 @@ import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import type { ScreenRef } from "@/lib/v2/builder";
 import { assembleGraph, extractFromSource } from "@/lib/v2/code-extract";
+import { ladderOf } from "@/lib/v3/instance";
+import { loadInstanceConfigAction } from "./instance/actions";
 import { Palette } from "./Palette";
 import {
 	createProjectAction,
@@ -35,6 +37,11 @@ import { V3SessionProvider } from "./V3Session";
  * plus récemment sauvé ; sans AUCUN projet, « Mon application » est auto-créé : créer
  * une app crée TOUJOURS un projet. La provider est CLÉE par l'id du projet — basculer
  * de projet remonte la session (le rejeu repart du bon transcript).
+ *
+ * L'ÉCHELLE PARAMÉTRABLE (ADR 0062 add.) : la config d'instance est chargée ICI
+ * (parse fail-closed du twin lib/v3/instance) → ladderOf(config) — l'échelle des
+ * environnements est une DONNÉE de l'instance injectée dans la provider ; chaque
+ * rejeu (turnsOf/replayTo) et chaque lentille la lisent depuis la session.
  * Themed (tokens shadcn) + bilingue (next-intl, FR par défaut). Le mur intact.
  */
 
@@ -258,6 +265,27 @@ const KEYS = [
 	"envPreviewRealApp",
 	"envPreviewRealPipeline",
 	"envPreviewClose",
+	"stackApp",
+	"stackApi",
+	"stackDb",
+	"stackCache",
+	"stackWorkflows",
+	"stackBus",
+	"stackTelemetry",
+	"stackDocs",
+	"stackAuth",
+	"stackErrors",
+	"stackTickets",
+	"stackGit",
+	"stackConnectors",
+	"instStackHeading",
+	"instStackNote",
+	"instStackLevel",
+	"instStackUnprovisioned",
+	"instLadderLabel",
+	"instLadderHint",
+	"instStackOverridesHeading",
+	"instStackOverridesHint",
 ] as const;
 
 export default async function V3Layout({ children }: { children: ReactNode }) {
@@ -278,6 +306,11 @@ export default async function V3Layout({ children }: { children: ReactNode }) {
 				: await createProjectAction("Mon application");
 		projectList = await listProjectsAction();
 	}
+
+	// L'ÉCHELLE de l'instance : la config persistée (fail-closed) → ladderOf — une
+	// DONNÉE injectée dans la provider (le rejeu et chaque lentille itèrent dessus).
+	const instanceConfig = await loadInstanceConfigAction();
+	const ladder = ladderOf(instanceConfig);
 
 	// Next s'exécute depuis front/web ; le garde-fou couvre un lancement depuis la racine.
 	const cwd = process.cwd();
@@ -337,6 +370,8 @@ export default async function V3Layout({ children }: { children: ReactNode }) {
 			strings={strings}
 			initialProject={initialProject}
 			projectList={projectList}
+			ladder={ladder}
+			instanceConfig={instanceConfig}
 		>
 			<div
 				data-testid="v3-shell"

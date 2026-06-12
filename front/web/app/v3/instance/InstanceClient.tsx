@@ -1,7 +1,13 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
-import { INSTANCE_TOOLS, type InstanceConfig } from "@/lib/v3/instance";
+import {
+	envStackOf,
+	INSTANCE_TOOLS,
+	type InstanceConfig,
+	ladderOf,
+	STACK_SERVICES,
+} from "@/lib/v3/instance";
 import { useV3Session } from "../V3Session";
 import {
 	type DockerContainer,
@@ -15,12 +21,15 @@ import {
 
 /**
  * /v3/instance — L'INSTANCE (lentille V3, ADR 0062) : « paramétrer toutes les infos
- * de l'instance (BDD, monitoring…) — on pourrait paramétrer dans le cloud ». Trois
+ * de l'instance (BDD, monitoring…) — on pourrait paramétrer dans le cloud ». Quatre
  * zones : les TUILES d'outils (le jeu déclaré INSTANCE_TOOLS, sondé côté serveur au
- * montage — jamais au rendu, pour ne rien bloquer), les CONTENEURS docker connus, et
- * VOS RÉGLAGES (la config persistée, fail-closed via le twin). END-USER FRIENDLY :
- * copie amicale, le code HTTP en tout petit. LE MUR (§2) : ces réglages décrivent
- * VOTRE instance — ils ne touchent jamais la vérité du produit.
+ * montage — jamais au rendu, pour ne rien bloquer), les CONTENEURS docker connus,
+ * LA STACK PAR ENVIRONNEMENT (la palette substrat déclarée STACK_SERVICES, résolue
+ * par envStackOf sur l'échelle ladderOf(config) — la spec canonique
+ * docs/plan/SPEC-stack-2026.md, DP14), et VOS RÉGLAGES (la config persistée,
+ * fail-closed via le twin — y compris l'échelle `ladder` et les surcharges
+ * `stack.<service>`). END-USER FRIENDLY : copie amicale, le code HTTP en tout petit.
+ * LE MUR (§2) : ces réglages décrivent VOTRE instance — jamais la vérité du produit.
  */
 
 /** La pastille d'état — émeraude (en ligne) / rouge (injoignable) / neutre (non sondé). */
@@ -29,6 +38,11 @@ const DOT: Record<ProbeStatus, string> = {
 	down: "bg-red-500",
 	unknown: "bg-muted-foreground/40",
 };
+
+/** Le NIVEAU déclaré de chaque service (spec stack-2026 : 1 core · 2 activable · 3 option). */
+const LEVEL_BY_KEY: ReadonlyMap<string, 1 | 2 | 3> = new Map(
+	STACK_SERVICES.map((s) => [s.key, s.level]),
+);
 
 export function InstanceClient({
 	initialConfig,
@@ -45,6 +59,11 @@ export function InstanceClient({
 	const [docker, setDocker] = useState<DockerContainer[] | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [saved, setSaved] = useState(false);
+	// L'ÉCHELLE de la config POSÉE (ladderOf — fail-closed) ; le chip actif retombe
+	// sur le premier barreau si l'échelle vient de changer (sauvegarde).
+	const ladder = ladderOf(config);
+	const [stackEnv, setStackEnv] = useState<string>(ladder[0] ?? "dev");
+	const activeEnv = ladder.includes(stackEnv) ? stackEnv : (ladder[0] ?? "dev");
 
 	// La SONDE au montage : l'état des outils + les conteneurs, côté serveur.
 	useEffect(() => {
@@ -195,6 +214,80 @@ export function InstanceClient({
 				)}
 			</section>
 
+			{/* ── LA STACK PAR ENVIRONNEMENT : la palette substrat déclarée (STACK_SERVICES),
+			    résolue par envStackOf sur l'échelle — la spec docs/plan/SPEC-stack-2026.md ── */}
+			<section
+				data-testid="v3-inst-stack"
+				className="space-y-3 rounded-xl border border-border bg-card p-4"
+			>
+				<h2 className="text-sm font-semibold text-foreground">
+					{t.instStackHeading}
+				</h2>
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					{t.instStackNote}
+				</p>
+				{/* · un chip par barreau de l'échelle (paramétrable — jamais codée en dur) */}
+				<div className="flex flex-wrap gap-1.5">
+					{ladder.map((env) => (
+						<button
+							key={env}
+							type="button"
+							data-testid="v3-inst-stack-env"
+							data-env={env}
+							aria-pressed={activeEnv === env}
+							onClick={() => setStackEnv(env)}
+							className={[
+								"rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+								activeEnv === env
+									? "border-primary/40 bg-primary/10 text-primary"
+									: "border-border bg-muted/40 text-foreground hover:border-primary/40 hover:bg-primary/5",
+							].join(" ")}
+						>
+							{env}
+						</button>
+					))}
+				</div>
+				{/* · la table résolue : libellé amical, URL (%env% substitué), niveau déclaré */}
+				<table className="w-full border-collapse text-left">
+					<tbody>
+						{envStackOf(activeEnv, config).map((row) => (
+							<tr
+								key={row.key}
+								data-testid="v3-inst-stack-row"
+								data-key={row.key}
+								className="border-t border-border/60 align-top"
+							>
+								<td className="py-1.5 pr-3 text-[11px] font-medium text-foreground">
+									{t[row.labelKey]}
+								</td>
+								<td className="py-1.5 pr-3">
+									{row.url === "" ? (
+										<span className="text-[11px] text-muted-foreground italic">
+											{t.instStackUnprovisioned}
+										</span>
+									) : (
+										<span className="break-all font-mono text-[11px] text-muted-foreground">
+											{row.url}
+										</span>
+									)}
+								</td>
+								<td className="py-1.5 text-right">
+									<span
+										title="SPEC-stack-2026"
+										className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap text-muted-foreground"
+									>
+										{t.instStackLevel.replace(
+											"%n%",
+											String(LEVEL_BY_KEY.get(row.key) ?? 3),
+										)}
+									</span>
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</section>
+
 			{/* ── VOS RÉGLAGES : une entrée par outil déclaré, persistée fail-closed ── */}
 			<form
 				data-testid="v3-inst-config"
@@ -217,6 +310,55 @@ export function InstanceClient({
 							value={draft[tool.key] ?? ""}
 							onChange={(e) => {
 								setDraft({ ...draft, [tool.key]: e.target.value });
+								setSaved(false);
+							}}
+							className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs text-foreground outline-none transition-colors focus:border-primary"
+						/>
+					</label>
+				))}
+
+				{/* · l'ÉCHELLE (CSV ordonné — « le nombre d'environnements est paramétrable ») */}
+				<label className="block space-y-1">
+					<span className="text-[11px] font-medium text-muted-foreground">
+						{t.instLadderLabel}
+					</span>
+					<input
+						name="ladder"
+						data-testid="v3-inst-ladder"
+						value={draft.ladder ?? ""}
+						placeholder="dev, staging, prod"
+						onChange={(e) => {
+							setDraft({ ...draft, ladder: e.target.value });
+							setSaved(false);
+						}}
+						className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs text-foreground outline-none transition-colors focus:border-primary"
+					/>
+					<span className="block text-[10px] leading-relaxed text-muted-foreground">
+						{t.instLadderHint}
+					</span>
+				</label>
+
+				{/* · les SURCHARGES de stack — une entrée par service déclaré (stack.<clé>),
+				    placeholder = le motif par défaut (%env% substitué à la résolution) */}
+				<h3 className="pt-1 text-xs font-semibold text-foreground">
+					{t.instStackOverridesHeading}
+				</h3>
+				<p className="text-[10px] leading-relaxed text-muted-foreground">
+					{t.instStackOverridesHint}
+				</p>
+				{STACK_SERVICES.map((s) => (
+					<label key={s.key} className="block space-y-1">
+						<span className="text-[11px] font-medium text-muted-foreground">
+							{t[s.labelKey]}
+						</span>
+						<input
+							name={`stack.${s.key}`}
+							data-testid="v3-inst-stack-override"
+							data-key={s.key}
+							value={draft[`stack.${s.key}`] ?? ""}
+							placeholder={s.urlPattern}
+							onChange={(e) => {
+								setDraft({ ...draft, [`stack.${s.key}`]: e.target.value });
 								setSaved(false);
 							}}
 							className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs text-foreground outline-none transition-colors focus:border-primary"

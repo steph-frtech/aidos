@@ -11,13 +11,10 @@ import {
 	useRef,
 	useState,
 } from "react";
-import {
-	type BuilderState,
-	ENV_LADDER,
-	type ScreenRef,
-} from "@/lib/v2/builder";
+import type { BuilderState, ScreenRef } from "@/lib/v2/builder";
 import type { CodeEdge, CodeNode } from "@/lib/v2/code-graph";
 import { bareTree, nodePath } from "@/lib/v2/composition";
+import type { InstanceConfig } from "@/lib/v3/instance";
 import type { ProjectRecord } from "@/lib/v3/project";
 import { replayTo, type SessionTurn, turnsOf } from "@/lib/v3/session";
 import { chatTurnAction } from "./actions";
@@ -83,6 +80,10 @@ export interface V3SessionValue {
 	readonly switchProject: (id: string) => Promise<void>;
 	/** Crée un projet (transcript vide) et bascule dessus — « créer une app crée un projet ». */
 	readonly createProject: (name: string) => Promise<void>;
+	/** L'ÉCHELLE de l'instance (ladderOf(config)) — la DONNÉE que chaque rejeu suit. */
+	readonly ladder: readonly string[];
+	/** La config d'instance chargée côté serveur (parse fail-closed du twin). */
+	readonly instanceConfig: InstanceConfig;
 }
 
 const V3SessionContext = createContext<V3SessionValue | null>(null);
@@ -93,9 +94,9 @@ function summarize(state: BuilderState): string {
 		.map((n) => nodePath(state.tree, n.id).join("/"))
 		.sort()
 		.slice(0, 40);
-	const envs = ENV_LADDER.map(
-		(e) => `${e}=${state.envs[e]?.version ?? "vide"}`,
-	).join(" · ");
+	const envs = state.ladder
+		.map((e) => `${e}=${state.envs[e]?.version ?? "vide"}`)
+		.join(" · ");
 	return [
 		`arbre (${state.tree.length} nœuds) : ${paths.join(", ")}`,
 		`idées capturées : ${state.ideas.length}`,
@@ -111,6 +112,8 @@ export function V3SessionProvider({
 	strings,
 	initialProject,
 	projectList,
+	ladder,
+	instanceConfig,
 	children,
 }: {
 	/** Les écrans V1 scannés côté serveur — injectés en DONNÉES dans le twin. */
@@ -122,6 +125,10 @@ export function V3SessionProvider({
 	initialProject: ProjectRecord | null;
 	/** La liste des projets connus (résumés triés), lue côté serveur. */
 	projectList: readonly ProjectSummary[];
+	/** L'ÉCHELLE de l'instance (ladderOf(config), fail-closed) — injectée en DONNÉE. */
+	ladder: readonly string[];
+	/** La config d'instance (parse fail-closed du twin lib/v3/instance). */
+	instanceConfig: InstanceConfig;
 	children: ReactNode;
 }) {
 	// ROUVRIR = initialiser le transcript depuis le projet puis REJOUER (turnsOf) :
@@ -156,8 +163,8 @@ export function V3SessionProvider({
 	// UN PROJET NEUF EST NU (bareTree — loi au miroir) : la seule racine « app »,
 	// AUCUNE branche de démonstration ; l'arbre pousse par les gestes du chat.
 	const { turns, state } = useMemo(
-		() => turnsOf(messages, v1Screens, bareTree()),
-		[messages, v1Screens],
+		() => turnsOf(messages, v1Screens, bareTree(), ladder),
+		[messages, v1Screens, ladder],
 	);
 
 	/** APPEND-ONLY : ajoute des messages au transcript (chaque message = un tour rejoué). */
@@ -183,6 +190,7 @@ export function V3SessionProvider({
 					messagesRef.current.length,
 					v1Screens,
 					bareTree(),
+					ladder,
 				);
 				const out = await chatTurnAction(text, summarize(cur));
 				// Panne / réponse invalide → repli déterministe : le texte entre directement.
@@ -200,7 +208,7 @@ export function V3SessionProvider({
 				setBusy(false);
 			}
 		},
-		[aiEnabled, busy, append, v1Screens],
+		[aiEnabled, busy, append, v1Screens, ladder],
 	);
 
 	/** LE VOYAGE DANS LE TEMPS : tronquer le transcript = rejouer un préfixe (replayTo). */
@@ -302,6 +310,8 @@ export function V3SessionProvider({
 			projects: projectList,
 			switchProject,
 			createProject,
+			ladder,
+			instanceConfig,
 		}),
 		[
 			messages,
@@ -320,6 +330,8 @@ export function V3SessionProvider({
 			projectList,
 			switchProject,
 			createProject,
+			ladder,
+			instanceConfig,
 		],
 	);
 

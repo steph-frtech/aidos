@@ -7,15 +7,15 @@ import {
 	type BuilderState,
 	codeDeltaFor,
 	type Deployment,
-	ENV_LADDER,
 	type EnvName,
 	emitApp,
 } from "@/lib/v2/builder";
 import { useV3Session } from "../V3Session";
 
 /**
- * /v3/environnements — LES ENVIRONNEMENTS : l'échelle (ENV_LADDER, une donnée — le
- * cliquet généralisé) lue sur la session PARTAGÉE (ADR 0060). Les boutons de barreau
+ * /v3/environnements — LES ENVIRONNEMENTS : l'échelle (state.ladder, une DONNÉE de
+ * l'état — le cliquet généralisé, paramétrable par la config d'instance ADR 0062
+ * add.) lue sur la session PARTAGÉE (ADR 0060). Les boutons de barreau
  * ENVOIENT la phrase canonique au chat (send — le tour repasse par le réducteur, la
  * loi) ; le DÉPLOIEMENT RÉEL (ADR 0052) RÉUTILISE deployRealAction (/v2/builder →
  * pipeline /ai-lab), gaté sur envs.prod — le geste humain, jamais avant l'échelle.
@@ -26,6 +26,23 @@ import { useV3Session } from "../V3Session";
  */
 
 type Strings = Record<string, string>;
+
+/** Les libellés AMICAUX déclarés des barreaux canoniques (clé i18n). */
+const DECLARED_ENV_TITLES: Record<string, string> = {
+	dev: "envDevTitle",
+	staging: "envStagingTitle",
+	prod: "envProdTitle",
+};
+
+/**
+ * Le TITRE d'un barreau : la paire FR déclarée pour dev/staging/prod ; un barreau
+ * CUSTOM (échelle paramétrée — ex. preprod) prend son nom capitalisé. PURE & TOTALE.
+ */
+function envTitleOf(t: Strings, name: string): string {
+	const key = DECLARED_ENV_TITLES[name];
+	if (key !== undefined && t[key] !== undefined) return t[key];
+	return name.charAt(0).toUpperCase() + name.slice(1);
+}
 
 /** L'ÉCART d'un barreau — la dérive vs les kernels courants, CALCULÉE à chaque rendu. */
 function driftOf(
@@ -70,13 +87,11 @@ export function EnvsClient() {
 		detail: string;
 	} | null>(null);
 
-	// Les libellés par BARREAU — l'échelle est une DONNÉE : un barreau de plus ici n'est
-	// qu'une entrée de libellé, jamais un cas codé.
-	const envTitle: Record<EnvName, string> = {
-		dev: t.envDevTitle,
-		staging: t.envStagingTitle,
-		prod: t.envProdTitle,
-	};
+	// Le barreau SOMMET de l'échelle (prod par défaut) — le déploiement réel s'y gate :
+	// le geste humain n'arrive qu'une fois l'échelle gravie jusqu'en haut (ADR 0052).
+	const topEnv = state.ladder[state.ladder.length - 1];
+	const topDeployed =
+		topEnv !== undefined ? (state.envs[topEnv] ?? null) : null;
 
 	// Le DELTA AU GRAIN CODE (ADR 0056 × 0058) — recalculé à CHAQUE rendu, jamais stocké.
 	const codeDelta = codeDeltaFor(
@@ -109,16 +124,17 @@ export function EnvsClient() {
 				</p>
 			</header>
 
-			{/* ── l'échelle : une carte par barreau (ENV_LADDER — le cliquet généralisé) ── */}
+			{/* ── l'échelle : une carte par barreau (state.ladder — le cliquet généralisé,
+			    paramétrable : un barreau de plus est une DONNÉE, jamais un cas codé) ── */}
 			<div className="grid gap-3 sm:grid-cols-3">
-				{ENV_LADDER.map((name) => {
-					const env = state.envs[name];
+				{state.ladder.map((name) => {
+					const env = state.envs[name] ?? null;
 					const drift = driftOf(env, state.kernels);
 					return (
 						<EnvCard
 							key={name}
 							name={name}
-							title={envTitle[name]}
+							title={envTitleOf(t, name)}
 							env={env}
 							drift={drift}
 							disabled={state.kernels.length === 0 || busy}
@@ -142,7 +158,7 @@ export function EnvsClient() {
 			{previewEnv !== null && (
 				<EnvPreview
 					name={previewEnv}
-					env={state.envs[previewEnv]}
+					env={state.envs[previewEnv] ?? null}
 					state={state}
 					onClose={() => setPreviewEnv(null)}
 					t={t}
@@ -160,8 +176,8 @@ export function EnvsClient() {
 				<button
 					type="button"
 					data-testid="v3-deploy-real"
-					disabled={state.envs.prod === null || realBusy}
-					title={state.envs.prod === null ? t.envRealNote : undefined}
+					disabled={topDeployed === null || realBusy}
+					title={topDeployed === null ? t.envRealNote : undefined}
 					onClick={runRealDeploy}
 					className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
 				>

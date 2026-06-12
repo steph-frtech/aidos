@@ -3,14 +3,15 @@
 import { Code2, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { ENV_LADDER, type EnvName, emitApp } from "@/lib/v2/builder";
+import { type EnvName, emitApp } from "@/lib/v2/builder";
 import { emitWorkspaceAction } from "../projects-actions";
 import { useV3Session } from "../V3Session";
 
 /**
  * /v3/code — CODE : votre éditeur en direct, SUR LE PROJET EN COURS, PAR ENVIRONNEMENT.
  *
- * Un onglet par barreau (ENV_LADDER — l'échelle est une DONNÉE) + l'onglet « AIDOS
+ * Un onglet par barreau (state.ladder — l'échelle est une DONNÉE de l'état,
+ * paramétrable par la config d'instance ADR 0062 add.) + l'onglet « AIDOS
  * (le moteur) » qui ouvre l'ancien dossier du dépôt. Par barreau : « Préparer le
  * workspace » (le GESTE EXPLICITE — l'app du déploiement de CE barreau, re-projetée
  * par emitApp sur les kernelVersions embarqués, puis émise en VRAIS fichiers par
@@ -37,7 +38,8 @@ export function CodeClient({
 	t: Strings;
 }) {
 	const { state, projectId, projectName } = useV3Session();
-	const [tab, setTab] = useState<Tab>("dev");
+	// Le premier barreau de l'ÉCHELLE COURANTE (jamais un nom codé en dur).
+	const [tab, setTab] = useState<Tab>(state.ladder[0] ?? "aidos");
 	const [emitting, setEmitting] = useState(false);
 	const [emitted, setEmitted] = useState<Partial<Record<EnvName, number>>>({});
 	const [failed, setFailed] = useState(false);
@@ -143,9 +145,9 @@ export function CodeClient({
 				</div>
 			) : (
 				<div className="flex flex-col gap-4">
-					{/* ── les onglets : un par barreau (ENV_LADDER, une donnée) + le moteur ── */}
+					{/* ── les onglets : un par barreau (state.ladder, une donnée) + le moteur ── */}
 					<div className="flex flex-wrap gap-2">
-						{ENV_LADDER.map((env) => (
+						{state.ladder.map((env) => (
 							<button
 								key={env}
 								type="button"

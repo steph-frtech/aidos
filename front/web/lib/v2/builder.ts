@@ -70,7 +70,8 @@ export type IntentKind = (typeof INTENT_KINDS)[number];
  * un barreau ici (une donnée), jamais coder un cas.
  */
 export const ENV_LADDER = ["dev", "staging", "prod"] as const;
-export type EnvName = (typeof ENV_LADDER)[number];
+/** Le nom d'un environnement — l'échelle est une DONNÉE (configurable par instance). */
+export type EnvName = string;
 
 /** Une référence d'ÉCRAN du Workbench (v1 ou v2) — l'inventaire est une DONNÉE. */
 export interface ScreenRef {
@@ -133,8 +134,10 @@ export interface BuilderState {
 	readonly tree: readonly KernelNode[];
 	readonly ideas: readonly Idea[];
 	readonly kernels: readonly ProposedKernel[];
-	/** L'échelle d'environnements (le CLIQUET généralisé sur ENV_LADDER — une donnée). */
-	readonly envs: Readonly<Record<EnvName, Deployment | null>>;
+	/** L'ÉCHELLE de CET état (configurable par instance — le nombre d'envs est une donnée). */
+	readonly ladder: readonly string[];
+	/** Les environnements de l'échelle (le CLIQUET généralisé — barreau i exige i-1). */
+	readonly envs: Readonly<Record<string, Deployment | null>>;
 	/** L'inventaire des ÉCRANS atteignables (v2 = le registre déclaré ; v1 = injecté en données). */
 	readonly screens: readonly ScreenRef[];
 	readonly log: readonly BuilderEvent[];
@@ -151,6 +154,7 @@ export interface ApplyResult {
 export function initBuilderState(
 	extraScreens: readonly ScreenRef[] = [],
 	tree?: readonly KernelNode[],
+	ladder: readonly string[] = ENV_LADDER,
 ): BuilderState {
 	// Le registre V2 (déclaré, clos) est TOUJOURS couvert ; les écrans V1 s'injectent
 	// en données (l'inventaire vient du scan serveur, jamais codé en dur ici).
@@ -174,7 +178,8 @@ export function initBuilderState(
 		tree: tree ?? seedComposes(),
 		ideas: [],
 		kernels: [],
-		envs: { dev: null, staging: null, prod: null },
+		ladder,
+		envs: Object.fromEntries(ladder.map((e) => [e, null])),
 		screens: [...v2, ...concepts, ...extraScreens],
 		log: [],
 	};
@@ -734,8 +739,8 @@ export function applyIntent(state: BuilderState, text: string): ApplyResult {
 		case "deployer": {
 			const folded = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 			// Le barreau visé : le PLUS HAUT nommé dans le message ; défaut = le premier (test).
-			let env: EnvName = ENV_LADDER[0];
-			for (const e of ENV_LADDER)
+			let env: EnvName = state.ladder[0];
+			for (const e of state.ladder)
 				if (
 					new RegExp(`\\b${e === "prod" ? "prod(uction)?" : e}\\b`).test(folded)
 				)
@@ -754,17 +759,17 @@ export function applyIntent(state: BuilderState, text: string): ApplyResult {
 					[],
 				);
 			const app = emitApp(state);
-			const rung = ENV_LADDER.indexOf(env);
+			const rung = state.ladder.indexOf(env);
 			// LE CLIQUET GÉNÉRALISÉ : le barreau précédent doit porter CETTE version exacte.
 			if (rung > 0) {
-				const below = state.envs[ENV_LADDER[rung - 1]];
+				const below = state.envs[state.ladder[rung - 1]];
 				if (below === null || below.version !== app.version)
 					return finish(
 						state,
 						[
 							{
 								kind: "refus",
-								detail: `${env} REFUSÉ : la version courante ${app.version} n'est pas passée en ${ENV_LADDER[rung - 1]} (le cliquet — chaque barreau, dans l'ordre, toujours)`,
+								detail: `${env} REFUSÉ : la version courante ${app.version} n'est pas passée en ${state.ladder[rung - 1]} (le cliquet — chaque barreau, dans l'ordre, toujours)`,
 								ref: app.version,
 								env,
 							},
@@ -792,8 +797,8 @@ export function applyIntent(state: BuilderState, text: string): ApplyResult {
 
 		case "delta": {
 			const folded = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-			let env: EnvName = "prod";
-			for (const e of ENV_LADDER)
+			let env: EnvName = state.ladder[state.ladder.length - 1] ?? "prod";
+			for (const e of state.ladder)
 				if (
 					new RegExp(`\\b${e === "prod" ? "prod(uction)?" : e}\\b`).test(folded)
 				)

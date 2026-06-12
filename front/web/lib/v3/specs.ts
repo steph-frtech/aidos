@@ -7,7 +7,7 @@
  */
 
 import type { MirrorForm } from "../besoin-completeness";
-import { type BuilderState, ENV_LADDER, type EnvName } from "../v2/builder";
+import type { BuilderState, EnvName } from "../v2/builder";
 
 /** Une ligne de spec : la vérité + sa coordonnée + son statut de cycle de vie. */
 export interface SpecRow {
@@ -36,9 +36,9 @@ function statusOfVersion(
 	version: string,
 ): "kernel" | EnvName {
 	let status: "kernel" | EnvName = "kernel";
-	for (const env of ENV_LADDER) {
+	for (const env of state.ladder) {
 		const d = state.envs[env];
-		if (d !== null && d.kernelVersions.includes(version)) status = env;
+		if (d?.kernelVersions.includes(version)) status = env;
 	}
 	return status;
 }

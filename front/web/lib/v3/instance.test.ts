@@ -2,8 +2,11 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
 	defaultInstanceConfig,
+	envStackOf,
 	INSTANCE_TOOLS,
+	ladderOf,
 	parseInstanceConfig,
+	STACK_SERVICES,
 	serializeInstanceConfig,
 } from "./instance";
 
@@ -45,5 +48,45 @@ describe("la config — aller-retour sans perte, fail-closed", () => {
 	it("du bruit → les DÉFAUTS (fail-closed, jamais une invention)", () => {
 		expect(parseInstanceConfig("@@@")).toEqual(defaultInstanceConfig());
 		expect(parseInstanceConfig('{"db":42}')).toEqual(defaultInstanceConfig());
+	});
+});
+
+describe("l'ÉCHELLE PARAMÉTRABLE + la STACK PAR ENVIRONNEMENT (DP14)", () => {
+	it("ladderOf : la config porte l'échelle ; défaut dev→staging→prod ; fail-closed", () => {
+		expect(ladderOf(defaultInstanceConfig())).toEqual([
+			"dev",
+			"staging",
+			"prod",
+		]);
+		expect(
+			ladderOf({ ...defaultInstanceConfig(), ladder: "dev, preprod ,prod" }),
+		).toEqual(["dev", "preprod", "prod"]);
+		// du bruit → le défaut (jamais une échelle vide ou inventée)
+		expect(ladderOf({ ...defaultInstanceConfig(), ladder: " , ," })).toEqual([
+			"dev",
+			"staging",
+			"prod",
+		]);
+	});
+
+	it("STACK_SERVICES est déclaré et couvre le substrat DP14 (docs Fumadocs, télémétrie OTel…)", () => {
+		const keys = STACK_SERVICES.map((s) => s.key);
+		for (const k of ["app", "db", "telemetry", "docs", "auth"])
+			expect(keys).toContain(k);
+		expect(new Set(keys).size).toBe(keys.length);
+	});
+
+	it("envStackOf : chaque env a SA stack — %env% substitué, db Doltgres en non-prod / Postgres en prod", () => {
+		const cfg = defaultInstanceConfig();
+		const dev = envStackOf("dev", cfg);
+		const prod = envStackOf("prod", cfg);
+		expect(dev).toHaveLength(STACK_SERVICES.length);
+		expect(envStackOf("dev", cfg)).toEqual(dev); // déterministe
+		const devApp = dev.find((s) => s.key === "app");
+		expect(devApp?.url).toContain("dev");
+		expect(devApp?.url).not.toContain("%env%");
+		// ADR 0006 : la donnée versionnée en non-prod (doltgres), Postgres en prod.
+		expect(dev.find((s) => s.key === "db")?.url).toContain("doltgres");
+		expect(prod.find((s) => s.key === "db")?.url).toContain("postgres");
 	});
 });

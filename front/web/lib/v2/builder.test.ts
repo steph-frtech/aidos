@@ -419,3 +419,31 @@ describe("codeDeltaFor — « quelles fonctions exactes » derrière un écart d
 		expect(a[0].waveSize).toBe(0);
 	});
 });
+
+describe("L'ÉCHELLE PARAMÉTRABLE — le cliquet tient sur N'IMPORTE QUELLE échelle déclarée", () => {
+	it("une échelle sur mesure (dev → preprod → prod) : chaque barreau exige le précédent", () => {
+		const ladder = ["dev", "preprod", "prod"];
+		let st = initBuilderState([], undefined, ladder);
+		expect(st.ladder).toEqual(ladder);
+		expect(Object.keys(st.envs)).toEqual(ladder);
+		st = applyIntent(
+			st,
+			"capture l'idée : au checkout, débiter une seule fois",
+		).state;
+		st = applyIntent(st, "promeus la dernière idée").state;
+		// preprod direct → refusé (dev d'abord)
+		expect(
+			applyIntent(st, "déploie l'application en preprod").events.some(
+				(e) => e.kind === "refus",
+			),
+		).toBe(true);
+		// dev → preprod → prod : la même version monte chaque barreau déclaré
+		const d = applyIntent(st, "déploie l'application en dev");
+		const pp = applyIntent(d.state, "déploie l'application en preprod");
+		expect(
+			pp.events.some((e) => e.kind === "deploiement" && e.env === "preprod"),
+		).toBe(true);
+		const pr = applyIntent(pp.state, "déploie l'application en prod");
+		expect(pr.state.envs.prod?.version).toBe(d.state.envs.dev?.version);
+	});
+});
