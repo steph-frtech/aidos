@@ -171,6 +171,17 @@ export const SCREENS: readonly ScreenEntry[] = [
 		fr: { title: "Code (descente) — la descente continue sous la feuille" },
 		en: { title: "Code (descent) — the descent continues below the leaf" },
 	},
+	{
+		slug: "builder",
+		concept: null,
+		fr: {
+			title: "IA Builder — le chat qui fait tout (par la grammaire fermée)",
+		},
+		en: {
+			title:
+				"AI Builder — the chat that does everything (through the closed grammar)",
+		},
+	},
 ];
 
 const BY_SLUG: ReadonlyMap<string, ScreenEntry> = new Map(
