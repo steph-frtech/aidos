@@ -1,5 +1,6 @@
 # Step-Verifier Memory Index
 
+- [DP04 envemit](project_dp04_envemit.md) — .env.example+scripts emitter verified green ZERO corrections; verifier re-derived Go hashes (throwaway test) == TS pins; prod /stack-emit 404 = pre-DP03 build expected; validation_humaine still 0 hits.
 - [DP03 composeemit](project_dp03_composeemit.md) — Target additif docker-compose verified green ZERO corrections; noTemplateCurlyInString scar pre-suppressed by executor (1st clean DP biome); validation_humaine STILL 0 hits (report overstated "câblées v3").
 - [DP01 stack spike](project_dp01_stack_spike.md) — 1st DP-track SPIKE-gate GO verified; SCAR biome noTemplateCurlyInString on literal compose ${VAR} strings (expect on every DP emitter, suppress with reason); v3 regression spec=v3.spec.ts 16 tests; 2 user reqs not yet existing.
 - [DP02 stackmanifest](project_dp02_stackmanifest.md) — Kernel source engraved, verified green after 1 biome fix; DP01 noTemplateCurlyInString scar RECURRED on e2e literal ${APP_DATA_PATH} — always re-run biome on DP steps; user-reqs: dev-URL lives in infra/ not front/web, validation_humaine still 0 hits.

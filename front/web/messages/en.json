@@ -5363,7 +5363,19 @@
 		"coherenceKo": "a ${VAR} the compose references is missing from the .env.example",
 		"emittedEnvVerdict": ".env.example emitted — output_hash:",
 		"envSameHash": "same manifest → same .env.example output_hash (byte-identical emission)",
-		"envNewOutput": "modified manifest → NEW .env.example output_hash"
+		"envNewOutput": "modified manifest → NEW .env.example output_hash",
+		"bundleHeading": "The complete bundle emitted from the phase (DP05)",
+		"bundleBody": "EmitStack(phase) composes DP03+DP04 into ONE complete, deterministic stack emission from a stable DAG phase (S23, reusing S78): docker-compose.yml + .env.example + start.sh + start_with_rebuild.sh + the Traefik dynamic config. The phase is the AUTHORITATIVE source: same content-addressed phase → same bytes on every machine (the cornerstone mirror). A hand-edited gen/ file blocks the whole re-emission (EMITTED_FILE_HAND_EDITED, fail-closed). Preview (DP25) and deploy (DP26) REUSE this function — they never choose between artifacts, they re-emit.",
+		"phaseVersionLabel": "phase_version (the S23 address of the phase pinning the manifest)",
+		"bundleHashLabel": "bundle_hash (phase + the 5 artifacts — “re-emit twice, equal hashes”)",
+		"sidecarLabel": "Go interpreter sidecar (ADR 0040 Decision 7)",
+		"sidecarAbsent": "no role=interpreter service declared",
+		"traefikLabel": "traefik.dynamic.yml (file provider — references, never a value)",
+		"traefikOutputHashLabel": "traefik.dynamic.yml output_hash",
+		"handEditLabel": "Closed hand-edit refusal code (the whole re-emission is blocked)",
+		"emittedBundleVerdict": "Complete bundle re-emitted — bundle_hash:",
+		"bundleSameHash": "same phase → same bundle_hash (the 5 artifacts byte-identical)",
+		"bundleNewOutput": "modified manifest → NEW phase, NEW bundle_hash (the emission follows the source, never the reverse)"
 	},
 	"provision": {
 		"eyebrow": "S89 · datastore provisioning",

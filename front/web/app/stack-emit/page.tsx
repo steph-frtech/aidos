@@ -2,13 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
-import {
-	composeEnvRefs,
-	emitEnvBundle,
-	envKeys,
-	isClean,
-} from "@/lib/env-emit";
-import { emitCompose } from "@/lib/stack-emit";
+import { composeEnvRefs, envKeys, isClean } from "@/lib/env-emit";
+import { emitStackBundle } from "@/lib/phase-emit";
 import { exampleManifest } from "@/lib/stack-manifest";
 import { StackEmitPanel } from "./StackEmitPanel";
 
@@ -40,24 +35,29 @@ export default async function StackEmitPage() {
 	const ctx = await activeProjectContext();
 	const t = await getTranslations("stackEmit");
 	const manifest = exampleManifest();
-	const seeded = await emitCompose(manifest);
-	if ("refusal" in seeded) {
+	// DP05 — ONE composition seeds the COMPLETE bundle from the manifest
+	// pinned in its S23 phase (PhaseFor): DP03 compose + DP04 env bundle +
+	// the traefik dynamic config, triple-addressed (phase_version ·
+	// source_hash · bundle_hash). Scan + coherence are COMPUTED
+	// deterministically server-side (code, never an LLM).
+	const seededBundle = await emitStackBundle(manifest);
+	if ("refusal" in seededBundle) {
 		// The pinned Example is always valid; a refusal here is a programming
 		// bug surfaced loudly (never silently swallowed).
-		throw new Error(`seeded manifest refused: ${seeded.refusal.code}`);
+		throw new Error(`seeded bundle refused: ${seededBundle.refusal.code}`);
 	}
-	// DP04 — the SAME manifest seeds the .env.example + scripts emission (the
-	// engraved merge order, secret references only). Scan + coherence are
-	// COMPUTED deterministically server-side (code, never an LLM).
-	const seededEnv = await emitEnvBundle(manifest);
-	if ("refusal" in seededEnv) {
-		throw new Error(`seeded env bundle refused: ${seededEnv.refusal.code}`);
-	}
+	const seeded = seededBundle.compose;
+	const seededEnv = seededBundle.env;
 	const seededKeys = new Set(envKeys(seededEnv.envExample.text));
-	const seededEnvClean = isClean(seededEnv.envExample.text);
-	const seededCoherent = composeEnvRefs(seeded.yaml).every((ref) =>
-		seededKeys.has(ref),
+	const seededEnvClean =
+		isClean(seededEnv.envExample.text) &&
+		isClean(seededBundle.traefikDynamic.text);
+	const seededCoherent = [seeded.yaml, seededBundle.traefikDynamic.text].every(
+		(src) => composeEnvRefs(src).every((ref) => seededKeys.has(ref)),
 	);
+	// ADR 0040 D7 — the Go interpreter sidecar declared by the manifest.
+	const sidecar =
+		manifest.services.find((s) => s.role === "interpreter") ?? null;
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -102,6 +102,10 @@ export default async function StackEmitPage() {
 						seededEnv={seededEnv}
 						seededEnvClean={seededEnvClean}
 						seededCoherent={seededCoherent}
+						seededPhaseVersion={seededBundle.phaseVersion}
+						seededBundleHash={seededBundle.bundleHash}
+						seededTraefik={seededBundle.traefikDynamic}
+						sidecar={sidecar}
 					/>
 				</div>
 			</main>

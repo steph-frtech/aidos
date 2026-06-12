@@ -409,6 +409,17 @@ const (
 	// (required ≤ declared, and never A8-on-critical), never an LLM judgment (§6/§8).
 	// ADDED at FK10 — additive enum extension (change_type: refine, never a removal).
 	CodeAgentAutonomyExceeded Code = "AGENT_AUTONOMY_EXCEEDED"
+	// CodeEmittedFileHandEdited — the full-stack PHASE EMITTER (DP05,
+	// back/runtime/stackemit, ROADMAP-provisioning-deploy EPIC A) refused to RE-EMIT a
+	// stack bundle because an emitted gen/ file on disk was HAND-EDITED: its bytes no
+	// longer hash to the output_hash the emitter recorded in the ledger (the S78 drift
+	// law, records.Hash inequality — COMPUTED, never an LLM judgment, §6/§8). The whole
+	// bundle is FAIL-CLOSED on the FIRST drift (sorted-path order): no partial re-emission
+	// silently overwrites a human edit (CLAUDE.md §9 anti-overwrite). The phase (source)
+	// is AUTHORITATIVE and the emitted code regenerable — never the reverse: to change the
+	// emission, change the SOURCE (idea → mirror → /goal), never the emitted file. ADDED
+	// at DP05 — additive enum extension (change_type: refine, never a removal).
+	CodeEmittedFileHandEdited Code = "EMITTED_FILE_HAND_EDITED"
 )
 
 // Severity is the gravity marker of a refusal. The KRD §44.5 example uses
@@ -1057,6 +1068,22 @@ var reasons = map[Code]BlockReason{
 			"freeze_the_higher_level_via_goal : la montée calculée est une PROPOSITION ; le nouveau niveau n'est figé qu'au-dessus de la ligne via idée → miroir → /goal → approbation (le mur §2).",
 		},
 	},
+	CodeEmittedFileHandEdited: {
+		Code:     CodeEmittedFileHandEdited,
+		Severity: SeverityBlocking,
+		Explanation: "La ré-émission du bundle de stack est REFUSÉE (DP05, back/runtime/stackemit, EPIC A " +
+			"provisioning-deploy) : un fichier émis sous gen/ a été HAND-EDITÉ — ses octets sur disque ne hashent " +
+			"plus vers l'output_hash que l'émetteur a enregistré dans le ledger (la loi de drift S78 : une inégalité " +
+			"de records.Hash, CALCULÉE, jamais un jugement LLM, §6/§8). Le bundle ENTIER est fail-closed au PREMIER " +
+			"drift (ordre de chemins trié) : aucune ré-émission partielle n'écrase silencieusement une édition humaine " +
+			"(CLAUDE.md §9 anti-overwrite). La phase (source) est AUTORITATIVE et le code émis régénérable — jamais " +
+			"l'inverse : pour changer l'émission, changez la SOURCE (idée → miroir → /goal), jamais le fichier émis.",
+		HowToFix: []string{
+			"restore_the_emitted_file : restaurez le fichier gen/ à ses octets émis (git checkout / ré-émission depuis la phase) — gen/ n'est JAMAIS édité à la main (CLAUDE.md §4).",
+			"change_the_source_not_the_projection : si l'édition portait une intention réelle, portez-la dans le StackManifest (au-dessus de la ligne, via idée → miroir → /goal → approbation) puis ré-émettez — l'émission est byte-identique à chaque run.",
+			"re_emit_from_the_phase : relancez EmitStack(phase) une fois le disque fidèle — même phase content-adressée → mêmes octets sur toute machine (le miroir-pierre-angulaire DP05).",
+		},
+	},
 }
 
 // codeOrder is the canonical enumeration order of the Code enum. Declared, never
@@ -1100,6 +1127,7 @@ var codeOrder = []Code{
 	CodeEnvPromoteNotStable,
 	CodeRollbackNotEarlier,
 	CodeAgentAutonomyExceeded,
+	CodeEmittedFileHandEdited,
 }
 
 // Codes returns every Code in the closed enum, in canonical order.

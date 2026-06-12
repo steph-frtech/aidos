@@ -1,0 +1,45 @@
+# 2026/06/13 00:14:27.641314 [TestProperty_Coherence_AllRefsHaveKeys] [rapid] draw app: "a"
+# 2026/06/13 00:14:27.641319 [TestProperty_Coherence_AllRefsHaveKeys] [rapid] draw n_services: 1
+# 2026/06/13 00:14:27.641322 [TestProperty_Coherence_AllRefsHaveKeys] [rapid] draw svc_name_0: "a"
+# 2026/06/13 00:14:27.641325 [TestProperty_Coherence_AllRefsHaveKeys] [rapid] draw svc_port_0: 1024
+# 2026/06/13 00:14:27.641326 [TestProperty_Coherence_AllRefsHaveKeys] [rapid] draw svc_role_0: 0
+# 2026/06/13 00:14:27.641328 [TestProperty_Coherence_AllRefsHaveKeys] [rapid] draw svc_image_0: ""
+# 2026/06/13 00:14:27.641329 [TestProperty_Coherence_AllRefsHaveKeys] [rapid] draw svc_profile_0: 0
+# 2026/06/13 00:14:27.641330 [TestProperty_Coherence_AllRefsHaveKeys] [rapid] draw svc_hc_0: ""
+# 2026/06/13 00:14:27.641331 [TestProperty_Coherence_AllRefsHaveKeys] [rapid] draw n_volumes: 0
+# 2026/06/13 00:14:27.641333 [TestProperty_Coherence_AllRefsHaveKeys] [rapid] draw n_scopes: 0
+# 2026/06/13 00:14:27.641334 [TestProperty_Coherence_AllRefsHaveKeys] [rapid] draw net_external: false
+# 2026/06/13 00:14:27.641501 [TestProperty_Coherence_AllRefsHaveKeys] reference ${VAR} has no key in the .env.example
+# 
+v0.4.8#3503029115555424245
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

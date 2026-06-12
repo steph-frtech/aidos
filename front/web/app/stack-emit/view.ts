@@ -36,6 +36,16 @@ export interface EmitView {
 	coherent?: boolean;
 	/** DP04 — whether the re-emitted .env.example output_hash equals the seeded one. */
 	sameEnvAsSeeded?: boolean;
+	/** DP05 — the S23 content address of the phase pinning the manifest. */
+	phaseVersion?: string;
+	/** DP05 — the bundle's own output address (phase + the 5 artifacts). */
+	bundleHash?: string;
+	/** DP05 — the emitted traefik dynamic config (file provider, references only). */
+	traefikText?: string;
+	/** DP05 — records.Hash(traefik.dynamic.yml bytes). */
+	traefikOutputHash?: string;
+	/** DP05 — « ré-émettre deux fois, hash égaux » : re-emitted bundle_hash == seeded. */
+	sameBundleAsSeeded?: boolean;
 }
 
 export const EMIT_INITIAL: EmitView = { ok: false };

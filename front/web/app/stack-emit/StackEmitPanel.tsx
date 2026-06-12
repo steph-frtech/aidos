@@ -4,8 +4,9 @@ import { useTranslations } from "next-intl";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { EnvBundle } from "@/lib/env-emit";
+import type { TraefikArtifact } from "@/lib/phase-emit";
 import type { ComposeArtifact } from "@/lib/stack-emit";
-import type { StackManifest } from "@/lib/stack-manifest";
+import type { Service, StackManifest } from "@/lib/stack-manifest";
 import { emitAction } from "./actions";
 import { EMIT_INITIAL, type EmitView } from "./view";
 
@@ -46,6 +47,10 @@ export function StackEmitPanel({
 	seededEnv,
 	seededEnvClean,
 	seededCoherent,
+	seededPhaseVersion,
+	seededBundleHash,
+	seededTraefik,
+	sidecar,
 }: {
 	activeProjectId: string | null;
 	manifest: StackManifest;
@@ -56,6 +61,14 @@ export function StackEmitPanel({
 	seededEnvClean: boolean;
 	/** DP04 — the DP03↔DP04 coherence verdict on the seeded emission. */
 	seededCoherent: boolean;
+	/** DP05 — the S23 content address of the phase pinning the manifest. */
+	seededPhaseVersion: string;
+	/** DP05 — the bundle's own output address (phase + the 5 artifacts). */
+	seededBundleHash: string;
+	/** DP05 — the seeded traefik dynamic config (file provider, references only). */
+	seededTraefik: TraefikArtifact;
+	/** ADR 0040 D7 — the Go interpreter sidecar declared by the manifest. */
+	sidecar: Service | null;
 }) {
 	const t = useTranslations("stackEmit");
 	const [state, action] = useActionState<EmitView, FormData>(
@@ -257,6 +270,92 @@ export function StackEmitPanel({
 				</dl>
 			</section>
 
+			{/* DP05 — the COMPLETE bundle emitted from the phase: phase_version
+			    (S23) + bundle_hash (« même phase → mêmes octets ») + the traefik
+			    dynamic config + the Go interpreter sidecar (ADR 0040 D7) */}
+			<section
+				data-testid="bundle-card"
+				className="rounded-xl border border-border bg-card p-5"
+			>
+				<h2 className="text-sm font-semibold tracking-tight text-foreground">
+					{t("bundleHeading")}
+				</h2>
+				<p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+					{t("bundleBody")}
+				</p>
+
+				<dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+					<div className="rounded-lg bg-muted/40 p-3">
+						<dt className="font-medium text-muted-foreground">
+							{t("phaseVersionLabel")}
+						</dt>
+						<dd
+							data-testid="phase-version"
+							className="mt-1 break-all font-mono text-foreground"
+						>
+							{seededPhaseVersion}
+						</dd>
+					</div>
+					<div className="rounded-lg bg-muted/40 p-3">
+						<dt className="font-medium text-muted-foreground">
+							{t("bundleHashLabel")}
+						</dt>
+						<dd
+							data-testid="bundle-hash"
+							className="mt-1 break-all font-mono text-foreground"
+						>
+							{seededBundleHash}
+						</dd>
+					</div>
+				</dl>
+
+				<div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+					<span className="font-medium text-muted-foreground">
+						{t("sidecarLabel")}:
+					</span>
+					<span
+						data-testid="sidecar-badge"
+						data-present={sidecar ? "true" : "false"}
+						className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 font-mono"
+					>
+						{sidecar
+							? `${sidecar.name} · role=interpreter · profile ${sidecar.profile} · :${sidecar.internal_port}`
+							: t("sidecarAbsent")}
+					</span>
+				</div>
+
+				<h3 className="mt-5 text-xs font-semibold text-foreground">
+					{t("traefikLabel")}
+				</h3>
+				<pre
+					data-testid="traefik-dynamic"
+					className="mt-2 max-h-96 overflow-auto rounded-lg bg-muted/40 p-4 font-mono text-xs leading-relaxed text-foreground"
+				>
+					{seededTraefik.text}
+				</pre>
+				<dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+					<div className="rounded-lg bg-muted/40 p-3">
+						<dt className="font-medium text-muted-foreground">
+							{t("traefikOutputHashLabel")}
+						</dt>
+						<dd
+							data-testid="traefik-output-hash"
+							className="mt-1 break-all font-mono text-foreground"
+						>
+							{seededTraefik.outputHash}
+						</dd>
+					</div>
+					<div className="rounded-lg bg-muted/40 p-3">
+						<dt className="font-medium text-muted-foreground">
+							{t("handEditLabel")}
+						</dt>
+						<dd className="mt-1 font-mono text-foreground">
+							EMITTED_FILE_HAND_EDITED
+						</dd>
+					</div>
+				</dl>
+			</section>
+
 			{/* the closed kind × target matrix — the target is ADDITIVE, never invented */}
 			<section
 				data-testid="target-matrix"
@@ -281,6 +380,10 @@ export function StackEmitPanel({
 					·{" "}
 					<span className="rounded bg-muted px-1.5 py-0.5 font-semibold">
 						stack_manifest × (env-example · start-scripts) — DP04
+					</span>{" "}
+					·{" "}
+					<span className="rounded bg-muted px-1.5 py-0.5 font-semibold">
+						stack_manifest × traefik-dynamic + EmitStack(phase) — DP05
 					</span>
 				</p>
 			</section>
@@ -306,6 +409,11 @@ export function StackEmitPanel({
 						type="hidden"
 						name="seededEnvOutputHash"
 						value={seededEnv.envExample.outputHash}
+					/>
+					<input
+						type="hidden"
+						name="seededBundleHash"
+						value={seededBundleHash}
 					/>
 					<textarea
 						name="manifestJson"
@@ -379,6 +487,39 @@ export function StackEmitPanel({
 							className="mt-3 max-h-72 overflow-auto rounded-lg bg-background p-3 font-mono leading-relaxed text-foreground"
 						>
 							{state.envText}
+						</pre>
+
+						{/* DP05 — the full bundle re-emitted: « ré-émettre deux fois,
+						    hash égaux » is ONE comparison (bundle_hash) */}
+						<p className="mt-4 font-medium text-foreground">
+							{t("emittedBundleVerdict")}
+						</p>
+						<p
+							data-testid="emitted-bundle-hash"
+							className="mt-1 break-all font-mono text-muted-foreground"
+						>
+							{state.bundleHash}
+						</p>
+						<p
+							data-testid="bundle-hash-compare"
+							data-same={state.sameBundleAsSeeded ? "true" : "false"}
+							className="mt-1 text-muted-foreground"
+						>
+							{state.sameBundleAsSeeded
+								? t("bundleSameHash")
+								: t("bundleNewOutput")}
+						</p>
+						<p
+							data-testid="emitted-phase-version"
+							className="mt-1 break-all font-mono text-muted-foreground"
+						>
+							{state.phaseVersion}
+						</p>
+						<pre
+							data-testid="emitted-traefik"
+							className="mt-3 max-h-72 overflow-auto rounded-lg bg-background p-3 font-mono leading-relaxed text-foreground"
+						>
+							{state.traefikText}
 						</pre>
 					</div>
 				) : null}
