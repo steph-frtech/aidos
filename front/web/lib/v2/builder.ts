@@ -30,6 +30,13 @@
  */
 
 import {
+	type AnchorSuggestion,
+	anchorSymbols,
+	type CodeEdge,
+	type CodeNode,
+	impactOf,
+} from "./code-graph";
+import {
 	growComposes,
 	nodeByPath,
 	nodePath,
@@ -39,6 +46,7 @@ import {
 import { type MirrorSpec, type ProposedKernel, promoteIdea } from "./goal";
 import { composeIdea, type Idea } from "./idea";
 import type { KernelNode } from "./kernel-tree";
+import { SCREENS } from "./screens";
 
 /** Le jeu CLOS des intentions — tout ce que le chat sait faire, déclaré, rien d'autre. */
 export const INTENT_KINDS = [
@@ -50,8 +58,24 @@ export const INTENT_KINDS = [
 	"delta",
 	"impacter",
 	"interroger",
+	"ouvrir",
 ] as const;
 export type IntentKind = (typeof INTENT_KINDS)[number];
+
+/**
+ * L'ÉCHELLE D'ENVIRONNEMENTS — DÉCLARÉE, close, ORDONNÉE (le cliquet généralisé) :
+ * déployer au barreau i exige que la MÊME version soit posée au barreau i-1 ; toute
+ * nouvelle promotion ré-arme chaque barreau supérieur. Étendre l'échelle = déclarer
+ * un barreau ici (une donnée), jamais coder un cas.
+ */
+export const ENV_LADDER = ["test", "staging", "prod"] as const;
+export type EnvName = (typeof ENV_LADDER)[number];
+
+/** Une référence d'ÉCRAN du Workbench (v1 ou v2) — l'inventaire est une DONNÉE. */
+export interface ScreenRef {
+	readonly route: string;
+	readonly label: string;
+}
 
 /** Un candidat de classement : une intention possible + son score d'accroche. */
 export interface IntentCandidate {
@@ -78,13 +102,15 @@ export interface BuilderEvent {
 		| "impact_calcule"
 		| "etat_lu"
 		| "app_generee"
-		| "deploiement_test"
-		| "deploiement_prod"
+		| "deploiement"
 		| "delta_calcule"
+		| "ecran_ouvert"
 		| "refus";
 	readonly detail: string;
-	/** La référence content-adressée touchée (chemin, id d'idée, version…). */
+	/** La référence content-adressée touchée (chemin, id d'idée, version, route…). */
 	readonly ref: string;
+	/** Le barreau d'environnement concerné (déploiements/refus d'échelle). */
+	readonly env?: EnvName;
 }
 
 /** Un IMPACT calculé (« quoi est touché ») — la vague, jamais estimée. */
@@ -106,11 +132,10 @@ export interface BuilderState {
 	readonly tree: readonly KernelNode[];
 	readonly ideas: readonly Idea[];
 	readonly kernels: readonly ProposedKernel[];
-	/** Les deux environnements (le CLIQUET : la prod exige le test de la MÊME version). */
-	readonly envs: {
-		readonly test: Deployment | null;
-		readonly prod: Deployment | null;
-	};
+	/** L'échelle d'environnements (le CLIQUET généralisé sur ENV_LADDER — une donnée). */
+	readonly envs: Readonly<Record<EnvName, Deployment | null>>;
+	/** L'inventaire des ÉCRANS atteignables (v2 = le registre déclaré ; v1 = injecté en données). */
+	readonly screens: readonly ScreenRef[];
 	readonly log: readonly BuilderEvent[];
 }
 
@@ -122,12 +147,21 @@ export interface ApplyResult {
 }
 
 /** L'état initial : l'arbre seed (un SEUL produit racine), rien d'autre. */
-export function initBuilderState(): BuilderState {
+export function initBuilderState(
+	extraScreens: readonly ScreenRef[] = [],
+): BuilderState {
+	// Le registre V2 (déclaré, clos) est TOUJOURS couvert ; les écrans V1 s'injectent
+	// en données (l'inventaire vient du scan serveur, jamais codé en dur ici).
+	const v2: ScreenRef[] = SCREENS.map((e) => ({
+		route: `/v2/${e.slug}`,
+		label: `${e.slug} ${e.fr.title} ${e.en.title}`,
+	}));
 	return {
 		tree: seedComposes(),
 		ideas: [],
 		kernels: [],
-		envs: { test: null, prod: null },
+		envs: { test: null, staging: null, prod: null },
+		screens: [...v2, ...extraScreens],
 		log: [],
 	};
 }
@@ -189,7 +223,11 @@ const LEXICONS: Record<
 	},
 	deployer: {
 		strong: ["deploie", "deployer", "deploiement", "livre", "livrer"],
-		weak: ["production", "prod", "ligne", "mettre"],
+		weak: ["production", "prod", "staging", "ligne", "mettre"],
+	},
+	ouvrir: {
+		strong: ["ouvre", "ouvrir", "ecran", "panneau", "navigue"],
+		weak: ["page", "route", "aller", "vers"],
 	},
 };
 
@@ -222,6 +260,19 @@ export function classifyIntent(text: string): IntentCandidate[] {
 export function understand(state: BuilderState, text: string): Understanding {
 	void state;
 	const candidates = classifyIntent(text);
+	// RÈGLE DÉCLARÉE « l'impératif de navigation commande » : `ouvre`/`ouvrir`/`navigue`
+	// en TÊTE de message ⇒ intention `ouvrir`, toujours. C'est le seul intent dont la
+	// charge utile CITE naturellement le vocabulaire des autres (les titres d'écrans
+	// contiennent « idée », « goal », « déployer »…) — sans cette règle, la loi de
+	// couverture (∀ écran atteignable) serait fausse. Déterministe, épinglée au miroir.
+	const first = text
+		.normalize("NFD")
+		.replace(/[̀-ͯ]/g, "")
+		.toLowerCase()
+		.split(/[^a-z0-9]+/)
+		.find((t) => t.length >= 3);
+	if (first === "ouvre" || first === "ouvrir" || first === "navigue")
+		return { status: "comprise", candidates, attente: "ouvrir" };
 	const top = candidates[0];
 	if (top.score === 0)
 		return { status: "incomprise", candidates, attente: null };
@@ -328,6 +379,87 @@ export function emitApp(state: BuilderState): AppProjection {
 		entities,
 		routes: entities.map((e) => `/${e.name}`),
 	};
+}
+
+/** Plie un texte en tokens (le même schéma que la grammaire). */
+function screenTokens(text: string): Set<string> {
+	return new Set(
+		text
+			.normalize("NFD")
+			.replace(/[̀-ͯ]/g, "")
+			.toLowerCase()
+			.split(/[^a-z0-9]+/)
+			.filter((t) => t.length >= 3),
+	);
+}
+
+/**
+ * RÉSOUT un écran depuis un message — la COUVERTURE TOTALE du Workbench (« il sait
+ * tout faire ») : score lexical contre l'inventaire DÉCLARÉ (le registre V2 + les
+ * écrans V1 injectés en données), +3 par token du slug de route, +1 par token de
+ * libellé ; départage stable par route. Aucune accroche → null (fail-closed, jamais
+ * une invention). PURE & TOTALE & DÉTERMINISTE. La LOI DE COUVERTURE du miroir
+ * prouve : ∀ écran du registre, « ouvre <titre> » résout vers SA route.
+ */
+export function resolveScreen(
+	screens: readonly ScreenRef[],
+	text: string,
+): ScreenRef | null {
+	const tokens = screenTokens(text);
+	let best: { s: ScreenRef; score: number } | null = null;
+	for (const sc of screens) {
+		const routeTokens = screenTokens(sc.route.replace(/[/-]/g, " "));
+		const labelTokens = screenTokens(sc.label);
+		let score = 0;
+		for (const t of tokens) {
+			if (routeTokens.has(t)) score += 3;
+			if (labelTokens.has(t)) score += 1;
+		}
+		if (
+			best === null ||
+			score > best.score ||
+			(score === best.score && sc.route < best.s.route)
+		)
+			best = { s: sc, score };
+	}
+	return best === null || best.score === 0 ? null : best.s;
+}
+
+/** Une ligne du DELTA AU GRAIN CODE : un kernel d'écart → ses fonctions ancrées + la vague. */
+export interface CodeDelta {
+	/** La version du kernel en écart. */
+	readonly kernelVersion: string;
+	/** Les fonctions/classes ancrées (ADR 0056 — « telle classe, telle fonction »). */
+	readonly anchors: readonly AnchorSuggestion[];
+	/** La taille de la vague de rouge code (impactOf de la meilleure ancre). */
+	readonly waveSize: number;
+}
+
+/**
+ * Le DELTA AU GRAIN CODE (ADR 0056 × ADR 0058) : pour chaque kernel d'écart, les
+ * SYMBOLES de code ancrés (anchorSymbols sur sa coordonnée — « quelles fonctions
+ * exactes ») et la taille de leur vague (impactOf). PURE & TOTALE & DÉTERMINISTE :
+ * un graphe de code vide → des ancres vides, jamais une erreur.
+ */
+export function codeDeltaFor(
+	kernels: readonly ProposedKernel[],
+	tree: readonly KernelNode[],
+	codeNodes: readonly CodeNode[],
+	codeEdges: readonly CodeEdge[],
+): CodeDelta[] {
+	return kernels.map((k) => {
+		const anchors = anchorSymbols(
+			tree,
+			codeNodes,
+			codeEdges,
+			k.coordinate.scale,
+		).slice(0, 3);
+		const waveSize =
+			anchors.length === 0
+				? 0
+				: impactOf(codeNodes, codeEdges, anchors[0].nodeId).length;
+		return { kernelVersion: k.version, anchors, waveSize };
+	});
 }
 
 /**
@@ -574,9 +706,13 @@ export function applyIntent(state: BuilderState, text: string): ApplyResult {
 
 		case "deployer": {
 			const folded = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-			const env: "test" | "prod" = /\bprod(uction)?\b/.test(folded)
-				? "prod"
-				: "test";
+			// Le barreau visé : le PLUS HAUT nommé dans le message ; défaut = le premier (test).
+			let env: EnvName = ENV_LADDER[0];
+			for (const e of ENV_LADDER)
+				if (
+					new RegExp(`\\b${e === "prod" ? "prod(uction)?" : e}\\b`).test(folded)
+				)
+					env = e;
 			if (state.kernels.length === 0)
 				return finish(
 					state,
@@ -585,47 +721,42 @@ export function applyIntent(state: BuilderState, text: string): ApplyResult {
 							kind: "refus",
 							detail: `rien à déployer en ${env} : aucun kernel proposé`,
 							ref: "",
+							env,
 						},
 					],
 					[],
 				);
 			const app = emitApp(state);
+			const rung = ENV_LADDER.indexOf(env);
+			// LE CLIQUET GÉNÉRALISÉ : le barreau précédent doit porter CETTE version exacte.
+			if (rung > 0) {
+				const below = state.envs[ENV_LADDER[rung - 1]];
+				if (below === null || below.version !== app.version)
+					return finish(
+						state,
+						[
+							{
+								kind: "refus",
+								detail: `${env} REFUSÉ : la version courante ${app.version} n'est pas passée en ${ENV_LADDER[rung - 1]} (le cliquet — chaque barreau, dans l'ordre, toujours)`,
+								ref: app.version,
+								env,
+							},
+						],
+						[],
+					);
+			}
 			const deployment: Deployment = {
 				version: app.version,
 				kernelVersions: state.kernels.map((k) => k.version),
 			};
-			if (env === "test")
-				return finish(
-					{ ...state, envs: { ...state.envs, test: deployment } },
-					[
-						{
-							kind: "deploiement_test",
-							detail: `app ${app.version} déployée en TEST (${app.entities.length} entité(s))`,
-							ref: app.version,
-						},
-					],
-					[{ cible: app.version, type: "kernel" }],
-				);
-			// LE CLIQUET : la prod exige que CETTE version exacte soit passée en test.
-			if (state.envs.test === null || state.envs.test.version !== app.version)
-				return finish(
-					state,
-					[
-						{
-							kind: "refus",
-							detail: `prod REFUSÉE : la version courante ${app.version} n'est pas passée en test (le cliquet — test d'abord, toujours)`,
-							ref: app.version,
-						},
-					],
-					[],
-				);
 			return finish(
-				{ ...state, envs: { ...state.envs, prod: deployment } },
+				{ ...state, envs: { ...state.envs, [env]: deployment } },
 				[
 					{
-						kind: "deploiement_prod",
-						detail: `app ${app.version} déployée en PROD (promue depuis le test — le cliquet a mordu dans le bon sens)`,
+						kind: "deploiement",
+						detail: `app ${app.version} déployée en ${env.toUpperCase()} (${app.entities.length} entité(s))`,
 						ref: app.version,
+						env,
 					},
 				],
 				[{ cible: app.version, type: "kernel" }],
@@ -634,7 +765,12 @@ export function applyIntent(state: BuilderState, text: string): ApplyResult {
 
 		case "delta": {
 			const folded = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-			const env: "test" | "prod" = /\btest\b/.test(folded) ? "test" : "prod";
+			let env: EnvName = "prod";
+			for (const e of ENV_LADDER)
+				if (
+					new RegExp(`\\b${e === "prod" ? "prod(uction)?" : e}\\b`).test(folded)
+				)
+					env = e;
 			const target = state.envs[env];
 			if (target === null)
 				return finish(
@@ -663,6 +799,34 @@ export function applyIntent(state: BuilderState, text: string): ApplyResult {
 					},
 				],
 				drift.map((k) => ({ cible: k.version, type: "kernel" as const })),
+			);
+		}
+
+		case "ouvrir": {
+			const target = resolveScreen(state.screens, text);
+			if (target === null)
+				return finish(
+					state,
+					[
+						{
+							kind: "refus",
+							detail:
+								"écran introuvable dans l'inventaire déclaré (fail-closed — jamais une route inventée)",
+							ref: "",
+						},
+					],
+					[],
+				);
+			return finish(
+				state,
+				[
+					{
+						kind: "ecran_ouvert",
+						detail: `écran « ${target.label.split(" ").slice(1).join(" ") || target.label} » — ${target.route}`,
+						ref: target.route,
+					},
+				],
+				[],
 			);
 		}
 	}

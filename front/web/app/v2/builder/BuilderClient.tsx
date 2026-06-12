@@ -8,20 +8,25 @@ import {
 	type BuilderImpact,
 	type BuilderState,
 	classifyIntent,
+	codeDeltaFor,
 	type Deployment,
+	ENV_LADDER,
+	type EnvName,
 	emitApp,
 	type IntentKind,
 	initBuilderState,
+	type ScreenRef,
 	type Understanding,
 	understand,
 } from "@/lib/v2/builder";
+import type { CodeEdge, CodeNode } from "@/lib/v2/code-graph";
 import { nodePath, type Position, positionOf } from "@/lib/v2/composition";
 import {
 	buildKernelTree,
 	type KernelNode,
 	type TreeNode,
 } from "@/lib/v2/kernel-tree";
-import { reformulateAction } from "./actions";
+import { deployRealAction, reformulateAction } from "./actions";
 
 /**
  * WB2-27 — le CLIENT du IA Builder (ADR 0057) : UN chat qui fait tout, mais « tout » passe
@@ -53,9 +58,9 @@ interface Turn {
 }
 
 /**
- * Les amorces canoniques (prouvées par le miroir) — la grammaire FERMÉE à 8 intentions,
+ * Les amorces canoniques (prouvées par le miroir) — la grammaire FERMÉE à 9 intentions,
  * FRANÇAISE, verbatim : le CYCLE DE VIE COMPLET (capturer → greffer → promouvoir → générer
- * → déployer test → déployer prod → delta → impacter/interroger).
+ * → déployer test → staging → prod (l'échelle) → delta → impacter/interroger → ouvrir).
  */
 const SUGGESTIONS: readonly string[] = [
 	"greffe pommes sous app/catalogue",
@@ -63,10 +68,12 @@ const SUGGESTIONS: readonly string[] = [
 	"promeus la dernière idée",
 	"génère l'application",
 	"déploie l'application en test",
+	"déploie l'application en staging",
 	"déploie l'application en prod",
 	"montre le delta depuis la prod",
 	"quel impact si je modifie app/paiement",
 	"montre-moi l'état du projet",
+	"ouvre l'écran code",
 ];
 
 /** Le verbe FORT canonique par intention — le préfixe de désambiguïsation (déclaré, jamais appris). */
@@ -79,6 +86,7 @@ const FORCE_PREFIX: Record<IntentKind, string> = {
 	delta: "delta ",
 	impacter: "impact ",
 	interroger: "montre ",
+	ouvrir: "ouvre ",
 };
 
 /**
@@ -271,16 +279,35 @@ function EnvCard({
 	);
 }
 
-export function BuilderClient({ t }: { t: Strings }) {
+export function BuilderClient({
+	t,
+	v1Screens,
+	codeNodes,
+	codeEdges,
+}: {
+	t: Strings;
+	/** Les écrans V1 scannés côté serveur (app/<dir>) — injectés en DONNÉES dans le twin. */
+	v1Screens: readonly ScreenRef[];
+	/** Le graphe de code extrait côté serveur (le motif /v2/code) — le delta au grain code. */
+	codeNodes: readonly CodeNode[];
+	codeEdges: readonly CodeEdge[];
+}) {
 	// ── l'état d'écran event-sourcé : l'état réduit + les tours (append-only) ──────────
 	const [builderState, setBuilderState] = useState<BuilderState>(() =>
-		initBuilderState(),
+		initBuilderState(v1Screens),
 	);
 	const [turns, setTurns] = useState<readonly Turn[]>([]);
 	const [input, setInput] = useState("");
 	const [highlighted, setHighlighted] = useState<string | null>(null);
 	const [claudeBusy, setClaudeBusy] = useState<number | null>(null);
 	const [tab, setTab] = useState<TabId>("arbre");
+	// Le DÉPLOIEMENT RÉEL (ADR 0052) : le geste humain, son occupation et son résultat (URL live / panne).
+	const [realBusy, setRealBusy] = useState(false);
+	const [realResult, setRealResult] = useState<{
+		ok: boolean;
+		url: string | null;
+		detail: string;
+	} | null>(null);
 
 	// La référence vers l'état courant (évite une fermeture périmée après un await Claude).
 	const stateRef = useRef(builderState);
@@ -294,6 +321,7 @@ export function BuilderClient({ t }: { t: Strings }) {
 		delta: t.intentDelta,
 		impacter: t.intentImpacter,
 		interroger: t.intentInterroger,
+		ouvrir: t.intentOuvrir,
 	};
 	const tabLabel: Record<TabId, string> = {
 		arbre: t.tabArbre,
@@ -371,6 +399,40 @@ export function BuilderClient({ t }: { t: Strings }) {
 			: builderState.kernels.filter(
 					(k) => !env.kernelVersions.includes(k.version),
 				).length;
+
+	// Les libellés par BARREAU — l'échelle est une DONNÉE (ENV_LADDER) : ajouter un barreau
+	// au twin n'ajoute ici qu'une entrée de libellé, jamais un cas codé.
+	const envTitle: Record<EnvName, string> = {
+		test: t.envTestTitle,
+		staging: t.envStagingTitle,
+		prod: t.envProdTitle,
+	};
+	const envDeployLabel: Record<EnvName, string> = {
+		test: t.deployTestBtn,
+		staging: t.deployStagingBtn,
+		prod: t.deployProdBtn,
+	};
+
+	// Le DELTA AU GRAIN CODE (ADR 0056 × 0058) — « quelles fonctions exactes » par kernel
+	// proposé : recalculé à CHAQUE rendu sur le graphe extrait du source réel (jamais stocké).
+	const codeDelta = codeDeltaFor(
+		builderState.kernels,
+		builderState.tree,
+		codeNodes,
+		codeEdges,
+	);
+
+	/** Le GESTE HUMAIN (ADR 0052) : déclencher le pipeline réel /ai-lab — server action, gatée par envs.prod. */
+	const runRealDeploy = async () => {
+		setRealBusy(true);
+		try {
+			setRealResult(await deployRealAction());
+		} catch {
+			setRealResult({ ok: false, url: null, detail: "action indisponible" });
+		} finally {
+			setRealBusy(false);
+		}
+	};
 
 	return (
 		<div className="grid gap-6 lg:grid-cols-[11fr_9fr]">
@@ -483,13 +545,31 @@ export function BuilderClient({ t }: { t: Strings }) {
 															: "border-border bg-card text-muted-foreground",
 													].join(" ")}
 												>
-													{e.kind}
+													{/* un déploiement porte son BARREAU (deploiement · test|staging|prod) */}
+													{e.env !== undefined
+														? `${e.kind} · ${e.env}`
+														: e.kind}
 												</span>
 												<span className="leading-relaxed">{e.detail}</span>
-												{e.ref !== "" && (
-													<span className="ml-auto font-mono text-[10px] text-muted-foreground">
-														{e.ref}
-													</span>
+												{/* un écran ouvert devient une PUCE DE NAVIGATION — le chat atteint TOUT le Workbench */}
+												{e.kind === "ecran_ouvert" ? (
+													<Link
+														href={e.ref}
+														data-testid="v2-builder-open-screen"
+														data-route={e.ref}
+														className="ml-auto flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/20"
+													>
+														<span>{t.openScreen}</span>
+														<span className="font-mono text-[10px]">
+															{e.ref} →
+														</span>
+													</Link>
+												) : (
+													e.ref !== "" && (
+														<span className="ml-auto font-mono text-[10px] text-muted-foreground">
+															{e.ref}
+														</span>
+													)
 												)}
 											</li>
 										))}
@@ -730,7 +810,8 @@ export function BuilderClient({ t }: { t: Strings }) {
 					</section>
 				)}
 
-				{/* · ENVIRONNEMENTS — test puis prod (le cliquet) ; les boutons ENVOIENT la phrase canonique au chat */}
+				{/* · ENVIRONNEMENTS — L'ÉCHELLE ENTIÈRE (ENV_LADDER, une donnée — le cliquet généralisé) ;
+				      les boutons ENVOIENT la phrase canonique au chat */}
 				{tab === "envs" && (
 					<section
 						data-testid="v2-builder-envs"
@@ -742,30 +823,118 @@ export function BuilderClient({ t }: { t: Strings }) {
 						<p className="text-xs leading-relaxed text-muted-foreground">
 							{t.envSendHint}
 						</p>
-						<EnvCard
-							testid="v2-builder-env-test"
-							title={t.envTestTitle}
-							env={builderState.envs.test}
-							drift={driftOf(builderState.envs.test)}
-							deployTestid="v2-builder-deploy-test"
-							deployLabel={t.deployTestBtn}
-							gateNote={null}
-							disabled={builderState.kernels.length === 0}
-							onDeploy={() => send("déploie l'application en test")}
-							t={t}
-						/>
-						<EnvCard
-							testid="v2-builder-env-prod"
-							title={t.envProdTitle}
-							env={builderState.envs.prod}
-							drift={driftOf(builderState.envs.prod)}
-							deployTestid="v2-builder-deploy-prod"
-							deployLabel={t.deployProdBtn}
-							gateNote={t.prodGateNote}
-							disabled={builderState.kernels.length === 0}
-							onDeploy={() => send("déploie l'application en prod")}
-							t={t}
-						/>
+						{ENV_LADDER.map((name, rung) => (
+							<EnvCard
+								key={name}
+								testid={`v2-builder-env-${name}`}
+								title={envTitle[name]}
+								env={builderState.envs[name]}
+								drift={driftOf(builderState.envs[name])}
+								deployTestid={`v2-builder-deploy-${name}`}
+								deployLabel={envDeployLabel[name]}
+								gateNote={rung === 0 ? null : t.envGateNote}
+								disabled={builderState.kernels.length === 0}
+								onDeploy={() => send(`déploie l'application en ${name}`)}
+								t={t}
+							/>
+						))}
+
+						{/* · DÉPLOIEMENT RÉEL (ADR 0052) — le GESTE HUMAIN (le clic) après l'échelle
+						      in-model : le bouton ne s'arme que lorsque envs.prod est posé ; le pipeline
+						      RÉUTILISÉ est celui du /ai-lab (deployStack — jamais un second chemin). */}
+						<div
+							data-testid="v2-builder-real-deploy"
+							className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3"
+						>
+							<span className="text-xs font-semibold text-foreground">
+								{t.realDeployHeading}
+							</span>
+							<p className="text-[10px] leading-relaxed text-muted-foreground italic">
+								{t.realDeployNote}
+							</p>
+							<button
+								type="button"
+								data-testid="v2-builder-deploy-real"
+								disabled={builderState.envs.prod === null || realBusy}
+								title={
+									builderState.envs.prod === null ? t.realDeployNote : undefined
+								}
+								onClick={runRealDeploy}
+								className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								{realBusy ? t.realDeployBusy : t.realDeployBtn}
+							</button>
+							{realResult !== null &&
+								(realResult.ok && realResult.url !== null ? (
+									<p className="text-xs text-foreground">
+										{t.realDeployUrlLabel} :{" "}
+										<a
+											data-testid="v2-builder-real-url"
+											href={realResult.url}
+											target="_blank"
+											rel="noreferrer"
+											className="font-medium text-primary hover:underline"
+										>
+											{realResult.url}
+										</a>
+									</p>
+								) : (
+									<p className="text-xs text-destructive">
+										{t.realDeployFailed} : {realResult.detail}
+									</p>
+								))}
+						</div>
+
+						{/* · LE DELTA AU GRAIN CODE (ADR 0056 × 0058) — « quelles fonctions exactes »
+						      par kernel proposé : les ancres (anchorSymbols) + la vague (impactOf),
+						      recalculées sur le graphe extrait du source réel. */}
+						<div
+							data-testid="v2-builder-code-delta"
+							className="space-y-2 rounded-md border border-border bg-muted/30 p-3"
+						>
+							<span className="text-xs font-semibold text-foreground">
+								{t.codeDeltaHeading}
+							</span>
+							{codeDelta.every((d) => d.anchors.length === 0) ? (
+								<p className="text-xs text-muted-foreground italic">
+									{t.codeDeltaEmpty}
+								</p>
+							) : (
+								<ul className="space-y-2">
+									{codeDelta.map((d) => (
+										<li key={d.kernelVersion} className="space-y-1">
+											<div className="flex flex-wrap items-center gap-2">
+												<span className="font-mono text-[10px] text-muted-foreground">
+													{d.kernelVersion}
+												</span>
+												<span className="rounded-full border border-destructive/30 bg-destructive/5 px-2 py-0.5 text-[10px] font-medium text-foreground">
+													{t.codeDeltaWaveLabel} : {d.waveSize}
+												</span>
+											</div>
+											<ul className="space-y-1">
+												{d.anchors.map((a) => (
+													<li key={a.nodeId}>
+														<Link
+															href="/v2/code"
+															data-testid="v2-builder-code-anchor"
+															className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+														>
+															<span className="font-medium">{a.name}</span>
+															<span className="font-mono text-[10px] text-muted-foreground">
+																{a.file}
+															</span>
+															<span className="ml-auto rounded bg-primary/10 px-1 font-mono text-[10px] text-primary">
+																{a.score}
+															</span>
+														</Link>
+													</li>
+												))}
+											</ul>
+										</li>
+									))}
+								</ul>
+							)}
+						</div>
 					</section>
 				)}
 
@@ -805,7 +974,7 @@ export function BuilderClient({ t }: { t: Strings }) {
 														: "border-border bg-muted text-muted-foreground",
 												].join(" ")}
 											>
-												{e.kind}
+												{e.env !== undefined ? `${e.kind} · ${e.env}` : e.kind}
 											</span>
 											<span className="text-muted-foreground">{e.detail}</span>
 										</li>

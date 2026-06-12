@@ -2,6 +2,7 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { deployStack } from "@/app/ai-lab/actions";
 import { INTENT_KINDS } from "@/lib/v2/builder";
 
 const execFileP = promisify(execFile);
@@ -71,4 +72,23 @@ export async function reformulateAction(
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * deployRealAction — le DÉPLOIEMENT RÉEL du builder (ADR 0052) : RÉUTILISE le pipeline
+ * /ai-lab (deployStack : réémission best-effort + docker compose up -d sur la stack fixe),
+ * jamais un second chemin de déploiement. L'exécution réelle est le GESTE HUMAIN (le clic),
+ * offert SEULEMENT après l'échelle in-model gravie jusqu'en prod (le cliquet généralisé) —
+ * l'écran gate le bouton sur envs.prod. LE MUR (§2) : une action au-dessous de la ligne
+ * (émettre + lancer l'app émise), aucune écriture-vérité.
+ */
+export async function deployRealAction(): Promise<{
+	ok: boolean;
+	url: string | null;
+	detail: string;
+}> {
+	const res = await deployStack();
+	return res.status === "up"
+		? { ok: true, url: res.url, detail: res.detail }
+		: { ok: false, url: null, detail: res.detail };
 }

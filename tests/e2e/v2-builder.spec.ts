@@ -13,9 +13,15 @@ import { expect, test } from "@playwright/test";
  *   - la promotion PROPOSE, n'applique pas : version k:, ChangeSet DRAFT, wroteKernel=false ;
  *   - l'AMBIGUÏTÉ est OFFERTE (chips), jamais tranchée en silence — cliquer une chip FORCE
  *     l'intention par un texte désambiguïsé qui repasse par le MÊME pipeline déterministe ;
- *   - le CYCLE DE VIE COMPLET est joué : générer → test → prod (LE CLIQUET) → delta — la
- *     prod est REFUSÉE tant que la version courante n'est pas passée en test, et une
- *     nouvelle promotion RÉARME la porte (l'écart redevient ≥ 1, la prod re-refuse) ;
+ *   - le CYCLE DE VIE COMPLET est joué sur L'ÉCHELLE ENTIÈRE (ENV_LADDER, une donnée) :
+ *     générer → test → staging → prod (LE CLIQUET GÉNÉRALISÉ : le barreau i exige la MÊME
+ *     version au barreau i-1) → delta — la prod est REFUSÉE tant que la version courante
+ *     n'a pas gravi chaque barreau, et une nouvelle promotion RÉARME chaque porte ;
+ *   - la COUVERTURE : le chat ouvre N'IMPORTE QUEL écran (le registre V2 déclaré + les
+ *     écrans V1 scannés côté serveur, injectés en DONNÉES) — « ouvre <titre> » → une puce
+ *     de navigation, jamais une route inventée (fail-closed) ;
+ *   - le DÉPLOIEMENT RÉEL (ADR 0052) est GATÉ : le bouton ne s'arme que lorsque envs.prod
+ *     est posé — et il n'est JAMAIS cliqué ici (run hermétique, pas de docker en e2e) ;
  *   - le mur intact : AUCUNE requête d'écriture sur toute la session (le bouton Claude n'est
  *     JAMAIS cliqué ici — le run reste hermétique, la grammaire fermée suffit).
  */
@@ -173,7 +179,7 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		await page.goto("/v2/builder");
 
 		// La session COMPLÈTE : un échantillon de la grammaire fermée + une ambiguïté forcée
-		// (le cycle de vie générer → test → prod → delta a SON test dédié ci-dessous).
+		// (le cycle de vie générer → test → staging → prod → delta a SON test dédié ci-dessous).
 		await send(page, "greffe pommes sous app/catalogue");
 		await send(
 			page,
@@ -206,7 +212,7 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		expect(writes).toEqual([]);
 	});
 
-	test("le CYCLE DE VIE COMPLET — générer → test → prod (le cliquet) → delta", async ({
+	test("le CYCLE DE VIE COMPLET — générer → test → staging → prod (le cliquet généralisé) → delta", async ({
 		page,
 	}) => {
 		// Le mur tient sur TOUT le cycle de vie : on capte chaque requête d'écriture.
@@ -228,22 +234,28 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		await send(page, "promeus la dernière idée");
 		await expect(page.getByTestId("v2-builder-kernel")).toHaveCount(1);
 
-		// ② prod AVANT test : LE CLIQUET refuse (test d'abord, toujours).
+		// ② prod AVANT l'échelle : LE CLIQUET GÉNÉRALISÉ refuse — le barreau prod exige la
+		// MÊME version au barreau staging (chaque barreau, dans l'ordre, toujours).
 		await send(page, "déploie l'application en prod");
 		const refusAvant = page.getByTestId("v2-builder-events").last();
 		await expect(refusAvant).toContainText("refus");
 		await expect(refusAvant).toContainText("le cliquet");
+		await expect(refusAvant).toContainText("staging");
 
-		// ③ test d'abord : deploiement_test — l'onglet Environnements montre la version
-		// app:<hash> posée sur la carte test, avec un ÉCART de 0 (zéro dérive, calculée).
+		// ③ test d'abord : deploiement · test — l'onglet Environnements montre L'ÉCHELLE
+		// ENTIÈRE (trois cartes), la version app:<hash> posée sur la carte test, ÉCART 0.
 		await send(page, "déploie l'application en test");
 		await expect(page.getByTestId("v2-builder-events").last()).toContainText(
-			"deploiement_test",
+			"deploiement · test",
 		);
 		await page
 			.locator('[data-testid="v2-builder-tab"][data-tab="envs"]')
 			.click();
 		const envTest = page.getByTestId("v2-builder-env-test");
+		const envStaging = page.getByTestId("v2-builder-env-staging");
+		const envProd = page.getByTestId("v2-builder-env-prod");
+		await expect(envStaging).toBeVisible();
+		await expect(envProd).toBeVisible();
 		await expect(envTest).toContainText(/app:[0-9a-f]{8}/);
 		await expect(envTest.locator("[data-drift]")).toHaveAttribute(
 			"data-drift",
@@ -254,25 +266,35 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		)?.[0];
 		expect(testVersion).toBeTruthy();
 
-		// ④ prod APRÈS test : le cliquet laisse passer — la MÊME version posée en prod.
+		// ④ staging APRÈS test (le barreau intermédiaire) : la MÊME version grimpe d'un cran.
+		await send(page, "déploie l'application en staging");
+		await expect(page.getByTestId("v2-builder-events").last()).toContainText(
+			"deploiement · staging",
+		);
+		await expect(envStaging).toContainText(testVersion as string);
+		await expect(envStaging.locator("[data-drift]")).toHaveAttribute(
+			"data-drift",
+			"0",
+		);
+
+		// ⑤ prod APRÈS staging : le cliquet laisse passer — la MÊME version posée en prod.
 		await send(page, "déploie l'application en prod");
 		await expect(page.getByTestId("v2-builder-events").last()).toContainText(
-			"deploiement_prod",
+			"deploiement · prod",
 		);
-		const envProd = page.getByTestId("v2-builder-env-prod");
 		await expect(envProd).toContainText(testVersion as string);
 		await expect(envProd.locator("[data-drift]")).toHaveAttribute(
 			"data-drift",
 			"0",
 		);
 
-		// ⑤ delta depuis la prod : 0 écart juste après le déploiement (le motif du twin).
+		// ⑥ delta depuis la prod : 0 écart juste après le déploiement (le motif du twin).
 		await send(page, "montre le delta depuis la prod");
 		const delta0 = page.getByTestId("v2-builder-events").last();
 		await expect(delta0).toContainText("delta_calcule");
 		await expect(delta0).toContainText("0 kernel(s) d'écart");
 
-		// ⑥ une SECONDE idée promue : la dérive apparaît — l'écart des deux cartes ≥ 1.
+		// ⑦ une SECONDE idée promue : la dérive apparaît — l'écart des TROIS cartes ≥ 1.
 		await send(
 			page,
 			"capture l'idée : au catalogue, lister les produits disponibles",
@@ -282,13 +304,17 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		const driftTest = Number(
 			await envTest.locator("[data-drift]").getAttribute("data-drift"),
 		);
+		const driftStaging = Number(
+			await envStaging.locator("[data-drift]").getAttribute("data-drift"),
+		);
 		const driftProd = Number(
 			await envProd.locator("[data-drift]").getAttribute("data-drift"),
 		);
 		expect(driftTest).toBeGreaterThanOrEqual(1);
+		expect(driftStaging).toBeGreaterThanOrEqual(1);
 		expect(driftProd).toBeGreaterThanOrEqual(1);
 
-		// ⑦ générer : app_generee — l'onglet App montre la PROJECTION pure recalculée
+		// ⑧ générer : app_generee — l'onglet App montre la PROJECTION pure recalculée
 		// (version app:<hash>, ≥ 2 entités versionnées k:, les routes émises visibles).
 		await send(page, "génère l'application");
 		await expect(page.getByTestId("v2-builder-events").last()).toContainText(
@@ -306,8 +332,9 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 		).toBeVisible();
 		await expect(app.getByText("/catalogue", { exact: true })).toBeVisible();
 
-		// ⑧ prod à nouveau : le cliquet s'est RÉARMÉ — la NOUVELLE version (2 kernels)
-		// n'est pas passée en test, la prod re-refuse (jamais un passe-droit).
+		// ⑨ prod à nouveau : le cliquet s'est RÉARMÉ sur CHAQUE barreau — la NOUVELLE
+		// version (2 kernels) n'a pas regravi l'échelle, la prod re-refuse (jamais un
+		// passe-droit).
 		await send(page, "déploie l'application en prod");
 		const refusApres = page.getByTestId("v2-builder-events").last();
 		await expect(refusApres).toContainText("refus");
@@ -315,5 +342,88 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 
 		// LE MUR : zéro requête d'écriture sur TOUT le cycle de vie.
 		expect(writes).toEqual([]);
+	});
+
+	test("la COUVERTURE : le chat ouvre n'importe quel écran — V2 déclaré ET V1 scanné", async ({
+		page,
+	}) => {
+		await page.goto("/v2/builder");
+
+		// ① un écran du REGISTRE V2 déclaré : « ouvre l'écran code » — l'impératif de
+		// navigation commande (règle déclarée), l'événement est ecran_ouvert et la PUCE
+		// DE NAVIGATION porte la route résolue (jamais une route inventée, fail-closed).
+		await send(page, "ouvre l'écran code");
+		const eventsV2 = page.getByTestId("v2-builder-events").last();
+		await expect(eventsV2).toContainText("ecran_ouvert");
+		await expect(
+			page.locator(
+				'[data-testid="v2-builder-open-screen"][data-route="/v2/code"]',
+			),
+		).toBeVisible();
+
+		// ② un écran V1 issu du SCAN serveur (app/why-tree) — l'inventaire V1 est injecté
+		// en DONNÉES dans le twin : la couverture atteint TOUT le Workbench, pas que V2.
+		await send(page, "ouvre l'écran why-tree");
+		const eventsV1 = page.getByTestId("v2-builder-events").last();
+		await expect(eventsV1).toContainText("ecran_ouvert");
+		await expect(
+			page.locator(
+				'[data-testid="v2-builder-open-screen"][data-route="/why-tree"]',
+			),
+		).toBeVisible();
+	});
+
+	test("le déploiement RÉEL est GATÉ (ADR 0052) : désarmé avant l'échelle, armé après — JAMAIS cliqué", async ({
+		page,
+	}) => {
+		await page.goto("/v2/builder");
+
+		// AVANT l'échelle : l'onglet Environnements montre le bouton réel DÉSARMÉ
+		// (envs.prod est vide — le geste humain n'est offert qu'au sommet du cliquet).
+		await page
+			.locator('[data-testid="v2-builder-tab"][data-tab="envs"]')
+			.click();
+		await expect(page.getByTestId("v2-builder-real-deploy")).toBeVisible();
+		const realBtn = page.getByTestId("v2-builder-deploy-real");
+		await expect(realBtn).toBeDisabled();
+
+		// L'ÉCHELLE ENTIÈRE, barreau par barreau : capture → promotion → test → staging → prod.
+		await send(
+			page,
+			"capture l'idée : au checkout, débiter le compte une seule fois",
+		);
+		await send(page, "promeus la dernière idée");
+		await send(page, "déploie l'application en test");
+		await send(page, "déploie l'application en staging");
+		await send(page, "déploie l'application en prod");
+		await expect(page.getByTestId("v2-builder-events").last()).toContainText(
+			"deploiement · prod",
+		);
+
+		// APRÈS : le bouton s'ARME (envs.prod posé) — et n'est PAS cliqué : le run reste
+		// HERMÉTIQUE (pas de docker en e2e ; le pipeline réel /ai-lab a son propre gate).
+		await expect(realBtn).toBeEnabled();
+	});
+
+	test("le DELTA AU GRAIN CODE (ADR 0056 × 0058) : la section est rendue après une promotion", async ({
+		page,
+	}) => {
+		await page.goto("/v2/builder");
+
+		// Une promotion : un kernel proposé — la matière du delta au grain code.
+		await send(
+			page,
+			"capture l'idée : au checkout, débiter le compte une seule fois",
+		);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v2-builder-kernel")).toHaveCount(1);
+
+		// PRÉSENCE seulement : les ancres dépendent de l'accroche lexicale (codeDeltaFor
+		// sur le graphe extrait du source réel) — la section rend ≥ 0 ancres (ancres OU
+		// note « vide »), jamais une panne.
+		await page
+			.locator('[data-testid="v2-builder-tab"][data-tab="envs"]')
+			.click();
+		await expect(page.getByTestId("v2-builder-code-delta")).toBeVisible();
 	});
 });

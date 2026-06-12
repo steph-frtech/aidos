@@ -1,5 +1,9 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import type { ScreenRef } from "@/lib/v2/builder";
+import { assembleGraph, extractFromSource } from "@/lib/v2/code-extract";
 import { BuilderClient } from "./BuilderClient";
 
 /**
@@ -7,8 +11,9 @@ import { BuilderClient } from "./BuilderClient";
  *
  * UN seul écran, UN seul chat — mais « tout » passe par une GRAMMAIRE D'INTENTIONS FERMÉE
  * (le twin pur lib/v2/builder : capturer une idée, greffer, promouvoir, générer l'app,
- * déployer, voir le delta, impacter, interroger — rien d'autre : le CYCLE DE VIE COMPLET,
- * jusqu'au CLIQUET test→prod). Chaque tour rend VISIBLES : « l'attente » (le verdict understand),
+ * déployer, voir le delta, impacter, interroger, ouvrir un écran — rien d'autre : le CYCLE
+ * DE VIE COMPLET, jusqu'au CLIQUET généralisé test→staging→prod et au DÉPLOIEMENT RÉEL gaté
+ * ADR 0052). Chaque tour rend VISIBLES : « l'attente » (le verdict understand),
  * « les types de réponse possibles » (TOUS les candidats classés, cliquables), « la réponse »
  * (les événements du réducteur pur, jeu clos) et « les impacts » (la vague calculée). Une
  * ambiguïté est OFFERTE (chips), jamais tranchée en silence ; le LLM est l'exception gatée
@@ -48,6 +53,8 @@ const KEYS = [
 	"intentDelta",
 	"intentImpacter",
 	"intentInterroger",
+	"intentOuvrir",
+	"openScreen",
 	"tabArbre",
 	"tabApp",
 	"tabEnvs",
@@ -61,14 +68,25 @@ const KEYS = [
 	"envsHeading",
 	"envSendHint",
 	"envTestTitle",
+	"envStagingTitle",
 	"envProdTitle",
 	"envNever",
 	"envKernelsLabel",
 	"envEcartLabel",
 	"envNoKernelHint",
 	"deployTestBtn",
+	"deployStagingBtn",
 	"deployProdBtn",
-	"prodGateNote",
+	"envGateNote",
+	"realDeployHeading",
+	"realDeployNote",
+	"realDeployBtn",
+	"realDeployBusy",
+	"realDeployUrlLabel",
+	"realDeployFailed",
+	"codeDeltaHeading",
+	"codeDeltaEmpty",
+	"codeDeltaWaveLabel",
 	"treeHeading",
 	"treeHint",
 	"ideasHeading",
@@ -90,6 +108,44 @@ const KEYS = [
 export default async function V2BuilderScreen() {
 	const t = await getTranslations("v2Builder");
 	const strings = Object.fromEntries(KEYS.map((k) => [k, t(k)]));
+
+	// La COLLECTE (la seule couche impure, le motif /v2/code) : Next s'exécute depuis front/web ;
+	// le garde-fou couvre un lancement depuis la racine du monorepo.
+	const cwd = process.cwd();
+	const absBase = cwd.endsWith(join("front", "web"))
+		? cwd
+		: join(cwd, "front", "web");
+
+	// (a) L'INVENTAIRE des écrans V1 : les dossiers d'app/ (hors v2, api et les dossiers privés
+	// `_` non routables), TRIÉS — injectés en DONNÉES dans le twin (le registre V2 déclaré est
+	// toujours couvert par initBuilderState ; ici s'ajoute TOUT le reste du Workbench).
+	const v1Screens: ScreenRef[] = readdirSync(join(absBase, "app"), {
+		withFileTypes: true,
+	})
+		.filter(
+			(e) =>
+				e.isDirectory() &&
+				e.name !== "v2" &&
+				e.name !== "api" &&
+				!e.name.startsWith("_"),
+		)
+		.map((e) => ({ route: `/${e.name}`, label: e.name.replace(/-/g, " ") }))
+		.sort((a, b) => (a.route < b.route ? -1 : 1));
+
+	// (b) Le GRAPHE DE CODE (le motif /v2/code) : extrait des twins lib/v2 RÉELS par l'API
+	// compilateur TypeScript (code-extract, côté serveur seulement), trié (même dépôt → même graphe).
+	const libDir = join(absBase, "lib", "v2");
+	const { nodes: codeNodes, edges: codeEdges } = assembleGraph(
+		readdirSync(libDir)
+			.filter((n) => n.endsWith(".ts"))
+			.sort()
+			.map((name) =>
+				extractFromSource(
+					`lib/v2/${name}`,
+					readFileSync(join(libDir, name), "utf8"),
+				),
+			),
+	);
 
 	return (
 		<div className="mx-auto w-full max-w-6xl space-y-8">
@@ -118,7 +174,12 @@ export default async function V2BuilderScreen() {
 				{t("wallNote")}
 			</p>
 
-			<BuilderClient t={strings} />
+			<BuilderClient
+				t={strings}
+				v1Screens={v1Screens}
+				codeNodes={codeNodes}
+				codeEdges={codeEdges}
+			/>
 		</div>
 	);
 }

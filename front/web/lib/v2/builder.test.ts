@@ -4,11 +4,16 @@ import {
 	applyIntent,
 	type BuilderState,
 	classifyIntent,
+	codeDeltaFor,
+	ENV_LADDER,
 	INTENT_KINDS,
 	initBuilderState,
+	resolveScreen,
 	understand,
 } from "./builder";
+import type { CodeEdge, CodeNode } from "./code-graph";
 import { nodeByPath } from "./composition";
+import { SCREENS } from "./screens";
 
 /**
  * WB2-27 — le MIROIR du IA BUILDER (ADR 0057) : UN écran, UN chat qui fait TOUT —
@@ -27,7 +32,7 @@ import { nodeByPath } from "./composition";
 const S = (): BuilderState => initBuilderState();
 
 describe("la grammaire d'intentions — un jeu CLOS, déclaré", () => {
-	it("le jeu des intentions est déclaré et clos (le cycle de vie ENTIER d'une appli)", () => {
+	it("le jeu des intentions est déclaré et clos (le cycle de vie ENTIER d'une appli + la navigation totale)", () => {
 		expect(INTENT_KINDS).toEqual([
 			"capturer_idee",
 			"greffer",
@@ -37,7 +42,12 @@ describe("la grammaire d'intentions — un jeu CLOS, déclaré", () => {
 			"delta",
 			"impacter",
 			"interroger",
+			"ouvrir",
 		]);
+	});
+
+	it("l'ÉCHELLE D'ENVIRONNEMENTS est déclarée, close, ordonnée (le cliquet généralisé)", () => {
+		expect(ENV_LADDER).toEqual(["test", "staging", "prod"]);
 	});
 
 	it("∀ texte : classifyIntent est TOTAL, DÉTERMINISTE, candidats ⊆ jeu clos, triés par score ↓", () => {
@@ -211,47 +221,78 @@ describe("GÉNÉRER — l'app est une PROJECTION pure des kernels proposés", ()
 	});
 });
 
-describe("DÉPLOYER — test PUIS prod : le CLIQUET d'environnements", () => {
+describe("DÉPLOYER — l'ÉCHELLE déclarée test → staging → prod : le CLIQUET généralisé", () => {
+	const deployedTo = (
+		r: ReturnType<typeof applyIntent>,
+		env: string,
+	): boolean => r.events.some((e) => e.kind === "deploiement" && e.env === env);
+
 	it("déployer en test sans kernel → refus (rien à déployer)", () => {
 		const r = applyIntent(S(), "déploie l'application en test");
 		expect(r.events.some((e) => e.kind === "refus")).toBe(true);
 		expect(r.state.envs.test).toBeNull();
 	});
 
-	it("LA PROD DIRECTE EST REFUSÉE : jamais la prod sans que CETTE version soit passée en test", () => {
+	it("∀ barreau > 1 : SAUTER UN BARREAU EST REFUSÉ (prod directe, staging directe, test→prod)", () => {
 		const st = withKernel();
-		const r = applyIntent(st, "déploie l'application en prod");
+		// prod directe
+		expect(
+			applyIntent(st, "déploie l'application en prod").events.some(
+				(e) => e.kind === "refus",
+			),
+		).toBe(true);
+		// staging directe
+		expect(
+			applyIntent(st, "déploie l'application en staging").events.some(
+				(e) => e.kind === "refus",
+			),
+		).toBe(true);
+		// test puis prod en sautant staging
+		const t = applyIntent(st, "déploie l'application en test");
+		const r = applyIntent(t.state, "déploie l'application en prod");
 		expect(r.events.some((e) => e.kind === "refus")).toBe(true);
 		expect(r.state.envs.prod).toBeNull();
 	});
 
-	it("le chemin légal : test → prod (même version) — les deux environnements portent la version", () => {
+	it("le chemin légal : test → staging → prod — la MÊME version monte chaque barreau", () => {
 		const st = withKernel();
 		const t = applyIntent(st, "déploie l'application en test");
-		expect(t.events.some((e) => e.kind === "deploiement_test")).toBe(true);
-		expect(t.state.envs.test).not.toBeNull();
-		const p = applyIntent(t.state, "déploie l'application en prod");
-		expect(p.events.some((e) => e.kind === "deploiement_prod")).toBe(true);
+		expect(deployedTo(t, "test")).toBe(true);
+		const s = applyIntent(t.state, "déploie l'application en staging");
+		expect(deployedTo(s, "staging")).toBe(true);
+		const p = applyIntent(s.state, "déploie l'application en prod");
+		expect(deployedTo(p, "prod")).toBe(true);
 		expect(p.state.envs.prod?.version).toBe(t.state.envs.test?.version);
+		expect(p.state.envs.staging?.version).toBe(t.state.envs.test?.version);
 	});
 
-	it("LE CLIQUET RE-MORD : une nouvelle promotion invalide la prod — il faut REPASSER par le test", () => {
+	it("LE CLIQUET RE-MORD sur TOUTE l'échelle : une promotion invalide chaque barreau supérieur", () => {
 		const st = withKernel();
 		const t = applyIntent(st, "déploie l'application en test");
-		const p = applyIntent(t.state, "déploie l'application en prod");
+		const s = applyIntent(t.state, "déploie l'application en staging");
+		const p = applyIntent(s.state, "déploie l'application en prod");
 		// une NOUVELLE vérité arrive…
 		const c = applyIntent(
 			p.state,
 			"capture l'idée : au catalogue, lister les produits disponibles",
 		);
 		const k = applyIntent(c.state, "promeus la dernière idée");
-		// …la prod de la nouvelle version SANS test → refusée (la version de test est d'hier).
-		const r = applyIntent(k.state, "déploie l'application en prod");
-		expect(r.events.some((e) => e.kind === "refus")).toBe(true);
-		// re-test puis prod → ok.
+		// …staging ET prod de la nouvelle version sont refusés tant que le barreau précédent n'a pas re-validé.
+		expect(
+			applyIntent(k.state, "déploie l'application en staging").events.some(
+				(e) => e.kind === "refus",
+			),
+		).toBe(true);
+		expect(
+			applyIntent(k.state, "déploie l'application en prod").events.some(
+				(e) => e.kind === "refus",
+			),
+		).toBe(true);
+		// la remontée complète re-passe.
 		const t2 = applyIntent(k.state, "déploie l'application en test");
-		const p2 = applyIntent(t2.state, "déploie l'application en prod");
-		expect(p2.events.some((e) => e.kind === "deploiement_prod")).toBe(true);
+		const s2 = applyIntent(t2.state, "déploie l'application en staging");
+		const p2 = applyIntent(s2.state, "déploie l'application en prod");
+		expect(deployedTo(p2, "prod")).toBe(true);
 	});
 });
 
@@ -265,7 +306,8 @@ describe("DELTA — « voir les deltas » : l'écart CALCULÉ entre l'état cour
 	it("après la prod : delta = 0 écart ; une nouvelle promotion → delta = 1 kernel d'écart", () => {
 		const st = withKernel();
 		const t = applyIntent(st, "déploie l'application en test");
-		const p = applyIntent(t.state, "déploie l'application en prod");
+		const sg = applyIntent(t.state, "déploie l'application en staging");
+		const p = applyIntent(sg.state, "déploie l'application en prod");
 		const d0 = applyIntent(p.state, "montre le delta depuis la prod");
 		const e0 = d0.events.find((e) => e.kind === "delta_calcule");
 		expect(e0?.detail).toContain("0");
@@ -279,5 +321,101 @@ describe("DELTA — « voir les deltas » : l'écart CALCULÉ entre l'état cour
 		const d1 = applyIntent(k.state, "montre le delta depuis la prod");
 		expect(d1.impacts.length).toBe(1);
 		expect(d1.impacts[0].type).toBe("kernel");
+	});
+});
+
+// ── OUVRIR — la couverture TOTALE du Workbench (« il sait tout faire ») ───────
+
+describe("OUVRIR — chaque écran du Workbench est atteignable depuis le chat", () => {
+	it("LA LOI DE COUVERTURE : ∀ écran du registre V2, « ouvre <titre> » résout vers SA route", () => {
+		const st = S();
+		for (const entry of SCREENS) {
+			const r = applyIntent(st, `ouvre ${entry.fr.title}`);
+			const ev = r.events.find((e) => e.kind === "ecran_ouvert");
+			expect(ev, `écran ${entry.slug} inatteignable`).toBeDefined();
+			expect(ev?.ref).toBe(`/v2/${entry.slug}`);
+		}
+	});
+
+	it("les écrans V1 injectés sont atteignables aussi (l'inventaire est une donnée, pas du code)", () => {
+		const st = initBuilderState([
+			{ route: "/why-tree", label: "why-tree l'arbre des pourquoi" },
+			{ route: "/agents", label: "agents la couche agent" },
+		]);
+		const r = applyIntent(st, "ouvre l'écran why-tree");
+		const ev = r.events.find((e) => e.kind === "ecran_ouvert");
+		expect(ev?.ref).toBe("/why-tree");
+	});
+
+	it("∀ texte : resolveScreen est TOTAL et DÉTERMINISTE ; aucune accroche → null (jamais une invention)", () => {
+		fc.assert(
+			fc.property(fc.string({ maxLength: 60 }), (txt) => {
+				const st = S();
+				const a = resolveScreen(st.screens, txt);
+				expect(a).toEqual(resolveScreen(st.screens, txt));
+			}),
+		);
+		expect(resolveScreen(S().screens, "zzz qqq www")).toBeNull();
+	});
+
+	it("ouvrir un écran introuvable → refus (fail-closed)", () => {
+		const r = applyIntent(S(), "ouvre l'écran zzzqqq");
+		expect(r.events.some((e) => e.kind === "refus")).toBe(true);
+	});
+});
+
+// ── le DELTA AU GRAIN CODE (ADR 0056 × ADR 0058) ──────────────────────────────
+
+describe("codeDeltaFor — « quelles fonctions exactes » derrière un écart de kernel", () => {
+	const codeFixture = (): { nodes: CodeNode[]; edges: CodeEdge[] } => {
+		const file: CodeNode = {
+			id: "f0",
+			kind: "file",
+			name: "src/caisse.ts",
+			file: "src/caisse.ts",
+			span: { start: 1, end: 60 },
+			version: "vf",
+			parentId: null,
+		};
+		const fn: CodeNode = {
+			id: "s0",
+			kind: "function",
+			name: "debitDuCompte",
+			file: "src/caisse.ts",
+			span: { start: 10, end: 20 },
+			version: "v0",
+			parentId: "f0",
+		};
+		const caller: CodeNode = {
+			id: "s1",
+			kind: "function",
+			name: "checkoutFlow",
+			file: "src/caisse.ts",
+			span: { start: 30, end: 40 },
+			version: "v1",
+			parentId: "f0",
+		};
+		return {
+			nodes: [file, fn, caller],
+			edges: [{ from: "s1", to: "s0", kind: "calls", confidence: "extracted" }],
+		};
+	};
+
+	it("un kernel d'écart s'ANCRE sur ses fonctions (nom lexical) + la taille de sa vague", () => {
+		const st = withKernel(); // scale = app/paiement/checkout/debit-du-compte
+		const { nodes, edges } = codeFixture();
+		const d = codeDeltaFor(st.kernels, st.tree, nodes, edges);
+		expect(d).toHaveLength(1);
+		expect(d[0].anchors.length).toBeGreaterThan(0);
+		expect(d[0].anchors[0].name).toBe("debitDuCompte");
+		expect(d[0].waveSize).toBeGreaterThan(0); // checkoutFlow + le fichier rougissent
+	});
+
+	it("TOTAL & DÉTERMINISTE : graphe de code vide → ancres vides, jamais une erreur", () => {
+		const st = withKernel();
+		const a = codeDeltaFor(st.kernels, st.tree, [], []);
+		expect(a).toEqual(codeDeltaFor(st.kernels, st.tree, [], []));
+		expect(a[0].anchors).toEqual([]);
+		expect(a[0].waveSize).toBe(0);
 	});
 });

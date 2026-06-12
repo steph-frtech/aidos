@@ -120,8 +120,11 @@ const APP_STACK =
 const APP_URL = process.env.AIDOS_APP_URL || "https://alphashop.sagedesk.fr";
 const APP_REPO = process.env.AIDOS_REPO || "/data/dev/aidos";
 
-async function deployStack(): Promise<{
+// Exporté (server-to-server) : /v2/builder réutilise CE pipeline pour son « Déploiement réel »
+// (ADR 0052) — le même geste gaté, jamais un second chemin de déploiement.
+export async function deployStack(): Promise<{
 	status: "up" | "error";
+	url: string;
 	detail: string;
 }> {
 	// (1) re-emit the app's data layer from the project's entity specs (best-effort).
@@ -143,9 +146,13 @@ async function deployStack(): Promise<{
 			timeout: 180_000,
 			maxBuffer: 8 * 1024 * 1024,
 		});
-		return { status: "up", detail: `${emitNote} · docker compose up -d` };
+		return {
+			status: "up",
+			url: APP_URL,
+			detail: `${emitNote} · docker compose up -d`,
+		};
 	} catch (e) {
-		return { status: "error", detail: String(e).slice(0, 240) };
+		return { status: "error", url: APP_URL, detail: String(e).slice(0, 240) };
 	}
 }
 
