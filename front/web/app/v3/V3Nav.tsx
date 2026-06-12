@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	Code,
 	History,
 	Layers,
 	Map as MapIcon,
@@ -12,9 +13,9 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 /**
- * La navigation V3 (ADR 0010 thème · ADR 0011 bilingue) : cinq lentilles sur UNE même
- * session (AI Lab · Parcours produit · Historique · Environnements · Paramètres) +
- * le retour Workbench V2 en pied. Libellés AMICAUX (aucun jargon KRD en copie primaire).
+ * La navigation V3 (ADR 0010 thème · ADR 0011 bilingue) : six lentilles sur UNE même
+ * session (AI Lab · Parcours produit · Historique · Environnements · Code · Paramètres)
+ * + le retour Workbench V2 en pied. Libellés AMICAUX (aucun jargon KRD en copie primaire).
  * Client Component (route active via usePathname). Le mur intact : la nav LIE, n'écrit rien.
  */
 
@@ -23,6 +24,7 @@ const ENTRIES = [
 	{ route: "/v3/parcours", key: "navParcours", Icon: MapIcon },
 	{ route: "/v3/history", key: "navHistory", Icon: History },
 	{ route: "/v3/environnements", key: "navEnvs", Icon: Layers },
+	{ route: "/v3/code", key: "navCode", Icon: Code },
 	{ route: "/v3/parametrage", key: "navParams", Icon: Settings },
 ] as const;
 

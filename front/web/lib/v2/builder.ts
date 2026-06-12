@@ -43,6 +43,7 @@ import {
 	placeIntent,
 	seedComposes,
 } from "./composition";
+import { GLOSSARY } from "./glossary";
 import { type MirrorSpec, type ProposedKernel, promoteIdea } from "./goal";
 import { composeIdea, type Idea } from "./idea";
 import type { KernelNode } from "./kernel-tree";
@@ -149,6 +150,7 @@ export interface ApplyResult {
 /** L'état initial : l'arbre seed (un SEUL produit racine), rien d'autre. */
 export function initBuilderState(
 	extraScreens: readonly ScreenRef[] = [],
+	tree?: readonly KernelNode[],
 ): BuilderState {
 	// Le registre V2 (déclaré, clos) est TOUJOURS couvert ; les écrans V1 s'injectent
 	// en données (l'inventaire vient du scan serveur, jamais codé en dur ici).
@@ -156,12 +158,24 @@ export function initBuilderState(
 		route: `/v2/${e.slug}`,
 		label: `${e.slug} ${e.fr.title} ${e.en.title}`,
 	}));
+	// Les CONCEPTS du glossaire servis par la route dynamique /v2/[slug] (la loi de
+	// couverture a attrapé l'angle mort : « anatomie » & co n'ont pas de page dédiée
+	// mais SONT des écrans réels — l'inventaire les déclare aussi).
+	const dedicated = new Set(SCREENS.map((e) => e.slug));
+	const concepts: ScreenRef[] = GLOSSARY.filter(
+		(g) => !dedicated.has(g.slug),
+	).map((g) => ({
+		route: `/v2/${g.slug}`,
+		label: `${g.slug} ${g.fr.def} ${g.en.def}`,
+	}));
 	return {
-		tree: seedComposes(),
+		// Par défaut le seed de démo (les écrans V2 illustrent le concept) ; la V3
+		// passe bareTree() — un PROJET NEUF est NU (loi au miroir).
+		tree: tree ?? seedComposes(),
 		ideas: [],
 		kernels: [],
 		envs: { test: null, staging: null, prod: null },
-		screens: [...v2, ...extraScreens],
+		screens: [...v2, ...concepts, ...extraScreens],
 		log: [],
 	};
 }
@@ -389,7 +403,9 @@ function screenTokens(text: string): Set<string> {
 			.replace(/[̀-ͯ]/g, "")
 			.toLowerCase()
 			.split(/[^a-z0-9]+/)
-			.filter((t) => t.length >= 3),
+			// ≥3 chars, OU un token lettre+chiffre (v1, v2, v3, a0…) — les noms de
+			// versions/niveaux départagent les routes (« v2 ai-lab » ≠ « ai-lab »).
+			.filter((t) => t.length >= 3 || /^[a-z][0-9]$/.test(t)),
 	);
 }
 
@@ -406,6 +422,12 @@ export function resolveScreen(
 	text: string,
 ): ScreenRef | null {
 	const tokens = screenTokens(text);
+	// La phrase pliée, séparateurs unifiés en tirets (pour le match de slug exact).
+	const phrase = `-${text
+		.normalize("NFD")
+		.replace(/[̀-ͯ]/g, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")}-`;
 	let best: { s: ScreenRef; score: number } | null = null;
 	for (const sc of screens) {
 		const routeTokens = screenTokens(sc.route.replace(/[/-]/g, " "));
@@ -415,6 +437,11 @@ export function resolveScreen(
 			if (routeTokens.has(t)) score += 3;
 			if (labelTokens.has(t)) score += 1;
 		}
+		// BONUS DE SLUG EXACT : la phrase cite le slug terminal de la route TEL QUEL
+		// (« auth » bat « app-auth », « ai-lab » ne vole pas « lab » — départage
+		// déterministe des collisions, exigé par la loi de couverture totale).
+		const lastSeg = sc.route.split("/").pop() ?? "";
+		if (lastSeg.length > 0 && phrase.includes(`-${lastSeg}-`)) score += 4;
 		if (
 			best === null ||
 			score > best.score ||

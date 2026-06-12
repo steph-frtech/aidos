@@ -74,10 +74,10 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 		// /v3 a REDIRIGÉ vers /v3/lab (la porte d'entrée est le chat).
 		await expect(page).toHaveURL(/\/v3\/lab$/);
 
-		// La nav offre les CINQ lentilles (AI Lab · Parcours · Historique ·
-		// Environnements · Paramètres) + le retour Workbench V2 en pied.
+		// La nav offre les SIX entrées (AI Lab · Parcours · Historique ·
+		// Environnements · Code · Paramètres) + le retour Workbench V2 en pied.
 		await expect(page.getByTestId("v3-nav")).toBeVisible();
-		await expect(page.getByTestId("v3-nav-item")).toHaveCount(5);
+		await expect(page.getByTestId("v3-nav-item")).toHaveCount(6);
 		await expect(page.getByTestId("v3-nav-workbench")).toBeVisible();
 
 		// Le HERO d'accueil — accueillant, en français simple — et ses 4 amorces.
@@ -115,18 +115,21 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 	}) => {
 		await openDeterministe(page);
 
-		// L'état du scénario 2 : capture + promotion (deux tours, même session).
+		// UN PROJET NEUF EST NU : l'arbre se CONSTRUIT par le chat (plus aucun seed de
+		// démo) — deux greffes canoniques, puis la capture + la promotion (même session).
+		await send(page, "greffe le paiement sous app");
+		await send(page, "greffe le checkout sous app/paiement");
 		await send(page, CAPTURE);
 		await send(page, "promeus la dernière idée");
-		await expect(page.getByTestId("v3-msg-user")).toHaveCount(2);
+		await expect(page.getByTestId("v3-msg-user")).toHaveCount(4);
 
-		// ① HISTORIQUE : la timeline montre les DEUX tours (la même session rejouée —
+		// ① HISTORIQUE : la timeline montre les QUATRE tours (la même session rejouée —
 		// le provider vit dans le layout /v3, la nav client préserve l'arbre React).
 		await navTo(page, "/v3/history");
 		await expect(page.getByTestId("v3-history")).toBeVisible({
 			timeout: 20_000,
 		});
-		await expect(page.getByTestId("v3-history-turn")).toHaveCount(2);
+		await expect(page.getByTestId("v3-history-turn")).toHaveCount(4);
 
 		// ② ENVIRONNEMENTS : l'échelle entière est rendue (la carte test au moins).
 		await navTo(page, "/v3/environnements");
@@ -136,7 +139,9 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 		await expect(page.getByTestId("v3-env-staging")).toBeVisible();
 		await expect(page.getByTestId("v3-env-prod")).toBeVisible();
 
-		// ③ PARCOURS : le graphe (React Flow) rend l'arbre seed — au moins 5 cartes.
+		// ③ PARCOURS : le graphe (React Flow) rend l'arbre GREFFÉ PAR LE CHAT — au
+		// moins 3 cartes (app → paiement → checkout) et la branche « paiement » est
+		// sélectionnable (le sélecteur lit le même arbre rejoué).
 		await navTo(page, "/v3/parcours");
 		await expect(page.getByTestId("v3-parcours-graph")).toBeVisible({
 			timeout: 20_000,
@@ -146,7 +151,12 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 		});
 		expect(
 			await page.locator(".react-flow__node").count(),
-		).toBeGreaterThanOrEqual(5);
+		).toBeGreaterThanOrEqual(3);
+		const paiementPick = page.locator(
+			'[data-testid="v3-parcours-pick"][data-path="app/paiement"]',
+		);
+		await expect(paiementPick).toBeVisible();
+		await expect(paiementPick).toContainText("paiement");
 
 		// ④ PARAMÈTRES : les vérités déclarées listées — au moins 5 lignes.
 		await navTo(page, "/v3/parametrage");
@@ -154,9 +164,70 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 			timeout: 20_000,
 		});
 		await expect(page.getByTestId("v3-param").first()).toBeVisible();
+		const totalRows = await page.getByTestId("v3-param").count();
+		expect(totalRows).toBeGreaterThanOrEqual(5);
+
+		// Le catalogue est COMPLET (paramCatalog — le twin lib/v3/params) : TOUTES
+		// les vérités déclarées V1+V2, au moins 14 sections repliables (chat,
+		// environnements, niveaux, facettes, preuves, seuils, écrans, agents,
+		// modèles, autonomie, budgets, adoption, mur, autorités, liens, anatomie…).
+		expect(
+			await page.getByTestId("v3-param-section").count(),
+		).toBeGreaterThanOrEqual(14);
+
+		// « Les types d'agent avec leur harness » : la section agents expose le
+		// modèle gouverné (claude-fable-5) noir sur blanc — la spec entière vient
+		// de lib/agentlayer-data.ts, jamais découverte à l'exécution.
+		await expect(
+			page
+				.locator('[data-testid="v3-param-section"][data-section="agents"]')
+				.getByTestId("v3-param")
+				.filter({ hasText: "claude-fable-5" })
+				.first(),
+		).toBeVisible();
+
+		// La RECHERCHE filtre les lignes (repli des accents, côté client) :
+		// « autonomie » réduit le compte sans jamais le vider — et l'effacer
+		// rend le catalogue ENTIER (le filtre ne mute jamais le catalogue).
+		await page.getByTestId("v3-param-search").fill("autonomie");
+		await expect
+			.poll(() => page.getByTestId("v3-param").count())
+			.toBeLessThan(totalRows);
 		expect(await page.getByTestId("v3-param").count()).toBeGreaterThanOrEqual(
-			5,
+			1,
 		);
+		await page.getByTestId("v3-param-search").fill("");
+		await expect
+			.poll(() => page.getByTestId("v3-param").count())
+			.toBe(totalRows);
+
+		// L'ANNEXE « Tous les écrans » existe (repliée par défaut — 180+ liens) : la
+		// preuve VISIBLE que chaque écran « se trouve quelque part » (la loi de
+		// couverture lib/v3/coverage.test.ts le prouve ; l'annexe le montre).
+		await expect(page.getByTestId("v3-param-screens")).toBeAttached();
+	});
+
+	test("un projet neuf est NU : aucune branche de démo, l'état vide amical", async ({
+		page,
+	}) => {
+		// HERMÉTIQUE d'abord (la bascule IA vit dans le lab), puis la lentille Parcours
+		// par la nav CLIENT — la session fraîche est rejouée sur l'arbre NU (bareTree).
+		await openDeterministe(page);
+		await navTo(page, "/v3/parcours");
+
+		// L'état vide AMICAL : pas de branches → le message + le CTA vers le chat.
+		const empty = page.getByTestId("v3-parcours-empty");
+		await expect(empty).toBeVisible({ timeout: 20_000 });
+		await expect(empty).toContainText("Aucun parcours pour l'instant");
+		await expect(empty.locator('a[href="/v3/lab"]')).toBeVisible();
+
+		// AUCUN parcours pré-rempli : la branche de démo « paiement » N'EXISTE PAS
+		// (le seed V2 ne fuit plus dans un projet neuf — bug utilisateur 2026-06-12).
+		await expect(
+			page.locator(
+				'[data-testid="v3-parcours-pick"][data-path="app/paiement"]',
+			),
+		).toHaveCount(0);
 	});
 
 	test("l'historique revient en arrière : deux clics doux, la timeline raccourcit", async ({

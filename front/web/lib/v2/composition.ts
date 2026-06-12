@@ -279,6 +279,25 @@ export function placeIntent(
 }
 
 /**
+ * L'ARBRE NU d'un PROJET NEUF : la seule racine (le produit), RIEN d'autre — aucun
+ * parcours de démonstration. Un utilisateur qui n'a encore rien créé ne doit voir
+ * AUCUNE branche pré-remplie (correction utilisateur 2026-06-12) ; l'arbre pousse
+ * ensuite par ses greffes et ses idées. Le seed de démo (seedComposes) reste pour
+ * les écrans V2 qui illustrent le concept.
+ */
+export function bareTree(): readonly KernelNode[] {
+	return [
+		{
+			id: fnv1a("app"),
+			level: SOURCE_ORDER[0],
+			facet: "F",
+			label: "app",
+			parentId: null,
+		},
+	];
+}
+
+/**
  * L'ARBRE SEED canonique (déterministe) qui amorce l'écran tant que la relation `composes`
  * vivante n'est pas servie depuis Postgres (S17/S18 — OpenQuestion documentée, ne bloque pas) :
  * une racine produit (« app »), deux cellules (« paiement », « catalogue »), un kernel

@@ -41,9 +41,10 @@ export function replayTo(
 	messages: readonly string[],
 	n: number,
 	extraScreens: readonly ScreenRef[] = [],
+	tree?: Parameters<typeof initBuilderState>[1],
 ): BuilderState {
 	const upTo = Math.max(0, Math.min(Math.floor(n), messages.length));
-	let state = initBuilderState(extraScreens);
+	let state = initBuilderState(extraScreens, tree);
 	for (let i = 0; i < upTo; i++) state = applyIntent(state, messages[i]).state;
 	return state;
 }
@@ -56,9 +57,10 @@ export function replayTo(
 export function turnsOf(
 	messages: readonly string[],
 	extraScreens: readonly ScreenRef[] = [],
+	tree?: Parameters<typeof initBuilderState>[1],
 ): { turns: SessionTurn[]; state: BuilderState } {
 	const turns: SessionTurn[] = [];
-	let state = initBuilderState(extraScreens);
+	let state = initBuilderState(extraScreens, tree);
 	for (let i = 0; i < messages.length; i++) {
 		const msg = messages[i];
 		const understanding = understand(state, msg);

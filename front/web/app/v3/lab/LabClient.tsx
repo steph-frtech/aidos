@@ -120,13 +120,27 @@ function forceText(kind: IntentKind, original: string): string {
 	return `${FORCE_PREFIX[kind]}${kept}`;
 }
 
-/** Les 4 grandes cartes d'amorce du hero (clés i18n — phrases envoyées telles quelles). */
-const SUGGESTION_KEYS = [
-	"suggestion1",
-	"suggestion2",
-	"suggestion3",
-	"suggestion4",
-] as const;
+/**
+ * Les 4 grandes cartes d'amorce du hero : le libellé est i18n, mais le GESTE est
+ * CANONIQUE (le jeu clos prouvé — jamais le libellé envoyé tel quel : « Crée une
+ * idée pour mon app » classait GREFFER et greffait une branche absurde, bug
+ * utilisateur 2026-06-12). La capture PRÉ-REMPLIT la saisie (l'utilisateur écrit
+ * SON idée) ; les autres envoient leur phrase canonique prouvée.
+ */
+const SUGGESTIONS: readonly {
+	labelKey: string;
+	mode: "prefill" | "send";
+	text: string;
+}[] = [
+	{ labelKey: "suggestion1", mode: "prefill", text: "capture l'idée : " },
+	{
+		labelKey: "suggestion2",
+		mode: "send",
+		text: "déploie l'application en test",
+	},
+	{ labelKey: "suggestion3", mode: "send", text: "ouvre l'écran v3 parcours" },
+	{ labelKey: "suggestion4", mode: "send", text: "ouvre l'écran v2 code" },
+];
 
 /** La carte ASSISTANT d'un tour : réponse Claude OU gabarits amicaux + chips + détails. */
 function AssistantCard({
@@ -337,6 +351,17 @@ export function LabClient() {
 		void send(text);
 	};
 
+	/** Une carte d'amorce : PRÉ-REMPLIR (la capture — l'utilisateur écrit son idée,
+	 *  rien ne part) ou ENVOYER la phrase canonique prouvée. */
+	const onSuggestion = (s: (typeof SUGGESTIONS)[number]) => {
+		if (s.mode === "prefill") {
+			setInput(s.text);
+			taRef.current?.focus();
+			return;
+		}
+		submit(s.text);
+	};
+
 	return (
 		<div
 			data-testid="v3-chat"
@@ -360,15 +385,16 @@ export function LabClient() {
 								{t.suggestionsLabel}
 							</p>
 							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-								{SUGGESTION_KEYS.map((k) => (
+								{SUGGESTIONS.map((s) => (
 									<button
-										key={k}
+										key={s.labelKey}
 										type="button"
 										data-testid="v3-suggestion"
-										onClick={() => submit(t[k])}
+										data-mode={s.mode}
+										onClick={() => onSuggestion(s)}
 										className="rounded-xl border border-border bg-card p-4 text-left text-sm text-foreground shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
 									>
-										{t[k]}
+										{t[s.labelKey]}
 									</button>
 								))}
 							</div>

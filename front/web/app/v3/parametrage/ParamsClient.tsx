@@ -1,48 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { type MirrorForm, mirrorForms } from "@/lib/besoin-completeness";
-import { SOURCE_ORDER } from "@/lib/besoin-grammar";
-import { FACETS } from "@/lib/facets";
-import { ENV_LADDER, INTENT_KINDS, type IntentKind } from "@/lib/v2/builder";
-import { MIN_MIRROR_LEN } from "@/lib/v2/goal";
-import { MIN_INTENT_LEN } from "@/lib/v2/idea";
-import { SCREENS } from "@/lib/v2/screens";
+import { useMemo, useState } from "react";
+import type { IntentKind } from "@/lib/v2/builder";
+import { type ParamSection, paramCatalog } from "@/lib/v3/params";
 import { useV3Session } from "../V3Session";
 
 /**
- * /v3/parametrage — LES PARAMÈTRES : TOUTES les vérités DÉCLARÉES du produit, noir sur
- * blanc (§8 — déclarées au-dessus de la ligne, jamais apprises) : les gestes du chat
- * (INTENT_KINDS + la phrase canonique), l'échelle (ENV_LADDER), les niveaux
- * (SOURCE_ORDER), les 8 facettes (FACETS), les formes de preuve (mirrorForms), les
- * seuils (MIN_INTENT_LEN, MIN_MIRROR_LEN) et les écrans atteignables.
+ * /v3/parametrage — LES PARAMÈTRES : TOUTES les vérités DÉCLARÉES de la V1 + V2, noir
+ * sur blanc (§8 — déclarées au-dessus de la ligne, jamais apprises). L'écran ne
+ * construit plus ses sections à la main : il REND le catalogue paramCatalog (le twin
+ * pur lib/v3/params, épinglé par son miroir) — les gestes du chat, l'échelle, les
+ * niveaux, les facettes, les preuves, les seuils, les écrans, LES AGENTS AVEC LEUR
+ * HARNAIS, les modèles, l'autonomie A0..A8, les budgets §66.3, l'adoption §82.5, les
+ * behaviors §24.6, le mur, les autorités §13.8, les liens §17 et les paires-miroir.
  *
  * LE MUR (§2), copie amicale : ces réglages ne se modifient JAMAIS en silence —
  * « Proposer un changement » ENVOIE une capture d'idée au chat (send — la porte légale
  * idée → miroir → /goal), jamais un écrit direct. Le module source de chaque valeur
- * vit replié dans <details> (le détail technique, jamais imposé).
+ * vit replié dans <details> (le détail technique, jamais imposé). Une recherche
+ * (repli des accents) filtre les lignes côté client — le catalogue, lui, ne bouge pas.
  */
-
-/** Une LIGNE de paramètre : le libellé amical, la valeur déclarée, le module source. */
-interface ParamRow {
-	readonly label: string;
-	readonly value: string;
-	readonly source: string;
-}
-
-/** La PHRASE CANONIQUE prouvée par intention (le jeu clos — lib/v2/builder + son miroir). */
-const CANONICAL_PHRASES: Record<IntentKind, string> = {
-	capturer_idee: "capture l'idée : <besoin>",
-	greffer: "greffe <libellé> sous <chemin>",
-	promouvoir: "promeus la dernière idée",
-	generer: "génère l'application",
-	deployer: "déploie l'application en test | staging | prod",
-	delta: "montre le delta depuis la prod",
-	impacter: "quel impact si je modifie <chemin>",
-	interroger: "montre-moi l'état du projet",
-	ouvrir: "ouvre l'écran <nom>",
-};
 
 /** Le libellé AMICAL par intention (clé i18n — les mêmes que les chips du lab). */
 const INTENT_LABEL_KEYS: Record<IntentKind, string> = {
@@ -57,121 +35,70 @@ const INTENT_LABEL_KEYS: Record<IntentKind, string> = {
 	ouvrir: "intentOuvrir",
 };
 
-/** Le libellé AMICAL par forme de preuve (clé i18n) — la forme technique reste la valeur. */
-const PROOF_LABEL_KEYS: Record<MirrorForm, string> = {
-	gherkin_n0: "paramsProofGherkin",
-	screen_fixture: "paramsProofScreen",
-	fixture_n2: "paramsProofFixture",
-	property_n1: "paramsProofProperty",
-};
+/** Replie les accents + la casse — « écran » et « Ecran » se trouvent pareil. */
+function fold(s: string): string {
+	return s
+		.normalize("NFD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.toLowerCase();
+}
 
 export function ParamsClient() {
 	const { state, send, busy, strings: t } = useV3Session();
 	// La section dont la demande de changement vient d'être envoyée (la note façon toast).
 	const [proposed, setProposed] = useState<string | null>(null);
+	// La recherche — un filtre CLIENT sur libellé + valeur, jamais une mutation du catalogue.
+	const [query, setQuery] = useState("");
 
-	// ── les SECTIONS — chaque valeur est lue de son module déclaré, jamais recopiée ──
-	const sections: readonly {
-		readonly id: string;
-		readonly title: string;
-		readonly hint: string;
-		readonly rows: readonly ParamRow[];
-	}[] = [
-		{
-			id: "gestes",
-			title: t.paramsGestures,
-			hint: t.paramsGesturesHint,
-			rows: INTENT_KINDS.map((k) => ({
-				label: t[INTENT_LABEL_KEYS[k]],
-				value: CANONICAL_PHRASES[k],
-				source: "lib/v2/builder.ts · INTENT_KINDS",
-			})),
-		},
-		{
-			id: "echelle",
-			title: t.paramsLadder,
-			hint: t.paramsLadderHint,
-			rows: [
-				{
-					label: t.paramsLadderOrder,
-					value: ENV_LADDER.join(" → "),
-					source: "lib/v2/builder.ts · ENV_LADDER",
-				},
-			],
-		},
-		{
-			id: "niveaux",
-			title: t.paramsLevels,
-			hint: t.paramsLevelsHint,
-			rows: [
-				{
-					label: t.paramsLevelsOrder,
-					value: SOURCE_ORDER.join(" → "),
-					source: "lib/besoin-grammar.ts · SOURCE_ORDER",
-				},
-			],
-		},
-		{
-			id: "facettes",
-			title: t.paramsFacets,
-			hint: t.paramsFacetsHint,
-			rows: FACETS.map((f) => ({
-				label: f.letter,
-				value: f.name,
-				source: "lib/facets.ts · FACETS",
-			})),
-		},
-		{
-			id: "preuves",
-			title: t.paramsProofs,
-			hint: t.paramsProofsHint,
-			rows: mirrorForms().map((f) => ({
-				label: t[PROOF_LABEL_KEYS[f]],
-				value: f,
-				source: "lib/besoin-completeness.ts · mirrorForms()",
-			})),
-		},
-		{
-			id: "seuils",
-			title: t.paramsThresholds,
-			hint: t.paramsThresholdsHint,
-			rows: [
-				{
-					label: t.paramsMinIntent,
-					value: `${MIN_INTENT_LEN} ${t.paramsChars}`,
-					source: "lib/v2/idea.ts · MIN_INTENT_LEN",
-				},
-				{
-					label: t.paramsMinMirror,
-					value: `${MIN_MIRROR_LEN} ${t.paramsChars}`,
-					source: "lib/v2/goal.ts · MIN_MIRROR_LEN",
-				},
-			],
-		},
-		{
-			id: "ecrans",
-			title: t.paramsScreens,
-			hint: t.paramsScreensHint,
-			rows: [
-				{
-					label: t.paramsScreensSession,
-					value: String(state.screens.length),
-					source: "app/v3/V3Session.tsx · state.screens",
-				},
-				{
-					label: t.paramsScreensV2,
-					value: String(SCREENS.length),
-					source: "lib/v2/screens.ts · SCREENS",
-				},
-			],
-		},
-	];
+	// ── LE CATALOGUE — le twin pur rend TOUTES les sections ; l'écran ne fait que les afficher ──
+	const sections = useMemo(
+		() => paramCatalog({ screensCount: state.screens.length }),
+		[state.screens.length],
+	);
+
+	/** Le libellé affiché : les intentions du chat reçoivent leur libellé amical i18n. */
+	const displayLabel = (sectionId: string, label: string): string =>
+		sectionId === "chat" && label in INTENT_LABEL_KEYS
+			? (t[INTENT_LABEL_KEYS[label as IntentKind]] ?? label)
+			: label;
+
+	// ── LE FILTRE — repli des accents, sur le libellé (brut + amical) et la valeur ──
+	const needle = fold(query.trim());
+	const visible: readonly ParamSection[] = sections
+		.map((s) => ({
+			...s,
+			rows:
+				needle === ""
+					? s.rows
+					: s.rows.filter((r) =>
+							fold(
+								`${r.label} ${displayLabel(s.id, r.label)} ${r.value}`,
+							).includes(needle),
+						),
+		}))
+		.filter((s) => s.rows.length > 0);
 
 	/** « Proposer un changement » : la capture d'idée part au chat (la porte légale, le mur). */
 	const propose = (id: string, title: string) => {
 		void send(`capture l'idée : changer ${title}`);
 		setProposed(id);
 	};
+
+	// ── L'ANNEXE « Tous les écrans » : la liste state.screens ENTIÈRE, groupée V3/V2/V1 —
+	// la preuve VISIBLE que chaque écran « se trouve quelque part » (la loi de couverture
+	// totale le prouve au miroir ; cette annexe le montre à l'utilisateur).
+	const screenGroups = useMemo(() => {
+		const v3 = state.screens.filter((s) => s.route.startsWith("/v3"));
+		const v2 = state.screens.filter((s) => s.route.startsWith("/v2"));
+		const v1 = state.screens.filter(
+			(s) => !s.route.startsWith("/v2") && !s.route.startsWith("/v3"),
+		);
+		return [
+			{ name: "V3", screens: v3 },
+			{ name: "V2", screens: v2 },
+			{ name: "V1", screens: v1 },
+		];
+	}, [state.screens]);
 
 	return (
 		<div data-testid="v3-params" className="mx-auto w-full max-w-3xl space-y-6">
@@ -189,73 +116,155 @@ export function ParamsClient() {
 				{t.paramsWall}
 			</p>
 
-			{sections.map((s) => (
-				<section
-					key={s.id}
-					className="space-y-3 rounded-xl border border-border bg-card p-4"
+			{/* ── LA RECHERCHE — filtre les lignes, ne touche jamais le catalogue ── */}
+			<input
+				data-testid="v3-param-search"
+				type="search"
+				value={query}
+				onChange={(e) => setQuery(e.target.value)}
+				placeholder={t.paramsSearchPlaceholder}
+				className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+			/>
+
+			{visible.length === 0 && (
+				<p
+					data-testid="v3-param-search-empty"
+					className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground"
 				>
-					<div className="space-y-1">
-						<h2 className="text-sm font-semibold text-foreground">{s.title}</h2>
-						<p className="text-xs leading-relaxed text-muted-foreground">
-							{s.hint}
-						</p>
-					</div>
+					{t.paramsSearchEmpty}
+				</p>
+			)}
 
-					<ul className="space-y-2">
-						{s.rows.map((row) => (
-							<li
-								key={`${row.label}·${row.value}`}
-								data-testid="v3-param"
-								className="space-y-1.5 rounded-md border border-border bg-muted/30 px-3 py-2"
-							>
-								<div className="flex flex-wrap items-baseline gap-2">
-									<span className="text-xs font-medium text-foreground">
-										{row.label}
-									</span>
-									<span className="ml-auto rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-										{row.value}
-									</span>
-								</div>
-								{/* · le module source — le détail technique, toujours replié */}
-								<details data-testid="v3-details">
-									<summary className="cursor-pointer text-[11px] text-muted-foreground">
-										{t.paramsSourceLabel}
-									</summary>
-									<p className="mt-1 font-mono text-[11px] text-muted-foreground">
-										{row.source}
-									</p>
-								</details>
-							</li>
-						))}
-					</ul>
-
-					<button
-						type="button"
-						data-testid="v3-param-propose"
-						disabled={busy}
-						onClick={() => propose(s.id, s.title)}
-						className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+			{visible.map((s) => {
+				const title = t[s.titleKey] ?? s.titleKey;
+				const hint = t[`${s.titleKey}Hint`];
+				return (
+					// · une section = un bloc REPLIABLE, ouvert par défaut (entête + badge de compte)
+					<details
+						key={s.id}
+						open
+						data-testid="v3-param-section"
+						data-section={s.id}
+						className="group rounded-xl border border-border bg-card"
 					>
-						{t.paramsPropose}
-					</button>
+						<summary className="flex cursor-pointer flex-wrap items-baseline gap-2 p-4">
+							<h2 className="text-sm font-semibold text-foreground">{title}</h2>
+							<span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+								{s.rows.length}
+							</span>
+						</summary>
 
-					{/* · la note façon toast : la demande est partie au chat (une idée à approuver) */}
-					{proposed === s.id && (
-						<p
-							data-testid="v3-param-proposed"
-							className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs text-foreground"
-						>
-							<span>{t.paramsProposed}</span>
-							<Link
-								href="/v3/lab"
-								className="font-medium text-primary hover:underline"
+						<div className="space-y-3 px-4 pb-4">
+							{hint !== undefined && (
+								<p className="text-xs leading-relaxed text-muted-foreground">
+									{hint}
+								</p>
+							)}
+
+							<ul className="space-y-2">
+								{s.rows.map((row) => (
+									<li
+										key={`${row.label}·${row.value}`}
+										data-testid="v3-param"
+										className="space-y-1.5 rounded-md border border-border bg-muted/30 px-3 py-2"
+									>
+										<div className="flex flex-wrap items-baseline gap-2">
+											<span className="text-xs font-medium text-foreground">
+												{displayLabel(s.id, row.label)}
+											</span>
+											<span className="ml-auto rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+												{row.value}
+											</span>
+										</div>
+										{/* · le module source — le détail technique, toujours replié */}
+										<details data-testid="v3-details">
+											<summary className="cursor-pointer text-[11px] text-muted-foreground">
+												{t.paramsSourceLabel}
+											</summary>
+											<p className="mt-1 font-mono text-[11px] text-muted-foreground">
+												{row.source}
+											</p>
+										</details>
+									</li>
+								))}
+							</ul>
+
+							<button
+								type="button"
+								data-testid="v3-param-propose"
+								disabled={busy}
+								onClick={() => propose(s.id, title)}
+								className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
 							>
-								{t.paramsProposedLink} →
-							</Link>
-						</p>
-					)}
-				</section>
-			))}
+								{t.paramsPropose}
+							</button>
+
+							{/* · la note façon toast : la demande est partie au chat (une idée à approuver) */}
+							{proposed === s.id && (
+								<p
+									data-testid="v3-param-proposed"
+									className="flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs text-foreground"
+								>
+									<span>{t.paramsProposed}</span>
+									<Link
+										href="/v3/lab"
+										className="font-medium text-primary hover:underline"
+									>
+										{t.paramsProposedLink} →
+									</Link>
+								</p>
+							)}
+						</div>
+					</details>
+				);
+			})}
+
+			{/* ── L'ANNEXE « Tous les écrans » — REPLIÉE par défaut (180+ liens) : chaque
+			     écran de l'inventaire est un lien réel, groupé V3 / V2 / V1. La loi de
+			     couverture (lib/v3/coverage.test.ts) PROUVE que le chat les résout tous ;
+			     cette annexe le MONTRE, noir sur blanc. ── */}
+			<details
+				data-testid="v3-param-screens"
+				className="rounded-xl border border-border bg-card"
+			>
+				<summary className="flex cursor-pointer flex-wrap items-baseline gap-2 p-4">
+					<h2 className="text-sm font-semibold text-foreground">
+						{t.paramsScreensTitle}
+					</h2>
+					<span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+						{state.screens.length}
+					</span>
+				</summary>
+				<div className="space-y-4 px-4 pb-4">
+					<p className="text-xs leading-relaxed text-muted-foreground">
+						{t.paramsScreensIntro}
+					</p>
+					{screenGroups.map((g) => (
+						<div key={g.name} className="space-y-1.5">
+							<p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+								{g.name}
+								<span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+									{g.screens.length}
+								</span>
+							</p>
+							<ul className="flex flex-wrap gap-1.5">
+								{g.screens.map((s) => (
+									<li key={s.route}>
+										<Link
+											href={s.route}
+											title={s.label}
+											data-testid="v3-param-screen-link"
+											className="inline-block rounded-full border border-border bg-muted/30 px-2.5 py-1 font-mono text-[11px] text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+										>
+											{s.route}
+										</Link>
+									</li>
+								))}
+							</ul>
+						</div>
+					))}
+				</div>
+			</details>
 		</div>
 	);
 }

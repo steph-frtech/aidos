@@ -12,6 +12,7 @@ import {
 	ReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { nodePath, positionOf } from "@/lib/v2/composition";
@@ -211,167 +212,194 @@ export function ParcoursClient() {
 				</p>
 			</header>
 
-			{/* ── le sélecteur de parcours (les branches de profondeur 1 + tout l'arbre) ── */}
-			<div className="space-y-1.5">
-				<p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-					{t.parcoursPickLabel}
-				</p>
-				<div className="flex flex-wrap gap-1.5">
-					<button
-						type="button"
-						data-testid="v3-parcours-pick"
-						data-path=""
-						onClick={() => pick(null)}
-						className={chipCls(focusPath === null)}
-					>
-						{t.parcoursAll}
-					</button>
-					{branches.map((b) => (
-						<button
-							key={b.id}
-							type="button"
-							data-testid="v3-parcours-pick"
-							data-path={b.path}
-							onClick={() => pick(b.path)}
-							className={chipCls(focusPath === b.path)}
-						>
-							{b.label}
-						</button>
-					))}
-				</div>
-			</div>
-
-			{/* ── le graphe + le panneau latéral ── */}
-			<div className="flex flex-col gap-4 lg:flex-row">
+			{/* ── UN PROJET NEUF EST NU : la racine sans enfant → l'état vide AMICAL,
+			     aucune branche de démo, le CTA ramène au chat (l'arbre pousse par les idées) ── */}
+			{branches.length === 0 ? (
 				<div
-					data-testid="v3-parcours-graph"
-					data-node-count={flow.nodes.length}
-					className="h-[30rem] min-w-0 flex-1 overflow-hidden rounded-xl border border-border bg-muted/20"
+					data-testid="v3-parcours-empty"
+					className="flex flex-col items-start gap-4 rounded-xl border border-border bg-card p-6"
 				>
-					{flow.nodes.length === 0 ? (
-						/* · l'état vide accueillant (fail-closed du twin : focus inconnu → graphe vide) */
-						<div className="flex h-full items-center justify-center p-6 text-center text-sm leading-relaxed text-muted-foreground">
-							{t.parcoursEmpty}
-						</div>
-					) : (
-						<ReactFlow
-							nodes={rfNodes}
-							edges={rfEdges}
-							nodeTypes={nodeTypes}
-							fitView
-							fitViewOptions={{ padding: 0.2 }}
-							nodesDraggable={false}
-							nodesConnectable={false}
-							elementsSelectable
-							onNodeClick={(_e, node) => setSelectedId(node.id)}
-							onPaneClick={() => setSelectedId(null)}
-							panOnDrag
-							zoomOnScroll
-							zoomOnPinch
-							minZoom={0.3}
-							maxZoom={2}
-							proOptions={{ hideAttribution: true }}
-							aria-label={t.parcoursTitle}
-						>
-							<Background />
-							<Controls showInteractive={false} />
-							<MiniMap pannable zoomable className="!bg-card" />
-						</ReactFlow>
-					)}
+					<p className="max-w-xl text-sm leading-relaxed text-foreground">
+						{t.parcoursEmptyTitle}
+					</p>
+					<Link
+						href="/v3/lab"
+						className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+					>
+						{t.parcoursEmptyCta} →
+					</Link>
 				</div>
-
-				{/* · le panneau amical du nœud cliqué */}
-				<aside
-					data-testid="v3-parcours-panel"
-					className="w-full shrink-0 self-start rounded-xl border border-border bg-card p-4 lg:w-80"
-				>
-					{panel === null ? (
-						<p className="text-sm leading-relaxed text-muted-foreground">
-							{t.parcoursPanelHint}
+			) : (
+				<>
+					{/* ── le sélecteur de parcours (les branches de profondeur 1 + tout l'arbre) ── */}
+					<div className="space-y-1.5">
+						<p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+							{t.parcoursPickLabel}
 						</p>
-					) : (
-						<div className="space-y-4">
-							<div className="flex items-start justify-between gap-2">
-								<div className="min-w-0">
-									<p className="truncate text-base font-semibold text-foreground">
-										{panel.node.label}
-									</p>
-									<p className="text-xs text-muted-foreground">
-										{panel.levelLabel}
-									</p>
-								</div>
-								<button
-									type="button"
-									onClick={() => setSelectedId(null)}
-									aria-label={t.parcoursPanelClose}
-									className="rounded-md px-2 py-0.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-								>
-									×
-								</button>
-							</div>
-
-							{/* · la position dérivée (racine / feuille · nN / nN — positionOf) */}
-							<p className="text-sm text-foreground">
-								<span className="font-medium">{t.parcoursPanelPosition}</span> :{" "}
-								<span data-testid="v3-parcours-position">{panel.posLabel}</span>
-							</p>
-
-							{/* · les idées rattachées à ce chemin */}
-							<div className="space-y-1.5">
-								<p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-									{t.parcoursPanelIdeas} ({panel.ideas.length})
-								</p>
-								{panel.ideas.length === 0 ? (
-									<p className="text-xs leading-relaxed text-muted-foreground italic">
-										{t.parcoursPanelNoIdeas}
-									</p>
-								) : (
-									<ul className="space-y-1.5">
-										{panel.ideas.map((i) => (
-											<li
-												key={i.id}
-												data-testid="v3-parcours-idea"
-												className="rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-xs leading-relaxed text-foreground"
-											>
-												{i.intent}
-											</li>
-										))}
-									</ul>
-								)}
-							</div>
-
-							{/* · en parler dans le chat — la phrase canonique d'impact, puis retour au lab */}
+						<div className="flex flex-wrap gap-1.5">
 							<button
 								type="button"
-								data-testid="v3-parcours-chat"
-								onClick={() => talkInChat(panel.path)}
-								className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+								data-testid="v3-parcours-pick"
+								data-path=""
+								onClick={() => pick(null)}
+								className={chipCls(focusPath === null)}
 							>
-								{t.parcoursPanelChat}
+								{t.parcoursAll}
 							</button>
-
-							{/* · le DÉTAIL TECHNIQUE — toujours replié, jamais imposé */}
-							<details
-								data-testid="v3-details"
-								className="rounded-md border border-border bg-muted/30 px-2.5 py-1.5"
-							>
-								<summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-									{t.detailsLabel}
-								</summary>
-								<dl className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
-									<div>id — {panel.node.id}</div>
-									<div>path — {panel.path}</div>
-									<div>level — {panel.node.level}</div>
-									<div>
-										depth — {panel.pos.depth} · root={String(panel.pos.isRoot)}{" "}
-										· leaf={String(panel.pos.isLeaf)}
-									</div>
-								</dl>
-							</details>
+							{branches.map((b) => (
+								<button
+									key={b.id}
+									type="button"
+									data-testid="v3-parcours-pick"
+									data-path={b.path}
+									onClick={() => pick(b.path)}
+									className={chipCls(focusPath === b.path)}
+								>
+									{b.label}
+								</button>
+							))}
 						</div>
-					)}
-				</aside>
-			</div>
+					</div>
+
+					{/* ── le graphe + le panneau latéral ── */}
+					<div className="flex flex-col gap-4 lg:flex-row">
+						<div
+							data-testid="v3-parcours-graph"
+							data-node-count={flow.nodes.length}
+							className="h-[30rem] min-w-0 flex-1 overflow-hidden rounded-xl border border-border bg-muted/20"
+						>
+							{flow.nodes.length === 0 ? (
+								/* · l'état vide accueillant (fail-closed du twin : focus inconnu → graphe vide) */
+								<div className="flex h-full items-center justify-center p-6 text-center text-sm leading-relaxed text-muted-foreground">
+									{t.parcoursEmpty}
+								</div>
+							) : (
+								<ReactFlow
+									nodes={rfNodes}
+									edges={rfEdges}
+									nodeTypes={nodeTypes}
+									fitView
+									fitViewOptions={{ padding: 0.2 }}
+									nodesDraggable={false}
+									nodesConnectable={false}
+									elementsSelectable
+									onNodeClick={(_e, node) => setSelectedId(node.id)}
+									onPaneClick={() => setSelectedId(null)}
+									panOnDrag
+									zoomOnScroll
+									zoomOnPinch
+									minZoom={0.3}
+									maxZoom={2}
+									proOptions={{ hideAttribution: true }}
+									aria-label={t.parcoursTitle}
+								>
+									<Background />
+									<Controls showInteractive={false} />
+									<MiniMap pannable zoomable className="!bg-card" />
+								</ReactFlow>
+							)}
+						</div>
+
+						{/* · le panneau amical du nœud cliqué */}
+						<aside
+							data-testid="v3-parcours-panel"
+							className="w-full shrink-0 self-start rounded-xl border border-border bg-card p-4 lg:w-80"
+						>
+							{panel === null ? (
+								<p className="text-sm leading-relaxed text-muted-foreground">
+									{t.parcoursPanelHint}
+								</p>
+							) : (
+								<div className="space-y-4">
+									<div className="flex items-start justify-between gap-2">
+										<div className="min-w-0">
+											<p className="truncate text-base font-semibold text-foreground">
+												{panel.node.label}
+											</p>
+											<p className="text-xs text-muted-foreground">
+												{panel.levelLabel}
+											</p>
+										</div>
+										<button
+											type="button"
+											onClick={() => setSelectedId(null)}
+											aria-label={t.parcoursPanelClose}
+											className="rounded-md px-2 py-0.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+										>
+											×
+										</button>
+									</div>
+
+									{/* · la position dérivée (racine / feuille · nN / nN — positionOf) */}
+									<p className="text-sm text-foreground">
+										<span className="font-medium">
+											{t.parcoursPanelPosition}
+										</span>{" "}
+										:{" "}
+										<span data-testid="v3-parcours-position">
+											{panel.posLabel}
+										</span>
+									</p>
+
+									{/* · les idées rattachées à ce chemin */}
+									<div className="space-y-1.5">
+										<p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+											{t.parcoursPanelIdeas} ({panel.ideas.length})
+										</p>
+										{panel.ideas.length === 0 ? (
+											<p className="text-xs leading-relaxed text-muted-foreground italic">
+												{t.parcoursPanelNoIdeas}
+											</p>
+										) : (
+											<ul className="space-y-1.5">
+												{panel.ideas.map((i) => (
+													<li
+														key={i.id}
+														data-testid="v3-parcours-idea"
+														className="rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-xs leading-relaxed text-foreground"
+													>
+														{i.intent}
+													</li>
+												))}
+											</ul>
+										)}
+									</div>
+
+									{/* · en parler dans le chat — la phrase canonique d'impact, puis retour au lab */}
+									<button
+										type="button"
+										data-testid="v3-parcours-chat"
+										onClick={() => talkInChat(panel.path)}
+										className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+									>
+										{t.parcoursPanelChat}
+									</button>
+
+									{/* · le DÉTAIL TECHNIQUE — toujours replié, jamais imposé */}
+									<details
+										data-testid="v3-details"
+										className="rounded-md border border-border bg-muted/30 px-2.5 py-1.5"
+									>
+										<summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+											{t.detailsLabel}
+										</summary>
+										<dl className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
+											<div>id — {panel.node.id}</div>
+											<div>path — {panel.path}</div>
+											<div>level — {panel.node.level}</div>
+											<div>
+												depth — {panel.pos.depth} · root=
+												{String(panel.pos.isRoot)} · leaf=
+												{String(panel.pos.isLeaf)}
+											</div>
+										</dl>
+									</details>
+								</div>
+							)}
+						</aside>
+					</div>
+				</>
+			)}
 		</div>
 	);
 }

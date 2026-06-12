@@ -15,7 +15,7 @@ import {
 	type ScreenRef,
 } from "@/lib/v2/builder";
 import type { CodeEdge, CodeNode } from "@/lib/v2/code-graph";
-import { nodePath } from "@/lib/v2/composition";
+import { bareTree, nodePath } from "@/lib/v2/composition";
 import { replayTo, type SessionTurn, turnsOf } from "@/lib/v3/session";
 import { chatTurnAction } from "./actions";
 
@@ -101,8 +101,10 @@ export function V3SessionProvider({
 	const messagesRef = useRef<string[]>([]);
 
 	// L'ÉTAT et la TIMELINE sont DÉRIVÉS (recalcul pur) — jamais stockés (ADR 0060).
+	// UN PROJET NEUF EST NU (bareTree — loi au miroir) : la seule racine « app »,
+	// AUCUNE branche de démonstration ; l'arbre pousse par les gestes du chat.
 	const { turns, state } = useMemo(
-		() => turnsOf(messages, v1Screens),
+		() => turnsOf(messages, v1Screens, bareTree()),
 		[messages, v1Screens],
 	);
 
@@ -128,6 +130,7 @@ export function V3SessionProvider({
 					messagesRef.current,
 					messagesRef.current.length,
 					v1Screens,
+					bareTree(),
 				);
 				const out = await chatTurnAction(text, summarize(cur));
 				// Panne / réponse invalide → repli déterministe : le texte entre directement.

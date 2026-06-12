@@ -2,6 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { SOURCE_ORDER } from "../besoin-grammar";
 import {
+	bareTree,
 	growComposes,
 	nodeByPath,
 	nodePath,
@@ -297,5 +298,27 @@ describe("growComposes — le niveau du nœud greffé descend la verticale (§23
 		const rootRank = SOURCE_ORDER.indexOf(root.level);
 		const childRank = SOURCE_ORDER.indexOf(child.level);
 		expect(childRank).toBe(Math.min(rootRank + 1, SOURCE_ORDER.length - 1));
+	});
+});
+
+// ── le projet neuf (correction utilisateur 2026-06-12) ────────────────────────
+
+describe("bareTree — un projet NEUF est NU", () => {
+	it("une seule racine, AUCUN parcours pré-rempli, et l'arbre est valide", () => {
+		const t = bareTree();
+		expect(t).toHaveLength(1);
+		expect(t[0].parentId).toBeNull();
+		expect(validateComposes(t)).toEqual([]);
+		expect(positionOf(t, t[0].id)).toEqual({
+			depth: 0,
+			isRoot: true,
+			isLeaf: true,
+		});
+	});
+
+	it("l'arbre nu POUSSE normalement (la première greffe crée le premier parcours)", () => {
+		const t = growComposes(bareTree(), bareTree()[0].id, "mon parcours");
+		expect(t).toHaveLength(2);
+		expect(nodeByPath(t, "app/mon-parcours")).not.toBeNull();
 	});
 });

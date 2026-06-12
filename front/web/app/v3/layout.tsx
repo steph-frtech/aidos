@@ -30,6 +30,7 @@ const KEYS = [
 	"navParcours",
 	"navHistory",
 	"navEnvs",
+	"navCode",
 	"navParams",
 	"navWorkbench",
 	"heroTitle",
@@ -83,6 +84,8 @@ const KEYS = [
 	"parcoursPickLabel",
 	"parcoursAll",
 	"parcoursEmpty",
+	"parcoursEmptyTitle",
+	"parcoursEmptyCta",
 	"parcoursPanelHint",
 	"parcoursPanelPosition",
 	"parcoursPanelIdeas",
@@ -134,31 +137,44 @@ const KEYS = [
 	"paramsProposed",
 	"paramsProposedLink",
 	"paramsSourceLabel",
+	"paramsSearchPlaceholder",
+	"paramsSearchEmpty",
 	"paramsGestures",
 	"paramsGesturesHint",
 	"paramsLadder",
 	"paramsLadderHint",
-	"paramsLadderOrder",
 	"paramsLevels",
 	"paramsLevelsHint",
-	"paramsLevelsOrder",
 	"paramsFacets",
 	"paramsFacetsHint",
 	"paramsProofs",
 	"paramsProofsHint",
-	"paramsProofGherkin",
-	"paramsProofScreen",
-	"paramsProofFixture",
-	"paramsProofProperty",
 	"paramsThresholds",
 	"paramsThresholdsHint",
-	"paramsMinIntent",
-	"paramsMinMirror",
-	"paramsChars",
 	"paramsScreens",
 	"paramsScreensHint",
-	"paramsScreensSession",
-	"paramsScreensV2",
+	"paramsAgents",
+	"paramsAgentsHint",
+	"paramsModels",
+	"paramsModelsHint",
+	"paramsAutonomy",
+	"paramsAutonomyHint",
+	"paramsBudgets",
+	"paramsBudgetsHint",
+	"paramsAdoption",
+	"paramsAdoptionHint",
+	"paramsBehaviors",
+	"paramsBehaviorsHint",
+	"paramsWallZones",
+	"paramsWallZonesHint",
+	"paramsAuthorities",
+	"paramsAuthoritiesHint",
+	"paramsLinks",
+	"paramsLinksHint",
+	"paramsAnatomy",
+	"paramsAnatomyHint",
+	"paramsScreensTitle",
+	"paramsScreensIntro",
 ] as const;
 
 export default async function V3Layout({ children }: { children: ReactNode }) {
@@ -188,6 +204,15 @@ export default async function V3Layout({ children }: { children: ReactNode }) {
 		.map((e) => ({ route: `/${e.name}`, label: e.name.replace(/-/g, " ") }))
 		.sort((a, b) => (a.route < b.route ? -1 : 1));
 
+	// Les LENTILLES V3 elles-mêmes sont des écrans atteignables (« ouvre l'écran v3
+	// parcours ») — la même convention que la loi de couverture (lib/v3/coverage.test.ts).
+	const v3Lenses: ScreenRef[] = readdirSync(join(absBase, "app", "v3"), {
+		withFileTypes: true,
+	})
+		.filter((e) => e.isDirectory() && !e.name.startsWith("_"))
+		.map((e) => ({ route: `/v3/${e.name}`, label: `v3 ${e.name}` }))
+		.sort((a, b) => (a.route < b.route ? -1 : 1));
+
 	// (b) Le GRAPHE DE CODE (le motif /v2/code) : extrait des twins lib/v2 RÉELS par l'API
 	// compilateur TypeScript (code-extract, côté serveur seulement), trié.
 	const libDir = join(absBase, "lib", "v2");
@@ -213,7 +238,7 @@ export default async function V3Layout({ children }: { children: ReactNode }) {
 			</aside>
 			<main className="min-w-0 flex-1 px-4 py-6 sm:px-8">
 				<V3SessionProvider
-					v1Screens={v1Screens}
+					v1Screens={[...v1Screens, ...v3Lenses]}
 					codeNodes={codeNodes}
 					codeEdges={codeEdges}
 					strings={strings}
