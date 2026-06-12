@@ -35,12 +35,13 @@ test.describe("WB2-11 /v2/goal — idée → miroir → /goal → gel (wizard XS
 		const stepper = page.getByTestId("v2-goal-stepper");
 		await expect(stepper).toHaveAttribute("data-state", "idea");
 
-		// L'IDÉE : hasMirror=false (PROPOSE), une coordonnée affichée.
+		// L'IDÉE : hasMirror=false (PROPOSE), une coordonnée affichée — l'échelle est la
+		// POSITION dans l'arbre composes (ADR 0055, un chemin), la feuille canonique du seed.
 		await expect(page.getByTestId("v2-goal-idea-has-mirror")).toContainText(
 			"false",
 		);
 		await expect(page.getByTestId("v2-goal-idea-coordinate")).toContainText(
-			"operation",
+			"operation × F × app/paiement/checkout/debit-du-compte",
 		);
 
 		// LE MUR : tenter une écriture-vérité DIRECTE → REFUSÉE (BlockReason), aucune transition.
@@ -70,9 +71,9 @@ test.describe("WB2-11 /v2/goal — idée → miroir → /goal → gel (wizard XS
 		// le ChangeSet DRAFT (PROPOSE, jamais appliqué).
 		await expect(page.getByTestId("v2-goal-changeset")).toContainText("DRAFT");
 		await expect(page.getByTestId("v2-goal-changeset")).toContainText("cs:");
-		// l'idée descendue à sa coordonnée.
+		// l'idée descendue à sa coordonnée (l'échelle = le chemin, ADR 0055).
 		await expect(page.getByTestId("v2-goal-frozen-coordinate")).toContainText(
-			"operation",
+			"operation × F × app/paiement/checkout/debit-du-compte",
 		);
 		// le mur franchi + le mur tenu : hasMirror=true, wroteKernel=false.
 		await expect(page.getByTestId("v2-goal-has-mirror")).toContainText("true");

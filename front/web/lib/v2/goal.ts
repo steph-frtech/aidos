@@ -8,7 +8,8 @@
  *   1. l'idée seule ne peut PAS être promue (un candidat sans miroir est un vœu, un MONSTRE, §1) ;
  *   2. ÉCRIRE LE MIROIR fait passer `HasMirror false → true` (le franchissement, §116) ;
  *   3. /goal compose alors un KERNEL PROPOSÉ : l'idée DESCEND à sa coordonnée (niveau × facette ×
- *      échelle, reprise verbatim de l'idée) et REÇOIT UNE VERSION GELÉE (content-adressée) ;
+ *      échelle — l'échelle est un CHEMIN dans l'arbre composes §49/ADR 0055, reprise verbatim de
+ *      l'idée) et REÇOIT UNE VERSION GELÉE (content-adressée) ;
  *   4. ce kernel proposé est porté par un CHANGESET DRAFT (S20) — il PROPOSE, il n'APPLIQUE rien :
  *      l'application reste l'approbation humaine (le mur, §2). `wroteKernel` reste TOUJOURS false.
  *
@@ -259,7 +260,8 @@ export function goalStage(
 /**
  * Une IDÉE de démonstration CANONIQUE (déterministe) pour seeder l'écran tant que le store ne sert pas
  * d'idée live (OpenQuestion documentée, ne bloque pas) : une idée au niveau « operation » (forme
- * attendue fixture_n2), à une coordonnée stable, hasMirror=false.
+ * attendue fixture_n2), à une coordonnée stable — l'échelle est la POSITION dans l'arbre composes
+ * (ADR 0055, un chemin — jamais l'ancien jeu clos) : la feuille canonique du seed (lib/v2/composition).
  */
 export function syntheticIdea(): Idea {
 	// Construit comme le twin WB2-03 le produirait — id content-adressé aligné sur ideaHash.
@@ -268,7 +270,8 @@ export function syntheticIdea(): Idea {
 	const coordinate: Coordinate = {
 		level: "operation",
 		facet: "F",
-		scale: "feuille",
+		// La feuille du seedComposes() : son rôle « feuille » est DÉRIVÉ de la position (roleOf).
+		scale: "app/paiement/checkout/debit-du-compte",
 	};
 	// L'id et expectedMirrorForm sont ceux que composeIdea(WB2-03) calculerait pour ce besoin.
 	return {

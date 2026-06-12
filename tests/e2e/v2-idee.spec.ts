@@ -9,6 +9,10 @@ import { expect, test } from "@playwright/test";
  *   - le parcours wizard COMPLET (intention → coordonnée → provenance → revue → PROPOSER) ;
  *   - aboutit à UNE idée proposée (amber), avec son empreinte, sa coordonnée et sa forme de
  *     miroir attendue ;
+ *   - l'ÉCHELLE VIVANTE (ADR 0055, §49/§108) : l'échelle est une POSITION (un chemin) dans
+ *     l'arbre composes — le SYSTÈME propose le placement (placeIntent), l'HUMAIN surcharge
+ *     (le picker) ou GREFFE (l'arbre pousse, profondeur illimitée) ; racine/cellule/kernel/
+ *     feuille sont des rôles DÉRIVÉS de la position, jamais stockés ;
  *   - le mur intact : hasMirror=false ET wroteKernel=false affichés ; AUCUNE requête d'écriture ;
  *   - XState : les états sont VISIBLES (le stepper + l'état courant) et les transitions
  *     exécutables (Suivant / Précédent / Proposer / Recommencer).
@@ -42,11 +46,24 @@ test.describe("WB2-03 /v2/idee — wizard XState de capture d'idée", () => {
 		await page.getByTestId("v2-idee-intent").fill("Je veux payer en un clic");
 		await page.getByTestId("v2-idee-next").click();
 
-		// Étape 2 — la coordonnée (niveau × facette × échelle fractale).
+		// Étape 2 — la coordonnée (niveau × facette × échelle = une POSITION dans l'arbre
+		// composes, ADR 0055). Ici l'humain SURCHARGE le placement proposé : il clique un
+		// nœud du picker (§49 — les frontières sont posées par jugement humain).
 		await expect(page.getByTestId("v2-idee-state")).toContainText("coordonnee");
 		await page.getByTestId("v2-idee-level").selectOption("operation");
 		await page.getByTestId("v2-idee-facet").selectOption("F");
-		await page.getByTestId("v2-idee-scale").selectOption("kernel");
+		await page
+			.locator(
+				'[data-testid="v2-idee-scale-node"][data-path="app/paiement/checkout"]',
+			)
+			.click();
+		// le chemin choisi + son rôle DÉRIVÉ de la position (jamais stocké) : checkout = kernel.
+		await expect(page.getByTestId("v2-idee-scale-path")).toHaveText(
+			"app/paiement/checkout",
+		);
+		await expect(page.getByTestId("v2-idee-scale-role")).toContainText(
+			"Kernel",
+		);
 		await page.getByTestId("v2-idee-next").click();
 
 		// Étape 3 — la provenance.
@@ -93,11 +110,25 @@ test.describe("WB2-03 /v2/idee — wizard XState de capture d'idée", () => {
 		page,
 	}) => {
 		await page.goto("/v2/idee");
-		await page.getByTestId("v2-idee-intent").fill("Je veux payer en un clic");
+		await page
+			.getByTestId("v2-idee-intent")
+			.fill("Au checkout, débiter le compte une seule fois");
 		await page.getByTestId("v2-idee-next").click();
 		await page.getByTestId("v2-idee-level").selectOption("entity");
 		await page.getByTestId("v2-idee-facet").selectOption("I");
-		await page.getByTestId("v2-idee-scale").selectOption("feuille");
+		// le SYSTÈME propose le placement (placeIntent — accroche lexicale « checkout » /
+		// « compte » → la feuille canonique du seed) ; l'humain l'ADOPTE d'un clic.
+		await expect(page.getByTestId("v2-idee-placement")).toBeVisible();
+		await expect(page.getByTestId("v2-idee-placement")).toContainText(
+			"app/paiement/checkout/debit-du-compte",
+		);
+		await page.getByTestId("v2-idee-placement-use").click();
+		await expect(page.getByTestId("v2-idee-scale-path")).toHaveText(
+			"app/paiement/checkout/debit-du-compte",
+		);
+		await expect(page.getByTestId("v2-idee-scale-role")).toContainText(
+			"Feuille",
+		);
 		await page.getByTestId("v2-idee-next").click();
 		await page.getByTestId("v2-idee-provenance-incident").click();
 		await page.getByTestId("v2-idee-next").click();
@@ -110,6 +141,48 @@ test.describe("WB2-03 /v2/idee — wizard XState de capture d'idée", () => {
 		await page.getByTestId("v2-idee-restart").click();
 		await expect(page.getByTestId("v2-idee-state")).toContainText("intention");
 		await expect(page.getByTestId("v2-idee-intent")).toHaveValue("");
+	});
+
+	test("GREFFER fait pousser l'arbre (profondeur illimitée) et auto-sélectionne le nouveau nœud", async ({
+		page,
+	}) => {
+		await page.goto("/v2/idee");
+		await page
+			.getByTestId("v2-idee-intent")
+			.fill("faire pousser l'arbre des échelles");
+		await page.getByTestId("v2-idee-next").click();
+		await expect(page.getByTestId("v2-idee-state")).toContainText("coordonnee");
+
+		// On sélectionne la feuille LA PLUS PROFONDE du seed…
+		const leaf = page.locator(
+			'[data-testid="v2-idee-scale-node"][data-path="app/paiement/checkout/debit-du-compte"]',
+		);
+		await leaf.click();
+		await expect(page.getByTestId("v2-idee-scale-role")).toContainText(
+			"Feuille",
+		);
+
+		// …et on GREFFE dessous : l'arbre POUSSE (append-only, §9), AU-DELÀ de la
+		// profondeur du seed — la profondeur est ILLIMITÉE (fractal, §49).
+		await page.getByTestId("v2-idee-grow-label").fill("preuve d'idempotence");
+		await page.getByTestId("v2-idee-grow").click();
+
+		const grown = page.locator(
+			'[data-testid="v2-idee-scale-node"][data-path="app/paiement/checkout/debit-du-compte/preuve-d-idempotence"]',
+		);
+		await expect(grown).toBeVisible(); // le nœud EXISTE : l'arbre a poussé
+		await expect(grown).toHaveAttribute("aria-pressed", "true"); // et il est AUTO-SÉLECTIONNÉ
+		await expect(page.getByTestId("v2-idee-scale-path")).toHaveText(
+			"app/paiement/checkout/debit-du-compte/preuve-d-idempotence",
+		);
+		await expect(page.getByTestId("v2-idee-scale-role")).toContainText(
+			"Feuille",
+		);
+		// la MÊME donnée change de rôle quand l'arbre pousse : l'ancienne feuille DEVIENT
+		// kernel (le rôle est une lecture DÉRIVÉE de la position, jamais stocké — ADR 0055).
+		await expect(leaf).toContainText("Kernel");
+		// le champ de greffe est vidé après la greffe.
+		await expect(page.getByTestId("v2-idee-grow-label")).toHaveValue("");
 	});
 
 	test("coexistence : /v2/idee 200 et l'ancien Workbench / 200", async ({

@@ -48,9 +48,17 @@ const KEYS = [
 	"errFacet",
 	"errScale",
 	"errProvenance",
-	"scaleCellule",
-	"scaleKernel",
-	"scaleFeuille",
+	"scaleHelp",
+	"placementLabel",
+	"placementUse",
+	"pickerLabel",
+	"grow",
+	"growPlaceholder",
+	"scalePathLabel",
+	"roleRacine",
+	"roleCellule",
+	"roleKernel",
+	"roleFeuille",
 ] as const;
 
 export default async function V2IdeaScreen() {

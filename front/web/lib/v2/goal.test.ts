@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { growComposes, nodePath, seedComposes } from "./composition";
 import {
 	type BlockReason,
 	changeSetId,
@@ -28,11 +29,21 @@ import type { Coordinate, Idea } from "./idea";
  * l'idée descend à sa coordonnée VERBATIM ; wroteKernel reste toujours false.
  */
 
+// L'ÉCHELLE n'est PLUS un jeu clos (ADR 0055) : c'est un CHEMIN dans l'arbre composes (§49/§108).
+// On tire l'échelle parmi les chemins MEMBRES d'un arbre CULTIVÉ depuis le seed canonique
+// (growComposes — l'arbre pousse, les rôles sont des lectures dérivées, jamais stockés).
+const grownTree = growComposes(
+	seedComposes(),
+	seedComposes().find((n) => n.label === "checkout")?.id ?? "",
+	"remboursement",
+);
+const memberPaths = grownTree.map((n) => nodePath(grownTree, n.id).join("/"));
+
 // Une idée arbitraire bien formée (telle que le twin WB2-03 en produirait), à la coordonnée donnée.
 const arbCoordinate = fc.record<Coordinate>({
 	level: fc.constantFrom("operation", "entity", "control", "view"),
 	facet: fc.constantFrom("F", "S", "E", "A"),
-	scale: fc.constantFrom("feuille", "kernel", "cellule"),
+	scale: fc.constantFrom(...memberPaths),
 });
 
 const arbIdea: fc.Arbitrary<Idea> = fc
