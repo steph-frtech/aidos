@@ -70,7 +70,7 @@ export const CANONICAL_PHRASES: Record<IntentKind, string> = {
 	greffer: "greffe <libellé> sous <chemin>",
 	promouvoir: "promeus la dernière idée",
 	generer: "génère l'application",
-	deployer: "déploie l'application en test | staging | prod",
+	deployer: "déploie l'application en dev | staging | prod",
 	delta: "montre le delta depuis la prod",
 	impacter: "quel impact si je modifie <chemin>",
 	interroger: "montre-moi l'état du projet",
