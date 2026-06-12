@@ -1,0 +1,22 @@
+---
+name: project-wb2-22-deploy
+description: WB2-22 verification — /v2/deploy specs→app web→prod twin (gated deploy plan, URL live, wall), result and the recurring biome false-claim scar
+metadata:
+  type: project
+---
+
+§WB2-22 (after WB2-21) NOUVEL écran /v2/deploy = la chaîne SPECS → APP WEB → PROD (AI Lab, ADR 0052, S96, CLAUDE.md §3 N5): à partir d'une source d'entité (la MÊME que /v2/emetteurs émet) AIDOS PLANIFIE DÉTERMINISTIQUEMENT le déploiement de l'app émise — empreinte content-adressée + plan de conteneurisation (postgres/app/traefik) + route Traefik (sous-domaine→URL https) + aperçu live. Bouton GATÉ (auth+rate-limit = la parenthèse sécurité ADR 0052 FERMÉE). DONE=e2e déploiement→URL live+aperçu / bouton refuse sans auth (gate) / le mur (action sous la ligne).
+
+TWIN lib/v2/deploy.ts PUR no-LLM RÉ-EXPORTE emitView/appPreview/entityId/ENTITY_CASES/BlockReason de WB2-21 emetteurs.ts (ADR 0007 NO-FORK, lui-même ré-export byte-id de S35) AJOUTE le seul neuf: deployGate(ctx)→GateVerdict FAIL-CLOSED & ORDONNÉE (auth d'abord→DEPLOY_GATE_UNAUTHENTICATED, puis quota→DEPLOY_GATE_RATE_LIMITED, DEFAULT_RATE_LIMIT=5 déclaré jamais appris)/buildDeployPlan(entity,gate)→DeployPlan|BlockReason (1)garde refusée→BlockReason AUCUN plan (2)emitView AST malformé→BlockReason (3)plan content-adressé appHash=hash32(FNV-1a octets 3 cibles)→planId=d-<appHash>/CONTAINER_SERVICES clos [postgres:16/aidos:emitted-app/traefik:v3]/route subdomainOf(table).sagedesk.fr→url https/preview=appPreview/reDeployStable(rounds=16) PREUVE reproductible même planId+url+appHash/subdomainOf TOTAL table vide→"app"/isBlockedPlan garde .code.
+
+MIROIR 16 fast-check RÉEL (→286/286, +16): plan reproductible done-property/buildDeployPlan pur/garde non-auth→UNAUTHENTICATED/auth sous quota→allowed/quota→RATE_LIMITED/garde ordonnée auth-d'abord/garde refusée→BlockReason aucun plan+reDeployStable false/URL dérivée table/subdomainOf total/services clos/aperçu=appPreview/view=emitView/registre ENTITY_CASES clos chaque→d-<8hex>/AST malformé(type uuid)→BlockReason/Order amputé discount→appHash+planId distincts.
+
+SCREEN page 53 KEYS→DeployClient useState selectedId+authenticated+deploysInWindow+deployed+reDeployed: toggle auth (v2-deploy-auth-toggle data-authenticated)→choisir entité→Déployer(v2-deploy-deploy); garde refusée→v2-deploy-blocked data-code+how_to_fix AUCUN plan; garde OK→v2-deploy-url href=https://order.sagedesk.fr+services(v2-deploy-service-{name})+aperçu(v2-deploy-preview-{col} data-nullable/data-pk)+Re-planifier(v2-deploy-redeploy)→report data-stable; Réinit; propose data-proposes=goal mur intact ZÉRO fetch. e2e 5 VÉRIFIÉ LIVE PAR MOI (build13.2s ƒ→PORT=3422 5passed 4.3s: refuse sans auth UNAUTHENTICATED aucun plan/URL/déploiement→URL Traefik+services+aperçu id PK discount nullable+re-deploy stable writes[]/Order amputé sans discount/propose goal/hub→/v2/deploy) kill exact ss:3422 prod:3000 inactif.
+
+REACHABILITY BRANCHÉ GrilleScreen.tsx:134 v2-grille-gesture-deploy+gestureDeploy fr==en EXECUTOR A BRANCHÉ (4e consécutif WB2-19/20/21/22 sans omission — scar orphan-nouvel-écran RÉSOLU durablement).
+
+VERIFIED-GREEN AFTER 1 CORRECTION (4a9895b): biome noUnusedImports deploy.test.ts `type DeployGateContext` importé jamais usé (exit 0 non-bloquant MAIS executor claim "Biome clean" FAUX)→import retiré biome CLEAN. Après: vitest 286/286(270+16) tsc0 build13.2s i18n v2Deploy fr53==en53+gestureDeploy DETERMINISM-FIRST(deployGate+buildDeployPlan PURES content-adressé reproductible reDeployStable no-LLM, planification pas LLM "est-ce sûr?") wall clean(grep fetch vide writes[]) docs 3-layer(Impl:9/Méta:31/Méta-méta:39) docs.json:533-534 mint validate PASS code 4a9895b==origin(executor 073dead+verifier biome fix) docs dab521d==origin/main pushed.
+
+OQ by-design (non-bloquantes): registre ENTITY_CASES clos (seed déterministe, vrai DAG/kernel Postgres = limite ADR 0052)/exécution réelle docker compose up = hors twin pur (S96, le twin prouve le PLAN content-adressé+la garde pas l'exécution machine)/Linear MCP write tools non exposés ici (authenticate/complete seuls)→issue non passée Done best-effort §11/Mintlify search-index lag derrière CDN (page live 200 prouvé).
+
+SCAR CONFIRMÉ 4e: executor claim "Biome clean" FAUX quand biome exit 0 + 1 warning (WB2-18 noExplicitAny/WB2-19 noNonNull/WB2-20 noUnusedImports/WB2-22 noUnusedImports type-import)→TOUJOURS re-run biome même exit 0, le type-import inutilisé compte. report ACCURATE(286/286+16/16+5/5 e2e+reachability+docs réels) SAUF biome-warning-omis (seul gap, comme WB2-19/20).

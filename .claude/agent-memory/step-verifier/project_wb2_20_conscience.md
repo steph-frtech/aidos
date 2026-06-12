@@ -1,0 +1,26 @@
+---
+name: wb2-20-conscience
+description: §WB2-20 verification — /v2/conscience the deterministic aggregator (axes voulu/construit/prouvé/autorisé), reuses reconcile FK09 no-fork
+metadata:
+  type: project
+---
+
+§WB2-20 (after WB2-19) NOUVEL écran /v2/conscience = LA CONSCIENCE = AGRÉGATEUR DÉTERMINISTE (ROADMAP-fke FK09/FKE-6.3/FKE-31/§8): compare paire par paire les 4 AXES d'une vérité — VOULU(idée/miroir attendu)·CONSTRUIT(code/projection)·PROUVÉ(miroir vert)·AUTORISÉ(policy/mur) — voyant 🟢/🔴/🟡 par axe + decision cards accept/amend/reject/defer. N'INVENTE AUCUN JUGE(§8): LIT verdicts sourcés et ROUTE.
+
+DONE=twin reconcile pur+property(mêmes verdicts→même rapport)/e2e voyants+cards — TOUS MET.
+
+TWIN lib/v2/conscience.ts RÉ-EXPORTE reconcile(FK09 lib/conscience.ts ADR0007 NO-FORK, pur/total, drift ssi paire HARD rouge, X soft jamais drift §13.6, cards content-addr FNV-1a) VERBATIM + ajoute VUE V2 par axes: AXES(4)/SOURCE_AXIS(table close mapping source→axe, facette S FORCE autorisé)/axisOf/axisLights(report)→4 voyants(rouge ssi paire HARD rouge·ambre ssi advisory seul·vert sinon)/pairLights(chaque paire sous axe)/V2_OPTIONS+OPTION_V2(table close CardOption FK09→verbe V2: fix_below_wall→amend, change_above_wall→accept, ask_user_decision/keep_experimental→defer, block/deprecate→reject)/decisionCardsV2/CONSCIENCE_CASES clos(aligned/runner-drift/break-security/break-experience réutilise squelette FK08 wireSkeleton+SourcedVerdict FK09). PUR no-LLM, déterministe.
+
+MIROIR 15 fast-check RÉEL re-run(→255/255 +15): reconcile déterm byte-identique/INVARIANT sous ordre(reverse)/axisLights TOUJOURS 4 axes ordre AXES/cohérence voyant↔tally/CONSERVATION paires(Σtotal==pairs.length)/S→autorisé/pairLights aucune perdue-inventée/decisionCardsV2 options CLOSES⊆{accept,amend,reject,defer} ordre canonique+déterm/v2Option totalité/X soft jamais drift verdict aligné+aucun voyant rouge/CONSCIENCE_CASES clos+résoluble/aligned 4 verts 0 card/runner-drift prouvé rouge+card/break-security autorisé rouge+card S reject recommandé/break-experience aligné+card advisory.
+
+SCREEN page Server(50 KEYS)→ConscienceClient client-only useState selectedId→caseReport(reconcile)→axisLights/pairLights/decisionCardsV2; choisir cas(v2-conscience-sample-{id})→v2-conscience-reconcile→v2-conscience-report{verdict data-verdict/tally green/red/advisory/determinism data-deterministic/4 axes v2-conscience-axis-{axis} data-light/tableau paires v2-conscience-pair data-source/facet/axis/light/cards v2-conscience-card data-source/facet/axis/advisory + options v2-conscience-card-option-{o} data-proposes=goal data-recommended/no-cards}/v2-conscience-reset; ZÉRO fetch/POST mur tient(propose→/goal pas write direct, data-proposes=goal).
+
+e2e 5 VÉRIFIÉ LIVE PAR MOI(build13.1s /v2/conscience ƒ→next start PORT=3414→PLAYWRIGHT_WEB_PORT=3414+BASE_URL 5passed 3.9s: aligned 4 voyants verts+no-cards+déterministe+writes[]/runner-drift DRIFT+prouvé rouge+card actionnable options data-proposes=goal+blast/break-security DRIFT+autorisé rouge+card S advisory=false+reject recommended/break-experience reste ALIGNÉ+card X advisory=true/hub /v2/grille→/v2/conscience) kill exact pid ss:3414 prod:3000 inactif(000).
+
+REACHABILITY /v2/conscience BRANCHÉ GrilleScreen.tsx:120 v2-grille-gesture-conscience+gestureConscience fr"La conscience — voulu/construit/prouvé/autorisé"==en"The consciousness — wanted/built/proven/authorized" EXECUTOR A BRANCHÉ LE HUB (2e nouvel écran consécutif sans omission reachability, après WB2-19).
+
+VERIFIED-GREEN AFTER 1 CORRECTION(verifier 578f187): biome noUnusedImports — conscience.test.ts importait CONSCIENCE_CASES(ligne 28) mais ne l'UTILISAIT QUE dans commentaire+string("le registre CONSCIENCE_CASES est CLOS"), pas comme valeur(le test passe par conscienceCaseIds()/conscienceCaseById()) → 1 biome WARNING (exit 0 non-bloquant MAIS executor claim "Biome clean" FAUX 3e fois consécutive) → import retiré → biome CLEAN. Après fix: vitest lib/v2+app/v2 255/255(240+15) tsc0 biome CLEAN build13.1s i18n v2Conscience fr50==en50(neuf)+gestureConscience DETERMINISM-FIRST(tout code pur, tables closes AXES/SOURCE_AXIS/OPTION_V2, repro mirror; reconcile authoritative Go side, aucun LLM) docs 3-layer(Implémentation·Méta·Méta-méta) docs.json:529-530 mint validate PASS code 578f187(executor bb93bbf+verifier biome fix); docs push b8ab5b7 origin/main(executor).
+
+OQ by-design: Linear MCP unauth(seul authenticate exposé pas d'outils issue→issue WB2-20 non créée/déplacée)/Mintlify index lag(page wb2-20 pas encore indexée recherche, mint validate+broken-links clean+push réussi=autorité)/vrai-Claude-cards-non-branché(options simulées CONSCIENCE_CASES déclarés).
+
+SCAR CONFIRMÉ 3e fois consécutif(WB2-18 noExplicitAny mal placé, WB2-19 noNonNullAssertion, WB2-20 noUnusedImports): executor claim "Biome clean" alors que biome WARNING subsiste(exit 0 non-bloquant→claim faux)→TOUJOURS re-run biome check même si executor dit clean, fix=retirer/garder import selon usage RÉEL(comment/string ne compte pas comme usage). SCAR reachability nouvel-écran RÉSOLU 2e fois consécutif(WB2-19+WB2-20 executor branche GrilleScreen hub spontanément). Executor report ACCURATE(255/255+15/15+5/5 e2e+reachability+docs réels) SAUF biome-warning-omis(scar récurrent).

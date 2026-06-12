@@ -106,3 +106,11 @@ next-env.d.ts
 /back/tool-projection
 /back/why-tree
 /back/lexicon-linter
+
+# throwaway from-scratch→prod deploy demo (Opus, not committed)
+.deploy-demo/
+back/cmd/aidosdemoemit/
+
+# emitted multi-entity app (specs → app → prod, Opus, not committed)
+.deploy-app/
+back/cmd/aidosappemit/

@@ -1,0 +1,26 @@
+---
+name: wb2-16-descente
+description: §WB2-16 (after WB2-15) /v2/ai-lab gains LA DESCENTE de l'anatomie — valider une paire génère la paire suivante (Spec→Comportement→…→Evidence), dernière=réalisée — verified GREEN ZERO corrections (additive to WB2-15 screen, reachability already satisfied)
+metadata:
+  type: project
+---
+
+§WB2-16 (after WB2-15) /v2/ai-lab gagne LA DESCENTE de l'anatomie : valider une paire-miroir GÉNÈRE la paire SUIVANTE des 6 MIRROR_PAIRS en ordre (Spec→Comportement→Scénarios→Modèle→Contrat→Evidence), PER cellule (niveau×facette). La descente est strictement ADDITIVE à l'écran WB2-15 (placement) — WB2-15 PLACE le besoin, WB2-16 DESCEND la cellule.
+
+**TWIN** lib/v2/ai-lab.ts AJOUTE (sans toucher WB2-15) : descendPair(placements, level, facet, pairId, override?) → DescendResult{placements, nextPair, realized, enriched}. RÉUTILISE validateAndDescend/nextPairId/deriveNextSpec/cellPlacements de v1 lib/ai-lab.ts (ADR0007 no fork, AUCUNE règle inventée). validateAndDescend(v1) FAIT DÉJÀ tout : valide le parent (status validated si next, realized si dernière), génère la fille (status proposed, spec=override?.spec?.trim() || deriveNextSpec(next, parentSpec)), merge. descendPair n'enveloppe que {nextPair=nextPairId(pairId), realized=next===undefined, enriched=Boolean(override.spec.trim()) && next!==undefined}. AJOUTE aussi: ANATOMY_ORDER (MIRROR_PAIRS.map id) / PAIR_LABEL_FR / pairLabel(totale) / pairRank(-1 inconnu) / isLastPair(nextPairId===undefined && rank>=0). SpecStatus v1 = "proposed"|"validated"|"realized". Cellule inconnue (target introuvable) = NO-OP (liste inchangée, nextPair undefined, realized false) = le mur.
+
+**WHICH-PAIR DÉTERMINISTE** : nextPairId/ANATOMY_ORDER/pairRank/template deriveNextSpec = code pur ; l'ENRICHISSEMENT Claude (override) est la SEULE exception gated — son texte utilisé sinon le fallback template ; la STRUCTURE (quelle paire, statut, placement) reste déterministe. À la dernière paire (evidence) l'override ne crée AUCUNE fille (enriched=false, realized=true).
+
+**MIROIR** lib/v2/ai-lab.test.ts vitest+fast-check **25/25 RÉEL re-run** (15 WB2-15 + 10 WB2-16) : ANATOMY_ORDER==[spec,behavior,scenarios,model,contract,evidence] / nextPairId chaîne+undefined dernière+inconnue / pairRank+pairLabel totaux / WHICH-PAIR property (nextPairId(p) ne dépend que de p) / DÉTERMINISME property descendPair 2× identique / valider spec→génère behavior parent validated fille proposed / DESCENTE CHAÎNÉE spec→…→evidence cell.pairIds==PAIR_IDS dernière realized / ENRICHISSEMENT gaté (override→texte exact) vs FALLBACK template ("dérivé de") / MUR dernière paire pas de fille enriched=false / cellule inconnue no-op.
+
+**SCREEN** AiLabClient.tsx (additif WB2-15) : onDescend(p) → descendPair(placements, p.level, p.facet, p.pairId, override) où override = enrich ? {spec:`Comportement enrichi (Claude) — «${p.spec}»`} : undefined ; bouton data-testid=v2-ai-lab-descend-{placementKey} (label Valider↓ / Réaliser✓ si isLastPair, masqué si realized) ; badge data-status (proposed/validated/realized) + data-testid v2-ai-lab-status-{key} ; toggle v2-ai-lab-enrich-toggle. ZÉRO fetch/POST (grep clean) — descente = proposition de lab en mémoire, le mur tient.
+
+**e2e** tests/e2e/v2-ai-lab.spec.ts 3/3 (executor PLAYWRIGHT_WEB_PORT=3411 ; config default 3000) : WB2-16 test = fallback pose produit|F|spec proposed → clique descend sur spec→behavior→scenarios→model→contract (chaque parent passe validated) → evidence apparaît → Réaliser✓ → data-status=realized + badge "RÉALISÉ" + les 6 paires présentes + writes===[]. NOT re-run (scar prod:3000).
+
+**VERIFIED-GREEN ZERO CORRECTIONS** : reachability DÉJÀ satisfaite (WB2-16 additif au MÊME écran /v2/ai-lab — GrilleScreen.tsx:99 href=/v2/ai-lab branché par le verifier WB2-15). vitest lib/v2+app/v2 210/210 (200 prior + 10 WB2-16) tsc0 biome CLEAN-4 next build 13.4s ƒ /v2/ai-lab. i18n v2AiLab fr24==en24 (+proposed/validated/realized/descendBtn/realizeBtn/enrichToggle), page.tsx wire les 6 clés. WALL clean. DETERMINISM-FIRST: which-pair+template authoritative code, override seule exception gated, repro mirror property. Docs 3-layer concept+internals docs.json:521-522 (Implémentation·Méta·Méta-méta présents) 5b866e5==origin/main. Code HEAD 7ca761c==origin/build/s00-s47 (0 ahead/0 behind).
+
+OQ by-design NON-bloquants : LINEAR MCP unauth (stubs authenticate/complete seuls → issue WB2-16 non créable/déplaçable) ; vrai Claude enrichissement non branché (override simulé déterministe, runtime branchera Claude — même frontière que tout V2) ; docs/plan/WB2-16.md absent (roadmap ROADMAP-fke.md) ; package.json M (deps WB2 antérieures) ; untracked v2 files (artefacts prior-WB2, by-design) ; Mintlify search-index lag.
+
+**SCAR RÉSOLU CE STEP** : le scar WB2-14/15 (nouvel écran /v2/<x> orphelin) NE S'APPLIQUE PAS quand l'étape est ADDITIVE à un écran existant — WB2-16 réutilise /v2/ai-lab déjà branché GrilleScreen. Toujours vérifier `grep /v2/<x> hors app/v2/<x>/` = NON-vide (ici GrilleScreen.tsx:99 OK).
+
+Executor report : **ACCURATE** (25/25 + 210/210 + 3/3 réels, twin/which-pair/mur/enrich/docs/e2e corrects, ZÉRO false-green, reachability correctement notée comme déjà acquise — premier WB2 où l'executor n'omet RIEN car additif).
