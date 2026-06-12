@@ -27,14 +27,16 @@ import { nodeByPath } from "./composition";
 const S = (): BuilderState => initBuilderState();
 
 describe("la grammaire d'intentions — un jeu CLOS, déclaré", () => {
-	it("le jeu des intentions est déclaré et clos", () => {
+	it("le jeu des intentions est déclaré et clos (le cycle de vie ENTIER d'une appli)", () => {
 		expect(INTENT_KINDS).toEqual([
 			"capturer_idee",
 			"greffer",
 			"promouvoir",
+			"generer",
+			"deployer",
+			"delta",
 			"impacter",
 			"interroger",
-			"deployer",
 		]);
 	});
 
@@ -175,10 +177,107 @@ describe("applyIntent — le RÉDUCTEUR PUR event-sourcé", () => {
 		);
 	});
 
-	it("INTERROGER + DEPLOYER : totals — l'état est lu, le déploiement PROPOSÉ (gaté), rien d'exécuté", () => {
+	it("INTERROGER : total — l'état est lu", () => {
 		const r1 = applyIntent(S(), "montre-moi l'état du projet");
 		expect(r1.events.some((e) => e.kind === "etat_lu")).toBe(true);
-		const r2 = applyIntent(S(), "déploie l'application en production");
-		expect(r2.events.some((e) => e.kind === "deploiement_propose")).toBe(true);
+	});
+});
+
+// ── le cycle de vie complet : générer → test → prod (le cliquet) → delta ──────
+
+/** Mène l'état jusqu'à UN kernel proposé (capture + promotion) — l'app minimale. */
+function withKernel(): BuilderState {
+	const r1 = applyIntent(
+		S(),
+		"capture l'idée : au checkout, débiter le compte une seule fois",
+	);
+	return applyIntent(r1.state, "promeus la dernière idée").state;
+}
+
+describe("GÉNÉRER — l'app est une PROJECTION pure des kernels proposés", () => {
+	it("générer sans kernel → refus (rien à projeter, jamais une invention)", () => {
+		const r = applyIntent(S(), "génère l'application");
+		expect(r.events.some((e) => e.kind === "refus")).toBe(true);
+	});
+
+	it("après promotion : app_generee, version content-adressée STABLE (même état → même app)", () => {
+		const st = withKernel();
+		const a = applyIntent(st, "génère l'application");
+		const b = applyIntent(st, "génère l'application");
+		expect(a.events.some((e) => e.kind === "app_generee")).toBe(true);
+		const va = a.events.find((e) => e.kind === "app_generee")?.ref;
+		expect(va).toBe(b.events.find((e) => e.kind === "app_generee")?.ref);
+		expect(va?.startsWith("app:")).toBe(true);
+	});
+});
+
+describe("DÉPLOYER — test PUIS prod : le CLIQUET d'environnements", () => {
+	it("déployer en test sans kernel → refus (rien à déployer)", () => {
+		const r = applyIntent(S(), "déploie l'application en test");
+		expect(r.events.some((e) => e.kind === "refus")).toBe(true);
+		expect(r.state.envs.test).toBeNull();
+	});
+
+	it("LA PROD DIRECTE EST REFUSÉE : jamais la prod sans que CETTE version soit passée en test", () => {
+		const st = withKernel();
+		const r = applyIntent(st, "déploie l'application en prod");
+		expect(r.events.some((e) => e.kind === "refus")).toBe(true);
+		expect(r.state.envs.prod).toBeNull();
+	});
+
+	it("le chemin légal : test → prod (même version) — les deux environnements portent la version", () => {
+		const st = withKernel();
+		const t = applyIntent(st, "déploie l'application en test");
+		expect(t.events.some((e) => e.kind === "deploiement_test")).toBe(true);
+		expect(t.state.envs.test).not.toBeNull();
+		const p = applyIntent(t.state, "déploie l'application en prod");
+		expect(p.events.some((e) => e.kind === "deploiement_prod")).toBe(true);
+		expect(p.state.envs.prod?.version).toBe(t.state.envs.test?.version);
+	});
+
+	it("LE CLIQUET RE-MORD : une nouvelle promotion invalide la prod — il faut REPASSER par le test", () => {
+		const st = withKernel();
+		const t = applyIntent(st, "déploie l'application en test");
+		const p = applyIntent(t.state, "déploie l'application en prod");
+		// une NOUVELLE vérité arrive…
+		const c = applyIntent(
+			p.state,
+			"capture l'idée : au catalogue, lister les produits disponibles",
+		);
+		const k = applyIntent(c.state, "promeus la dernière idée");
+		// …la prod de la nouvelle version SANS test → refusée (la version de test est d'hier).
+		const r = applyIntent(k.state, "déploie l'application en prod");
+		expect(r.events.some((e) => e.kind === "refus")).toBe(true);
+		// re-test puis prod → ok.
+		const t2 = applyIntent(k.state, "déploie l'application en test");
+		const p2 = applyIntent(t2.state, "déploie l'application en prod");
+		expect(p2.events.some((e) => e.kind === "deploiement_prod")).toBe(true);
+	});
+});
+
+describe("DELTA — « voir les deltas » : l'écart CALCULÉ entre l'état courant et un environnement", () => {
+	it("sans aucun déploiement : le delta est TOTAL (tout est écart), jamais une erreur", () => {
+		const st = withKernel();
+		const r = applyIntent(st, "montre le delta depuis la prod");
+		expect(r.events.some((e) => e.kind === "delta_calcule")).toBe(true);
+	});
+
+	it("après la prod : delta = 0 écart ; une nouvelle promotion → delta = 1 kernel d'écart", () => {
+		const st = withKernel();
+		const t = applyIntent(st, "déploie l'application en test");
+		const p = applyIntent(t.state, "déploie l'application en prod");
+		const d0 = applyIntent(p.state, "montre le delta depuis la prod");
+		const e0 = d0.events.find((e) => e.kind === "delta_calcule");
+		expect(e0?.detail).toContain("0");
+		expect(d0.impacts).toHaveLength(0);
+		// une nouvelle vérité promue…
+		const c = applyIntent(
+			p.state,
+			"capture l'idée : au catalogue, lister les produits disponibles",
+		);
+		const k = applyIntent(c.state, "promeus la dernière idée");
+		const d1 = applyIntent(k.state, "montre le delta depuis la prod");
+		expect(d1.impacts.length).toBe(1);
+		expect(d1.impacts[0].type).toBe("kernel");
 	});
 });

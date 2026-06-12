@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import {
 	applyIntent,
@@ -7,6 +8,8 @@ import {
 	type BuilderImpact,
 	type BuilderState,
 	classifyIntent,
+	type Deployment,
+	emitApp,
 	type IntentKind,
 	initBuilderState,
 	type Understanding,
@@ -49,14 +52,21 @@ interface Turn {
 	readonly claudeNote: "rewritten" | "failed" | null;
 }
 
-/** Les 6 exemples canoniques (prouvés par le miroir) — la grammaire est FRANÇAISE, verbatim. */
+/**
+ * Les amorces canoniques (prouvées par le miroir) — la grammaire FERMÉE à 8 intentions,
+ * FRANÇAISE, verbatim : le CYCLE DE VIE COMPLET (capturer → greffer → promouvoir → générer
+ * → déployer test → déployer prod → delta → impacter/interroger).
+ */
 const SUGGESTIONS: readonly string[] = [
 	"greffe pommes sous app/catalogue",
 	"capture l'idée : au checkout, débiter le compte une seule fois",
 	"promeus la dernière idée",
+	"génère l'application",
+	"déploie l'application en test",
+	"déploie l'application en prod",
+	"montre le delta depuis la prod",
 	"quel impact si je modifie app/paiement",
 	"montre-moi l'état du projet",
-	"déploie l'application en production",
 ];
 
 /** Le verbe FORT canonique par intention — le préfixe de désambiguïsation (déclaré, jamais appris). */
@@ -64,9 +74,11 @@ const FORCE_PREFIX: Record<IntentKind, string> = {
 	capturer_idee: "capture l'idée : ",
 	greffer: "greffe ",
 	promouvoir: "promeus ",
+	generer: "génère ",
+	deployer: "déploie ",
+	delta: "delta ",
 	impacter: "impact ",
 	interroger: "montre ",
-	deployer: "déploie ",
 };
 
 /**
@@ -177,6 +189,88 @@ const STATUS_CLASSES: Record<Understanding["status"], string> = {
 	incomprise: "border-border bg-muted text-muted-foreground",
 };
 
+/** Les 4 onglets du panneau droit — l'état VIVANT sous quatre angles (l'arbre par défaut). */
+const TAB_IDS = ["arbre", "app", "envs", "journal"] as const;
+type TabId = (typeof TAB_IDS)[number];
+
+/**
+ * Une carte d'ENVIRONNEMENT (test ou prod) : la version déployée (ou « jamais déployé »),
+ * le nombre de kernels embarqués, le badge ÉCART (la dérive vs l'app courante — CALCULÉE à
+ * chaque rendu, jamais stockée : vert 0 / ambre N) et le bouton d'action qui ENVOIE la
+ * phrase canonique au chat — le geste humain reste un tour de chat (la source unique de
+ * vérité), jamais un écrit direct de l'écran (le mur, §2).
+ */
+function EnvCard({
+	testid,
+	title,
+	env,
+	drift,
+	deployTestid,
+	deployLabel,
+	gateNote,
+	disabled,
+	onDeploy,
+	t,
+}: {
+	testid: string;
+	title: string;
+	env: Deployment | null;
+	drift: number;
+	deployTestid: string;
+	deployLabel: string;
+	gateNote: string | null;
+	disabled: boolean;
+	onDeploy: () => void;
+	t: Strings;
+}) {
+	return (
+		<div
+			data-testid={testid}
+			className="space-y-2 rounded-md border border-border bg-muted/30 p-3"
+		>
+			<div className="flex flex-wrap items-center gap-2">
+				<span className="text-xs font-semibold text-foreground">{title}</span>
+				<span
+					data-drift={drift}
+					className={[
+						"ml-auto rounded-full border px-2 py-0.5 text-[10px] font-medium",
+						drift === 0
+							? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600"
+							: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+					].join(" ")}
+				>
+					{t.envEcartLabel} : {drift}
+				</span>
+			</div>
+			{env === null ? (
+				<p className="text-xs text-muted-foreground italic">{t.envNever}</p>
+			) : (
+				<>
+					<p className="font-mono text-[11px] text-foreground">{env.version}</p>
+					<p className="text-[10px] text-muted-foreground">
+						{t.envKernelsLabel} : {env.kernelVersions.length}
+					</p>
+				</>
+			)}
+			<button
+				type="button"
+				data-testid={deployTestid}
+				disabled={disabled}
+				title={disabled ? t.envNoKernelHint : t.envSendHint}
+				onClick={onDeploy}
+				className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+			>
+				{deployLabel}
+			</button>
+			{gateNote !== null && (
+				<p className="text-[10px] leading-relaxed text-muted-foreground italic">
+					{gateNote}
+				</p>
+			)}
+		</div>
+	);
+}
+
 export function BuilderClient({ t }: { t: Strings }) {
 	// ── l'état d'écran event-sourcé : l'état réduit + les tours (append-only) ──────────
 	const [builderState, setBuilderState] = useState<BuilderState>(() =>
@@ -186,6 +280,7 @@ export function BuilderClient({ t }: { t: Strings }) {
 	const [input, setInput] = useState("");
 	const [highlighted, setHighlighted] = useState<string | null>(null);
 	const [claudeBusy, setClaudeBusy] = useState<number | null>(null);
+	const [tab, setTab] = useState<TabId>("arbre");
 
 	// La référence vers l'état courant (évite une fermeture périmée après un await Claude).
 	const stateRef = useRef(builderState);
@@ -194,9 +289,17 @@ export function BuilderClient({ t }: { t: Strings }) {
 		capturer_idee: t.intentCapturerIdee,
 		greffer: t.intentGreffer,
 		promouvoir: t.intentPromouvoir,
+		generer: t.intentGenerer,
+		deployer: t.intentDeployer,
+		delta: t.intentDelta,
 		impacter: t.intentImpacter,
 		interroger: t.intentInterroger,
-		deployer: t.intentDeployer,
+	};
+	const tabLabel: Record<TabId, string> = {
+		arbre: t.tabArbre,
+		app: t.tabApp,
+		envs: t.tabEnvs,
+		journal: t.tabJournal,
 	};
 	const statusLabel: Record<Understanding["status"], string> = {
 		comprise: t.statusComprise,
@@ -255,6 +358,19 @@ export function BuilderClient({ t }: { t: Strings }) {
 	};
 
 	const built = buildKernelTree(builderState.tree);
+
+	// L'APP GÉNÉRÉE — une PROJECTION pure recalculée à CHAQUE rendu (jamais stockée) :
+	// même état → même version app:<hash> (le contenu décide, jamais l'horloge).
+	const app = emitApp(builderState);
+
+	// L'ÉCART d'un environnement : les kernels proposés dont la version n'est pas embarquée —
+	// CALCULÉ (jamais stocké) ; aucun déploiement → tout est écart (le motif du twin, delta).
+	const driftOf = (env: Deployment | null): number =>
+		env === null
+			? builderState.kernels.length
+			: builderState.kernels.filter(
+					(k) => !env.kernelVersions.includes(k.version),
+				).length;
 
 	return (
 		<div className="grid gap-6 lg:grid-cols-[11fr_9fr]">
@@ -504,26 +620,200 @@ export function BuilderClient({ t }: { t: Strings }) {
 
 			{/* ════════════ DROITE — L'ÉTAT VIVANT (la preuve que le chat agit) ════════════ */}
 			<div className="space-y-4">
-				{/* · l'arbre composes — les greffes du chat y apparaissent ; une cible d'impact rougit */}
-				<section
-					data-testid="v2-builder-tree"
-					className="space-y-2 rounded-xl border border-border bg-card p-4"
-				>
-					<h2 className="text-sm font-semibold text-foreground">
-						{t.treeHeading}
-					</h2>
-					<p className="text-xs leading-relaxed text-muted-foreground">
-						{t.treeHint}
-					</p>
-					{built.ok && (
-						<BuilderTreeNodes
-							nodes={built.roots}
-							tree={builderState.tree}
-							highlighted={highlighted}
+				{/* · les 4 onglets : Arbre · App générée · Environnements · Journal */}
+				<div className="flex flex-wrap gap-1.5">
+					{TAB_IDS.map((id) => (
+						<button
+							key={id}
+							type="button"
+							data-testid="v2-builder-tab"
+							data-tab={id}
+							data-active={tab === id || undefined}
+							onClick={() => setTab(id)}
+							className={[
+								"rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+								tab === id
+									? "border-primary/40 bg-primary/10 text-primary"
+									: "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
+							].join(" ")}
+						>
+							{tabLabel[id]}
+						</button>
+					))}
+				</div>
+
+				{/* · ARBRE — les greffes du chat y apparaissent ; une cible d'impact rougit */}
+				{tab === "arbre" && (
+					<section
+						data-testid="v2-builder-tree"
+						className="space-y-2 rounded-xl border border-border bg-card p-4"
+					>
+						<h2 className="text-sm font-semibold text-foreground">
+							{t.treeHeading}
+						</h2>
+						<p className="text-xs leading-relaxed text-muted-foreground">
+							{t.treeHint}
+						</p>
+						{built.ok && (
+							<BuilderTreeNodes
+								nodes={built.roots}
+								tree={builderState.tree}
+								highlighted={highlighted}
+								t={t}
+							/>
+						)}
+					</section>
+				)}
+
+				{/* · APP GÉNÉRÉE — emitApp(état) : une PROJECTION pure, recalculée, jamais stockée */}
+				{tab === "app" && (
+					<section
+						data-testid="v2-builder-app"
+						className="space-y-3 rounded-xl border border-border bg-card p-4"
+					>
+						<h2 className="text-sm font-semibold text-foreground">
+							{t.appHeading}
+						</h2>
+						{builderState.kernels.length === 0 ? (
+							<p className="text-xs text-muted-foreground italic">
+								{t.appEmpty}
+							</p>
+						) : (
+							<>
+								<span className="inline-flex rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 font-mono text-[11px] text-primary">
+									{app.version}
+								</span>
+								<div className="space-y-1">
+									<h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+										{t.appEntitiesHeading}
+									</h3>
+									<ul className="space-y-1">
+										{app.entities.map((e) => (
+											<li
+												key={e.version}
+												className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs text-foreground"
+											>
+												<span>{e.name}</span>
+												<span className="ml-auto font-mono text-[10px] text-muted-foreground">
+													{e.version}
+												</span>
+											</li>
+										))}
+									</ul>
+								</div>
+								<div className="space-y-1">
+									<h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+										{t.appRoutesHeading}
+									</h3>
+									<ul className="flex flex-wrap gap-1.5">
+										{app.routes.map((r) => (
+											<li
+												key={r}
+												className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-mono text-[11px] text-foreground"
+											>
+												{r}
+											</li>
+										))}
+									</ul>
+								</div>
+							</>
+						)}
+						<p className="text-[11px] leading-relaxed text-muted-foreground italic">
+							{t.appProjectionNote}
+						</p>
+						<Link
+							href="/v2/deploy"
+							className="inline-block text-xs font-medium text-primary transition-colors hover:underline"
+						>
+							{t.appDeployLink}
+						</Link>
+					</section>
+				)}
+
+				{/* · ENVIRONNEMENTS — test puis prod (le cliquet) ; les boutons ENVOIENT la phrase canonique au chat */}
+				{tab === "envs" && (
+					<section
+						data-testid="v2-builder-envs"
+						className="space-y-3 rounded-xl border border-border bg-card p-4"
+					>
+						<h2 className="text-sm font-semibold text-foreground">
+							{t.envsHeading}
+						</h2>
+						<p className="text-xs leading-relaxed text-muted-foreground">
+							{t.envSendHint}
+						</p>
+						<EnvCard
+							testid="v2-builder-env-test"
+							title={t.envTestTitle}
+							env={builderState.envs.test}
+							drift={driftOf(builderState.envs.test)}
+							deployTestid="v2-builder-deploy-test"
+							deployLabel={t.deployTestBtn}
+							gateNote={null}
+							disabled={builderState.kernels.length === 0}
+							onDeploy={() => send("déploie l'application en test")}
 							t={t}
 						/>
-					)}
-				</section>
+						<EnvCard
+							testid="v2-builder-env-prod"
+							title={t.envProdTitle}
+							env={builderState.envs.prod}
+							drift={driftOf(builderState.envs.prod)}
+							deployTestid="v2-builder-deploy-prod"
+							deployLabel={t.deployProdBtn}
+							gateNote={t.prodGateNote}
+							disabled={builderState.kernels.length === 0}
+							onDeploy={() => send("déploie l'application en prod")}
+							t={t}
+						/>
+					</section>
+				)}
+
+				{/* · JOURNAL — APPEND-ONLY (affiché du plus récent au plus ancien) */}
+				{tab === "journal" && (
+					<section
+						data-testid="v2-builder-log"
+						className="space-y-2 rounded-xl border border-border bg-card p-4"
+					>
+						<h2 className="text-sm font-semibold text-foreground">
+							{t.logHeading}
+						</h2>
+						{builderState.log.length === 0 ? (
+							<p className="text-xs text-muted-foreground italic">
+								{t.logEmpty}
+							</p>
+						) : (
+							<ol className="space-y-1">
+								{builderState.log
+									.map((e, i) => ({ e, i }))
+									.reverse()
+									.map(({ e, i }) => (
+										<li
+											// le journal est APPEND-ONLY — la position i EST la clé stable
+											key={i}
+											data-testid="v2-builder-log-entry"
+											className="flex flex-wrap items-center gap-2 text-xs"
+										>
+											<span className="font-mono text-[10px] text-muted-foreground">
+												#{i + 1}
+											</span>
+											<span
+												className={[
+													"rounded border px-1.5 py-0.5 font-mono text-[10px]",
+													e.kind === "refus"
+														? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+														: "border-border bg-muted text-muted-foreground",
+												].join(" ")}
+											>
+												{e.kind}
+											</span>
+											<span className="text-muted-foreground">{e.detail}</span>
+										</li>
+									))}
+							</ol>
+						)}
+					</section>
+				)}
 
 				{/* · les idées capturées — hasMirror=false, toujours (au-dessus du mur) */}
 				<section
@@ -601,48 +891,6 @@ export function BuilderClient({ t }: { t: Strings }) {
 								</li>
 							))}
 						</ul>
-					)}
-				</section>
-
-				{/* · le journal — APPEND-ONLY (affiché du plus récent au plus ancien) */}
-				<section
-					data-testid="v2-builder-log"
-					className="space-y-2 rounded-xl border border-border bg-card p-4"
-				>
-					<h2 className="text-sm font-semibold text-foreground">
-						{t.logHeading}
-					</h2>
-					{builderState.log.length === 0 ? (
-						<p className="text-xs text-muted-foreground italic">{t.logEmpty}</p>
-					) : (
-						<ol className="space-y-1">
-							{builderState.log
-								.map((e, i) => ({ e, i }))
-								.reverse()
-								.map(({ e, i }) => (
-									<li
-										// le journal est APPEND-ONLY — la position i EST la clé stable
-										key={i}
-										data-testid="v2-builder-log-entry"
-										className="flex flex-wrap items-center gap-2 text-xs"
-									>
-										<span className="font-mono text-[10px] text-muted-foreground">
-											#{i + 1}
-										</span>
-										<span
-											className={[
-												"rounded border px-1.5 py-0.5 font-mono text-[10px]",
-												e.kind === "refus"
-													? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-													: "border-border bg-muted text-muted-foreground",
-											].join(" ")}
-										>
-											{e.kind}
-										</span>
-										<span className="text-muted-foreground">{e.detail}</span>
-									</li>
-								))}
-						</ol>
 					)}
 				</section>
 			</div>

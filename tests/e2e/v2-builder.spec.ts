@@ -13,6 +13,9 @@ import { expect, test } from "@playwright/test";
  *   - la promotion PROPOSE, n'applique pas : version k:, ChangeSet DRAFT, wroteKernel=false ;
  *   - l'AMBIGUÏTÉ est OFFERTE (chips), jamais tranchée en silence — cliquer une chip FORCE
  *     l'intention par un texte désambiguïsé qui repasse par le MÊME pipeline déterministe ;
+ *   - le CYCLE DE VIE COMPLET est joué : générer → test → prod (LE CLIQUET) → delta — la
+ *     prod est REFUSÉE tant que la version courante n'est pas passée en test, et une
+ *     nouvelle promotion RÉARME la porte (l'écart redevient ≥ 1, la prod re-refuse) ;
  *   - le mur intact : AUCUNE requête d'écriture sur toute la session (le bouton Claude n'est
  *     JAMAIS cliqué ici — le run reste hermétique, la grammaire fermée suffit).
  */
@@ -169,7 +172,8 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 
 		await page.goto("/v2/builder");
 
-		// La session COMPLÈTE : les six intentions de la grammaire fermée + une ambiguïté forcée.
+		// La session COMPLÈTE : un échantillon de la grammaire fermée + une ambiguïté forcée
+		// (le cycle de vie générer → test → prod → delta a SON test dédié ci-dessous).
 		await send(page, "greffe pommes sous app/catalogue");
 		await send(
 			page,
@@ -187,13 +191,129 @@ test.describe("WB2-27 /v2/builder — IA Builder : UN chat qui fait tout (gramma
 			.last()
 			.click();
 
-		// La session a bien eu lieu : 8 tours, le déploiement PROPOSÉ (gaté), jamais exécuté.
+		// La session a bien eu lieu : 8 tours, et la prod REFUSÉE par le cliquet (pas de
+		// test préalable) — jamais exécutée. Le journal vit dans l'onglet Journal (mêmes
+		// testids v2-builder-log/-log-entry : un clic d'onglet d'abord).
 		await expect(page.getByTestId("v2-builder-attente")).toHaveCount(8);
-		await expect(page.getByTestId("v2-builder-log")).toContainText(
-			"deploiement_propose",
-		);
+		await page
+			.locator('[data-testid="v2-builder-tab"][data-tab="journal"]')
+			.click();
+		const log = page.getByTestId("v2-builder-log");
+		await expect(log).toContainText("refus");
+		await expect(log).toContainText("le cliquet");
 
 		// LE MUR : aucune requête d'écriture n'a été émise par toute la session.
+		expect(writes).toEqual([]);
+	});
+
+	test("le CYCLE DE VIE COMPLET — générer → test → prod (le cliquet) → delta", async ({
+		page,
+	}) => {
+		// Le mur tient sur TOUT le cycle de vie : on capte chaque requête d'écriture.
+		const writes: string[] = [];
+		page.on("request", (req) => {
+			const m = req.method();
+			if (["POST", "PUT", "PATCH", "DELETE"].includes(m)) {
+				writes.push(`${m} ${req.url()}`);
+			}
+		});
+
+		await page.goto("/v2/builder");
+
+		// ① capture + promotion : UN kernel proposé — la matière de l'app à émettre.
+		await send(
+			page,
+			"capture l'idée : au checkout, débiter le compte une seule fois",
+		);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v2-builder-kernel")).toHaveCount(1);
+
+		// ② prod AVANT test : LE CLIQUET refuse (test d'abord, toujours).
+		await send(page, "déploie l'application en prod");
+		const refusAvant = page.getByTestId("v2-builder-events").last();
+		await expect(refusAvant).toContainText("refus");
+		await expect(refusAvant).toContainText("le cliquet");
+
+		// ③ test d'abord : deploiement_test — l'onglet Environnements montre la version
+		// app:<hash> posée sur la carte test, avec un ÉCART de 0 (zéro dérive, calculée).
+		await send(page, "déploie l'application en test");
+		await expect(page.getByTestId("v2-builder-events").last()).toContainText(
+			"deploiement_test",
+		);
+		await page
+			.locator('[data-testid="v2-builder-tab"][data-tab="envs"]')
+			.click();
+		const envTest = page.getByTestId("v2-builder-env-test");
+		await expect(envTest).toContainText(/app:[0-9a-f]{8}/);
+		await expect(envTest.locator("[data-drift]")).toHaveAttribute(
+			"data-drift",
+			"0",
+		);
+		const testVersion = ((await envTest.textContent()) ?? "").match(
+			/app:[0-9a-f]{8}/,
+		)?.[0];
+		expect(testVersion).toBeTruthy();
+
+		// ④ prod APRÈS test : le cliquet laisse passer — la MÊME version posée en prod.
+		await send(page, "déploie l'application en prod");
+		await expect(page.getByTestId("v2-builder-events").last()).toContainText(
+			"deploiement_prod",
+		);
+		const envProd = page.getByTestId("v2-builder-env-prod");
+		await expect(envProd).toContainText(testVersion as string);
+		await expect(envProd.locator("[data-drift]")).toHaveAttribute(
+			"data-drift",
+			"0",
+		);
+
+		// ⑤ delta depuis la prod : 0 écart juste après le déploiement (le motif du twin).
+		await send(page, "montre le delta depuis la prod");
+		const delta0 = page.getByTestId("v2-builder-events").last();
+		await expect(delta0).toContainText("delta_calcule");
+		await expect(delta0).toContainText("0 kernel(s) d'écart");
+
+		// ⑥ une SECONDE idée promue : la dérive apparaît — l'écart des deux cartes ≥ 1.
+		await send(
+			page,
+			"capture l'idée : au catalogue, lister les produits disponibles",
+		);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v2-builder-kernel")).toHaveCount(2);
+		const driftTest = Number(
+			await envTest.locator("[data-drift]").getAttribute("data-drift"),
+		);
+		const driftProd = Number(
+			await envProd.locator("[data-drift]").getAttribute("data-drift"),
+		);
+		expect(driftTest).toBeGreaterThanOrEqual(1);
+		expect(driftProd).toBeGreaterThanOrEqual(1);
+
+		// ⑦ générer : app_generee — l'onglet App montre la PROJECTION pure recalculée
+		// (version app:<hash>, ≥ 2 entités versionnées k:, les routes émises visibles).
+		await send(page, "génère l'application");
+		await expect(page.getByTestId("v2-builder-events").last()).toContainText(
+			"app_generee",
+		);
+		await page
+			.locator('[data-testid="v2-builder-tab"][data-tab="app"]')
+			.click();
+		const app = page.getByTestId("v2-builder-app");
+		await expect(app).toContainText(/app:[0-9a-f]{8}/);
+		const entities = app.locator("li").filter({ hasText: /k:[0-9a-f]{8}/ });
+		expect(await entities.count()).toBeGreaterThanOrEqual(2);
+		await expect(
+			app.getByText("/debit-du-compte", { exact: true }),
+		).toBeVisible();
+		await expect(app.getByText("/catalogue", { exact: true })).toBeVisible();
+
+		// ⑧ prod à nouveau : le cliquet s'est RÉARMÉ — la NOUVELLE version (2 kernels)
+		// n'est pas passée en test, la prod re-refuse (jamais un passe-droit).
+		await send(page, "déploie l'application en prod");
+		const refusApres = page.getByTestId("v2-builder-events").last();
+		await expect(refusApres).toContainText("refus");
+		await expect(refusApres).toContainText("le cliquet");
+
+		// LE MUR : zéro requête d'écriture sur TOUT le cycle de vie.
 		expect(writes).toEqual([]);
 	});
 });

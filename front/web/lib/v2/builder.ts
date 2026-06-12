@@ -45,9 +45,11 @@ export const INTENT_KINDS = [
 	"capturer_idee",
 	"greffer",
 	"promouvoir",
+	"generer",
+	"deployer",
+	"delta",
 	"impacter",
 	"interroger",
-	"deployer",
 ] as const;
 export type IntentKind = (typeof INTENT_KINDS)[number];
 
@@ -75,7 +77,10 @@ export interface BuilderEvent {
 		| "kernel_propose"
 		| "impact_calcule"
 		| "etat_lu"
-		| "deploiement_propose"
+		| "app_generee"
+		| "deploiement_test"
+		| "deploiement_prod"
+		| "delta_calcule"
 		| "refus";
 	readonly detail: string;
 	/** La référence content-adressée touchée (chemin, id d'idée, version…). */
@@ -88,11 +93,24 @@ export interface BuilderImpact {
 	readonly type: "composes" | "idee" | "kernel";
 }
 
-/** L'ÉTAT du builder — event-sourcé : l'arbre vivant, les idées, les kernels proposés, le journal. */
+/** Un DÉPLOIEMENT d'environnement : la version d'app posée + les versions de kernels embarquées. */
+export interface Deployment {
+	/** La version content-adressée de l'app déployée (app:<hash>). */
+	readonly version: string;
+	/** Les versions des kernels embarqués (la base du calcul de DELTA). */
+	readonly kernelVersions: readonly string[];
+}
+
+/** L'ÉTAT du builder — event-sourcé : l'arbre vivant, les idées, les kernels, les ENVIRONNEMENTS, le journal. */
 export interface BuilderState {
 	readonly tree: readonly KernelNode[];
 	readonly ideas: readonly Idea[];
 	readonly kernels: readonly ProposedKernel[];
+	/** Les deux environnements (le CLIQUET : la prod exige le test de la MÊME version). */
+	readonly envs: {
+		readonly test: Deployment | null;
+		readonly prod: Deployment | null;
+	};
 	readonly log: readonly BuilderEvent[];
 }
 
@@ -105,7 +123,13 @@ export interface ApplyResult {
 
 /** L'état initial : l'arbre seed (un SEUL produit racine), rien d'autre. */
 export function initBuilderState(): BuilderState {
-	return { tree: seedComposes(), ideas: [], kernels: [], log: [] };
+	return {
+		tree: seedComposes(),
+		ideas: [],
+		kernels: [],
+		envs: { test: null, prod: null },
+		log: [],
+	};
 }
 
 /** Plie un texte en tokens canoniques (accents pliés, ≥3 chars). */
@@ -143,6 +167,21 @@ const LEXICONS: Record<
 	impacter: {
 		strong: ["impact", "impacte", "impacts", "touche", "casse"],
 		weak: ["modifie", "modifier", "change", "vague", "rouge"],
+	},
+	generer: {
+		strong: [
+			"genere",
+			"generer",
+			"emets",
+			"emettre",
+			"construis",
+			"construire",
+		],
+		weak: ["app", "application", "code", "entites"],
+	},
+	delta: {
+		strong: ["delta", "deltas", "diff", "difference", "ecart", "compare"],
+		weak: ["depuis", "entre", "version", "deploye"],
 	},
 	interroger: {
 		strong: ["montre", "montrer", "affiche", "liste", "etat"],
@@ -240,6 +279,55 @@ function parseGraft(
 	const p = placeIntent(tree, text);
 	if (p.nodeId === "") return null;
 	return { label: verb[1].trim(), parentPath: p.path };
+}
+
+/** L'APP PROJETÉE depuis les kernels proposés — une PROJECTION pure, jamais stockée. */
+export interface AppProjection {
+	/** La version content-adressée de l'app (app:<hash des versions de kernels triées>). */
+	readonly version: string;
+	/** Une entité par kernel proposé (nommée du grain feuille de sa coordonnée). */
+	readonly entities: readonly {
+		readonly name: string;
+		readonly version: string;
+	}[];
+	/** Les routes émises (une par entité). */
+	readonly routes: readonly string[];
+}
+
+/** FNV-1a local pour la version d'app (le schéma commun content-adressé). */
+function fnv1aApp(canon: string): string {
+	let h = 0x811c9dc5;
+	for (let i = 0; i < canon.length; i++) {
+		h ^= canon.charCodeAt(i);
+		h = Math.imul(h, 0x01000193) >>> 0;
+	}
+	return h.toString(16).padStart(8, "0");
+}
+
+/**
+ * GÉNÈRE l'app — « développer toute une appli dans le chat » : une PROJECTION PURE
+ * des kernels proposés (déterminisme-first : l'app n'est jamais stockée, elle est
+ * RECALCULÉE — même état → même app, même version). Une entité par kernel (nommée du
+ * grain feuille de sa coordonnée), une route par entité, la version = le hash des
+ * versions de kernels triées (le contenu décide, jamais l'horloge).
+ */
+export function emitApp(state: BuilderState): AppProjection {
+	const entities = state.kernels.map((k) => ({
+		name: k.coordinate.scale.split("/").pop() ?? k.coordinate.scale,
+		version: k.version,
+	}));
+	const version = `app:${fnv1aApp(
+		state.kernels
+			.map((k) => k.version)
+			.slice()
+			.sort()
+			.join("|"),
+	)}`;
+	return {
+		version,
+		entities,
+		routes: entities.map((e) => `/${e.name}`),
+	};
 }
 
 /**
@@ -453,18 +541,129 @@ export function applyIntent(state: BuilderState, text: string): ApplyResult {
 				[],
 			);
 
-		case "deployer":
+		case "generer": {
+			if (state.kernels.length === 0)
+				return finish(
+					state,
+					[
+						{
+							kind: "refus",
+							detail:
+								"rien à générer : aucun kernel proposé (capture puis promeus d'abord — l'app est une projection des vérités)",
+							ref: "",
+						},
+					],
+					[],
+				);
+			const app = emitApp(state);
 			return finish(
 				state,
 				[
 					{
-						kind: "deploiement_propose",
-						detail:
-							"déploiement PROPOSÉ (gaté ADR 0052) — l'exécution reste un geste humain approuvé, jamais le chat",
-						ref: "",
+						kind: "app_generee",
+						detail: `app ${app.version} générée — ${app.entities.length} entité(s), ${app.routes.length} route(s) : ${app.routes.join(", ")}`,
+						ref: app.version,
 					},
 				],
-				[],
+				app.entities.map((e) => ({
+					cible: e.version,
+					type: "kernel" as const,
+				})),
 			);
+		}
+
+		case "deployer": {
+			const folded = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+			const env: "test" | "prod" = /\bprod(uction)?\b/.test(folded)
+				? "prod"
+				: "test";
+			if (state.kernels.length === 0)
+				return finish(
+					state,
+					[
+						{
+							kind: "refus",
+							detail: `rien à déployer en ${env} : aucun kernel proposé`,
+							ref: "",
+						},
+					],
+					[],
+				);
+			const app = emitApp(state);
+			const deployment: Deployment = {
+				version: app.version,
+				kernelVersions: state.kernels.map((k) => k.version),
+			};
+			if (env === "test")
+				return finish(
+					{ ...state, envs: { ...state.envs, test: deployment } },
+					[
+						{
+							kind: "deploiement_test",
+							detail: `app ${app.version} déployée en TEST (${app.entities.length} entité(s))`,
+							ref: app.version,
+						},
+					],
+					[{ cible: app.version, type: "kernel" }],
+				);
+			// LE CLIQUET : la prod exige que CETTE version exacte soit passée en test.
+			if (state.envs.test === null || state.envs.test.version !== app.version)
+				return finish(
+					state,
+					[
+						{
+							kind: "refus",
+							detail: `prod REFUSÉE : la version courante ${app.version} n'est pas passée en test (le cliquet — test d'abord, toujours)`,
+							ref: app.version,
+						},
+					],
+					[],
+				);
+			return finish(
+				{ ...state, envs: { ...state.envs, prod: deployment } },
+				[
+					{
+						kind: "deploiement_prod",
+						detail: `app ${app.version} déployée en PROD (promue depuis le test — le cliquet a mordu dans le bon sens)`,
+						ref: app.version,
+					},
+				],
+				[{ cible: app.version, type: "kernel" }],
+			);
+		}
+
+		case "delta": {
+			const folded = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+			const env: "test" | "prod" = /\btest\b/.test(folded) ? "test" : "prod";
+			const target = state.envs[env];
+			if (target === null)
+				return finish(
+					state,
+					[
+						{
+							kind: "delta_calcule",
+							detail: `aucun déploiement en ${env} — tout est écart (${state.kernels.length} kernel(s))`,
+							ref: env,
+						},
+					],
+					state.kernels.map((k) => ({
+						cible: k.version,
+						type: "kernel" as const,
+					})),
+				);
+			const deployed = new Set(target.kernelVersions);
+			const drift = state.kernels.filter((k) => !deployed.has(k.version));
+			return finish(
+				state,
+				[
+					{
+						kind: "delta_calcule",
+						detail: `${drift.length} kernel(s) d'écart avec ${env} (déployé : ${target.version} · courant : ${emitApp(state).version})`,
+						ref: env,
+					},
+				],
+				drift.map((k) => ({ cible: k.version, type: "kernel" as const })),
+			);
+		}
 	}
 }
