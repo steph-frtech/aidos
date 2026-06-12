@@ -1,0 +1,45 @@
+# 2026/06/12 23:45:48.498522 [TestProperty_MergeOrderIsEngravedAndDeployTimeOverrides] [rapid] draw app: "a"
+# 2026/06/12 23:45:48.498527 [TestProperty_MergeOrderIsEngravedAndDeployTimeOverrides] [rapid] draw n_services: 1
+# 2026/06/12 23:45:48.498529 [TestProperty_MergeOrderIsEngravedAndDeployTimeOverrides] [rapid] draw svc_name_0: "a"
+# 2026/06/12 23:45:48.498531 [TestProperty_MergeOrderIsEngravedAndDeployTimeOverrides] [rapid] draw svc_port_0: 1024
+# 2026/06/12 23:45:48.498532 [TestProperty_MergeOrderIsEngravedAndDeployTimeOverrides] [rapid] draw svc_role_0: 0
+# 2026/06/12 23:45:48.498533 [TestProperty_MergeOrderIsEngravedAndDeployTimeOverrides] [rapid] draw svc_image_0: ""
+# 2026/06/12 23:45:48.498533 [TestProperty_MergeOrderIsEngravedAndDeployTimeOverrides] [rapid] draw svc_profile_0: 0
+# 2026/06/12 23:45:48.498534 [TestProperty_MergeOrderIsEngravedAndDeployTimeOverrides] [rapid] draw svc_hc_0: ""
+# 2026/06/12 23:45:48.498535 [TestProperty_MergeOrderIsEngravedAndDeployTimeOverrides] [rapid] draw n_volumes: 0
+# 2026/06/12 23:45:48.498536 [TestProperty_MergeOrderIsEngravedAndDeployTimeOverrides] [rapid] draw n_scopes: 0
+# 2026/06/12 23:45:48.498536 [TestProperty_MergeOrderIsEngravedAndDeployTimeOverrides] [rapid] draw net_external: false
+# 2026/06/12 23:45:48.498572 [TestProperty_MergeOrderIsEngravedAndDeployTimeOverrides] layer section "bp-secrets" missing in the .env.example
+# 
+v0.4.8#15620212013489951274
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

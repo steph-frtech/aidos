@@ -1,5 +1,11 @@
 "use server";
 
+import {
+	composeEnvRefs,
+	emitEnvBundle,
+	envKeys,
+	isClean,
+} from "@/lib/env-emit";
 import { emitCompose } from "@/lib/stack-emit";
 import type { StackManifest } from "@/lib/stack-manifest";
 import type { EmitView } from "./view";
@@ -42,6 +48,16 @@ export async function emitAction(
 	if ("refusal" in result) {
 		return { ok: false, refusal: result.refusal };
 	}
+	// DP04 — the SAME manifest also emits the .env.example + scripts (the
+	// engraved /data/dockers merge order, secret REFERENCES only); the secret
+	// scan and the DP03↔DP04 coherence are computed deterministically (code,
+	// never an LLM). A manifest that passed validate never refuses here.
+	const bundle = await emitEnvBundle(manifest);
+	if ("refusal" in bundle) {
+		return { ok: false, refusal: bundle.refusal };
+	}
+	const seededEnvOutputHash = String(formData.get("seededEnvOutputHash") ?? "");
+	const keys = new Set(envKeys(bundle.envExample.text));
 	return {
 		ok: true,
 		yaml: result.yaml,
@@ -49,5 +65,12 @@ export async function emitAction(
 		sourceHash: result.sourceHash,
 		path: result.path,
 		sameAsSeeded: result.outputHash === seededOutputHash,
+		envText: bundle.envExample.text,
+		envOutputHash: bundle.envExample.outputHash,
+		startShOutputHash: bundle.startSh.outputHash,
+		rebuildOutputHash: bundle.startWithRebuild.outputHash,
+		envClean: isClean(bundle.envExample.text),
+		coherent: composeEnvRefs(result.yaml).every((ref) => keys.has(ref)),
+		sameEnvAsSeeded: bundle.envExample.outputHash === seededEnvOutputHash,
 	};
 }

@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
+import {
+	composeEnvRefs,
+	emitEnvBundle,
+	envKeys,
+	isClean,
+} from "@/lib/env-emit";
 import { emitCompose } from "@/lib/stack-emit";
 import { exampleManifest } from "@/lib/stack-manifest";
 import { StackEmitPanel } from "./StackEmitPanel";
@@ -40,6 +46,18 @@ export default async function StackEmitPage() {
 		// bug surfaced loudly (never silently swallowed).
 		throw new Error(`seeded manifest refused: ${seeded.refusal.code}`);
 	}
+	// DP04 — the SAME manifest seeds the .env.example + scripts emission (the
+	// engraved merge order, secret references only). Scan + coherence are
+	// COMPUTED deterministically server-side (code, never an LLM).
+	const seededEnv = await emitEnvBundle(manifest);
+	if ("refusal" in seededEnv) {
+		throw new Error(`seeded env bundle refused: ${seededEnv.refusal.code}`);
+	}
+	const seededKeys = new Set(envKeys(seededEnv.envExample.text));
+	const seededEnvClean = isClean(seededEnv.envExample.text);
+	const seededCoherent = composeEnvRefs(seeded.yaml).every((ref) =>
+		seededKeys.has(ref),
+	);
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -81,6 +99,9 @@ export default async function StackEmitPage() {
 						activeProjectId={ctx.activeId}
 						manifest={manifest}
 						seeded={seeded}
+						seededEnv={seededEnv}
+						seededEnvClean={seededEnvClean}
+						seededCoherent={seededCoherent}
 					/>
 				</div>
 			</main>
