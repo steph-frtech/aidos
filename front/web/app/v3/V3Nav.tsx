@@ -1,7 +1,9 @@
 "use client";
 
 import {
+	ChevronDown,
 	Code,
+	FolderOpen,
 	History,
 	Layers,
 	Map as MapIcon,
@@ -11,11 +13,15 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useState } from "react";
+import { useV3Session } from "./V3Session";
 
 /**
  * La navigation V3 (ADR 0010 thème · ADR 0011 bilingue) : six lentilles sur UNE même
  * session (AI Lab · Parcours produit · Historique · Environnements · Code · Paramètres)
  * + le retour Workbench V2 en pied. Libellés AMICAUX (aucun jargon KRD en copie primaire).
+ * LE COMMUTATEUR DE PROJETS (ADR 0061) sous le logo : le projet actif + un petit panneau
+ * (la liste — cliquer rouvre AVEC tout l'historique, le rejeu — et « Nouveau projet »).
  * Client Component (route active via usePathname). Le mur intact : la nav LIE, n'écrit rien.
  */
 
@@ -31,6 +37,10 @@ const ENTRIES = [
 export function V3Nav() {
 	const pathname = usePathname();
 	const t = useTranslations("v3");
+	const { projectId, projectName, projects, switchProject, createProject } =
+		useV3Session();
+	const [open, setOpen] = useState(false);
+	const [newName, setNewName] = useState("");
 
 	return (
 		<nav
@@ -44,6 +54,103 @@ export function V3Nav() {
 			>
 				{t("navLogo")}
 			</Link>
+			{/* LE COMMUTATEUR DE PROJETS : le projet actif + le panneau (liste, création). */}
+			<div className="mb-2 border-b border-border pb-3">
+				<button
+					type="button"
+					data-testid="v3-project-name"
+					aria-label={t("projectsCurrent")}
+					aria-expanded={open}
+					onClick={() => setOpen((o) => !o)}
+					className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+				>
+					<FolderOpen className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+					<span className="min-w-0 flex-1 truncate text-left">
+						{projectName ?? "—"}
+					</span>
+					<ChevronDown
+						className={[
+							"h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+							open ? "rotate-180" : "",
+						].join(" ")}
+						aria-hidden
+					/>
+				</button>
+				{open && (
+					<div
+						data-testid="v3-project-panel"
+						className="mt-1 rounded-md border border-border bg-card p-2"
+					>
+						<p className="px-1 pb-2 text-xs text-muted-foreground">
+							{t("projectsHint")}
+						</p>
+						<ul className="flex flex-col gap-0.5">
+							{projects.map((p) => (
+								<li key={p.id}>
+									<button
+										type="button"
+										data-testid="v3-project-item"
+										data-id={p.id}
+										aria-current={p.id === projectId ? "true" : undefined}
+										onClick={() => void switchProject(p.id)}
+										className={[
+											"flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-xs transition-colors",
+											p.id === projectId
+												? "bg-primary/10 font-semibold text-primary"
+												: "text-foreground hover:bg-muted",
+										].join(" ")}
+									>
+										<span className="min-w-0 flex-1 truncate">{p.name}</span>
+										<span
+											className="shrink-0 text-[10px] text-muted-foreground"
+											title={t("projectsTurnsLabel")}
+										>
+											{p.turns}
+											<span className="sr-only">
+												{" "}
+												{t("projectsTurnsLabel")}
+											</span>
+										</span>
+									</button>
+								</li>
+							))}
+						</ul>
+						<form
+							className="mt-2 flex flex-col gap-1 border-t border-border pt-2"
+							aria-label={t("projectsNew")}
+							onSubmit={(e) => {
+								e.preventDefault();
+								if (newName.trim() === "") return;
+								void createProject(newName);
+								setNewName("");
+							}}
+						>
+							<label
+								htmlFor="v3-project-new-name"
+								className="px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+							>
+								{t("projectsNew")}
+							</label>
+							<input
+								id="v3-project-new-name"
+								data-testid="v3-project-new-name"
+								value={newName}
+								onChange={(e) => setNewName(e.target.value)}
+								placeholder={t("projectsNewPlaceholder")}
+								className="w-full rounded border border-input bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+							/>
+							<button
+								type="submit"
+								data-testid="v3-project-create"
+								disabled={newName.trim() === ""}
+								className="rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+							>
+								{t("projectsCreate")}
+							</button>
+						</form>
+					</div>
+				)}
+			</div>
 			{ENTRIES.map(({ route, key, Icon }) => {
 				const active = pathname === route || pathname.startsWith(`${route}/`);
 				return (

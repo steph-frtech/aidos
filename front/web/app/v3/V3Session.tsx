@@ -1,10 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
 	createContext,
 	type ReactNode,
 	useCallback,
 	useContext,
+	useEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -16,8 +18,15 @@ import {
 } from "@/lib/v2/builder";
 import type { CodeEdge, CodeNode } from "@/lib/v2/code-graph";
 import { bareTree, nodePath } from "@/lib/v2/composition";
+import type { ProjectRecord } from "@/lib/v3/project";
 import { replayTo, type SessionTurn, turnsOf } from "@/lib/v3/session";
 import { chatTurnAction } from "./actions";
+import {
+	createProjectAction,
+	type ProjectSummary,
+	saveProjectAction,
+	setActiveProjectAction,
+} from "./projects-actions";
 
 /**
  * V3 — LA SESSION PARTAGÉE (une session, cinq lentilles ; ADR 0060) : le transcript
@@ -30,6 +39,13 @@ import { chatTurnAction } from "./actions";
  * est active, Claude PROPOSE des gestes canoniques (chatTurnAction) et chaque geste
  * repasse par understand/applyIntent (un geste invalide devient un refus doux) ; le
  * bascule « IA conversationnelle » (défaut ON) permet le mode déterministe pur.
+ *
+ * LE PROJET PERSISTANT (ADR 0061) : la session vit DANS un projet — le transcript
+ * (+ les réponses IA, un décor) est initialisé depuis le ProjectRecord chargé côté
+ * serveur (layout, cookie « aidos-v3-project ») et REJOUÉ par turnsOf : rouvrir un
+ * projet fait réapparaître TOUT l'historique, partout, même état. Chaque send et
+ * chaque rewindTo déclenche une sauvegarde DÉBONCÉE (800 ms) via saveProjectAction
+ * (l'horloge ne vit que dans la couche impure serveur).
  *
  * LE MUR (§2) : la session PROPOSE — aucune écriture kernel/mirrors/fitness, jamais.
  */
@@ -58,6 +74,15 @@ export interface V3SessionValue {
 	readonly codeEdges: readonly CodeEdge[];
 	/** Les libellés i18n « v3 » (motif KEYS — un client ne peut pas appeler getTranslations). */
 	readonly strings: Record<string, string>;
+	/** Le projet actif (chargé côté serveur via le cookie) — null seulement si la création a échoué. */
+	readonly projectId: string | null;
+	readonly projectName: string | null;
+	/** Les projets connus (résumés triés : le plus récemment sauvé d'abord). */
+	readonly projects: readonly ProjectSummary[];
+	/** Bascule vers un autre projet : sauve l'en-cours, pose le cookie, recharge (rejeu). */
+	readonly switchProject: (id: string) => Promise<void>;
+	/** Crée un projet (transcript vide) et bascule dessus — « créer une app crée un projet ». */
+	readonly createProject: (name: string) => Promise<void>;
 }
 
 const V3SessionContext = createContext<V3SessionValue | null>(null);
@@ -84,6 +109,8 @@ export function V3SessionProvider({
 	codeNodes,
 	codeEdges,
 	strings,
+	initialProject,
+	projectList,
 	children,
 }: {
 	/** Les écrans V1 scannés côté serveur — injectés en DONNÉES dans le twin. */
@@ -91,14 +118,39 @@ export function V3SessionProvider({
 	codeNodes: readonly CodeNode[];
 	codeEdges: readonly CodeEdge[];
 	strings: Record<string, string>;
+	/** Le projet actif chargé côté serveur (cookie) — la session s'initialise dessus. */
+	initialProject: ProjectRecord | null;
+	/** La liste des projets connus (résumés triés), lue côté serveur. */
+	projectList: readonly ProjectSummary[];
 	children: ReactNode;
 }) {
-	const [messages, setMessages] = useState<string[]>([]);
-	const [replies, setReplies] = useState<Record<number, string>>({});
+	// ROUVRIR = initialiser le transcript depuis le projet puis REJOUER (turnsOf) :
+	// tout l'historique réapparaît partout — bulles, parcours, environnements, même état.
+	const [messages, setMessages] = useState<string[]>(() =>
+		initialProject ? [...initialProject.transcript] : [],
+	);
+	const [replies, setReplies] = useState<Record<number, string>>(() =>
+		initialProject
+			? Object.fromEntries(
+					Object.entries(initialProject.replies).map(([k, v]) => [
+						Number(k),
+						v,
+					]),
+				)
+			: {},
+	);
 	const [aiEnabled, setAiEnabled] = useState(true);
 	const [busy, setBusy] = useState(false);
+	const router = useRouter();
 	// La référence vers le transcript courant (évite une fermeture périmée après un await).
-	const messagesRef = useRef<string[]>([]);
+	const messagesRef = useRef<string[]>(
+		initialProject ? [...initialProject.transcript] : [],
+	);
+	// La référence vers les réponses courantes (la sauvegarde immédiate au changement de projet).
+	const repliesRef = useRef<Record<number, string>>({});
+	useEffect(() => {
+		repliesRef.current = replies;
+	}, [replies]);
 
 	// L'ÉTAT et la TIMELINE sont DÉRIVÉS (recalcul pur) — jamais stockés (ADR 0060).
 	// UN PROJET NEUF EST NU (bareTree — loi au miroir) : la seule racine « app »,
@@ -166,6 +218,71 @@ export function V3SessionProvider({
 		);
 	}, []);
 
+	// LA SAUVEGARDE DÉBONCÉE (800 ms) : chaque send/rewindTo (le transcript change) ou
+	// réponse IA relance le compte à rebours ; l'horloge (savedAt) ne vit que côté serveur.
+	const projectId = initialProject?.id ?? null;
+	const projectName = initialProject?.name ?? null;
+	const firstRunRef = useRef(true);
+	const dirtyRef = useRef(false);
+	useEffect(() => {
+		if (firstRunRef.current) {
+			// Le premier passage est l'état FRAÎCHEMENT CHARGÉ — rien à resauver.
+			firstRunRef.current = false;
+			return;
+		}
+		if (projectId === null || projectName === null) return;
+		dirtyRef.current = true;
+		const timer = setTimeout(() => {
+			dirtyRef.current = false;
+			void saveProjectAction({
+				id: projectId,
+				name: projectName,
+				transcript: messages,
+				replies: Object.fromEntries(
+					Object.entries(replies).map(([k, v]) => [k, v]),
+				),
+			});
+		}, 800);
+		return () => clearTimeout(timer);
+	}, [messages, replies, projectId, projectName]);
+
+	/** VIDE le débonceur avant de quitter le projet (aucun tour ne se perd au switch). */
+	const persistNow = useCallback(async () => {
+		if (projectId === null || projectName === null || !dirtyRef.current) return;
+		dirtyRef.current = false;
+		await saveProjectAction({
+			id: projectId,
+			name: projectName,
+			transcript: messagesRef.current,
+			replies: Object.fromEntries(
+				Object.entries(repliesRef.current).map(([k, v]) => [k, v]),
+			),
+		});
+	}, [projectId, projectName]);
+
+	/** BASCULE de projet : sauve l'en-cours, pose le cookie, recharge — le layout rejoue. */
+	const switchProject = useCallback(
+		async (id: string) => {
+			if (id === projectId) return;
+			await persistNow();
+			await setActiveProjectAction(id);
+			router.refresh();
+		},
+		[projectId, persistNow, router],
+	);
+
+	/** CRÉE un projet (transcript vide, slug déterministe) puis bascule dessus. */
+	const createProject = useCallback(
+		async (name: string) => {
+			await persistNow();
+			const record = await createProjectAction(name);
+			if (record === null) return;
+			await setActiveProjectAction(record.id);
+			router.refresh();
+		},
+		[persistNow, router],
+	);
+
 	const value = useMemo<V3SessionValue>(
 		() => ({
 			messages,
@@ -180,6 +297,11 @@ export function V3SessionProvider({
 			codeNodes,
 			codeEdges,
 			strings,
+			projectId,
+			projectName,
+			projects: projectList,
+			switchProject,
+			createProject,
 		}),
 		[
 			messages,
@@ -193,6 +315,11 @@ export function V3SessionProvider({
 			codeNodes,
 			codeEdges,
 			strings,
+			projectId,
+			projectName,
+			projectList,
+			switchProject,
+			createProject,
 		],
 	);
 

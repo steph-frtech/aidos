@@ -1,9 +1,15 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { cookies } from "next/headers";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import type { ScreenRef } from "@/lib/v2/builder";
 import { assembleGraph, extractFromSource } from "@/lib/v2/code-extract";
+import {
+	createProjectAction,
+	listProjectsAction,
+	loadProjectAction,
+} from "./projects-actions";
 import { V3Nav } from "./V3Nav";
 import { V3SessionProvider } from "./V3Session";
 
@@ -19,6 +25,13 @@ import { V3SessionProvider } from "./V3Session";
  *
  * LA COLLECTE (la seule couche impure, le motif /v2/builder) : l'inventaire des écrans
  * V1 (fs-scan) + le graphe de code extrait des twins lib/v2 — injectés en DONNÉES.
+ *
+ * LE PROJET PERSISTANT (ADR 0061) : le cookie « aidos-v3-project » désigne le projet
+ * actif ; le layout le CHARGE côté serveur (parse fail-closed) et l'injecte dans la
+ * provider — rouvrir = rejouer, tout l'historique réapparaît partout. Sans cookie, le
+ * plus récemment sauvé ; sans AUCUN projet, « Mon application » est auto-créé : créer
+ * une app crée TOUJOURS un projet. La provider est CLÉE par l'id du projet — basculer
+ * de projet remonte la session (le rejeu repart du bon transcript).
  * Themed (tokens shadcn) + bilingue (next-intl, FR par défaut). Le mur intact.
  */
 
@@ -33,6 +46,12 @@ const KEYS = [
 	"navCode",
 	"navParams",
 	"navWorkbench",
+	"projectsCurrent",
+	"projectsHint",
+	"projectsNew",
+	"projectsNewPlaceholder",
+	"projectsCreate",
+	"projectsTurnsLabel",
 	"heroTitle",
 	"heroSubtitle",
 	"suggestionsLabel",
@@ -181,6 +200,21 @@ export default async function V3Layout({ children }: { children: ReactNode }) {
 	const t = await getTranslations("v3");
 	const strings = Object.fromEntries(KEYS.map((k) => [k, t(k)]));
 
+	// LE PROJET ACTIF : le cookie → le record (fail-closed) ; sans cookie, le plus
+	// récemment sauvé ; sans aucun projet, l'auto-création « Mon application » —
+	// l'utilisateur atterrit TOUJOURS dans un projet persisté.
+	const activeId = (await cookies()).get("aidos-v3-project")?.value ?? null;
+	let initialProject =
+		activeId !== null ? await loadProjectAction(activeId) : null;
+	let projectList = await listProjectsAction();
+	if (initialProject === null) {
+		initialProject =
+			projectList.length > 0
+				? await loadProjectAction(projectList[0].id)
+				: await createProjectAction("Mon application");
+		projectList = await listProjectsAction();
+	}
+
 	// Next s'exécute depuis front/web ; le garde-fou couvre un lancement depuis la racine.
 	const cwd = process.cwd();
 	const absBase = cwd.endsWith(join("front", "web"))
@@ -228,24 +262,27 @@ export default async function V3Layout({ children }: { children: ReactNode }) {
 			),
 	);
 
+	// La provider ENVELOPPE tout le shell (la nav lit le projet via useV3Session) et
+	// est CLÉE par l'id : basculer de projet remonte la session — le rejeu repart à neuf.
 	return (
-		<div
-			data-testid="v3-shell"
-			className="flex min-h-screen flex-col bg-background text-foreground sm:-ml-64 sm:flex-row"
+		<V3SessionProvider
+			key={initialProject?.id ?? "aucun-projet"}
+			v1Screens={[...v1Screens, ...v3Lenses]}
+			codeNodes={codeNodes}
+			codeEdges={codeEdges}
+			strings={strings}
+			initialProject={initialProject}
+			projectList={projectList}
 		>
-			<aside className="shrink-0 border-b border-border bg-card/40 p-3 sm:sticky sm:top-0 sm:h-screen sm:w-60 sm:border-b-0 sm:border-r">
-				<V3Nav />
-			</aside>
-			<main className="min-w-0 flex-1 px-4 py-6 sm:px-8">
-				<V3SessionProvider
-					v1Screens={[...v1Screens, ...v3Lenses]}
-					codeNodes={codeNodes}
-					codeEdges={codeEdges}
-					strings={strings}
-				>
-					{children}
-				</V3SessionProvider>
-			</main>
-		</div>
+			<div
+				data-testid="v3-shell"
+				className="flex min-h-screen flex-col bg-background text-foreground sm:-ml-64 sm:flex-row"
+			>
+				<aside className="shrink-0 border-b border-border bg-card/40 p-3 sm:sticky sm:top-0 sm:h-screen sm:w-60 sm:border-b-0 sm:border-r">
+					<V3Nav />
+				</aside>
+				<main className="min-w-0 flex-1 px-4 py-6 sm:px-8">{children}</main>
+			</div>
+		</V3SessionProvider>
 	);
 }

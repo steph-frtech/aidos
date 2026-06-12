@@ -1,14 +1,21 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 /**
- * V3 Playwright e2e — /v3 : UNE session, cinq lentilles (ADR 0060).
- * mirror record: reflects=V3-session-lenses, test_kind=e2e, cert_language=playwright,
- * liveness=live, authority=above (le chat PROPOSE, n'écrit aucune vérité).
+ * V3 Playwright e2e — /v3 : UNE session, cinq lentilles (ADR 0060) + le PROJET
+ * PERSISTANT (ADR 0061). mirror record: reflects=V3-session-lenses,
+ * test_kind=e2e, cert_language=playwright, liveness=live, authority=above
+ * (le chat PROPOSE, n'écrit aucune vérité).
  *
  * HERMÉTIQUE PAR CONSTRUCTION : chaque test COMMENCE par éteindre la bascule
  * « IA conversationnelle » (v3-ai-toggle, défaut ON) — la session tourne en
  * déterministe pur : AUCUN appel au CLI claude (zéro coût, zéro aléa), le
  * réducteur (understand/applyIntent — lib/v2/builder) reste LA LOI.
+ *
+ * HERMÉTIQUE FACE AU MAGASIN AUSSI : les projets persistés (.aidos-projects)
+ * sont PARTAGÉS entre les tests et entre les runs (esprit append-only — aucune
+ * suppression). Chaque test crée donc SON projet frais, au nom unique par test
+ * (testInfo.testId — stable, sans horloge ni aléa) ; une collision de nom entre
+ * deux runs est inoffensive : l'id reçoit un suffixe déterministe « -2 », « -3 »….
  *
  * Les critères de done V3, atteints depuis l'écran (action-capable, ui-completeness) :
  *   - le SHELL : /v3 redirige vers /v3/lab, la nav offre les cinq lentilles, le hero
@@ -23,17 +30,16 @@ import { expect, test } from "@playwright/test";
  *   - le VOYAGE DANS LE TEMPS : « Revenir ici » (confirmation douce à DEUX clics,
  *     jamais de window.confirm) tronque le transcript et l'état est REJOUÉ — la
  *     timeline raccourcit et le chat montre la session rembobinée ;
- *   - LE MUR : toute une session IA-éteinte n'émet AUCUNE écriture (POST/PUT/PATCH/
- *     DELETE) — la server-action Claude n'est JAMAIS appelée quand la bascule est off.
+ *   - le PROJET PERSISTANT (ADR 0061) : créer une app crée un PROJET ; le rouvrir
+ *     (reload, bascule) REJOUE tout l'historique — partout, même état ; deux
+ *     projets gardent deux histoires isolées ;
+ *   - LE MUR : toute une session IA-éteinte n'émet AUCUNE écriture-vérité — la
+ *     server-action Claude n'est JAMAIS appelée quand la bascule est off (la seule
+ *     écriture légale est la sauvegarde du projet, au-dessous de la ligne).
  */
 
-/** Ouvre une page V3 puis ÉTEINT l'IA conversationnelle (le mode déterministe pur). */
-async function openDeterministe(
-	page: import("@playwright/test").Page,
-	path = "/v3/lab",
-): Promise<void> {
-	await page.goto(path);
-	// La bascule vit dans le lab — défaut ON (aria-checked=true), un clic l'éteint.
+/** ÉTEINT l'IA conversationnelle — et PROUVE au passage son défaut ON. */
+async function eteindreIA(page: Page): Promise<void> {
 	const toggle = page.getByTestId("v3-ai-toggle");
 	await expect(toggle).toBeVisible({ timeout: 20_000 });
 	await expect(toggle).toHaveAttribute("aria-checked", "true");
@@ -41,20 +47,78 @@ async function openDeterministe(
 	await expect(toggle).toHaveAttribute("aria-checked", "false");
 }
 
-/** Envoie un message au chat : remplir la saisie puis Envoyer (un TOUR re-jugé). */
-async function send(
-	page: import("@playwright/test").Page,
-	text: string,
+/** OUVRE le panneau du commutateur de projets (sans le refermer s'il l'est déjà). */
+async function ouvrirPanneau(page: Page): Promise<void> {
+	const panneau = page.getByTestId("v3-project-panel");
+	if (!(await panneau.isVisible())) {
+		await page.getByTestId("v3-project-name").click();
+		await expect(panneau).toBeVisible();
+	}
+}
+
+/**
+ * CRÉE un projet depuis le commutateur et attend la BASCULE effective. Le provider
+ * est CLÉ par l'id du projet : le REMONTAGE referme le panneau — c'est LE signal
+ * déterministe que le nouveau projet est monté (fiable même quand le nom collisionne
+ * avec un run précédent, puisque l'id, lui, reste unique).
+ */
+async function creerProjet(page: Page, nom: string): Promise<void> {
+	await ouvrirPanneau(page);
+	await page.getByTestId("v3-project-new-name").fill(nom);
+	await page.getByTestId("v3-project-create").click();
+	await expect(page.getByTestId("v3-project-panel")).toBeHidden({
+		timeout: 20_000,
+	});
+	await expect(page.getByTestId("v3-project-name")).toContainText(nom);
+}
+
+/** L'id du projet ACTIF, lu dans le panneau (aria-current) — unique, lui. */
+async function projetActif(page: Page): Promise<string> {
+	await ouvrirPanneau(page);
+	const id = await page
+		.locator('[data-testid="v3-project-item"][aria-current="true"]')
+		.getAttribute("data-id");
+	expect(id).not.toBeNull();
+	return id ?? "";
+}
+
+/** BASCULE vers un autre projet par id et attend le remontage (panneau refermé). */
+async function basculerVers(page: Page, id: string): Promise<void> {
+	await ouvrirPanneau(page);
+	await page
+		.locator(`[data-testid="v3-project-item"][data-id="${id}"]`)
+		.click();
+	await expect(page.getByTestId("v3-project-panel")).toBeHidden({
+		timeout: 20_000,
+	});
+}
+
+/**
+ * Ouvre une page V3 dans un PROJET FRAIS puis ÉTEINT l'IA (le mode déterministe pur).
+ * Le projet frais d'abord, l'IA ensuite : la bascule de projet REMONTE le provider
+ * (key par id), ce qui réinitialiserait une bascule IA éteinte trop tôt.
+ */
+async function openDeterministe(
+	page: Page,
+	nomDeProjet: string,
+	path = "/v3/lab",
 ): Promise<void> {
+	await page.goto(path);
+	await expect(page.getByTestId("v3-project-name")).toBeVisible({
+		timeout: 20_000,
+	});
+	await creerProjet(page, nomDeProjet);
+	await eteindreIA(page);
+}
+
+/** Envoie un message au chat : remplir la saisie puis Envoyer (un TOUR re-jugé). */
+async function send(page: Page, text: string): Promise<void> {
 	await page.getByTestId("v3-input").fill(text);
 	await page.getByTestId("v3-send").click();
 }
 
 /** Navigue vers une lentille PAR LA NAV (Link client — la session du layout survit). */
-async function navTo(
-	page: import("@playwright/test").Page,
-	route: string,
-): Promise<void> {
+async function navTo(page: Page, route: string): Promise<void> {
 	await page
 		.locator(`[data-testid="v3-nav-item"][data-route="${route}"]`)
 		.click();
@@ -67,9 +131,10 @@ const CAPTURE =
 test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", () => {
 	test("le shell : /v3 redirige vers le lab, cinq lentilles, hero accueillant", async ({
 		page,
-	}) => {
-		// HERMÉTIQUE d'abord : la bascule IA éteinte (et son défaut ON est PROUVÉ ici).
-		await openDeterministe(page, "/v3");
+	}, testInfo) => {
+		// HERMÉTIQUE d'abord : un projet frais, puis la bascule IA éteinte (son
+		// défaut ON est PROUVÉ dans eteindreIA, sur le projet fraîchement monté).
+		await openDeterministe(page, `shell-${testInfo.testId}`, "/v3");
 
 		// /v3 a REDIRIGÉ vers /v3/lab (la porte d'entrée est le chat).
 		await expect(page).toHaveURL(/\/v3\/lab$/);
@@ -89,8 +154,8 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 
 	test("le chat agit : capture puis promotion — copie amicale, détail replié", async ({
 		page,
-	}) => {
-		await openDeterministe(page);
+	}, testInfo) => {
+		await openDeterministe(page, `chat-${testInfo.testId}`);
 
 		// ① la capture canonique : la bulle utilisateur + la carte assistant AMICALE.
 		await send(page, CAPTURE);
@@ -112,8 +177,8 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 
 	test("une session, cinq lentilles : l'état du chat est LU partout (nav client)", async ({
 		page,
-	}) => {
-		await openDeterministe(page);
+	}, testInfo) => {
+		await openDeterministe(page, `lentilles-${testInfo.testId}`);
 
 		// UN PROJET NEUF EST NU : l'arbre se CONSTRUIT par le chat (plus aucun seed de
 		// démo) — deux greffes canoniques, puis la capture + la promotion (même session).
@@ -209,10 +274,10 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 
 	test("un projet neuf est NU : aucune branche de démo, l'état vide amical", async ({
 		page,
-	}) => {
-		// HERMÉTIQUE d'abord (la bascule IA vit dans le lab), puis la lentille Parcours
+	}, testInfo) => {
+		// HERMÉTIQUE d'abord (projet frais + IA éteinte), puis la lentille Parcours
 		// par la nav CLIENT — la session fraîche est rejouée sur l'arbre NU (bareTree).
-		await openDeterministe(page);
+		await openDeterministe(page, `nu-${testInfo.testId}`);
 		await navTo(page, "/v3/parcours");
 
 		// L'état vide AMICAL : pas de branches → le message + le CTA vers le chat.
@@ -232,8 +297,8 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 
 	test("l'historique revient en arrière : deux clics doux, la timeline raccourcit", async ({
 		page,
-	}) => {
-		await openDeterministe(page);
+	}, testInfo) => {
+		await openDeterministe(page, `retour-${testInfo.testId}`);
 
 		// Deux tours (capture + promotion), puis la lentille Historique (nav client).
 		await send(page, CAPTURE);
@@ -267,21 +332,23 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 		);
 	});
 
-	test("LE MUR : une session de 3 tours IA-éteinte n'émet AUCUNE écriture", async ({
+	test("LE MUR : une session de 3 tours IA-éteinte n'émet AUCUNE écriture-vérité", async ({
 		page,
-	}) => {
-		// Capte toute requête d'écriture (le mur) : POST/PUT/PATCH/DELETE = interdit.
-		// La bascule IA éteinte garantit que la server-action Claude (un POST) n'est
-		// JAMAIS déclenchée — le run reste hermétique, la grammaire fermée suffit.
-		const writes: string[] = [];
+	}, testInfo) => {
+		// Le projet frais + l'IA éteinte D'ABORD (la mise en place écrit au magasin de
+		// projets — une écriture LÉGALE, au-dessous de la ligne) ; on capte les requêtes
+		// d'écriture (POST/PUT/PATCH/DELETE) à partir d'ICI, corps inclus.
+		await openDeterministe(page, `mur-${testInfo.testId}`);
+		const writes: Array<{ ligne: string; corps: string }> = [];
 		page.on("request", (req) => {
 			const m = req.method();
 			if (["POST", "PUT", "PATCH", "DELETE"].includes(m)) {
-				writes.push(`${m} ${req.url()}`);
+				writes.push({
+					ligne: `${m} ${req.url()}`,
+					corps: req.postData() ?? "",
+				});
 			}
 		});
-
-		await openDeterministe(page);
 
 		// TROIS tours déterministes : capture → promotion → déploiement en test.
 		await send(page, CAPTURE);
@@ -295,7 +362,169 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 			"Application déployée en test",
 		);
 
-		// LE MUR : aucune requête d'écriture n'a été émise par toute la session.
-		expect(writes).toEqual([]);
+		// LE MUR : la SEULE écriture tolérée est la sauvegarde débondée du projet
+		// (son corps porte le champ « transcript » — ADR 0061, un transcript de
+		// PROPOSITIONS, jamais une vérité). Tout le reste — la server-action Claude
+		// en tête (un POST sans « transcript ») — est interdit, bascule éteinte.
+		const interdites = writes.filter((w) => !w.corps.includes("transcript"));
+		expect(interdites.map((w) => w.ligne)).toEqual([]);
+	});
+});
+
+test.describe("V3 — le projet persistant (créer une app crée un projet, ADR 0061)", () => {
+	test("créer une app crée un PROJET : on atterrit dans un projet, le neuf naît nu", async ({
+		page,
+	}, testInfo) => {
+		// On atterrit TOUJOURS dans un projet persisté (auto-créé au tout premier
+		// passage, sinon le plus récemment sauvé) : le commutateur porte un nom.
+		await page.goto("/v3/lab");
+		const nomActif = page.getByTestId("v3-project-name");
+		await expect(nomActif).toBeVisible({ timeout: 20_000 });
+		await expect(nomActif).not.toHaveText("—");
+		await eteindreIA(page); // hermétique d'abord, comme toujours
+
+		// Le panneau : l'astuce amicale + au moins le projet actif listé.
+		await ouvrirPanneau(page);
+		await expect(page.getByTestId("v3-project-panel")).toContainText(
+			"Vos projets — chacun garde tout son historique.",
+		);
+		expect(
+			await page.getByTestId("v3-project-item").count(),
+		).toBeGreaterThanOrEqual(1);
+
+		// « Créer » est GARDÉ tant que le nom est vide (le fail-closed, depuis l'écran).
+		await expect(page.getByTestId("v3-project-create")).toBeDisabled();
+
+		// LA CRÉATION : le commutateur affiche le nouveau projet… et le chat est NU
+		// (le hero d'accueil, zéro bulle) — créer une app crée un projet VIERGE.
+		const nom = `boutique-${testInfo.testId}`;
+		await creerProjet(page, nom);
+		await expect(page.getByTestId("v3-chat")).toContainText(
+			"Construisons votre application ensemble",
+		);
+		await expect(page.getByTestId("v3-msg-user")).toHaveCount(0);
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(0);
+	});
+
+	test("rouvrir = TOUT retrouver, partout, même état : reload puis rejeu du projet", async ({
+		page,
+	}, testInfo) => {
+		const nom = `boutique-${testInfo.testId}`;
+		await openDeterministe(page, nom);
+
+		// Capte les sauvegardes (les POST de server action) à partir d'ICI : attendre
+		// CELLE qui porte le tour 2 (« promeus ») rend le reload DÉTERMINISTE — la
+		// sauvegarde est débondée (800 ms), rien ne doit se perdre en rechargeant.
+		const sauvegardes: string[] = [];
+		page.on("response", (res) => {
+			const req = res.request();
+			if (req.method() === "POST" && res.ok()) {
+				sauvegardes.push(req.postData() ?? "");
+			}
+		});
+
+		// Deux tours déterministes — les deux cartes amicales apparaissent.
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		const cartes = page.getByTestId("v3-msg-assistant");
+		await expect(cartes).toHaveCount(2);
+		await expect(cartes.first()).toContainText("Votre idée a été ajoutée");
+		await expect(cartes.last()).toContainText("Une version a été figée");
+
+		// La sauvegarde portant le tour 2 est ÉCRITE (réponse reçue) — reload sûr.
+		await expect
+			.poll(() => sauvegardes.some((corps) => corps.includes("promeus")), {
+				timeout: 15_000,
+			})
+			.toBe(true);
+
+		// ROUVRIR : un VRAI rechargement — l'état client est jeté, le projet est
+		// rechargé (cookie) puis REJOUÉ (turnsOf). La bascule IA peut revenir à son
+		// défaut ON : aucun tour n'est envoyé après, le run reste hermétique.
+		await page.reload();
+
+		// MÊME PROJET, MÊME ÉTAT : le nom, les 2 bulles utilisateur, les cartes
+		// amicales re-rendues depuis le REJEU (jamais depuis un état stocké).
+		await expect(page.getByTestId("v3-project-name")).toContainText(nom, {
+			timeout: 20_000,
+		});
+		await expect(page.getByTestId("v3-msg-user")).toHaveCount(2);
+		await expect(page.getByTestId("v3-msg-user").first()).toContainText(
+			"au checkout",
+		);
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(2);
+		await expect(page.getByTestId("v3-msg-assistant").first()).toContainText(
+			"Votre idée a été ajoutée",
+		);
+		await expect(page.getByTestId("v3-msg-assistant").last()).toContainText(
+			"Une version a été figée",
+		);
+
+		// PARTOUT ① : l'historique montre les DEUX tours (la même session rejouée).
+		await navTo(page, "/v3/history");
+		await expect(page.getByTestId("v3-history-turn")).toHaveCount(2, {
+			timeout: 20_000,
+		});
+
+		// PARTOUT ② : les environnements rendent l'échelle du MÊME état (rien n'a
+		// été déployé dans ce projet : les trois cartes sont là, inchangées).
+		await navTo(page, "/v3/environnements");
+		await expect(page.getByTestId("v3-env-test")).toBeVisible({
+			timeout: 20_000,
+		});
+		await expect(page.getByTestId("v3-env-staging")).toBeVisible();
+		await expect(page.getByTestId("v3-env-prod")).toBeVisible();
+
+		// Le projet n'a pas bougé pendant le voyage (la nav cliente, même session).
+		await expect(page.getByTestId("v3-project-name")).toContainText(nom);
+	});
+
+	test("deux projets, deux histoires : l'isolation des historiques, dans les deux sens", async ({
+		page,
+	}, testInfo) => {
+		await page.goto("/v3/lab");
+		await expect(page.getByTestId("v3-project-name")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		// LE PREMIER projet (celui où l'on atterrit) : son id — unique — et son nombre
+		// de tours, lu sur le badge du panneau (tolérant à son contenu réel).
+		const premierId = await projetActif(page);
+		const badge = page
+			.locator(`[data-testid="v3-project-item"][data-id="${premierId}"]`)
+			.locator("span[title]");
+		const premierTours = Number.parseInt(
+			(await badge.textContent()) ?? "0",
+			10,
+		);
+
+		// LE PROJET FRAIS : créé, IA éteinte (le remontage l'a réarmée), 2 tours.
+		const nom = `isolation-${testInfo.testId}`;
+		await creerProjet(page, nom);
+		await eteindreIA(page);
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v3-msg-user")).toHaveCount(2);
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(2);
+		const fraisId = await projetActif(page);
+		expect(fraisId).not.toBe(premierId);
+
+		// BASCULE vers le premier (la bascule FLUSH la sauvegarde — aucun tour perdu) :
+		// le chat montre SON histoire à lui, pas les 2 tours du frais — le compte de
+		// bulles égale exactement son badge (l'assertion tolérante à son contenu).
+		await basculerVers(page, premierId);
+		await expect(page.getByTestId("v3-msg-user")).toHaveCount(premierTours);
+		expect(await projetActif(page)).toBe(premierId);
+
+		// BASCULE retour : le frais retrouve EXACTEMENT ses 2 tours, cartes amicales
+		// rejouées — l'isolation tient dans les deux sens.
+		await basculerVers(page, fraisId);
+		await expect(page.getByTestId("v3-project-name")).toContainText(nom);
+		await expect(page.getByTestId("v3-msg-user")).toHaveCount(2);
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(2);
+		await expect(page.getByTestId("v3-msg-assistant").first()).toContainText(
+			"Votre idée a été ajoutée",
+		);
+		expect(await projetActif(page)).toBe(fraisId);
 	});
 });

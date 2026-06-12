@@ -114,3 +114,6 @@ back/cmd/aidosdemoemit/
 # emitted multi-entity app (specs → app → prod, Opus, not committed)
 .deploy-app/
 back/cmd/aidosappemit/
+
+# V3 persisted projects (replayable transcripts, user data — never committed)
+.aidos-projects/
