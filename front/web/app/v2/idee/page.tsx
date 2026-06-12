@@ -55,10 +55,9 @@ const KEYS = [
 	"grow",
 	"growPlaceholder",
 	"scalePathLabel",
-	"roleRacine",
-	"roleCellule",
-	"roleKernel",
-	"roleFeuille",
+	"posRacine",
+	"posFeuille",
+	"posDepthTitle",
 ] as const;
 
 export default async function V2IdeaScreen() {

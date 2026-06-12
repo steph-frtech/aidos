@@ -4,9 +4,9 @@ import { useMachine } from "@xstate/react";
 import { useId, useState } from "react";
 import {
 	nodePath,
+	type Position,
 	placeIntent,
-	roleOf,
-	type ScaleRole,
+	positionOf,
 } from "@/lib/v2/composition";
 import {
 	type Besoin,
@@ -33,7 +33,7 @@ import { ideaWizardMachine, WIZARD_STEPS } from "./IdeaWizardMachine";
  * (un chemin) dans l'arbre composes porté par la machine. La zone d'échelle fait trois gestes :
  *   1. le PLACEMENT PROPOSÉ — placeIntent (un algorithme de score, pur, calculé au rendu, jamais
  *      un prompt) propose où attacher l'intention ; l'HUMAIN peut l'adopter ou surcharger ;
- *   2. le PICKER d'arbre — une liste imbriquée accessible de <button> (rôle dérivé par roleOf,
+ *   2. le PICKER d'arbre — une liste imbriquée accessible de <button> (position dérivée par positionOf,
  *      indentation par profondeur, aria-pressed sur la sélection). react-aria-components est
  *      dans les dépendances mais ADR 0053 admet un petit arbre a11y maison : une liste imbriquée
  *      shadcn suffit ici (pas de virtualisation nécessaire, l'arbre est petit) ;
@@ -42,7 +42,7 @@ import { ideaWizardMachine, WIZARD_STEPS } from "./IdeaWizardMachine";
  *
  * DÉTERMINISME-FIRST : la validation et la composition sont DÉLÉGUÉES au twin lib/v2/idea.ts ;
  * XState n'orchestre que l'état d'écran. Les jeux clos (niveaux, facettes, provenances) viennent
- * des sources ; racine/cellule/kernel/feuille sont des LECTURES DÉRIVÉES de la position (roleOf),
+ * des sources ; la position (racine, feuille, profondeur nN) est une LECTURE DÉRIVÉE (positionOf),
  * jamais stockées.
  */
 
@@ -64,23 +64,29 @@ const ERROR_KEYS: Record<BesoinError, string> = {
 	provenance_unknown: "errProvenance",
 };
 
-const ROLE_KEYS: Record<ScaleRole, string> = {
-	racine: "roleRacine",
-	cellule: "roleCellule",
-	kernel: "roleKernel",
-	feuille: "roleFeuille",
-};
-
 const PROVENANCE_KEYS: Record<string, string> = {
 	humain: "provenanceHumain",
 	incident: "provenanceIncident",
 };
 
-/** Le badge du RÔLE DÉRIVÉ d'une position (jamais stocké — roleOf, ADR 0055). */
-function RoleBadge({ role, t }: { role: ScaleRole; t: Strings }) {
+/**
+ * Le badge de POSITION (jamais stocké — positionOf, ADR 0055). PAS de noms de niveaux :
+ * l'arbre est illimité, donc seuls s'affichent les faits topologiques sans échelle —
+ * « racine », « feuille » — et la PROFONDEUR numérique (n1, n2, n3…). Chaque nœud EST
+ * un kernel (§49) : nommer les étages intérieurs n'apporterait aucune information.
+ */
+function PositionBadge({ position, t }: { position: Position; t: Strings }) {
+	const label = position.isRoot
+		? t.posRacine
+		: position.isLeaf
+			? `${t.posFeuille} · n${position.depth}`
+			: `n${position.depth}`;
 	return (
-		<span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-			{t[ROLE_KEYS[role]] ?? role}
+		<span
+			title={t.posDepthTitle}
+			className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+		>
+			{label}
 		</span>
 	);
 }
@@ -123,7 +129,7 @@ function ScaleTreeNodes({
 							}
 						>
 							<span>{n.label}</span>
-							<RoleBadge role={roleOf(tree, n.id)} t={t} />
+							<PositionBadge position={positionOf(tree, n.id)} t={t} />
 						</button>
 						{n.children.length > 0 && (
 							<ScaleTreeNodes
@@ -283,7 +289,7 @@ export function IdeaWizardClient({ t }: { t: Strings }) {
 									<span className="font-mono text-foreground">
 										{placement.path}
 									</span>
-									<RoleBadge role={placement.role} t={t} />
+									<PositionBadge position={placement.position} t={t} />
 									<button
 										type="button"
 										data-testid="v2-idee-placement-use"
@@ -357,7 +363,10 @@ export function IdeaWizardClient({ t }: { t: Strings }) {
 								</span>
 								{selectedNode !== null && (
 									<span data-testid="v2-idee-scale-role">
-										<RoleBadge role={roleOf(tree, selectedNode.id)} t={t} />
+										<PositionBadge
+											position={positionOf(tree, selectedNode.id)}
+											t={t}
+										/>
 									</span>
 								)}
 							</div>

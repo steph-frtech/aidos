@@ -61,9 +61,7 @@ test.describe("WB2-03 /v2/idee — wizard XState de capture d'idée", () => {
 		await expect(page.getByTestId("v2-idee-scale-path")).toHaveText(
 			"app/paiement/checkout",
 		);
-		await expect(page.getByTestId("v2-idee-scale-role")).toContainText(
-			"Kernel",
-		);
+		await expect(page.getByTestId("v2-idee-scale-role")).toContainText("n2");
 		await page.getByTestId("v2-idee-next").click();
 
 		// Étape 3 — la provenance.
@@ -127,7 +125,7 @@ test.describe("WB2-03 /v2/idee — wizard XState de capture d'idée", () => {
 			"app/paiement/checkout/debit-du-compte",
 		);
 		await expect(page.getByTestId("v2-idee-scale-role")).toContainText(
-			"Feuille",
+			"feuille",
 		);
 		await page.getByTestId("v2-idee-next").click();
 		await page.getByTestId("v2-idee-provenance-incident").click();
@@ -159,7 +157,7 @@ test.describe("WB2-03 /v2/idee — wizard XState de capture d'idée", () => {
 		);
 		await leaf.click();
 		await expect(page.getByTestId("v2-idee-scale-role")).toContainText(
-			"Feuille",
+			"feuille",
 		);
 
 		// …et on GREFFE dessous : l'arbre POUSSE (append-only, §9), AU-DELÀ de la
@@ -176,11 +174,13 @@ test.describe("WB2-03 /v2/idee — wizard XState de capture d'idée", () => {
 			"app/paiement/checkout/debit-du-compte/preuve-d-idempotence",
 		);
 		await expect(page.getByTestId("v2-idee-scale-role")).toContainText(
-			"Feuille",
+			"feuille",
 		);
-		// la MÊME donnée change de rôle quand l'arbre pousse : l'ancienne feuille DEVIENT
-		// kernel (le rôle est une lecture DÉRIVÉE de la position, jamais stocké — ADR 0055).
-		await expect(leaf).toContainText("Kernel");
+		// la MÊME donnée change de lecture quand l'arbre pousse : l'ancienne feuille n'est
+		// plus « feuille » — son badge ne montre plus que sa profondeur (n3). Les niveaux ne
+		// portent PAS de nom (l'arbre est illimité ; chaque nœud est un kernel, §49).
+		await expect(leaf).not.toContainText("feuille");
+		await expect(leaf).toContainText("n3");
 		// le champ de greffe est vidé après la greffe.
 		await expect(page.getByTestId("v2-idee-grow-label")).toHaveValue("");
 	});

@@ -208,28 +208,40 @@ export function countNodes(roots: readonly TreeNode[]): number {
 }
 
 /**
- * Construit une relation `composes` SYNTHÉTIQUE de N kernels (un produit racine, puis des branches
- * fractales) — déterministe, pour peupler l'écran (200+ nœuds) et le miroir de virtualisation.
- * PURE & TOTALE : même N → même relation. Chaque kernel descend d'un cran dans la verticale jusqu'à
- * l'entité, puis recommence une cellule sœur ; aucune coordonnée hors des jeux clos.
+ * Construit une relation `composes` SYNTHÉTIQUE de N kernels — déterministe, pour peupler
+ * l'écran (200+ nœuds) et le miroir de virtualisation. PURE & TOTALE : même N → même relation.
+ *
+ * UNE SEULE RACINE (correction conceptuelle 2026-06-12) : un projet = UN produit — l'arbre
+ * entier compose SOUS lui (§45/§49 : la fédération est l'unique plafond ; « plusieurs
+ * products » était un artefact du générateur, pas le modèle). Chaque branche descend la
+ * verticale d'un cran par nœud (journey → … → entité), puis une NOUVELLE branche sœur
+ * repart sous LA racine ; aucune coordonnée hors des jeux clos.
  */
 export function syntheticComposes(n: number): KernelNode[] {
 	const size = Math.max(0, Math.floor(n));
 	const facets = ["F", "I", "S", "B", "R", "V", "M", "X"];
 	const out: KernelNode[] = [];
 	for (let i = 0; i < size; i++) {
-		const levelIdx = i % SOURCE_ORDER.length;
-		const level = SOURCE_ORDER[levelIdx];
-		const facet = facets[i % facets.length];
-		// La racine (produit) du premier bloc n'a pas de parent ; les autres descendent du
-		// précédent dans la fratrie fractale (le nœud d'index i-1 quand on n'est pas une racine).
-		const parentId = levelIdx === 0 ? null : `k${i - 1}`;
+		if (i === 0) {
+			// L'UNIQUE racine : le produit (le projet entier).
+			out.push({
+				id: "k0",
+				level: SOURCE_ORDER[0],
+				facet: facets[0],
+				label: `${SOURCE_ORDER[0]} 0`,
+				parentId: null,
+			});
+			continue;
+		}
+		// Les branches cyclent journey → … → entité (jamais un second produit) ; le début
+		// d'un cycle se greffe sous LA racine, la suite descend du nœud précédent.
+		const levelIdx = ((i - 1) % (SOURCE_ORDER.length - 1)) + 1;
 		out.push({
 			id: `k${i}`,
-			level,
-			facet,
-			label: `${level} ${i}`,
-			parentId,
+			level: SOURCE_ORDER[levelIdx],
+			facet: facets[i % facets.length],
+			label: `${SOURCE_ORDER[levelIdx]} ${i}`,
+			parentId: levelIdx === 1 ? "k0" : `k${i - 1}`,
 		});
 	}
 	return out;

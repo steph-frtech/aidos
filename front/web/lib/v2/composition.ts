@@ -7,8 +7,8 @@
  *   - l'arbre POUSSE au fur et à mesure des ajouts (append-only, anti-overwrite §9) ;
  *   - sa profondeur est ILLIMITÉE (fractal §49 — borné seulement par le plancher feuille
  *     et le plafond racine/fédération) ;
- *   - racine / cellule / kernel / feuille sont des RÔLES DÉRIVÉS de la position (calculés à la
- *     lecture : profondeur + feuille-ou-non), JAMAIS stockés sur le nœud ;
+ *   - la POSITION est TOPOLOGIQUE, jamais un nom de niveau : racine (prof. 0), feuille (sans
+ *     enfant) et la profondeur numerique nN — calculees a la lecture, JAMAIS stockees ;
  *   - le SYSTÈME identifie où attacher un besoin (placeIntent — un ALGORITHME de score, pas un
  *     prompt, §6/§8 déterminisme-first) ; l'HUMAIN peut surcharger (§49 : « les frontières des
  *     cellules sont posées par jugement humain, pas engendrées par la récursion »).
@@ -18,7 +18,7 @@
  * même greffe → même id ; la greffe est IDEMPOTENTE (re-greffer le même libellé sous le même
  * parent ne crée rien). Le miroir de reproductibilité lib/v2/composition.test.ts (fast-check)
  * épingle : validité sous toute croissance, append-only, idempotence, profondeur illimitée,
- * rôles dérivés (une feuille qui reçoit un enfant DEVIENT kernel), placement total/déterministe/
+ * position topologique (une feuille greffée cesse d'être feuille), placement total/déterministe/
  * membre, bijection chemin↔nœud.
  *
  * RÉUTILISATION (pas de fork) : la STRUCTURE (KernelNode, validation cycles/orphelins, l'arbre
@@ -34,19 +34,32 @@
 import { SOURCE_ORDER } from "../besoin-grammar";
 import type { KernelNode } from "./kernel-tree";
 
-/** Les RÔLES DÉRIVÉS d'une position dans l'arbre — un jeu clos de LECTURES, jamais stocké. */
-export const SCALE_ROLES = ["racine", "cellule", "kernel", "feuille"] as const;
-export type ScaleRole = (typeof SCALE_ROLES)[number];
+/**
+ * La POSITION d'un nœud — TOPOLOGIQUE, jamais un nom de niveau. L'arbre étant ILLIMITÉ
+ * (§49), nommer les niveaux n'a pas de sens : un « niveau 7 » n'est pas plus « kernel »
+ * qu'un autre — CHAQUE nœud est un kernel (l'auto-similarité). Les seules lectures
+ * stables d'une position : la RACINE (profondeur 0), la FEUILLE (aucun enfant — le
+ * plancher), et la PROFONDEUR numérique (n0, n1, n2… — infinie comme l'arbre).
+ * Calculée à la lecture, jamais stockée.
+ */
+export interface Position {
+	/** La profondeur (racine = 0) — illimitée, affichée telle quelle (n{depth}). */
+	readonly depth: number;
+	/** Profondeur 0 — le produit / la fédération (le plafond §49). */
+	readonly isRoot: boolean;
+	/** Aucun enfant — le grain le plus fin À CE JOUR (le plancher §49) ; cesse de l'être à la greffe. */
+	readonly isLeaf: boolean;
+}
 
-/** Le PLACEMENT calculé d'une intention : le nœud d'attache + son adresse + son rôle dérivé. */
+/** Le PLACEMENT calculé d'une intention : le nœud d'attache + son adresse + sa position dérivée. */
 export interface Placement {
 	/** L'id du nœud d'attache (membre de l'arbre, toujours). */
 	readonly nodeId: string;
 	/** Le chemin canonique (slugs joints par « / ») — l'ADRESSE de l'échelle. */
 	readonly path: string;
-	/** Le rôle dérivé de la position (jamais stocké). */
-	readonly role: ScaleRole;
-	/** Le score d'accroche lexicale (0 ⇒ aucune accroche : proposer une nouvelle cellule à la racine). */
+	/** La position dérivée (topologique, jamais stockée). */
+	readonly position: Position;
+	/** Le score d'accroche lexicale (0 ⇒ aucune accroche : proposer une nouvelle branche à la racine). */
 	readonly score: number;
 }
 
@@ -130,19 +143,18 @@ export function nodeByPath(
 }
 
 /**
- * Le RÔLE DÉRIVÉ d'une position (§49) — CALCULÉ à la lecture, jamais stocké sur le nœud :
- *   - profondeur 0            → « racine »  (le produit / la fédération — le plafond) ;
- *   - profondeur 1            → « cellule » (un contexte délimité, enfant direct de la racine) ;
- *   - feuille (profondeur ≥2) → « feuille » (le grain le plus fin — le plancher) ;
- *   - sinon                   → « kernel »  (un kernel intermédiaire).
- * La MÊME donnée change de rôle quand l'arbre pousse (une feuille greffée devient kernel).
+ * La POSITION dérivée d'un nœud (§49) — CALCULÉE à la lecture, jamais stockée, et
+ * JAMAIS un nom de niveau : l'arbre est illimité, donc seuls comptent la profondeur
+ * numérique et les deux faits topologiques sans échelle (racine, feuille). « Cellule »
+ * et « kernel » ne sont PAS des profondeurs — chaque nœud EST un kernel (l'auto-
+ * similarité §49), et une cellule est une FRONTIÈRE déclarée par l'humain, pas un
+ * étage. La MÊME donnée change de lecture quand l'arbre pousse (une feuille greffée
+ * cesse d'être feuille ; sa profondeur, elle, ne bouge pas).
  */
-export function roleOf(nodes: readonly KernelNode[], id: string): ScaleRole {
-	const depth = nodePath(nodes, id).length - 1;
-	if (depth <= 0) return "racine";
-	if (depth === 1) return "cellule";
-	const hasChild = nodes.some((n) => n.parentId === id);
-	return hasChild ? "kernel" : "feuille";
+export function positionOf(nodes: readonly KernelNode[], id: string): Position {
+	const depth = Math.max(0, nodePath(nodes, id).length - 1);
+	const isLeaf = !nodes.some((n) => n.parentId === id);
+	return { depth, isRoot: depth === 0, isLeaf };
 }
 
 /**
@@ -244,9 +256,15 @@ export function placeIntent(
 	}
 
 	// Arbre vide impossible en pratique (seed) ; total quand même : un placement « nulle part ».
-	if (best === null) return { nodeId: "", path: "", role: "racine", score: 0 };
+	if (best === null)
+		return {
+			nodeId: "",
+			path: "",
+			position: { depth: 0, isRoot: true, isLeaf: true },
+			score: 0,
+		};
 
-	// Aucune accroche → la racine (proposer une nouvelle cellule), jamais un nœud arbitraire.
+	// Aucune accroche → la racine (proposer une nouvelle branche), jamais un nœud arbitraire.
 	const target =
 		best.score === 0
 			? (nodes.find((n) => n.parentId === null) ?? best.n)
@@ -255,7 +273,7 @@ export function placeIntent(
 	return {
 		nodeId: target.id,
 		path: nodePath(nodes, target.id).join("/"),
-		role: roleOf(nodes, target.id),
+		position: positionOf(nodes, target.id),
 		score: best.score === 0 ? 0 : best.score,
 	};
 }

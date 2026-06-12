@@ -5,10 +5,9 @@ import {
 	growComposes,
 	nodeByPath,
 	nodePath,
+	type Position,
 	placeIntent,
-	roleOf,
-	SCALE_ROLES,
-	type ScaleRole,
+	positionOf,
 	seedComposes,
 	slugify,
 } from "./composition";
@@ -19,8 +18,8 @@ import { validateComposes } from "./kernel-tree";
  *
  * L'échelle n'est PAS un jeu clos à trois valeurs : c'est une POSITION dans l'arbre de
  * composition (`composes`), qui POUSSE à chaque ajout et dont la profondeur est illimitée.
- * Les libellés racine/cellule/kernel/feuille sont DÉRIVÉS de la position (calculés), jamais
- * stockés. Le SYSTÈME identifie où attacher un besoin (placeIntent, déterministe) ; l'humain
+ * La position est TOPOLOGIQUE (racine, feuille, profondeur nN) — calculée, jamais stockée ;
+ * les niveaux ne portent PAS de nom (chaque nœud est un kernel, §49). Le SYSTÈME identifie où attacher un besoin (placeIntent, déterministe) ; l'humain
  * peut surcharger (§49 : les frontières des cellules sont posées par jugement humain).
  */
 
@@ -125,14 +124,10 @@ describe("growComposes — l'arbre pousse à chaque ajout (§49)", () => {
 	});
 });
 
-// ── les rôles dérivés (jamais stockés) ────────────────────────────────────────
+// ── la position (jamais nommée par niveau : l'arbre est illimité) ─────────────
 
-describe("roleOf — racine/cellule/kernel/feuille DÉRIVÉS de la position, jamais stockés", () => {
-	it("le jeu des rôles dérivés est déclaré et clos", () => {
-		expect(SCALE_ROLES).toEqual(["racine", "cellule", "kernel", "feuille"]);
-	});
-
-	it("∀ arbre poussé : la racine est « racine », un enfant direct est « cellule », une feuille profonde est « feuille », un intérieur profond est « kernel »", () => {
+describe("positionOf — la position est TOPOLOGIQUE (racine, feuille, profondeur), jamais un nom de niveau", () => {
+	it("∀ arbre poussé : isRoot ⇔ profondeur 0, isLeaf ⇔ aucun enfant, depth = la profondeur réelle", () => {
 		fc.assert(
 			fc.property(growthArb, (growth) => {
 				const nodes = grown(growth);
@@ -142,17 +137,16 @@ describe("roleOf — racine/cellule/kernel/feuille DÉRIVÉS de la position, jam
 				for (const n of nodes) {
 					const depth = nodePath(nodes, n.id).length - 1;
 					const isLeaf = (children.get(n.id) ?? 0) === 0;
-					const role: ScaleRole = roleOf(nodes, n.id);
-					if (depth === 0) expect(role).toBe("racine");
-					else if (depth === 1) expect(role).toBe("cellule");
-					else if (isLeaf) expect(role).toBe("feuille");
-					else expect(role).toBe("kernel");
+					const pos: Position = positionOf(nodes, n.id);
+					expect(pos.depth).toBe(depth);
+					expect(pos.isRoot).toBe(depth === 0);
+					expect(pos.isLeaf).toBe(isLeaf);
 				}
 			}),
 		);
 	});
 
-	it("le rôle CHANGE quand l'arbre pousse : une feuille qui reçoit un enfant devient kernel (dérivé, pas stocké)", () => {
+	it("la position CHANGE quand l'arbre pousse : une feuille qui reçoit un enfant cesse d'être feuille (recalculé, pas stocké)", () => {
 		let nodes = seedComposes();
 		// fabriquer une feuille profonde
 		const root = nodes[0];
@@ -168,9 +162,28 @@ describe("roleOf — racine/cellule/kernel/feuille DÉRIVÉS de la position, jam
 			`${nodePath(nodes, zone.id).join("/")}/grain`,
 		);
 		if (grain === null) throw new Error("grain absent");
-		expect(roleOf(nodes, grain.id)).toBe("feuille");
+		expect(positionOf(nodes, grain.id).isLeaf).toBe(true);
 		nodes = growComposes(nodes, grain.id, "sous-grain");
-		expect(roleOf(nodes, grain.id)).toBe("kernel"); // la MÊME donnée, un rôle recalculé
+		const pos = positionOf(nodes, grain.id);
+		expect(pos.isLeaf).toBe(false); // la MÊME donnée, une lecture recalculée
+		expect(pos.depth).toBe(2); // la profondeur, elle, n'a pas bougé
+	});
+
+	it("la profondeur est ILLIMITÉE et la position la porte telle quelle (n40 : pas de plafond de nommage)", () => {
+		let nodes = seedComposes();
+		let parentId = nodes[0].id;
+		for (let i = 0; i < 40; i++) {
+			nodes = growComposes(nodes, parentId, `etage ${i}`);
+			const child = nodeByPath(
+				nodes,
+				nodePath(nodes, parentId)
+					.concat(slugify(`etage ${i}`))
+					.join("/"),
+			);
+			if (child === null) throw new Error("unreachable");
+			parentId = child.id;
+		}
+		expect(positionOf(nodes, parentId).depth).toBe(40);
 	});
 });
 
@@ -246,23 +259,24 @@ describe("placeIntent — le système identifie le point d'attache (déterminist
 		if (leaf === null) throw new Error("feuille absente");
 		const p = placeIntent(nodes, "le remboursement qst doit être idempotent");
 		expect(p.nodeId).toBe(leaf.id);
-		expect(p.role).toBe("feuille");
+		expect(p.position.isLeaf).toBe(true);
 	});
 
-	it("une intention sans AUCUNE accroche atterrit à la racine avec score 0 (proposer une nouvelle cellule)", () => {
+	it("une intention sans AUCUNE accroche atterrit à la racine avec score 0 (proposer une nouvelle branche)", () => {
 		const nodes = seedComposes();
 		const p = placeIntent(nodes, "zzz qqq www");
 		expect(p.score).toBe(0);
-		expect(p.role).toBe("racine");
+		expect(p.position.isRoot).toBe(true);
+		expect(p.position.depth).toBe(0);
 	});
 
-	it("le placement porte le chemin et le rôle dérivé (l'écran n'invente rien)", () => {
+	it("le placement porte le chemin et la position dérivée (l'écran n'invente rien)", () => {
 		fc.assert(
 			fc.property(growthArb, fc.string(), (growth, intent) => {
 				const nodes = grown(growth);
 				const p = placeIntent(nodes, intent);
 				expect(p.path).toBe(nodePath(nodes, p.nodeId).join("/"));
-				expect(p.role).toBe(roleOf(nodes, p.nodeId));
+				expect(p.position).toEqual(positionOf(nodes, p.nodeId));
 			}),
 		);
 	});
