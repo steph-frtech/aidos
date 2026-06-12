@@ -194,8 +194,9 @@ func TestFieldValidityFromEnums(t *testing.T) {
 	})
 }
 
-// TestExactEnumCardinality — the enums are EXACTLY the §13.7 members (region 4 incl. "*",
-// target 5, segment 3, environment 3). A change to a set trips this mirror.
+// TestExactEnumCardinality — the enums are EXACTLY the closed members (region 4 incl. "*",
+// target 5, segment 3, environment 5 — §13.7 trio + DP06/ADR 0065 local, future_cloud).
+// A change to a set trips this mirror.
 func TestExactEnumCardinality(t *testing.T) {
 	if got := len(scope.Regions()); got != 4 {
 		t.Fatalf("Region cardinality = %d, want 4 (FR|EU|US|*) (KRD §13.7)", got)
