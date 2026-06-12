@@ -53,6 +53,7 @@ test.describe("DP02 — StackManifest as a first-class Kernel source", () => {
 		await expect(page.getByTestId("service-interpreter")).toContainText(
 			"interpreter",
 		);
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: the screen renders the LITERAL compose env-var reference ${APP_DATA_PATH} (never a hardcoded path) — the assertion must stay a plain string.
 		await expect(page.getByTestId("volumes")).toContainText("${APP_DATA_PATH}");
 		await expect(page.getByTestId("network")).toContainText(
 			"traefik_default (external)",
