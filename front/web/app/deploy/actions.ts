@@ -11,6 +11,14 @@ import {
 	type OrderManifest,
 } from "@/lib/deploy";
 import {
+	type AuditEntry,
+	auditTimeline,
+	type EnvDomainBinding as CockpitDomainBinding,
+	type CockpitInput,
+	type PhaseInput as CockpitPhaseInput,
+	project as projectCockpit,
+} from "@/lib/deploy-cockpit";
+import {
 	cableInEnvironment,
 	type EnvBindRequest,
 	envServesHTTPS,
@@ -36,7 +44,13 @@ import {
 	servedMatchesEmitted,
 	teardownOf,
 } from "@/lib/preview-bootstrap";
-import type { DeployView, DomainView, EnvView, PreviewView } from "./view";
+import type {
+	CockpitView,
+	DeployView,
+	DomainView,
+	EnvView,
+	PreviewView,
+} from "./view";
 
 /**
  * Server Action for the /deploy Workbench panel (S96 — the phase-keyed deploy pipeline,
@@ -584,4 +598,192 @@ export async function envAction(
 	}
 
 	return { ok: false, env: "preview", phaseHash: devPhase, devUrl };
+}
+
+/* --- DP29: the per-project deploy & environments COCKPIT (EPIC F, clôture) -------------------- */
+
+/** The stable HEAD phase (N) — vert, deployable, the phase preview/staging/prod serve. */
+const COCKPIT_HEAD = "phase-0123456789abcdef";
+/** An EARLIER stable phase (N-1) — vert, the rollback target the audit timeline re-projects. */
+const COCKPIT_PREV = "phase-prev-0011223344";
+/** A RED phase — rouge, NON-deployable (a red fixture mirror) — proves the PHASE_NOT_STABLE refusal. */
+const COCKPIT_RED = "phase-red-aabbccddeeff";
+
+/**
+ * cockpitPhases — the project's phases in frontier order (projectdag, S56). A deterministic
+ * fixture (the Go truth-store is authoritative for the real DAG): a stable HEAD (N, vert), a stable
+ * earlier phase (N-1, vert — the rollback target), and a RED phase (rouge, non-deployable). The
+ * cut verdict + gate ARE the liveness/deployability — READ by the pure projection, never re-derived.
+ */
+function cockpitPhases(): CockpitPhaseInput[] {
+	const stableGate = {
+		mutationScore: 0.9,
+		mutationThreshold: 0.8,
+		monsterCount: 0,
+	};
+	return [
+		{
+			nodeId: COCKPIT_HEAD,
+			label: "phase N (tête)",
+			head: true,
+			phase: { phaseHash: COCKPIT_HEAD, stable: true, reasons: [] },
+			gate: stableGate,
+		},
+		{
+			nodeId: COCKPIT_PREV,
+			label: "phase N-1",
+			head: false,
+			phase: { phaseHash: COCKPIT_PREV, stable: true, reasons: [] },
+			gate: stableGate,
+		},
+		{
+			nodeId: COCKPIT_RED,
+			label: "phase rouge",
+			head: false,
+			phase: {
+				phaseHash: COCKPIT_RED,
+				stable: false,
+				reasons: ["createOrder.fixture"],
+			},
+			gate: stableGate,
+		},
+	];
+}
+
+/**
+ * Server Action for the DP29 « Cockpit déploiement & environnements » tab (EPIC F, clôture — ÉTEND
+ * S99, ASSEMBLE DP25-28 en UN écran).
+ *
+ * THE STEP (DP29). The cockpit shows, per project, in ONE read model: the PHASES with their
+ * liveness (vert/rouge/inconnu), the ENVIRONMENTS (preview/staging/prod/future_cloud) with the
+ * phase each serves and its live HTTPS URL, the custom DOMAINS (+ TLS), the closed PROFILES, and
+ * the audit TIMELINE of incident/rollback. Its source is the PURE projection (deploy-cockpit.project,
+ * the twin of Go back/runtime/deploycockpit) + the DP28 audit reducer.
+ *
+ * DETERMINISM-FIRST (CLAUDE.md §6/§8 ; « projection PURE du DAG »): project + auditTimeline are PURE
+ * functions of their input (no clock, no rng, no LLM) — same project + DAG → byte-identical
+ * projection (same hash). The liveness/deployability are READ from the DP25-28 twins (S23 cut + DP26
+ * Stop-gate), never re-computed, never estimated. THE WALL (§2): the cockpit READS already-projected
+ * facts below the line and ASSEMBLES the read model — it writes NOTHING. A deploy/rollback action
+ * reuses the DP26/DP28 action tabs (a ChangeSet proposal for infra truth, a below-the-line trigger
+ * for preview/staging) — never a direct truth-write.
+ */
+export async function cockpitAction(
+	_prev: CockpitView,
+	formData: FormData,
+): Promise<CockpitView> {
+	const project = String(formData.get("project") ?? "").trim() || "shop";
+	// Whether the preview deployment carries a validated validation_humaine (DP28). The cockpit's
+	// « valider le dev » control flips it; default validated so the staging-promotable badge shows.
+	const validated = formData.get("previewValidated") !== "off";
+
+	// The custom domain DP27 binding cabled into prod (read-as-is — the twin already resolved TLS/URL).
+	const domains: CockpitDomainBinding[] = [
+		{
+			domain: `${project}.acme.com`,
+			environment: "prod",
+			url: `https://${project}.acme.com`,
+			certResolver: "letsencrypt",
+			routerName: `${project}-prod`,
+			tls: true,
+			labels: [
+				{
+					label: "traefik.http.routers.app-secure.entrypoints",
+					value: "websecure",
+				},
+				{
+					label: "traefik.http.routers.app-secure.tls.certresolver",
+					value: "letsencrypt",
+				},
+			],
+		},
+	];
+
+	const input: CockpitInput = {
+		project,
+		phases: cockpitPhases(),
+		environments: [
+			{
+				env: "preview",
+				servedPhaseId: COCKPIT_HEAD,
+				humanValidated: validated,
+			},
+			{ env: "staging", servedPhaseId: COCKPIT_HEAD },
+			{
+				env: "prod",
+				servedPhaseId: COCKPIT_HEAD,
+				domainRoot: `${project}.acme.com`,
+			},
+			{ env: "future_cloud" },
+		],
+		domains,
+	};
+
+	const projection = projectCockpit(project, input);
+
+	// The DP28 incident/rollback audit timeline — recorded, append-only decisions (provenance §9).
+	// A deterministic fixture mirroring the lived history: deploy N → human-validate → promote
+	// staging → promote prod → incident in prod → rollback to N-1 (re-projected). The reducer
+	// preserves the recorded order (never re-sorts).
+	const audit: AuditEntry[] = auditTimeline([
+		{
+			kind: "deploy",
+			env: "preview",
+			phaseHash: COCKPIT_HEAD,
+			summary: "Déploiement preview de la phase N (ré-projection S78).",
+			provenance: {
+				actor: "human",
+				reason: "preview de la phase N",
+				fromPhaseHash: "",
+				toPhaseHash: COCKPIT_HEAD,
+			},
+		},
+		{
+			kind: "human_validation",
+			env: "preview",
+			phaseHash: COCKPIT_HEAD,
+			summary:
+				"Validation humaine de la phase N (DP28 — la vraie app vue et validée).",
+			provenance: {
+				actor: "human",
+				reason: "validation_humaine validated=true",
+				fromPhaseHash: "",
+				toPhaseHash: COCKPIT_HEAD,
+			},
+		},
+		{
+			kind: "promote",
+			env: "staging",
+			phaseHash: COCKPIT_HEAD,
+			summary: "Promotion vers staging (phase N validée).",
+		},
+		{
+			kind: "promote",
+			env: "prod",
+			phaseHash: COCKPIT_HEAD,
+			summary: "Promotion vers prod (phase N).",
+		},
+		{
+			kind: "incident",
+			env: "prod",
+			phaseHash: COCKPIT_HEAD,
+			summary: "Incident en prod sur la phase N — déclenche le rollback.",
+		},
+		{
+			kind: "rollback",
+			env: "prod",
+			phaseHash: COCKPIT_PREV,
+			fromPhaseHash: COCKPIT_HEAD,
+			summary:
+				"Rollback vers la phase antérieure N-1 (app ré-émise, hash = N-1).",
+			provenance: {
+				actor: "human",
+				reason: "incident en prod — retour à la phase antérieure (DP28)",
+				fromPhaseHash: COCKPIT_HEAD,
+				toPhaseHash: COCKPIT_PREV,
+			},
+		},
+	]);
+
+	return { ok: true, projection, audit };
 }

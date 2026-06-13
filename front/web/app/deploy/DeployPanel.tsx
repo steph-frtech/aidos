@@ -1,16 +1,20 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { livenessAttr } from "@/lib/deploy-cockpit";
 import { liveUrl } from "@/lib/env-rollback";
 import {
+	cockpitAction,
 	deployAction,
 	domainAction,
 	envAction,
 	previewAction,
 } from "./actions";
 import {
+	COCKPIT_INITIAL,
+	type CockpitView,
 	DEPLOY_INITIAL,
 	type DeployView,
 	DOMAIN_INITIAL,
@@ -110,9 +114,9 @@ export function DeployPanel({
 		deployAction,
 		DEPLOY_INITIAL,
 	);
-	const [tab, setTab] = useState<"deploy" | "preview" | "env" | "domain">(
-		"deploy",
-	);
+	const [tab, setTab] = useState<
+		"cockpit" | "deploy" | "preview" | "env" | "domain"
+	>("deploy");
 
 	return (
 		<div className="space-y-8">
@@ -128,11 +132,25 @@ export function DeployPanel({
 				</span>
 			</div>
 
-			{/* Tabs — DEPLOY (S96) | PREVIEW ÉPHÉMÈRE (DP25, EPIC F). */}
+			{/* Tabs — COCKPIT (DP29, clôture) | DEPLOY (S96) | PREVIEW (DP25) | ENV (DP28) | DOMAINE (DP27). */}
 			<div
-				className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1"
+				className="flex flex-wrap gap-1 rounded-lg border border-border bg-muted/40 p-1"
 				role="tablist"
 			>
+				<button
+					type="button"
+					role="tab"
+					data-testid="cockpit-tab"
+					aria-selected={tab === "cockpit"}
+					onClick={() => setTab("cockpit")}
+					className={
+						tab === "cockpit"
+							? "flex-1 rounded-md bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm"
+							: "flex-1 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+					}
+				>
+					{t("tabCockpit")}
+				</button>
 				<button
 					type="button"
 					role="tab"
@@ -191,7 +209,9 @@ export function DeployPanel({
 				</button>
 			</div>
 
-			{tab === "preview" ? (
+			{tab === "cockpit" ? (
+				<CockpitSection activeProjectId={activeProjectId} onGoToTab={setTab} />
+			) : tab === "preview" ? (
 				<PreviewSection activeProjectId={activeProjectId} />
 			) : tab === "env" ? (
 				<EnvSection activeProjectId={activeProjectId} />
@@ -201,6 +221,510 @@ export function DeployPanel({
 				<DeploySection state={state} action={action} />
 			)}
 		</div>
+	);
+}
+
+/**
+ * CockpitSection — the DP29 « Cockpit déploiement & environnements » tab (EPIC F, clôture — ÉTEND
+ * S99, ASSEMBLE DP25-28 en UN écran). The READ-SIDE companion of the DP25-28 action tabs: it shows,
+ * per project, in ONE read model, the PHASES with their liveness (vert/rouge/inconnu — a PURE
+ * projection of the DAG cut, S23, NEVER an estimation), the ENVIRONMENTS (preview/staging/prod/
+ * future_cloud) switchables with the phase each serves and its live HTTPS URL, the custom DOMAINS
+ * (+ TLS), the closed PROFILES, and the audit TIMELINE of incident/rollback. The deploy/rollback
+ * actions are EXECUTABLE from the cockpit (they reuse the DP26 deploy + DP28 env twins) — a deploy
+ * on a NON-STABLE phase is refused PHASE_NOT_STABLE (the inherited Stop-gate).
+ *
+ * DETERMINISM-FIRST (CLAUDE.md §6/§8): the projection is the PURE twin (deploy-cockpit.project) —
+ * same DAG → byte-identical read model. The liveness/deployability are READ from the DP25-28 twins,
+ * never re-computed. THE WALL (§2): the cockpit READS below-the-line facts and ASSEMBLES — it
+ * writes NOTHING; a deploy/rollback is a ChangeSet proposal (infra truth) OR a below-the-line
+ * trigger (preview/staging), executed through the reused DP26/DP28 actions.
+ */
+function CockpitSection({
+	activeProjectId,
+	onGoToTab,
+}: {
+	activeProjectId: string | null;
+	onGoToTab: (tab: "deploy" | "preview" | "env" | "domain") => void;
+}) {
+	const t = useTranslations("deploy");
+	const [state, action, pending] = useActionState<CockpitView, FormData>(
+		cockpitAction,
+		COCKPIT_INITIAL,
+	);
+	// Auto-load the read model on mount (the cockpit is a projection — it shows the DAG, then the
+	// controls re-run it). The form is also submittable so a human re-projects after a deploy.
+	const [loaded, setLoaded] = useState(false);
+	useEffect(() => {
+		if (!loaded) {
+			setLoaded(true);
+			const fd = new FormData();
+			fd.set("project", activeProjectId ?? "shop");
+			action(fd);
+		}
+	}, [loaded, action, activeProjectId]);
+
+	const project = activeProjectId ?? "shop";
+	const proj = state.projection;
+
+	return (
+		<div
+			className="space-y-8"
+			data-testid="deploy-cockpit"
+			data-project={project}
+		>
+			{/* The cockpit re-projection control — re-runs the PURE DP29 projection over the DAG. */}
+			<form
+				action={action}
+				className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-muted/40 p-5"
+			>
+				<div className="flex-1 space-y-2">
+					<label
+						htmlFor="cockpit-project"
+						className="text-sm font-medium text-foreground"
+					>
+						{t("projectLabel")}
+					</label>
+					<input
+						id="cockpit-project"
+						name="project"
+						defaultValue={project}
+						data-testid="cockpit-project-input"
+						className="block w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					/>
+				</div>
+				<button
+					type="submit"
+					data-testid="cockpit-refresh"
+					disabled={pending}
+					className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+				>
+					{pending ? t("working") : t("cockpitRefreshLabel")}
+				</button>
+				{proj && (
+					<span
+						data-testid="cockpit-hash"
+						className="font-mono text-xs text-muted-foreground"
+					>
+						{t("cockpitHashLabel")}: {proj.hash}
+					</span>
+				)}
+			</form>
+
+			{proj && (
+				<>
+					{/* ── PHASES — liveness (vert/rouge/inconnu) + deployability (DP26). ── */}
+					<section className="space-y-3 rounded-xl border border-border p-5">
+						<h2 className="text-sm font-semibold text-foreground">
+							{t("cockpitPhasesHeading")}
+						</h2>
+						<p className="text-xs leading-relaxed text-muted-foreground">
+							{t("cockpitPhasesIntro")}
+						</p>
+						<ul className="space-y-2" data-testid="cockpit-phases">
+							{proj.phases.map((p) => (
+								<li
+									key={p.nodeId}
+									data-testid="cockpit-phase"
+									data-node={p.nodeId}
+									data-liveness={livenessAttr(p.liveness)}
+									data-deployable={p.deployable ? "true" : "false"}
+									className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted p-3"
+								>
+									<div className="min-w-0 space-y-0.5">
+										<div className="flex items-center gap-2">
+											<LivenessDot liveness={livenessAttr(p.liveness)} />
+											<span className="text-sm font-medium text-foreground">
+												{p.label ?? p.nodeId}
+											</span>
+											{p.head && (
+												<span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+													{t("cockpitHeadBadge")}
+												</span>
+											)}
+										</div>
+										<p className="truncate font-mono text-xs text-muted-foreground">
+											{p.nodeId}
+										</p>
+										{!p.deployable && p.reasons.length > 0 && (
+											<p className="font-mono text-xs text-destructive">
+												{p.reasons.join(", ")}
+											</p>
+										)}
+									</div>
+									{/* EXECUTABLE deploy of THIS phase — reuses the DP26 deploy twin; a non-stable
+									    phase surfaces PHASE_NOT_STABLE in the cockpit-blockreason below. */}
+									<CockpitDeployPhase
+										project={project}
+										phaseHash={p.nodeId}
+										deployable={p.deployable}
+									/>
+								</li>
+							))}
+						</ul>
+					</section>
+
+					{/* ── ENVIRONMENTS — switchable, with the served phase + the live HTTPS URL. ── */}
+					<CockpitEnvironments proj={proj} project={project} />
+
+					{/* ── DOMAINS (+ TLS) + the closed PROFILES. ── */}
+					<section className="grid gap-5 sm:grid-cols-2">
+						<div className="space-y-3 rounded-xl border border-border p-5">
+							<div className="flex flex-wrap items-center justify-between gap-2">
+								<h2 className="text-sm font-semibold text-foreground">
+									{t("cockpitDomainsHeading")}
+								</h2>
+								<button
+									type="button"
+									data-testid="cockpit-go-domain"
+									onClick={() => onGoToTab("domain")}
+									className="text-xs text-blue-600 underline"
+								>
+									{t("cockpitLinkDomainLabel")}
+								</button>
+							</div>
+							{proj.domains.length === 0 ? (
+								<p className="text-xs text-muted-foreground">
+									{t("cockpitNoDomains")}
+								</p>
+							) : (
+								<ul className="space-y-2" data-testid="cockpit-domains">
+									{proj.domains.map((d) => (
+										<li
+											key={d.domain}
+											data-testid="cockpit-domain"
+											data-env={d.environment}
+											data-tls={d.tls ? "true" : "false"}
+											className="space-y-0.5 rounded-lg bg-muted p-3"
+										>
+											<a
+												href={d.url}
+												data-testid="cockpit-domain-url"
+												className="font-mono text-xs text-blue-600 underline"
+											>
+												{d.url}
+											</a>
+											<p className="font-mono text-xs text-muted-foreground">
+												{d.environment} ·{" "}
+												{d.tls ? t("cockpitTlsOn") : t("cockpitTlsOff")} ·{" "}
+												{d.certResolver}
+											</p>
+										</li>
+									))}
+								</ul>
+							)}
+						</div>
+						<div className="space-y-3 rounded-xl border border-border p-5">
+							<h2 className="text-sm font-semibold text-foreground">
+								{t("cockpitProfilesHeading")}
+							</h2>
+							<ul
+								className="flex flex-wrap gap-2"
+								data-testid="cockpit-profiles"
+							>
+								{proj.profiles.map((p) => (
+									<li
+										key={p}
+										data-testid="cockpit-profile"
+										className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 font-mono text-xs text-foreground"
+									>
+										{p}
+									</li>
+								))}
+							</ul>
+						</div>
+					</section>
+
+					{/* ── THE AUDIT TIMELINE — the DP28 incident/rollback history (provenance §9). ── */}
+					<section className="space-y-3 rounded-xl border border-border p-5">
+						<h2 className="text-sm font-semibold text-foreground">
+							{t("cockpitAuditHeading")}
+						</h2>
+						<p className="text-xs leading-relaxed text-muted-foreground">
+							{t("cockpitAuditIntro")}
+						</p>
+						<ol className="space-y-2" data-testid="cockpit-audit-timeline">
+							{(state.audit ?? []).map((e) => (
+								<li
+									key={e.seq}
+									data-testid="cockpit-audit-entry"
+									data-kind={e.kind}
+									data-env={e.env}
+									data-seq={e.seq}
+									className="flex items-start gap-3 rounded-lg bg-muted p-3"
+								>
+									<span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+										{e.seq + 1}
+									</span>
+									<div className="min-w-0 space-y-0.5">
+										<p className="text-xs font-semibold tracking-wide text-foreground uppercase">
+											{e.kind} · {e.env}
+										</p>
+										<p className="text-xs text-muted-foreground">{e.summary}</p>
+										{e.fromPhaseHash && (
+											<p className="font-mono text-xs text-muted-foreground">
+												{e.fromPhaseHash} → {e.phaseHash}
+											</p>
+										)}
+									</div>
+								</li>
+							))}
+						</ol>
+					</section>
+				</>
+			)}
+		</div>
+	);
+}
+
+/** LivenessDot — the vert/rouge/inconnu colour pip the cockpit paints per phase. */
+function LivenessDot({ liveness }: { liveness: "green" | "red" | "unknown" }) {
+	const cls =
+		liveness === "green"
+			? "bg-emerald-500"
+			: liveness === "red"
+				? "bg-destructive"
+				: "bg-muted-foreground";
+	return <span className={`inline-block size-2.5 rounded-full ${cls}`} />;
+}
+
+/**
+ * CockpitDeployPhase — the EXECUTABLE « Déployer » control for one phase row, bound to the DP26
+ * deploy twin (deployAction). A deployable (vert, stable) phase yields a per-phase deploy URL; a
+ * NON-deployable (rouge) phase is refused PHASE_NOT_STABLE (surfaced in cockpit-blockreason). The
+ * deploy is a ChangeSet proposal (infra truth) — the action writes no truth (the wall, §2).
+ */
+function CockpitDeployPhase({
+	project,
+	phaseHash,
+	deployable,
+}: {
+	project: string;
+	phaseHash: string;
+	deployable: boolean;
+}) {
+	const [state, action] = useActionState<DeployView, FormData>(
+		deployAction,
+		DEPLOY_INITIAL,
+	);
+
+	return (
+		<form action={action} className="flex flex-col items-end gap-1">
+			<input type="hidden" name="project" value={project} />
+			<input type="hidden" name="phaseHash" value={phaseHash} />
+			{/* a non-deployable phase carries the `unstable` toggle ON → the action refuses PHASE_NOT_STABLE. */}
+			{!deployable && <input type="hidden" name="unstable" value="on" />}
+			<CockpitDeployButton deployable={deployable} />
+			{state.ok && state.plan && (
+				<a
+					href={state.plan.url}
+					data-testid="cockpit-phase-url"
+					data-phase={phaseHash}
+					className="font-mono text-[11px] text-blue-600 underline"
+				>
+					{state.plan.url}
+				</a>
+			)}
+			{!state.ok && state.blockCode && (
+				<span
+					data-testid="cockpit-blockreason"
+					data-code={state.blockCode}
+					data-phase={phaseHash}
+					className="font-mono text-[11px] text-destructive"
+				>
+					{state.blockCode}
+				</span>
+			)}
+		</form>
+	);
+}
+
+function CockpitDeployButton({ deployable }: { deployable: boolean }) {
+	const t = useTranslations("deploy");
+	const { pending } = useFormStatus();
+	return (
+		<button
+			type="submit"
+			data-testid="cockpit-deploy-phase"
+			disabled={pending}
+			className={
+				deployable
+					? "inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+					: "inline-flex items-center justify-center rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50"
+			}
+		>
+			{pending ? t("working") : t("cockpitDeployLabel")}
+		</button>
+	);
+}
+
+/**
+ * CockpitEnvironments — the switchable environment ladder (preview/staging/prod/future_cloud) with
+ * the phase each serves, its liveness, and its live HTTPS URL (cockpit-live-url). An EXECUTABLE
+ * rollback control re-projects an earlier phase (DP28 envAction) — the cockpit's rollback surfaces
+ * the re-emitted app of N-1. The selected env drives data-current (the e2e anchors on this change).
+ */
+function CockpitEnvironments({
+	proj,
+	project,
+}: {
+	proj: NonNullable<CockpitView["projection"]>;
+	project: string;
+}) {
+	const t = useTranslations("deploy");
+	const [selected, setSelected] = useState<string>(
+		proj.environments[0]?.env ?? "preview",
+	);
+	const [rollback, rollbackAction] = useActionState<EnvView, FormData>(
+		envAction,
+		ENV_INITIAL,
+	);
+	const current = proj.environments.find((e) => e.env === selected);
+
+	return (
+		<section className="space-y-4 rounded-xl border border-border p-5">
+			<h2 className="text-sm font-semibold text-foreground">
+				{t("cockpitEnvsHeading")}
+			</h2>
+			{/* The switchable env ladder. */}
+			<ol className="flex flex-wrap gap-2" data-testid="cockpit-envs">
+				{proj.environments.map((e) => (
+					<li key={e.env}>
+						<button
+							type="button"
+							data-testid="cockpit-env"
+							data-env={e.env}
+							data-current={selected === e.env ? "true" : "false"}
+							data-served-liveness={
+								e.servedLiveness ? livenessAttr(e.servedLiveness) : "none"
+							}
+							onClick={() => setSelected(e.env)}
+							className={
+								selected === e.env
+									? "inline-flex items-center gap-2 rounded-full bg-primary px-3 py-1 font-mono text-xs font-semibold text-primary-foreground"
+									: "inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 font-mono text-xs text-foreground hover:bg-muted/70"
+							}
+						>
+							{e.servedLiveness && (
+								<LivenessDot liveness={livenessAttr(e.servedLiveness)} />
+							)}
+							{e.env}
+						</button>
+					</li>
+				))}
+			</ol>
+
+			{/* The selected env's detail — served phase + the live HTTPS URL. */}
+			{current && (
+				<div
+					data-testid="cockpit-env-detail"
+					data-env={current.env}
+					className="space-y-2 rounded-lg bg-muted p-4"
+				>
+					{current.servedPhaseId ? (
+						<>
+							<div className="flex flex-wrap items-center justify-between gap-2">
+								<span className="text-xs font-medium text-foreground">
+									{t("cockpitServesLabel")}
+								</span>
+								<a
+									href={current.liveUrl}
+									data-testid="cockpit-live-url"
+									data-env={current.env}
+									className="font-mono text-xs text-blue-600 underline"
+								>
+									{current.liveUrl}
+								</a>
+							</div>
+							<p className="font-mono text-xs text-muted-foreground">
+								{t("phaseLabel")}: {current.servedPhaseId}
+							</p>
+							{current.domain && (
+								<p
+									data-testid="cockpit-env-domain"
+									data-tls={current.tls ? "true" : "false"}
+									className="font-mono text-xs text-emerald-700"
+								>
+									{current.domain} ·{" "}
+									{current.tls ? t("cockpitTlsOn") : t("cockpitTlsOff")}
+								</p>
+							)}
+							{current.env === "preview" && (
+								<p
+									data-testid="cockpit-staging-promotable"
+									data-ok={current.stagingPromotable ? "true" : "false"}
+									className={
+										current.stagingPromotable
+											? "text-xs text-emerald-700"
+											: "text-xs text-muted-foreground"
+									}
+								>
+									{current.stagingPromotable
+										? t("cockpitPromotableOk")
+										: t("cockpitPromotableNo")}
+								</p>
+							)}
+						</>
+					) : (
+						<p
+							data-testid="cockpit-env-empty"
+							className="text-xs text-muted-foreground"
+						>
+							{t("cockpitEnvEmpty")}
+						</p>
+					)}
+				</div>
+			)}
+
+			{/* EXECUTABLE rollback — re-project an earlier phase (DP28 envAction). */}
+			<form
+				action={rollbackAction}
+				className="flex flex-wrap items-center gap-3"
+			>
+				<input type="hidden" name="project" value={project} />
+				<input type="hidden" name="intent" value="rollback" />
+				<input type="hidden" name="devPhase" value="phase-dev-current" />
+				<CockpitRollbackButton />
+			</form>
+			{rollback.ok && rollback.rollback && (
+				<div
+					data-testid="cockpit-rollback-result"
+					className="space-y-1 rounded-lg border border-border p-4"
+				>
+					<p className="text-xs font-medium text-foreground">
+						{t("rollbackDoneHeading")}
+					</p>
+					<p
+						data-testid="cockpit-rollback-to"
+						className="font-mono text-xs text-foreground"
+					>
+						{rollback.rollback.fromPhaseHash} → {rollback.rollback.toPhaseHash}
+					</p>
+					<p
+						data-testid="cockpit-rollback-hash"
+						data-phase={rollback.rollback.toPhaseHash}
+						className="font-mono text-xs text-emerald-700"
+					>
+						{t("rollbackAppHashLabel")}: {rollback.rollback.reProjectedAppHash}
+					</p>
+				</div>
+			)}
+		</section>
+	);
+}
+
+function CockpitRollbackButton() {
+	const t = useTranslations("deploy");
+	const { pending } = useFormStatus();
+	return (
+		<button
+			type="submit"
+			data-testid="cockpit-rollback"
+			disabled={pending}
+			className="inline-flex items-center justify-center rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50"
+		>
+			{pending ? t("working") : t("cockpitRollbackLabel")}
+		</button>
 	);
 }
 

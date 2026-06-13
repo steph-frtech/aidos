@@ -1,4 +1,5 @@
 import type { DeployPlan } from "@/lib/deploy";
+import type { AuditEntry, CockpitProjection } from "@/lib/deploy-cockpit";
 import type { EnvDomainBinding, Label } from "@/lib/env-domainbind";
 import type {
 	Environment,
@@ -142,3 +143,26 @@ export interface EnvView {
 }
 
 export const ENV_INITIAL: EnvView = { ok: false };
+
+/**
+ * View model for the DP29 « Cockpit déploiement & environnements » tab (EPIC F, clôture — ÉTEND
+ * S99, ASSEMBLE DP25-28 en UN écran). The cockpit is the read-side companion of the DP25-28 action
+ * tabs: it shows, per project, the PHASES with their liveness (vert/rouge/inconnu), the
+ * ENVIRONMENTS (preview/staging/prod/future_cloud) with the phase each serves and its live HTTPS
+ * URL, the custom DOMAINS (+ TLS), the closed PROFILES, and the audit TIMELINE of
+ * incident/rollback. Its source is the PURE projection (lib/deploy-cockpit.project, the twin of Go
+ * back/runtime/deploycockpit) + the DP28 audit reducer — a PROJECTION of the DAG, never an estimation.
+ *
+ * THE WALL (CLAUDE.md §2): the cockpit READS already-projected facts below the line and ASSEMBLES
+ * the read model — it writes NOTHING. The deploy/rollback controls reuse the DP26/DP28 action tabs
+ * (a ChangeSet proposal for infra truth, a below-the-line trigger for preview/staging).
+ */
+export interface CockpitView {
+	ok: boolean;
+	/** the pure DP29 read model (phase cards + env cards + domains + profiles + content address). */
+	projection?: CockpitProjection;
+	/** the DP28 incident/rollback audit timeline (recorded order, append-only). */
+	audit?: AuditEntry[];
+}
+
+export const COCKPIT_INITIAL: CockpitView = { ok: false };

@@ -650,3 +650,165 @@ test.describe("DP28 — env promotion + human gate + rollback (EPIC F)", () => {
 		expect(appHash.length).toBeGreaterThan(0);
 	});
 });
+
+/**
+ * DP29 Playwright e2e — the « Cockpit déploiement & environnements » tab (EPIC F, CLÔTURE — ÉTEND
+ * S99, ASSEMBLE DP25-28 en UN écran). mirror record: reflects=DP29-deploy-cockpit, test_kind=e2e,
+ * cert_language=playwright, liveness=live.
+ *
+ * Proves the /deploy route's cockpit tab is action-capable (ui-completeness, CLAUDE.md §7), the
+ * read-side companion of the DP25-28 action tabs, bound to a Server Action running the REAL pure
+ * projection (lib/deploy-cockpit.project, the twin of Go back/runtime/deploycockpit) + the DP28
+ * audit reducer. The DP29 done-criteria, reached from the cockpit:
+ *   - the PHASES are shown with their LIVENESS (vert/rouge/inconnu — a PURE projection of the DAG
+ *     cut, S23, never an estimation): a stable head is green, a red phase is red ;
+ *   - the ENVIRONMENTS (preview/staging/prod/future_cloud) are SWITCHABLE, each with the phase it
+ *     serves and its live HTTPS URL (cockpit-live-url) ;
+ *   - deploying a GREEN phase yields a per-phase deploy URL ; an action on a NON-STABLE phase is
+ *     refused PHASE_NOT_STABLE (the inherited Stop-gate) ;
+ *   - a rollback re-projects an earlier phase (the re-emitted app of N-1) ;
+ *   - the audit TIMELINE shows the incident/rollback history (provenance §9) ;
+ *   - a custom domain (+ TLS) is reachable and shown.
+ *
+ * THE WALL (CLAUDE.md §2): the cockpit READS already-projected facts below the line and ASSEMBLES
+ * the read model — it writes NO truth. The projection is a PURE function of the DAG, never an LLM.
+ */
+test.describe("DP29 — the deploy & environments cockpit (EPIC F, clôture)", () => {
+	test("the cockpit tab renders the phases with their liveness (vert/rouge/inconnu)", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("cockpit-tab").click();
+		// wait for the projection to load.
+		const cockpit = page.getByTestId("deploy-cockpit");
+		await expect(cockpit).toBeVisible();
+		// the phases render with a data-liveness attribute (the pure DAG-cut projection).
+		const phases = page.getByTestId("cockpit-phase");
+		await expect(phases.first()).toBeVisible();
+		// the stable head phase is GREEN.
+		await expect(
+			page.getByTestId("cockpit-phase").filter({ hasText: "phase N (tête)" }),
+		).toHaveAttribute("data-liveness", "green");
+		// the red phase is RED (a non-deployable phase, never painted green on a red cut).
+		const red = page
+			.getByTestId("cockpit-phase")
+			.filter({ hasText: "phase rouge" });
+		await expect(red).toHaveAttribute("data-liveness", "red");
+		await expect(red).toHaveAttribute("data-deployable", "false");
+	});
+
+	test("the environments are switchable and show the live HTTPS URL", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("cockpit-tab").click();
+		await expect(page.getByTestId("deploy-cockpit")).toBeVisible();
+		// the closed four-rung ladder is rendered (preview/staging/prod/future_cloud).
+		await expect(page.getByTestId("cockpit-env")).toHaveCount(4);
+
+		// the preview rung is selected first; prod serves the head phase with a live HTTPS URL.
+		await page.getByTestId("cockpit-env").filter({ hasText: "prod" }).click();
+		// anchor on the selection state CHANGING (data-current=true) before reading the URL.
+		await expect(
+			page.getByTestId("cockpit-env").filter({ hasText: "prod" }),
+		).toHaveAttribute("data-current", "true");
+		const liveUrl = page.getByTestId("cockpit-live-url");
+		await expect(liveUrl).toBeVisible();
+		expect((await liveUrl.innerText()).trim()).toMatch(/^https:\/\//);
+	});
+
+	test("deploying a GREEN phase from the cockpit yields a per-phase deploy URL", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("cockpit-tab").click();
+		await expect(page.getByTestId("deploy-cockpit")).toBeVisible();
+		// deploy the stable head phase (the first phase row, green + deployable).
+		const headRow = page
+			.getByTestId("cockpit-phase")
+			.filter({ hasText: "phase N (tête)" });
+		await headRow.getByTestId("cockpit-deploy-phase").click();
+		// the per-phase deploy URL appears (the re-projection from the phase).
+		const url = headRow.getByTestId("cockpit-phase-url");
+		await expect(url).toBeVisible();
+		expect((await url.innerText()).trim()).toMatch(/^https:\/\/d-[a-z0-9]+\./);
+	});
+
+	test("an action on a NON-STABLE phase is refused PHASE_NOT_STABLE", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("cockpit-tab").click();
+		await expect(page.getByTestId("deploy-cockpit")).toBeVisible();
+		// deploy the RED phase → the inherited Stop-gate refuses PHASE_NOT_STABLE.
+		const redRow = page
+			.getByTestId("cockpit-phase")
+			.filter({ hasText: "phase rouge" });
+		await redRow.getByTestId("cockpit-deploy-phase").click();
+		const block = redRow.getByTestId("cockpit-blockreason");
+		await expect(block).toBeVisible();
+		await expect(block).toHaveAttribute("data-code", "PHASE_NOT_STABLE");
+		// no deploy URL is produced for a non-stable phase.
+		await expect(redRow.getByTestId("cockpit-phase-url")).toHaveCount(0);
+	});
+
+	test("a rollback from the cockpit re-projects the app of an earlier phase (N-1)", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("cockpit-tab").click();
+		await expect(page.getByTestId("deploy-cockpit")).toBeVisible();
+		await page.getByTestId("cockpit-rollback").click();
+		const result = page.getByTestId("cockpit-rollback-result");
+		await expect(result).toBeVisible();
+		// the rolled-back app carries the EARLIER phase N-1 (phase-dev-prev) — the re-emission.
+		await expect(page.getByTestId("cockpit-rollback-hash")).toHaveAttribute(
+			"data-phase",
+			"phase-dev-prev",
+		);
+		const hash = await page.getByTestId("cockpit-rollback-hash").innerText();
+		expect(hash.length).toBeGreaterThan(0);
+	});
+
+	test("the cockpit shows the incident/rollback audit timeline", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("cockpit-tab").click();
+		await expect(page.getByTestId("deploy-cockpit")).toBeVisible();
+		const timeline = page.getByTestId("cockpit-audit-timeline");
+		await expect(timeline).toBeVisible();
+		// the recorded history contains an incident and a rollback (provenance §9) — filter on
+		// data-kind (the summaries mention "rollback" in prose, so a text filter would over-match).
+		const incidentEntry = page.locator(
+			'[data-testid="cockpit-audit-entry"][data-kind="incident"]',
+		);
+		const rollbackEntry = page.locator(
+			'[data-testid="cockpit-audit-entry"][data-kind="rollback"]',
+		);
+		await expect(incidentEntry).toBeVisible();
+		await expect(rollbackEntry).toBeVisible();
+		// the entries are append-only (the rollback comes AFTER the incident).
+		const entries = page.getByTestId("cockpit-audit-entry");
+		expect(await entries.count()).toBeGreaterThanOrEqual(2);
+		const incidentSeq = Number(await incidentEntry.getAttribute("data-seq"));
+		const rollbackSeq = Number(await rollbackEntry.getAttribute("data-seq"));
+		expect(rollbackSeq).toBeGreaterThan(incidentSeq);
+	});
+
+	test("the cockpit surfaces the custom domain (+ TLS) and the closed profiles", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("cockpit-tab").click();
+		await expect(page.getByTestId("deploy-cockpit")).toBeVisible();
+		// the custom domain cabled into prod is shown with TLS over HTTPS.
+		const domain = page.getByTestId("cockpit-domain").first();
+		await expect(domain).toBeVisible();
+		await expect(domain).toHaveAttribute("data-tls", "true");
+		const domainUrl = page.getByTestId("cockpit-domain-url").first();
+		expect((await domainUrl.innerText()).trim()).toMatch(/^https:\/\//);
+		// the closed DP11 profile set is offered (nine rungs).
+		await expect(page.getByTestId("cockpit-profile")).toHaveCount(9);
+	});
+});
