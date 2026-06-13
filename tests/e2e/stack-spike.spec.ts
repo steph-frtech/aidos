@@ -41,9 +41,11 @@ test.describe("DP01 — StackManifest spike gate", () => {
 		await expect(page.getByTestId("source-hash")).toHaveText(/^[0-9a-f]{64}$/);
 		await expect(page.getByTestId("output-hash")).toHaveText(/^[0-9a-f]{64}$/);
 		await expect(page.getByTestId("emitted-compose")).toContainText(
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: literal docker-compose ${VAR} placeholder asserted verbatim
 			"container_name: ${APP_NAME}-app",
 		);
 		await expect(page.getByTestId("emitted-compose")).toContainText(
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: literal docker-compose ${VAR} placeholder asserted verbatim
 			"traefik.http.routers.${APP_NAME}.entrypoints=websecure",
 		);
 	});
