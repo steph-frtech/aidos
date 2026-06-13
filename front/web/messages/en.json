@@ -7591,6 +7591,8 @@
 		"role_datastore": "datastore",
 		"role_cache": "cache",
 		"role_pooler": "pooler",
+		"role_workflow": "workflow",
+		"role_bus": "bus",
 		"profileCore": "core",
 		"profileNonProd": "non-prod",
 		"horsProd": "non-prod",
@@ -7601,7 +7603,18 @@
 		"healthcheck": "healthcheck",
 		"dependsOn": "depends_on",
 		"project": "project",
-		"hash": "address"
+		"hash": "address",
+		"asyncHeading": "Asynchronous execution (DP16)",
+		"asyncIntro": "The TWO ASYNCHRONOUS services of the emitted app, rendered as deterministic StackManifest fragments by the same Go emitter (cmd/aidosdatafragments -async): Windmill (the workflow / jobs engine, core profile — NEVER Temporal, a hard constraint) and NATS (the message bus, core). Each fragment carries its image, internal port, per-project isolated bind volume, healthcheck, depends_on and profile. The emitted workers are TypeScript (ADR 0040); this Go is the build-time realisation + the scheduler.",
+		"workflowEngine": "workflow engine",
+		"windmillNote": "Windmill stores its job state in Postgres (the DP15 datastore) — hence the depends_on. Temporal is REFUSED: Windmill stays the slot's engine.",
+		"demoHeading": "Trigger a demo job",
+		"demoIntro": "Realises the canonical SCHEDULED operation (sendReminder) at its echeance on an INJECTED clock — no real job, no real clock. The sequence shows the transactional OUTBOX: the effect is written (PENDING) BEFORE it is acknowledged (dispatched over NATS/Windmill). Replayable with no duplicate (exactly-once relative).",
+		"demoTrigger": "Trigger the job",
+		"demoRunning": "realising…",
+		"demoEmpty": "No events yet — trigger the demo job to see the ordered dispatch sequence (write-effect before ack).",
+		"phaseWriteEffect": "write-effect",
+		"phaseAck": "ack"
 	},
 	"bootstrap": {
 		"eyebrow": "DP12 · deterministic one-shot bootstrap",

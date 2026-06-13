@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
-import { emitFragments } from "./actions";
-import { SubstratePanel } from "./SubstratePanel";
+import { emitAsyncFragments, emitFragments } from "./actions";
+import { SubstrateScreen } from "./SubstrateScreen";
 
 export const metadata: Metadata = {
 	title: "Services de données (fragments StackManifest) — AIDOS Workbench",
@@ -36,8 +36,12 @@ export default async function SubstratePage() {
 	const ctx = await activeProjectContext();
 	const t = await getTranslations("substrate");
 	// Seed the panel off prod (dev) so the four fragments — including the opt-in
-	// doltgres — are visible on first paint; the selector drives prod from there.
-	const initial = await emitFragments(ctx.activeId, "dev");
+	// doltgres — are visible on first paint; the selector drives prod from there. The
+	// async twin (Windmill + NATS) is seeded for the same env so both slices are in step.
+	const [initialData, initialAsync] = await Promise.all([
+		emitFragments(ctx.activeId, "dev"),
+		emitAsyncFragments(ctx.activeId, "dev"),
+	]);
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -75,7 +79,11 @@ export default async function SubstratePage() {
 				</section>
 
 				<div className="mt-10">
-					<SubstratePanel activeProjectId={ctx.activeId} initial={initial} />
+					<SubstrateScreen
+						activeProjectId={ctx.activeId}
+						initialData={initialData}
+						initialAsync={initialAsync}
+					/>
 				</div>
 			</main>
 		</div>

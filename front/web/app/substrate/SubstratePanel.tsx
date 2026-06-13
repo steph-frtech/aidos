@@ -27,9 +27,13 @@ import {
 export function SubstratePanel({
 	activeProjectId,
 	initial,
+	onEnvChange,
 }: {
 	activeProjectId: string | null;
 	initial: SubstrateView;
+	/** notifies a parent (the async twin) when the env selector changes, so the two
+	 * substrate slices (data + async) re-emit for the SAME (project, env) in step. */
+	onEnvChange?: (env: string) => void;
 }) {
 	const t = useTranslations("substrate");
 	const [view, setView] = useState<SubstrateView>(initial);
@@ -38,6 +42,7 @@ export function SubstratePanel({
 
 	function selectEnv(next: string) {
 		setEnv(next);
+		onEnvChange?.(next);
 		startTransition(async () => {
 			const v = await emitFragments(activeProjectId, next);
 			setView(v);

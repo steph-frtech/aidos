@@ -85,6 +85,47 @@ interface RawOutput {
 }
 
 /**
+ * DemoStep is the twin of the Go demoStep — one observable step of the DP16 demo job's
+ * outbox dispatch sequence: a `write-effect` step (the effect is written PENDING in the
+ * state transaction) THEN an `ack` step (the dispatcher delivered it). The ordered list
+ * is the deterministic trace of the canonical scheduled operation (sendReminder) realised
+ * at its echeance on an INJECTED clock — write-effect ALWAYS precedes ack.
+ */
+export interface DemoStepView {
+	step: number;
+	phase: "write-effect" | "ack";
+	operation: string;
+	effect_id: string;
+	kind: string;
+	target: string;
+	bus: string;
+}
+
+/**
+ * AsyncSubstrateView is the full DP16 ASYNC-substrate emission for one (project, env) —
+ * the TWO async-layer service fragments (Windmill = workflow engine, NATS = bus) and the
+ * ordered demo dispatch trace. The async panel renders this single source.
+ */
+export interface AsyncSubstrateView {
+	ok: boolean;
+	project_id: string;
+	env: Environment;
+	async: ServiceFragmentView[];
+	keys: string[];
+	demo: DemoStepView[];
+	/** error carries any execution-level failure (the Go cmd refused / crashed). */
+	error?: string;
+}
+
+interface RawAsyncOutput {
+	project_id: string;
+	env: string;
+	async?: ServiceFragmentView[];
+	keys?: string[];
+	demo?: DemoStepView[];
+}
+
+/**
  * emitFragments — the /substrate gesture (ui-completeness, CLAUDE.md §7): run the
  * AUTHORITATIVE Go emitter (cmd/aidosdatafragments) for the active project and the
  * SELECTED environment, and surface the fragments + the DP06 verdict.
@@ -139,6 +180,68 @@ export async function emitFragments(
 			refusal: null,
 			core: [],
 			keys: [],
+			error: e instanceof Error ? e.message : String(e),
+		};
+	}
+}
+
+/**
+ * emitAsyncFragments — the DP16 /substrate ASYNC gesture (ui-completeness, CLAUDE.md §7):
+ * run the AUTHORITATIVE Go emitter (cmd/aidosdatafragments -async, the twin of the data
+ * door — never a forked TS palette) for the active project + the SELECTED environment, and
+ * surface the TWO async fragments (Windmill workflow engine, NATS bus) plus the demo
+ * dispatch trace (write-effect → ack) of the canonical scheduled operation realised at its
+ * echeance on an INJECTED clock — no real job, no real clock.
+ *
+ * DETERMINISM-FIRST (§6/§8): the Go is authoritative; the env is VALIDATED against the
+ * closed set before it reaches the process. THE WALL (§2): a below-the-line projection —
+ * it WRITES NO truth (no kernel/mirrors/fitness, no gen/ file); Windmill is the slot's
+ * engine, Temporal is REFUSED (the Go asserts it). Same (project, env) ⇒ same fragments.
+ */
+export async function emitAsyncFragments(
+	projectId: string | null,
+	env: string,
+): Promise<AsyncSubstrateView> {
+	const safeEnv: Environment = isKnownEnvironment(env) ? env : "dev";
+	const project = projectId?.trim() ? projectId.trim() : "__demo__";
+
+	try {
+		const go = resolveGo();
+		const { stdout } = await execFileP(
+			go.bin,
+			[
+				"run",
+				"./cmd/aidosdatafragments",
+				"-project",
+				project,
+				"-env",
+				safeEnv,
+				"-async",
+			],
+			{
+				cwd: `${APP_REPO}/back`,
+				timeout: 120_000,
+				maxBuffer: 8 * 1024 * 1024,
+				env: { ...process.env, GOTOOLCHAIN: go.toolchain },
+			},
+		);
+		const raw = JSON.parse(stdout) as RawAsyncOutput;
+		return {
+			ok: true,
+			project_id: raw.project_id,
+			env: safeEnv,
+			async: raw.async ?? [],
+			keys: raw.keys ?? [],
+			demo: raw.demo ?? [],
+		};
+	} catch (e) {
+		return {
+			ok: false,
+			project_id: project,
+			env: safeEnv,
+			async: [],
+			keys: [],
+			demo: [],
 			error: e instanceof Error ? e.message : String(e),
 		};
 	}

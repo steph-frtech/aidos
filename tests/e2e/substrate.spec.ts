@@ -41,16 +41,20 @@ test.describe("DP15 — the data-service fragments (additive route)", () => {
 		// the four data-service fragments are emitted off prod (the dev seed).
 		const services = page.getByTestId("substrate-services");
 		await expect(services).toBeVisible();
+		// Scope the count to the DATA container — the async section (DP16) also renders
+		// `substrate-service` cards, so a global count would now mix the two slices.
 		await expect
-			.poll(() => page.getByTestId("substrate-service").count(), {
+			.poll(() => services.getByTestId("substrate-service").count(), {
 				timeout: ACTION_TIMEOUT,
 			})
 			.toBe(4);
 
-		// each of the four canonical keys is present.
+		// each of the four canonical keys is present in the data container.
 		for (const key of ["postgres", "doltgres", "valkey", "pgbouncer"]) {
 			await expect(
-				page.locator(`[data-testid="substrate-service"][data-key="${key}"]`),
+				services.locator(
+					`[data-testid="substrate-service"][data-key="${key}"]`,
+				),
 			).toBeVisible();
 		}
 
@@ -116,18 +120,118 @@ test.describe("DP15 — the data-service fragments (additive route)", () => {
 			page.locator('[data-testid="substrate-service"][data-key="doltgres"]'),
 		).toHaveCount(0);
 
-		// the three core services remain and the set is scoped to prod.
-		await expect(page.getByTestId("substrate-services")).toHaveAttribute(
-			"data-env",
-			"prod",
-		);
+		// the three core data services remain and the set is scoped to prod.
+		const dataServices = page.getByTestId("substrate-services");
+		await expect(dataServices).toHaveAttribute("data-env", "prod");
+		// Scope the count to the DATA container (the async section adds its own cards).
 		await expect
-			.poll(() => page.getByTestId("substrate-service").count())
+			.poll(() => dataServices.getByTestId("substrate-service").count())
 			.toBe(3);
 		for (const key of ["postgres", "valkey", "pgbouncer"]) {
 			await expect(
-				page.locator(`[data-testid="substrate-service"][data-key="${key}"]`),
+				dataServices.locator(
+					`[data-testid="substrate-service"][data-key="${key}"]`,
+				),
 			).toBeVisible();
 		}
+	});
+});
+
+/**
+ * DP16 Playwright e2e — the « Exécution asynchrone » section of the /substrate route.
+ * mirror record: reflects=DP16-asyncfragments, test_kind=e2e, cert_language=playwright, liveness=live
+ *
+ * Proves the async slice renders the TWO async-layer service fragments the Go emitter
+ * (runtime/asyncfragments, via cmd/aidosdatafragments -async) produces — Windmill (the
+ * workflow engine, core, marked « moteur de workflows », NEVER Temporal) + NATS (the
+ * bus, core) — each carrying image / port / volume / healthcheck / profile; and that the
+ * MINI DEMO TRIGGER (ui-completeness CLAUDE.md §7) executes from the screen: triggering
+ * the demo job realises the canonical scheduled operation (sendReminder) at its echeance
+ * on an INJECTED clock and shows the ORDERED dispatch sequence via the S73 transactional
+ * outbox — the `write-effect` step ALWAYS precedes the `ack` step.
+ *
+ * THE WALL (CLAUDE.md §2): below-the-line projection — it writes no truth (no kernel/
+ * mirrors/fitness; a worker writes no truth). The scheduler is code on an injected clock,
+ * never the real clock; Windmill is the slot's engine, Temporal is refused.
+ */
+test.describe("DP16 — the async-service fragments + the demo job (additive section)", () => {
+	test.setTimeout(90_000);
+
+	test("the async section renders Windmill (workflow engine, never Temporal) and NATS (bus)", async ({
+		page,
+	}) => {
+		await page.goto("/substrate");
+
+		const asyncSection = page.getByTestId("substrate-async");
+		await expect(asyncSection).toBeVisible();
+
+		// the two async fragments are emitted (the dev seed).
+		const services = page.getByTestId("substrate-async-services");
+		await expect
+			.poll(() => services.getByTestId("substrate-service").count(), {
+				timeout: ACTION_TIMEOUT,
+			})
+			.toBe(2);
+
+		// Windmill = the workflow engine (core), marked « moteur de workflows ».
+		const windmill = asyncSection.locator(
+			'[data-testid="substrate-service"][data-key="windmill"]',
+		);
+		await expect(windmill).toBeVisible();
+		await expect(windmill).toHaveAttribute("data-role", "workflow");
+		await expect(windmill).toHaveAttribute("data-profile", "core");
+		await expect(windmill.getByTestId("badge-workflow-engine")).toBeVisible();
+		await expect(windmill.getByTestId("service-image")).toContainText(
+			"windmill",
+		);
+		await expect(windmill.getByTestId("service-port")).toContainText("8000");
+
+		// the hard constraint: the workflow-engine IMAGE is a Windmill image, NEVER a
+		// Temporal one (the engine is Windmill; the honest note may *mention* Temporal as
+		// refused — the constraint is on the emitted image, not the prose).
+		await expect(windmill.getByTestId("service-image")).not.toContainText(
+			/temporal/i,
+		);
+
+		// NATS = the bus (core).
+		const nats = asyncSection.locator(
+			'[data-testid="substrate-service"][data-key="nats"]',
+		);
+		await expect(nats).toBeVisible();
+		await expect(nats).toHaveAttribute("data-role", "bus");
+		await expect(nats.getByTestId("service-image")).toContainText("nats");
+		await expect(nats.getByTestId("service-port")).toContainText("4222");
+	});
+
+	test("triggering the demo job shows the ordered dispatch sequence — write-effect before ack", async ({
+		page,
+	}) => {
+		await page.goto("/substrate");
+
+		// before the trigger: no events are shown.
+		await expect(page.getByTestId("substrate-async")).toBeVisible();
+		await expect(page.getByTestId("async-events")).toHaveCount(0);
+		await expect(page.getByTestId("async-events-empty")).toBeVisible();
+
+		// the gesture: trigger the demo job — realises sendReminder on the injected clock.
+		await page.getByTestId("async-trigger").click();
+
+		// the ordered dispatch sequence appears (write-effect → ack), at least two steps.
+		const events = page.getByTestId("async-events");
+		await expect(events).toBeVisible({ timeout: ACTION_TIMEOUT });
+		const steps = page.getByTestId("async-event");
+		await expect.poll(() => steps.count()).toBeGreaterThanOrEqual(2);
+
+		// step 1 is the write-effect (the effect is written PENDING) — BEFORE the ack.
+		const step1 = page.locator('[data-testid="async-event"][data-step="1"]');
+		await expect(step1).toHaveAttribute("data-phase", "write-effect");
+
+		// step 2 is the ack (the dispatcher delivered it) — AFTER the write.
+		const step2 = page.locator('[data-testid="async-event"][data-step="2"]');
+		await expect(step2).toHaveAttribute("data-phase", "ack");
+
+		// the canonical scheduled operation drove it.
+		await expect(step1).toContainText("sendReminder");
+		await expect(step2).toContainText("sendReminder");
 	});
 });

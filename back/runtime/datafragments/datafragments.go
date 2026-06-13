@@ -99,11 +99,14 @@ type ServiceFragment struct {
 	Volumes []stackmanifest.Volume `json:"volumes"`
 }
 
-// isolationToken derives a deterministic per-project 12-hex token (records.Hash,
+// IsolationToken derives a deterministic per-project 12-hex token (records.Hash,
 // S02 reused — the SAME motif as provision.isolation, never a forked scheme).
 // Project A and project B never collide; the same project always maps to the same
-// token — reproducible isolation.
-func isolationToken(projectID string) string {
+// token — reproducible isolation. Exported so the DP16 async-substrate fragments
+// (runtime/asyncfragments) derive the SAME per-project token over the SAME seed —
+// Windmill's job DB / NATS's stream store stay isolated under the same token as the
+// data layer, never a forked scheme (CLAUDE.md §6 reuse, §9 anti-overwrite: additive).
+func IsolationToken(projectID string) string {
 	h := records.Hash([]byte("datafragments/v1:" + projectID))
 	if len(h) >= 12 {
 		return h[:12]
@@ -235,7 +238,7 @@ func SubstrateCoreFragments(projectID string, env scope.Environment) ([]ServiceF
 			Message: "environment is outside the closed set (want prod|staging|dev|local|future_cloud — ADR 0065)",
 		}
 	}
-	token := isolationToken(projectID)
+	token := IsolationToken(projectID)
 	out := make([]ServiceFragment, 0, len(dataPalette))
 	for _, s := range dataPalette {
 		if s.nonProdOnly {
@@ -266,7 +269,7 @@ func SubstrateDataFragments(projectID string, env scope.Environment) ([]ServiceF
 			Message: "environment is outside the closed set (want prod|staging|dev|local|future_cloud — ADR 0065)",
 		}
 	}
-	token := isolationToken(projectID)
+	token := IsolationToken(projectID)
 	out := make([]ServiceFragment, 0, len(dataPalette))
 	for _, s := range dataPalette {
 		if s.nonProdOnly {

@@ -18,7 +18,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/steph-frtech/aidos/back/kernel/operation"
 	"github.com/steph-frtech/aidos/back/kernel/scope"
+	"github.com/steph-frtech/aidos/back/runtime/asyncfragments"
 	"github.com/steph-frtech/aidos/back/runtime/datafragments"
 	"github.com/steph-frtech/aidos/back/runtime/envbindings"
 )
@@ -52,6 +54,33 @@ type refusalOut struct {
 	Message string `json:"message"`
 }
 
+// asyncOutput is the full DP16 async-substrate emission for one (project, env): the TWO
+// async fragments (Windmill + NATS) and the deterministic DEMO dispatch trace of the S73
+// scheduled operation realised at its echeance on an INJECTED clock (write-effect → ack).
+type asyncOutput struct {
+	ProjectID string        `json:"project_id"`
+	Env       string        `json:"env"`
+	Async     []fragmentOut `json:"async"`
+	Keys      []string      `json:"keys"`
+	// Demo carries the ordered dispatch steps of the canonical scheduled operation
+	// (sendReminder) realised at echeance — write-effect THEN ack, the outbox sequence.
+	Demo []demoStep `json:"demo"`
+}
+
+// demoStep is one observable step of the demo job's outbox dispatch sequence — the
+// transactional-outbox order: a `write-effect` step (the effect is written PENDING in the
+// state transaction) then an `ack` step (the dispatcher delivers + marks dispatched). The
+// `step` index is the deterministic order the panel renders (1 = write, 2 = ack, …).
+type demoStep struct {
+	Step      int    `json:"step"`
+	Phase     string `json:"phase"` // "write-effect" | "ack"
+	Operation string `json:"operation"`
+	EffectID  string `json:"effect_id"`
+	Kind      string `json:"kind"`
+	Target    string `json:"target"`
+	Bus       string `json:"bus"` // the async fragment the effect is dispatched over (nats)
+}
+
 func toOut(frags []datafragments.ServiceFragment) ([]fragmentOut, error) {
 	out := make([]fragmentOut, 0, len(frags))
 	for _, f := range frags {
@@ -64,10 +93,138 @@ func toOut(frags []datafragments.ServiceFragment) ([]fragmentOut, error) {
 	return out, nil
 }
 
+// demoOutbox is a deterministic in-memory double for the S73 transactional outbox seam —
+// the SAME shape the asyncfragments fixture uses (Write + Pending/MarkDispatched/
+// IsDispatched). It is build-time only (the CLI runs no real job, no real clock); it lets
+// the demo trace REUSE the authoritative RealizeScheduled rather than re-coin a sequence.
+type demoOutbox struct {
+	entries    []operation.OutboxEntry
+	dispatched map[string]bool
+}
+
+func newDemoOutbox() *demoOutbox { return &demoOutbox{dispatched: map[string]bool{}} }
+
+func (o *demoOutbox) Write(e operation.OutboxEntry) { o.entries = append(o.entries, e) }
+
+func (o *demoOutbox) Pending() []operation.OutboxEntry {
+	out := make([]operation.OutboxEntry, 0, len(o.entries))
+	for _, e := range o.entries {
+		if e.Status == operation.OutboxPending {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func (o *demoOutbox) MarkDispatched(id string) {
+	o.dispatched[id] = true
+	for i := range o.entries {
+		if o.entries[i].ID == id {
+			o.entries[i].Status = operation.OutboxDispatched
+		}
+	}
+}
+
+func (o *demoOutbox) IsDispatched(id string) bool { return o.dispatched[id] }
+
+// demoSink records deliveries; the demo discards them (the trace is built from the events).
+type demoSink struct{ delivered []operation.Effect }
+
+func (s *demoSink) Deliver(e operation.Effect) error {
+	s.delivered = append(s.delivered, e)
+	return nil
+}
+
+// buildDemoTrace realises the canonical scheduled operation (sendReminder) at its echeance
+// on an INJECTED clock through the S73 outbox, and renders the ordered dispatch steps the
+// panel shows: per delivered effect, a `write-effect` step THEN an `ack` step (the
+// transactional-outbox order — the effect is written before it is acknowledged/dispatched).
+// Same input ⇒ byte-identical trace (no clock, no rng — the clock is the fixture echeance).
+func buildDemoTrace() ([]demoStep, error) {
+	op, async := operation.SendReminder()
+	clock := operation.FixedClock{At: async.Trigger.At} // realise AT the echeance — injected
+	outbox := newDemoOutbox()
+	sink := &demoSink{}
+	events, err := asyncfragments.RealizeScheduled(op, async, clock, outbox, sink)
+	if err != nil {
+		return nil, err
+	}
+	steps := make([]demoStep, 0, len(events)*2)
+	n := 0
+	for _, e := range events {
+		// 1. write-effect — the effect is written PENDING (the outbox WRITE side).
+		n++
+		steps = append(steps, demoStep{
+			Step:      n,
+			Phase:     "write-effect",
+			Operation: e.Operation,
+			EffectID:  e.EffectID,
+			Kind:      string(e.Kind),
+			Target:    e.Target,
+			Bus:       "nats",
+		})
+		// 2. ack — the dispatcher delivered it (at-least-once + dedup ⇒ exactly-once relative).
+		n++
+		steps = append(steps, demoStep{
+			Step:      n,
+			Phase:     "ack",
+			Operation: e.Operation,
+			EffectID:  e.EffectID,
+			Kind:      string(e.Kind),
+			Target:    e.Target,
+			Bus:       "nats",
+		})
+	}
+	return steps, nil
+}
+
+// emitAsync prints the DP16 async-substrate emission (the two fragments + the demo trace).
+func emitAsync(project, env string) {
+	frags, err := asyncfragments.SubstrateAsyncFragments(project, scope.Environment(env))
+	if err != nil {
+		var ref *envbindings.Refusal
+		if errors.As(err, &ref) {
+			fmt.Fprintln(os.Stderr, "aidosdatafragments:", ref.Error())
+			os.Exit(1)
+		}
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", err)
+		os.Exit(1)
+	}
+	asyncOut, ferr := toOut(frags)
+	if ferr != nil {
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", ferr)
+		os.Exit(1)
+	}
+	demo, derr := buildDemoTrace()
+	if derr != nil {
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", derr)
+		os.Exit(1)
+	}
+	res := asyncOutput{
+		ProjectID: project,
+		Env:       env,
+		Async:     asyncOut,
+		Keys:      asyncfragments.Keys(),
+		Demo:      demo,
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(res); err != nil {
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", err)
+		os.Exit(1)
+	}
+}
+
 func main() {
 	project := flag.String("project", "", "the project the fragments are isolated to")
 	env := flag.String("env", "dev", "the deployment environment (prod|staging|dev|local|future_cloud)")
+	async := flag.Bool("async", false, "emit the DP16 ASYNC-substrate fragments (Windmill + NATS) + the demo dispatch trace instead of the DP15 data fragments")
 	flag.Parse()
+
+	if *async {
+		emitAsync(*project, *env)
+		return
+	}
 
 	res := output{
 		ProjectID: *project,
