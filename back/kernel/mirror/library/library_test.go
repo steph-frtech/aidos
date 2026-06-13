@@ -185,16 +185,21 @@ func TestScopeNeverLeaksAnotherProject(t *testing.T) {
 		if cut.Project != project {
 			t.Fatalf("cut.Project must equal the scope")
 		}
-		// every layer/mirror in the cut belongs to exactly the scoped project.
+		// every layer/mirror in the cut belongs to exactly the scoped project. Two sibling
+		// projects can own BYTE-IDENTICAL rows (same MirrorID/reflects/kind), so the oracle keys
+		// the ownership set on (project-owned) rows only — never a global map a sibling could
+		// overwrite, which would slander a row the scoped project genuinely owns.
 		ownLayer := map[string]bool{}
-		ownMirror := map[string]ProjectID{}
+		ownMirror := map[string]bool{}
 		for _, pl := range lib.Layers {
 			if pl.Project == project {
 				ownLayer[layerSortKey(pl.Layer)] = true
 			}
 		}
 		for _, pm := range lib.Mirrors {
-			ownMirror[mirrorSortKey(pm.Mirror)] = pm.Project
+			if pm.Project == project {
+				ownMirror[mirrorSortKey(pm.Mirror)] = true
+			}
 		}
 		for _, l := range cut.Layers {
 			if !ownLayer[layerSortKey(l)] {
@@ -202,7 +207,7 @@ func TestScopeNeverLeaksAnotherProject(t *testing.T) {
 			}
 		}
 		for _, m := range cut.Mirrors {
-			if ownMirror[mirrorSortKey(m)] != project {
+			if !ownMirror[mirrorSortKey(m)] {
 				t.Fatalf("scope leaked a mirror not owned by %q: %+v", project, m)
 			}
 		}
