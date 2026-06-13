@@ -99,9 +99,7 @@ test.describe("DP09 — the environments cockpit (propose → ChangeSet → appr
 		await expect(page.getByTestId("cockpit-mode-server")).toHaveText(
 			"managed_url",
 		);
-		await expect(page.getByTestId("cockpit-mode-db")).toHaveText(
-			"managed_url",
-		);
+		await expect(page.getByTestId("cockpit-mode-db")).toHaveText("managed_url");
 		// the recomputed address DIVERGES from the Go-pinned zero-changeset one.
 		await expect(page.getByTestId("cockpit-matrix-hash")).toHaveText(
 			/^[0-9a-f]{64}$/,
