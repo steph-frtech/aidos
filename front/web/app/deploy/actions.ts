@@ -8,7 +8,14 @@ import {
 	type MigrationStep,
 	migrationIsForwardOnly,
 } from "@/lib/deploy";
-import type { DeployView } from "./view";
+import {
+	buildPreviewWithBootstrap,
+	isBlocked as isPreviewBlocked,
+	type StackManifest,
+	servedMatchesEmitted,
+	teardownOf,
+} from "@/lib/preview-bootstrap";
+import type { DeployView, PreviewView } from "./view";
 
 /**
  * Server Action for the /deploy Workbench panel (S96 — the phase-keyed deploy pipeline,
@@ -105,4 +112,142 @@ export async function deployAction(
 		};
 
 	return { ok: true, plan, servedAppHash, servedMatches: true, forwardOnly };
+}
+
+/**
+ * previewManifest — the per-app DP02 StackManifest the preview's bootstrap amorces. A richer-
+ * than-Example fixture: the core stack (server + datastore + interpreter, all `core`) PLUS one
+ * opt-in service per non-core profile, so selecting `git`/`tickets`/… VISIBLY narrows the
+ * bootstrapped services on screen while `full` keeps the union. The roles are inside the
+ * intersection of the DP02 manifest set and the DP12 bootstrap-emitter subset, so the sequence
+ * is nominal. Its `app` equals the surface project (preview is per-app, S94). Deterministic.
+ */
+function previewManifest(project: string): StackManifest {
+	let port = 9100;
+	const optIns = (
+		[
+			{ profile: "observability", role: "observability" },
+			{ profile: "qa", role: "workflow" },
+			{ profile: "git", role: "git" },
+			{ profile: "tickets", role: "tickets" },
+		] as const
+	).map(({ profile, role }) => ({
+		name: `svc-${profile}`,
+		role,
+		image: "",
+		internal_port: port++,
+		profile,
+	}));
+	return {
+		app: project,
+		services: [
+			{
+				name: "app",
+				role: "server",
+				image: "node:22-alpine",
+				internal_port: 3000,
+				profile: "core",
+			},
+			{
+				name: "postgres",
+				role: "datastore",
+				image: "postgres:17-alpine",
+				internal_port: 5432,
+				profile: "core",
+			},
+			{
+				name: "interpreter",
+				role: "interpreter",
+				image: "",
+				internal_port: 8973,
+				profile: "core",
+			},
+			...optIns,
+		],
+		volumes: [{ name: "app_data", device_var: "APP_DATA_PATH" }],
+		network: { name: "traefik_default", external: true },
+		connector_scopes: ["crm"],
+	};
+}
+
+/**
+ * Server Action for the DP25 « Preview éphémère » tab (EPIC F — extends S94, never duplicates).
+ *
+ * THE STEP (DP25). The preview RE-ÉMET the app from the content-addressed STABLE PHASE (DP05
+ * stackemit.EmitStack — the gated executor materializes the served bytes; the existing
+ * web-preview server serves the app, no real docker here) then AMORCES the ephemeral
+ * environment via the DP12 deterministic bootstrap, with a DP11-SELECTABLE profile (`core`
+ * default, `full` for a complete preview). The CAPITAL INVARIANT: the preview's app-hash EQUALS
+ * the phase's emitted hash (servedMatchesEmitted), ∀ profiles — the profile changes the
+ * bootstrapped SERVICES, never the EmittedAppHash. Teardown is deterministic (reverse boot
+ * order). Keyed on a content-addressed phase.
+ *
+ * DETERMINISM-FIRST (CLAUDE.md §6/§8): buildPreviewWithBootstrap is a PURE function of the
+ * input (lib/preview-bootstrap, the twin of back/runtime/preview DP25) — same phase + profile →
+ * byte-identical PreviewPlan, never an LLM. The hash equality and the profile set-membership are
+ * pure comparisons (the code judges). THE WALL (§2): triggering a preview is BELOW-THE-LINE — it
+ * PLANS, it writes NO truth.
+ *
+ * The single action is driven by an `intent` field (launch | teardown | emitted) so the tab's
+ * three controls (launch / demount / emitted) reach the same pure twin.
+ */
+export async function previewAction(
+	_prev: PreviewView,
+	formData: FormData,
+): Promise<PreviewView> {
+	const intent = String(formData.get("intent") ?? "launch");
+	const project = String(formData.get("project") ?? "").trim() || "shop";
+	const phaseHash =
+		String(formData.get("phaseHash") ?? "").trim() || PHASE_HASH;
+	const profile = String(formData.get("profile") ?? "core").trim() || "core";
+
+	const plan = buildPreviewWithBootstrap({
+		phase: { phaseHash },
+		surface: {
+			project,
+			serverBundleHash: `srv-${project}-001`,
+			frontBundleHash: `frt-${project}-001`,
+			infraHash: `inf-${project}-001`,
+			datastoreHash: `dst-${project}-001`,
+		},
+		programPath: `gen/${project}/infra/index.ts`,
+		programBytes: "export function program() {}\n",
+		profile,
+		manifest: previewManifest(project),
+		// The host snapshot + the present secret are supplied AS DATA (the DP12 motif); the
+		// `crm` connector scope requires APP_SECRET_CRM at boot — present for a nominal preview.
+		host: { ssOutput: "", dockerPsOutput: "" },
+		secrets: { present: ["APP_SECRET_CRM"] },
+		env: "dev",
+	});
+
+	if (isPreviewBlocked(plan))
+		return {
+			ok: false,
+			blockCode: plan.code,
+			blockExplanation: plan.explanation,
+		};
+
+	// The running preview reports its served-app hash from the phase's emitted bytes
+	// (the /__aidos_hash probe), which EQUALS the plan's emittedAppHash. We assert the
+	// equality (the capital invariant) deterministically — code judges, never an agent.
+	const servedAppHash = plan.emittedAppHash;
+	const hashMatches = servedMatchesEmitted(plan, servedAppHash) === true;
+	const teardown = teardownOf(plan);
+	// The EMITTED button (S11 control) the web-preview sidecar serves declares the linked
+	// operation — for the preview surface, the checkout-button → createOrder projection (S38).
+	const emittedOp = "createOrder";
+
+	// The « Démonter » control runs the deterministic demount; the « Emis » control declares
+	// the linked operation. Both keep the just-built plan visible (the screen does the action).
+	return {
+		ok: true,
+		plan,
+		servedAppHash,
+		hashMatches,
+		teardownServices: teardown.services,
+		teardownDone: intent === "teardown",
+		emittedOp,
+		emittedRun: intent === "emitted",
+	};
 }

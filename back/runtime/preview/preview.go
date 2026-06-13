@@ -32,6 +32,36 @@
 // below the line) and PLANS the ephemeral environment — it writes NOTHING to the kernel/
 // mirrors/fitness. A malformed input (no phase, no server, mismatched project) is a typed
 // BlockReason (the S13 shape), never a panic, never an invented URL/phase.
+//
+// DP25 — THE PROFILE + BOOTSTRAP EXTENSION (EPIC F opens, extending S94, never duplicating
+// it). The preview RE-EMITS from the phase (DP05 stackemit.EmitStack is the function the
+// gated executor runs to materialize the served bytes) and then AMORCES the ephemeral
+// environment via the DP12 deterministic bootstrap sequence (bootstrap.EmitBootstrapSequence),
+// with a DP11-SELECTABLE PROFILE (composeemit.FilterByProfile): `core` by default, `full`
+// for a complete preview. The profile is a CLOSED-SET membership (DP11), never inferred.
+//
+//   - THE CAPITAL INVARIANT. The profile changes the SERVICES that are bootstrapped (a lean
+//     profile boots fewer services than full), but NEVER the EmittedAppHash of the phase —
+//     the app-hash is a pure function of (phase ⊕ surface), profile-independent. The
+//     reproducibility mirror pins ∀ profiles: same phase → same EmittedAppHash;
+//     ServedMatchesEmitted holds across every profile. (DP11 semantic: `core` is the
+//     always-on baseline — it keeps every service whose profile set contains core, which is
+//     all of them — so `core` ≡ `full` in service count; a SPECIFIC profile no optional
+//     service declares is the one that genuinely narrows the boot set.)
+//   - RE-EMISSION IS PURE. Same (phase, surface, profile, manifest, host, secrets) →
+//     byte-identical PreviewPlan (same ID, same bootstrap sequence, same teardown). No
+//     clock, no RNG, no I/O — the bootstrap host state is an explicit DATA input (the DP12
+//     motif), the docker run stays gated (the mirror proves the PLAN + the hash; the
+//     existing web-preview server serves the app, ADR 0040 — no real docker here).
+//   - DETERMINISTIC TEARDOWN. TeardownOf derives the teardown plan purely from the built
+//     plan (the same Pulumi destroy + stack removal, ${VAR}-only) — a demounting that is a
+//     pure function of the plan, never a hand-written deploy.sh (DP26 "deploy = re-emit").
+//
+// BACKWARD-COMPATIBLE (CLAUDE.md §9 anti-overwrite). The bootstrap section is ADDITIVE: an
+// Input with no Manifest (the S94 shape) yields exactly the S94 PreviewPlan (no Profile, no
+// Bootstrap) — every S94 test stays byte-identical green. Supplying a Manifest opts in to
+// the DP25 profile-filtered bootstrap; the EmittedAppHash/URL/StackName are unchanged either
+// way (they never read the profile or the manifest).
 package preview
 
 import (
@@ -42,7 +72,11 @@ import (
 	"strings"
 
 	"github.com/steph-frtech/aidos/back/kernel/records"
+	"github.com/steph-frtech/aidos/back/kernel/scope"
+	"github.com/steph-frtech/aidos/back/kernel/stackmanifest"
 	"github.com/steph-frtech/aidos/back/runtime/blockreason"
+	"github.com/steph-frtech/aidos/back/runtime/bootstrap"
+	"github.com/steph-frtech/aidos/back/runtime/composeemit"
 	"github.com/steph-frtech/aidos/back/runtime/honoemit"
 )
 
@@ -100,6 +134,11 @@ type PhaseRef struct {
 // Input is the whole preview request: the phase to preview, its emitted surface, the
 // emitted Pulumi program (the boot/teardown unit), and the preview-domain root under which
 // the per-phase subdomain is minted. PURE input — no clock, no host path.
+//
+// DP25 adds the OPTIONAL bootstrap section (Profile + Manifest + Host + Secrets + Env). When
+// Manifest.AppName is empty the input is exactly the S94 shape (no bootstrap is computed and
+// the plan carries no Profile/Bootstrap). When a Manifest is supplied, BuildPlan ADDITIONALLY
+// computes the DP11-profile-filtered DP12 bootstrap sequence — never altering the EmittedAppHash.
 type Input struct {
 	Phase   PhaseRef          `json:"phase"`
 	Surface EmittedSurface    `json:"surface"`
@@ -108,10 +147,39 @@ type Input struct {
 	// subdomain is minted under it deterministically from the phase hash. Defaults to
 	// DefaultDomainRoot when empty so the plan is always projectable.
 	DomainRoot string `json:"domain_root"`
+
+	// --- DP25: the optional profile-filtered bootstrap section -------------------
+	// Profile is the DP11 compose profile the preview's bootstrap is filtered by — a
+	// member of the closed SPEC-stack-2026 set. Defaults to DefaultProfile (`core`) when
+	// empty (set-membership, never inferred). It selects the SERVICES that boot, NEVER
+	// the EmittedAppHash. Ignored when Manifest is absent.
+	Profile stackmanifest.Profile `json:"profile,omitempty"`
+	// Manifest is the DP02 StackManifest source the phase pins — the topology whose
+	// services the bootstrap amorces. Optional: absent ⇒ the S94 plan (no bootstrap).
+	Manifest stackmanifest.StackManifest `json:"manifest,omitempty"`
+	// Host is the observed host snapshot AS DATA (DP12 motif) the port resolver reads.
+	// The snapshot is taken by the gated executor, never inside this package.
+	Host bootstrap.HostState `json:"host,omitempty"`
+	// Secrets is the set of secret env-var NAMES present at boot (DP12). A missing
+	// required secret fails the bootstrap closed (MISSING_SECRET_AT_BOOT).
+	Secrets bootstrap.SecretsState `json:"secrets,omitempty"`
+	// Env is the target environment of the preview — used ONLY for the DP11 cross
+	// non-prod × prod gate (Doltgres forbidden in prod). Defaults to EnvDev (a preview is
+	// an ephemeral non-prod environment) when empty.
+	Env scope.Environment `json:"env,omitempty"`
 }
 
 // DefaultDomainRoot is the preview wildcard root used when Input.DomainRoot is empty.
 const DefaultDomainRoot = "preview.aidos.app"
+
+// DefaultProfile is the DP11 compose profile a preview boots when Input.Profile is empty —
+// `core` (the always-running services only). `full` is selected for a complete preview.
+const DefaultProfile = stackmanifest.ProfileCore
+
+// DefaultPreviewEnv is the target environment of a preview when Input.Env is empty — a
+// preview is an ephemeral NON-PROD environment (dev), so the DP11 Doltgres-in-prod gate
+// never bites by default; an explicit prod Env still triggers the delegated DP06 refusal.
+const DefaultPreviewEnv = scope.EnvDev
 
 // PreviewPlan is the DETERMINISTIC, content-addressed plan that brings the phase's emitted
 // app up at a preview URL and tears it down. Same Input → byte-identical Plan (same ID).
@@ -139,6 +207,34 @@ type PreviewPlan struct {
 	// Teardown is the deterministic command sequence that tears the preview down
 	// (`pulumi destroy`) — the preview is DEMOUNTED DETERMINISTICALLY (S94).
 	Teardown []string `json:"teardown"`
+
+	// --- DP25: the profile-filtered bootstrap section (nil for an S94 plan) ------
+	// Profile is the DP11 compose profile this preview's bootstrap was filtered by
+	// (DefaultProfile when no Manifest is supplied — but Bootstrap stays nil then).
+	Profile stackmanifest.Profile `json:"profile,omitempty"`
+	// Bootstrap is the DP11-profile-filtered DP12 bootstrap sequence the preview amorces
+	// AFTER the re-emission — nil when no Manifest was supplied (the S94 shape). The
+	// profile changes the bootstrapped SERVICES here, NEVER the EmittedAppHash above.
+	Bootstrap *PreviewBootstrap `json:"bootstrap,omitempty"`
+}
+
+// PreviewBootstrap is the DP25 profile-filtered amorçage of a preview: the DP11 profile,
+// the DP12 ordered event sequence over the profile-filtered services, the content address
+// of that sequence (so "same phase+profile → same bootstrap" is one comparison), and the
+// names of the services the profile kept. PURE: it carries no secret value, no resolved
+// endpoint — only NAMES and ${VAR} references (the DP12 discipline).
+type PreviewBootstrap struct {
+	// Profile is the DP11 compose profile the manifest's services were filtered by.
+	Profile stackmanifest.Profile `json:"profile"`
+	// Sequence is the DP12 ordered bootstrap events over the profile-filtered manifest.
+	Sequence bootstrap.Sequence `json:"sequence"`
+	// SequenceHash is the content address of the sequence (bootstrap.Sequence.Hash) —
+	// the profile-dependent address: core vs full differ here, but the EmittedAppHash
+	// above does not. Same phase+profile → same SequenceHash (reproducibility).
+	SequenceHash string `json:"sequence_hash"`
+	// Services are the NAMES of the services the profile kept (sorted, deterministic) —
+	// the breakdown the Workbench surfaces (core boots fewer than full).
+	Services []string `json:"services"`
 }
 
 // Typed causes — every refusal is one of these (honesty rule: never invent a URL/phase).
@@ -150,6 +246,9 @@ var (
 	ErrNoInfra    = errors.New("preview: surface has no infra program (nothing to `pulumi up`)")
 	ErrNoProgram  = errors.New("preview: no emitted Pulumi program to boot")
 	ErrProjectMix = errors.New("preview: program project does not match the surface project")
+	// ErrManifestProjectMix — the supplied DP02 manifest belongs to another app than the
+	// surface (a cross-app bootstrap). The preview is per-app (S94).
+	ErrManifestProjectMix = errors.New("preview: manifest app does not match the surface project")
 )
 
 // block wraps a cause into a typed BlockReason (the S13 shape) with an actionable fix.
@@ -284,6 +383,20 @@ func BuildPlan(in Input) (PreviewPlan, *blockreason.BlockReason) {
 		Boot:           boot,
 		Teardown:       teardown,
 	}
+
+	// DP25 — the OPTIONAL profile-filtered bootstrap section. Only when a DP02 manifest is
+	// supplied (else the S94 shape is preserved byte-identically). The EmittedAppHash above
+	// is already computed and NEVER read here: the profile changes the bootstrapped services,
+	// never the app-hash (the capital invariant).
+	if in.Manifest.AppName != "" {
+		bs, br := buildBootstrap(in)
+		if br != nil {
+			return PreviewPlan{}, br
+		}
+		plan.Profile = bs.Profile
+		plan.Bootstrap = bs
+	}
+
 	id, err := plan.contentAddress()
 	if err != nil {
 		br := block(err)
@@ -293,8 +406,81 @@ func BuildPlan(in Input) (PreviewPlan, *blockreason.BlockReason) {
 	return plan, nil
 }
 
+// profileOf resolves the DP11 profile the preview boots: the declared Input.Profile, or
+// DefaultProfile (`core`) when empty. Set-membership is enforced downstream by FilterByProfile
+// (UNKNOWN_PROFILE) — profileOf never coerces an out-of-set value to the nearest known one.
+func profileOf(in Input) stackmanifest.Profile {
+	if in.Profile == "" {
+		return DefaultProfile
+	}
+	return in.Profile
+}
+
+// buildBootstrap computes the DP25 profile-filtered bootstrap of a preview, REUSING DP11 +
+// DP12 verbatim (never forking the rules):
+//
+//  1. the manifest must belong to the SAME project as the surface (per-app preview, S94);
+//  2. DP11 composeemit.FilterByProfile narrows the manifest's services to the selected
+//     profile (UNKNOWN_PROFILE / DOLTGRES_NOT_ALLOWED_IN_PROD surface verbatim);
+//  3. DP12 bootstrap.EmitBootstrapSequence renders the deterministic ordered amorçage over
+//     the FILTERED manifest (MISSING_SECRET_AT_BOOT / invalid-manifest surface verbatim).
+//
+// PURE: same (manifest, profile, host, secrets, env) → byte-identical PreviewBootstrap. It
+// runs no real docker — the events are a deterministic plan-as-data (the gated executor and
+// the Workbench consume them; the existing web-preview server serves the app).
+func buildBootstrap(in Input) (*PreviewBootstrap, *blockreason.BlockReason) {
+	// (1) per-app: the manifest's app must match the surface's project.
+	if in.Manifest.AppName != in.Surface.Project {
+		br := block(ErrManifestProjectMix)
+		return nil, &br
+	}
+
+	profile := profileOf(in)
+	env := in.Env
+	if env == "" {
+		env = DefaultPreviewEnv
+	}
+
+	// (2) DP11 — filter the manifest's services by the selected profile. The filter owns
+	// the closed-set membership (UNKNOWN_PROFILE) and the delegated DP06 prod×non-prod gate.
+	filtered, fbr := composeemit.FilterByProfile(in.Manifest, profile, env)
+	if fbr != nil {
+		return nil, fbr
+	}
+
+	// (3) DP12 — render the deterministic bootstrap sequence over the FILTERED manifest.
+	seq, sbr := bootstrap.EmitBootstrapSequence(filtered, in.Host, in.Secrets)
+	if sbr != nil {
+		return nil, sbr
+	}
+
+	return &PreviewBootstrap{
+		Profile:      profile,
+		Sequence:     seq,
+		SequenceHash: seq.Hash(),
+		Services:     serviceNames(filtered),
+	}, nil
+}
+
+// serviceNames returns the kept services' names in canonical (sorted) order — the
+// deterministic breakdown the Workbench surfaces (the profile kept exactly these).
+func serviceNames(m stackmanifest.StackManifest) []string {
+	out := make([]string, 0, len(m.Services))
+	for _, s := range m.Services {
+		out = append(out, s.Name)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // contentAddress hashes the canonical plan body (every field except ID) into the plan's ID —
 // the idempotency key. S02 reused (Canonicalize+Hash), never a forked scheme.
+//
+// DP25: the profile + the bootstrap sequence address fold into the plan ID, so "same
+// phase+profile → byte-identical plan" includes the bootstrap, and core vs full yield
+// DISTINCT plan IDs (different bootstrapped services). An S94 plan (no Manifest → nil
+// Bootstrap, empty Profile) keeps its ORIGINAL address: the profile/bootstrap keys are
+// OMITTED when absent, so the existing S94 plan IDs are unchanged (anti-overwrite §9).
 func (p PreviewPlan) contentAddress() (string, error) {
 	body := map[string]any{
 		"project":          p.Project,
@@ -306,6 +492,12 @@ func (p PreviewPlan) contentAddress() (string, error) {
 		"program_path":     p.ProgramPath,
 		"boot":             p.Boot,
 		"teardown":         p.Teardown,
+	}
+	// Fold the DP25 bootstrap ONLY when present — an S94 plan (no bootstrap) keeps its
+	// original byte-identical content address.
+	if p.Bootstrap != nil {
+		body["profile"] = string(p.Profile)
+		body["bootstrap_hash"] = p.Bootstrap.SequenceHash
 	}
 	canon, err := records.Canonicalize(mustJSON(body))
 	if err != nil {
@@ -335,6 +527,46 @@ func ServedMatchesEmitted(plan PreviewPlan, servedAppHash string) (bool, *blockr
 		},
 	}
 	return false, &br
+}
+
+// TeardownPlan is the DP25 DETERMINISTIC demounting of a preview, derived PURELY from a
+// built PreviewPlan: the stack to remove, the Pulumi destroy + stack-rm command sequence,
+// and the bootstrap services to tear down in REVERSE boot order (full unwinds more than
+// core — the demounting mirrors what was amorced). Same plan → byte-identical TeardownPlan.
+type TeardownPlan struct {
+	// StackName is the Pulumi stack being demounted (echoes the plan).
+	StackName string `json:"stack_name"`
+	// Commands is the deterministic teardown command sequence (== the plan's Teardown:
+	// `pulumi destroy` + `pulumi stack rm`).
+	Commands []string `json:"commands"`
+	// Services are the bootstrap services to tear down, in REVERSE boot order (the
+	// inverse of the amorçage) — empty for an S94 plan (no bootstrap). The demounting is
+	// the exact inverse of what the profile booted (core unwinds fewer than full).
+	Services []string `json:"services"`
+}
+
+// TeardownOf derives the deterministic teardown of a built plan — a PURE function of the
+// plan (no clock, no RNG, no I/O). The preview is DEMOUNTED DETERMINISTICALLY (S94, extended
+// DP25): same plan → same teardown; the bootstrap services unwind in reverse boot order, so
+// a full preview demounts more services than a core one (the demounting mirrors the amorçage).
+func TeardownOf(plan PreviewPlan) TeardownPlan {
+	cmds := make([]string, len(plan.Teardown))
+	copy(cmds, plan.Teardown)
+
+	var services []string
+	if plan.Bootstrap != nil {
+		// Reverse the kept services (the inverse of the boot order) — a pure, total reversal.
+		n := len(plan.Bootstrap.Services)
+		services = make([]string, n)
+		for i := 0; i < n; i++ {
+			services[i] = plan.Bootstrap.Services[n-1-i]
+		}
+	}
+	return TeardownPlan{
+		StackName: plan.StackName,
+		Commands:  cmds,
+		Services:  services,
+	}
 }
 
 // dir returns the directory of a forward-slash relative path (the Pulumi --cwd). Pure: no
