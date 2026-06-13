@@ -2,8 +2,9 @@
 
 import { composeEnvRefs, envKeys, isClean } from "@/lib/env-emit";
 import { emitStackBundle } from "@/lib/phase-emit";
-import type { StackManifest } from "@/lib/stack-manifest";
-import type { EmitView } from "./view";
+import { emitCompose, filterByProfile, isProfileBlock } from "@/lib/stack-emit";
+import { profiledManifest, type StackManifest } from "@/lib/stack-manifest";
+import type { EmitView, ProfileEmitView } from "./view";
 
 /**
  * Server Action for the /stack-emit Workbench panel (DP03 + DP04 + DP05 —
@@ -76,5 +77,66 @@ export async function emitAction(
 		traefikText: bundle.traefikDynamic.text,
 		traefikOutputHash: bundle.traefikDynamic.outputHash,
 		sameBundleAsSeeded: bundle.bundleHash === seededBundleHash,
+	};
+}
+
+/**
+ * emitProfileAction — the DP11 PROFILE gesture (ui-completeness, CLAUDE.md §7):
+ * the selector's chosen profile NARROWS the profiled manifest deterministically
+ * (lib/stack-emit.filterByProfile — the pure include/exclude over the closed set,
+ * byte-parity-pinned to Go composeemit.FilterByProfile) and re-emits the compose
+ * of the narrowed manifest. Services appear/disappear by selection; `full` is the
+ * UNION; an out-of-set profile → UNKNOWN_PROFILE; the cross non-prod × prod →
+ * DOLTGRES_NOT_ALLOWED_IN_PROD (the DP06 rule reused verbatim, never forked).
+ *
+ * THE WALL (§2): the profiles are DECLARED above the line in stack_manifest; the
+ * SELECTION is a below-the-line measure applied at emission. This action WRITES
+ * NOTHING — it reads the AST and returns a narrowed AST + bytes.
+ */
+export async function emitProfileAction(
+	_prev: ProfileEmitView,
+	formData: FormData,
+): Promise<ProfileEmitView> {
+	const profile = String(formData.get("profile") ?? "");
+	const env = String(formData.get("env") ?? "dev");
+	const manifest: StackManifest = profiledManifest();
+
+	// (1) the pure include/exclude over the closed set — the profile is a
+	// DECLARED parameter, never inferred. An out-of-set selection or the
+	// non-prod × prod cross returns a DP11 BlockReason.
+	const filtered = filterByProfile(manifest, profile, env);
+	if (isProfileBlock(filtered)) {
+		return {
+			ok: false,
+			profile,
+			env,
+			totalCount: manifest.services.length,
+			block: filtered.block,
+		};
+	}
+
+	// (2) emit the compose of the NARROWED manifest (a server always survives,
+	// so the emission never refuses STACK_HAS_NO_SERVER for a core-bearing stack).
+	const emitted = await emitCompose(filtered);
+	if ("refusal" in emitted) {
+		return {
+			ok: false,
+			profile,
+			env,
+			totalCount: manifest.services.length,
+			block: { code: emitted.refusal.code, message: emitted.refusal.message },
+		};
+	}
+
+	return {
+		ok: true,
+		profile,
+		env,
+		yaml: emitted.yaml,
+		outputHash: emitted.outputHash,
+		sourceHash: emitted.sourceHash,
+		keptServices: filtered.services.map((s) => s.name),
+		keptCount: filtered.services.length,
+		totalCount: manifest.services.length,
 	};
 }

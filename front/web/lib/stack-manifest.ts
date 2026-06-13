@@ -108,6 +108,42 @@ export function isKnownProfile(p: string): p is Profile {
 }
 
 /**
+ * serviceProfiles — the effective CLOSED profile set a service belongs to
+ * (DP11), the exact twin of Go stackmanifest.ServiceProfiles: its DECLARED
+ * profile (Service.profile, above-the-line truth) PLUS `core` (a core service
+ * ALWAYS runs — the docker-compose convention the DP03 emitter already encodes:
+ * a service whose profile == core carries no `profiles:` key and is active under
+ * every selection). PURE total lookup, order-stable (declared profile first,
+ * then core when distinct). It NEVER includes `full` (the UNION computed at
+ * selection time, not a per-service membership).
+ */
+export function serviceProfiles(svc: Service): Profile[] {
+	if (svc.profile === "core") {
+		return ["core"];
+	}
+	return [svc.profile as Profile, "core"];
+}
+
+/**
+ * serviceInProfile — whether a service is INCLUDED by a profile SELECTION
+ * (DP11), the exact twin of Go stackmanifest.ServiceInProfile: `full` selects
+ * EVERY service (the deterministic UNION); a `core` service ALWAYS runs (no
+ * `profiles:` key) and is selected by every profile; any other selection p
+ * selects a non-core service iff its declared profile equals p. PURE total
+ * predicate (determinism-first): same (service, profile) → same verdict. The
+ * selection's closed-set membership is the caller's pre-flight.
+ */
+export function serviceInProfile(svc: Service, selection: Profile): boolean {
+	if (selection === "full") {
+		return true;
+	}
+	if (svc.profile === "core") {
+		return true;
+	}
+	return serviceProfiles(svc).includes(selection);
+}
+
+/**
  * validate — the PURE total validator, the exact twin of Go
  * stackmanifest.Validate: name required, services named + unique, roles and
  * profiles inside their closed sets, internal ports unique, ≥1 role=server.
@@ -285,4 +321,39 @@ export function exampleManifest(): StackManifest {
 		network: { name: "traefik_default", external: true },
 		connector_scopes: ["postgres:read-only"],
 	};
+}
+
+/**
+ * profiledManifest — a richer reference manifest for the DP11 PROFILE selector:
+ * the Example core stack (server + datastore + interpreter, all `core`) PLUS one
+ * opt-in service per NON-CORE profile (docs · observability · qa · git · tickets
+ * · connectors · non-prod), so selecting a profile VISIBLY includes/excludes
+ * services on screen. Deterministic — a fixture, never drawn. The core services
+ * survive EVERY selection (a server always runs); a non-core selection keeps
+ * core + that profile's service; `full` keeps every service (the UNION).
+ *
+ * This is ADDITIVE: it does NOT touch exampleManifest (the pinned DP03 byte
+ * parity stays intact); the profile demo reads its own richer fixture.
+ */
+export function profiledManifest(): StackManifest {
+	const base = exampleManifest();
+	let port = 9100;
+	const optIns: Service[] = (
+		[
+			{ profile: "docs", role: "docs" },
+			{ profile: "observability", role: "observability" },
+			{ profile: "qa", role: "workflow" },
+			{ profile: "git", role: "git" },
+			{ profile: "tickets", role: "tickets" },
+			{ profile: "connectors", role: "connector" },
+			{ profile: "non-prod", role: "datastore" },
+		] as const
+	).map(({ profile, role }) => ({
+		name: `svc-${profile}`,
+		role,
+		image: "",
+		internal_port: port++,
+		profile,
+	}));
+	return { ...base, services: [...base.services, ...optIns] };
 }

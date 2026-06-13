@@ -49,3 +49,35 @@ export interface EmitView {
 }
 
 export const EMIT_INITIAL: EmitView = { ok: false };
+
+/**
+ * View types for the DP11 PROFILE selector (the deterministic include/exclude
+ * over the closed SPEC-stack-2026 profile set). Selecting a profile re-emits the
+ * compose of the profiled manifest NARROWED to that selection — services
+ * appear/disappear, BYTE-IDENTICAL per selection. A profile outside the closed
+ * set is unselectable (the dropdown is closed), but the action still surfaces the
+ * BlockReason if one is returned (UNKNOWN_PROFILE / DOLTGRES_NOT_ALLOWED_IN_PROD).
+ */
+export interface ProfileEmitView {
+	ok: boolean;
+	/** the selection that was applied (echoed for the screen). */
+	profile?: string;
+	/** the target environment the selection was checked against (DP06 cross). */
+	env?: string;
+	/** the emitted compose of the narrowed manifest. */
+	yaml?: string;
+	/** records.Hash(bytes) — byte-identical per (manifest, selection). */
+	outputHash?: string;
+	/** the narrowed manifest's content address (S02 reused). */
+	sourceHash?: string;
+	/** the names of the services KEPT by the selection (visible include/exclude). */
+	keptServices?: string[];
+	/** the count of services kept (vs. the manifest's total). */
+	keptCount?: number;
+	/** the manifest's total service count (the `full` cardinality). */
+	totalCount?: number;
+	/** the DP11 refusal (code + message): UNKNOWN_PROFILE / DOLTGRES_NOT_ALLOWED_IN_PROD. */
+	block?: { code: string; message: string };
+}
+
+export const PROFILE_EMIT_INITIAL: ProfileEmitView = { ok: false };

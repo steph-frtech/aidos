@@ -27,11 +27,15 @@
  * never the source of truth.
  */
 
+import { validateDatastore } from "./environments";
 import {
 	hashManifest,
+	PROFILES,
+	type Profile,
 	type Refusal,
 	type Service,
 	type StackManifest,
+	serviceInProfile,
 	validate,
 } from "./stack-manifest";
 
@@ -220,6 +224,88 @@ export async function emitCompose(
 		outputHash: await sha256hex(yaml),
 		protected: true,
 	};
+}
+
+/**
+ * The DP11 BlockReason codes carried by FilterByProfile — the exact twin of the
+ * Go back/runtime/blockreason additions (UNKNOWN_PROFILE + the delegated DP06
+ * DOLTGRES_NOT_ALLOWED_IN_PROD). A selection outside the closed set is never
+ * coerced to the nearest known profile, never silently widened to `full`.
+ */
+export type ProfileBlockCode =
+	| "UNKNOWN_PROFILE"
+	| "DOLTGRES_NOT_ALLOWED_IN_PROD";
+
+export interface ProfileBlock {
+	code: ProfileBlockCode;
+	message: string;
+}
+
+/**
+ * filterByProfile — the DP11 PURE include/exclude over the CLOSED SPEC-stack-2026
+ * profile set, the exact twin of Go composeemit.FilterByProfile. It adds no
+ * business rule — it SELECTS which services of an already-declared manifest enter
+ * the emission, deterministically:
+ *
+ *  1. the selection MUST be a member of the closed set (UNKNOWN_PROFILE else —
+ *     never guessed, never coerced to `full`);
+ *  2. the cross `non-prod` × `prod` is refused via the EXISTING DP06 gate
+ *     (validateDatastore(env, "doltgres") reused verbatim, never forked —
+ *     DOLTGRES_NOT_ALLOWED_IN_PROD): the `non-prod` profile carries Doltgres and
+ *     prod imposes Postgres (ADR 0065);
+ *  3. it keeps EXACTLY the services for which serviceInProfile(svc, selection)
+ *     holds — `full` keeps every service (the deterministic UNION), any other
+ *     profile keeps its declared members plus the always-running core services.
+ *
+ * The kept services preserve the manifest's declared order; everything else of
+ * the manifest is carried through unchanged. PURE: same (manifest, profile, env)
+ * → same filtered manifest. THE WALL (§2): the profiles are DECLARED above the
+ * line in stack_manifest; the SELECTION is applied below the line at emission —
+ * this reads the AST and returns a narrowed AST, it writes no truth.
+ */
+export function filterByProfile(
+	m: StackManifest,
+	profile: string,
+	env: string,
+): StackManifest | { block: ProfileBlock } {
+	// (1) the selection is a DECLARED member of the closed set — never guessed.
+	if (!(PROFILES as readonly string[]).includes(profile)) {
+		return {
+			block: {
+				code: "UNKNOWN_PROFILE",
+				message: `profile "${profile}" is outside the closed set [${PROFILES.join(" ")}] — a selection is declared, never inferred (DP11)`,
+			},
+		};
+	}
+	const selection = profile as Profile;
+
+	// (2) the cross non-prod × prod ⇒ Doltgres refused — DELEGATE to the existing
+	// DP06 gate (never a forked rule): the `non-prod` profile carries Doltgres,
+	// and prod imposes Postgres. Only the non-prod selection bites; any other
+	// profile against prod passes (the gate is keyed on the doltgres datastore).
+	if (selection === "non-prod") {
+		const refusal = validateDatastore(env, "doltgres");
+		if (refusal && refusal.code === "DOLTGRES_NOT_ALLOWED_IN_PROD") {
+			return {
+				block: {
+					code: "DOLTGRES_NOT_ALLOWED_IN_PROD",
+					message: refusal.message,
+				},
+			};
+		}
+	}
+
+	// (3) the pure include/exclude over the closed set — declared order preserved,
+	// the caller's slice never mutated (a copy).
+	const kept = m.services.filter((svc) => serviceInProfile(svc, selection));
+	return { ...m, services: kept };
+}
+
+/** isProfileBlock — narrow the filterByProfile result to its DP11 refusal. */
+export function isProfileBlock(
+	v: StackManifest | { block: ProfileBlock },
+): v is { block: ProfileBlock } {
+	return "block" in v;
 }
 
 /**

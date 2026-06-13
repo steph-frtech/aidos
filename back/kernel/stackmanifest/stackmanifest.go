@@ -123,6 +123,53 @@ func IsKnownProfile(p Profile) bool {
 	return false
 }
 
+// ServiceProfiles returns the effective CLOSED profile set a service belongs
+// to (DP11) — its DECLARED profile (Service.Profile, above-the-line truth)
+// PLUS `core` (a core service ALWAYS runs, the docker-compose convention the
+// DP03 emitter already encodes: a service whose Profile == core carries no
+// `profiles:` key and is active under every selection). It is a PURE total
+// lookup, deterministic and order-stable (declared profile first, then core
+// when distinct). It NEVER includes `full`: `full` is the UNION computed at
+// selection time (FilterByProfile), not a per-service membership. A service
+// whose declared profile is outside the closed set is left as-is — the pure
+// validator (Validate) is the single owner of the UNKNOWN_PROFILE refusal.
+func ServiceProfiles(svc Service) []Profile {
+	if svc.Profile == ProfileCore {
+		return []Profile{ProfileCore}
+	}
+	return []Profile{svc.Profile, ProfileCore}
+}
+
+// ServiceInProfile reports whether a service is INCLUDED by a profile
+// SELECTION (DP11) — the pure include/exclude filter over the closed set,
+// faithful to docker-compose's own profile semantics:
+//
+//   - `full` selects EVERY service (the deterministic UNION);
+//   - a `core` service ALWAYS runs (no `profiles:` key in the DP03 emission) —
+//     it is selected by EVERY profile, never excluded;
+//   - any other selection p selects a non-core service iff its declared
+//     profile equals p (p ∈ ServiceProfiles(svc)).
+//
+// It is a PURE total predicate (determinism-first): same (service, profile) →
+// same verdict. The selection's membership in the closed set is the caller's
+// pre-flight (FilterByProfile / Validate own UNKNOWN_PROFILE).
+func ServiceInProfile(svc Service, selection Profile) bool {
+	if selection == ProfileFull {
+		return true
+	}
+	// A core service always runs (the DP03 emission gives it no `profiles:`
+	// key): it is selected by every profile, never excluded.
+	if svc.Profile == ProfileCore {
+		return true
+	}
+	for _, p := range ServiceProfiles(svc) {
+		if p == selection {
+			return true
+		}
+	}
+	return false
+}
+
 // Service is one declared service of the stack.
 type Service struct {
 	Name string `json:"name"`

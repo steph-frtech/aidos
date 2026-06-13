@@ -148,3 +148,88 @@ test.describe("DP03 — the docker-compose emitter (additive target)", () => {
 		);
 	});
 });
+
+/**
+ * DP11 Playwright e2e — the « Profils déterministes » selector on /stack-emit.
+ * mirror record: reflects=DP11-profile-filter, test_kind=e2e, cert_language=playwright, liveness=live
+ *
+ * Proves the DP11 done-criterion from the screen: a profile selector over the
+ * CLOSED SPEC-stack-2026 set re-emits the compose NARROWED by the selection —
+ * services appear/disappear (core => fewer; full => more), byte-identical per
+ * selection, core included in full; the cross non-prod × prod surfaces the DP06
+ * BlockReason. The selection is DECLARED (a closed dropdown — an unknown profile
+ * is unselectable), never inferred. THE WALL (§2): the screen measures, it writes
+ * nothing.
+ */
+test.describe("DP11 — the deterministic profile selector (include/exclude)", () => {
+	test("switching profile makes services appear/disappear (core ⊊ full, core in full)", async ({
+		page,
+	}) => {
+		await page.goto("/stack-emit");
+
+		const selector = page.getByTestId("stack-emit-profile");
+		await expect(selector).toBeVisible();
+		// the dropdown is the CLOSED set — exactly the 9 profiles, no more.
+		await expect(selector.locator("option")).toHaveCount(9);
+
+		const result = page.getByTestId("profile-result");
+		const yaml = page.getByTestId("profile-yaml");
+		const kept = page.getByTestId("profile-kept");
+
+		// `full` — the deterministic UNION: every service of the profiled manifest.
+		await selector.selectOption("full");
+		await expect(result).toHaveAttribute("data-outcome", "emitted");
+		// the « N/total kept » verdict re-emits per selection — wait on the kept
+		// list (server-action result), never on the optimistic state attribute, so
+		// the read reflects the SELECTION, not a stale render (no fixed sleep).
+		await expect(kept).toContainText("svc-git");
+		await expect(kept).toContainText("svc-docs");
+		// the core server + the opt-in services are all present under full.
+		await expect(yaml).toContainText("app:");
+		await expect(yaml).toContainText("svc-git:");
+		await expect(yaml).toContainText("svc-docs:");
+		const fullYaml = (await yaml.textContent()) ?? "";
+
+		// `git` — narrows: core stays, the other opt-ins drop. FEWER than full.
+		await selector.selectOption("git");
+		await expect(result).toHaveAttribute("data-outcome", "emitted");
+		// wait for the git emission to LAND (the docs opt-in disappears) before
+		// reading — the retrying matcher is the synchronisation point.
+		await expect(kept).not.toContainText("svc-docs");
+		await expect(kept).toContainText("svc-git");
+		await expect(yaml).not.toContainText("svc-docs:");
+		// core is still in (the server survives every selection).
+		await expect(yaml).toContainText("app:");
+		await expect(yaml).toContainText("svc-git:");
+		const gitYaml = (await yaml.textContent()) ?? "";
+
+		// the text DIFFERS between selections, and git is strictly shorter (fewer
+		// services emitted) — the include/exclude is visible on screen.
+		expect(gitYaml).not.toBe(fullYaml);
+		expect(gitYaml.length).toBeLessThan(fullYaml.length);
+		// the core server is present in BOTH (core ⊆ every selection ⊆ full).
+		expect(fullYaml).toContain("app:");
+		expect(gitYaml).toContain("app:");
+	});
+
+	test("the cross non-prod × prod surfaces the DP06 BlockReason (DOLTGRES_NOT_ALLOWED_IN_PROD)", async ({
+		page,
+	}) => {
+		await page.goto("/stack-emit");
+
+		// select prod, then the non-prod profile → the DP06 gate refuses (reused).
+		await page.getByTestId("stack-emit-env").selectOption("prod");
+		await page.getByTestId("stack-emit-profile").selectOption("non-prod");
+
+		const result = page.getByTestId("profile-result");
+		await expect(result).toHaveAttribute("data-outcome", "blocked");
+		await expect(page.getByTestId("profile-block-code")).toHaveText(
+			"DOLTGRES_NOT_ALLOWED_IN_PROD",
+		);
+
+		// off the cross — the same non-prod profile against dev passes (emitted).
+		await page.getByTestId("stack-emit-env").selectOption("dev");
+		await page.getByTestId("stack-emit-profile").selectOption("non-prod");
+		await expect(result).toHaveAttribute("data-outcome", "emitted");
+	});
+});

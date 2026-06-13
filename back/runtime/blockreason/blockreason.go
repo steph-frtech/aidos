@@ -420,6 +420,33 @@ const (
 	// emission, change the SOURCE (idea → mirror → /goal), never the emitted file. ADDED
 	// at DP05 — additive enum extension (change_type: refine, never a removal).
 	CodeEmittedFileHandEdited Code = "EMITTED_FILE_HAND_EDITED"
+	// CodeUnknownProfile — the PROFILE-FILTERED emitter (DP11,
+	// back/runtime/composeemit, ROADMAP-provisioning-deploy EPIC A) was asked to
+	// emit a SELECTION whose compose profile is OUTSIDE the closed SPEC-stack-2026
+	// set {core, docs, observability, qa, git, tickets, connectors, non-prod,
+	// full}. The selection is a DECLARED parameter, never inferred: an unknown
+	// profile is FAIL-CLOSED with this actionable BlockReason, never coerced to
+	// the nearest known one or silently treated as `full` (honesty, §8 — never
+	// guess a business rule). The membership test is a PURE filter over the closed
+	// set (stackmanifest.IsKnownProfile), never an LLM judgment (§6/§8). The
+	// profiles are DECLARED above the line in the stack_manifest source; the
+	// selection is applied below the line at emission. ADDED at DP11 — additive
+	// enum extension (change_type: refine, never a removal); recorded by a
+	// ChangeSet + SemanticDiff + ADR.
+	CodeUnknownProfile Code = "UNKNOWN_PROFILE"
+	// CodeDoltgresNotAllowedInProd — the PROFILE-FILTERED emitter (DP11) refused
+	// to emit a SELECTION that crosses the `non-prod` profile with the `prod`
+	// environment: prod imposes Postgres (SPEC-stack-2026 verbatim « PostgreSQL =
+	// la prod. Doltgres = hors prod uniquement. », ADR 0065 addendum to 0006). The
+	// `non-prod` profile carries Doltgres (git-for-data), which prod forbids. The
+	// rule is the EXISTING DP06 gate (back/runtime/envbindings.ValidateDatastore)
+	// reused verbatim — the filter delegates the verdict, never forks it. A
+	// non-prod selection against a prod environment is FAIL-CLOSED with this
+	// actionable BlockReason, never deployed with a Doltgres datastore in prod.
+	// The cross is a PURE comparison (profile==non-prod ∧ env==prod), never an LLM
+	// judgment (§6/§8). ADDED at DP11 — additive enum extension (change_type:
+	// refine, never a removal); recorded by a ChangeSet + SemanticDiff + ADR.
+	CodeDoltgresNotAllowedInProd Code = "DOLTGRES_NOT_ALLOWED_IN_PROD"
 )
 
 // Severity is the gravity marker of a refusal. The KRD §44.5 example uses
@@ -1084,6 +1111,37 @@ var reasons = map[Code]BlockReason{
 			"re_emit_from_the_phase : relancez EmitStack(phase) une fois le disque fidèle — même phase content-adressée → mêmes octets sur toute machine (le miroir-pierre-angulaire DP05).",
 		},
 	},
+	CodeUnknownProfile: {
+		Code:     CodeUnknownProfile,
+		Severity: SeverityBlocking,
+		Explanation: "Émission profilée REFUSÉE (DP11, back/runtime/composeemit) : le profile de SÉLECTION " +
+			"est HORS de l'ensemble clos SPEC-stack-2026 {core, docs, observability, qa, git, tickets, " +
+			"connectors, non-prod, full}. Le profile est un paramètre DÉCLARÉ, jamais inféré : un profile " +
+			"inconnu n'est ni coercé vers le plus proche, ni traité silencieusement comme `full` (honnêteté, " +
+			"§8 — on ne devine jamais une règle). Le test d'appartenance est un filtre PUR sur l'ensemble clos " +
+			"(stackmanifest.IsKnownProfile), jamais un jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"use_a_known_profile : choisissez un profile de l'ensemble clos — core | docs | observability | qa | git | tickets | connectors | non-prod | full (stackmanifest.Profiles()).",
+			"do_not_invent : aucun profile hors de cet ensemble n'est accepté ; corrigez la sélection plutôt que d'inventer une règle.",
+			"widen_via_goal : élargir l'ensemble des profiles est un changement de vérité au-dessus de la ligne (le stack_manifest est above-the-line) — passez par idée → miroir → /goal → approbation.",
+		},
+	},
+	CodeDoltgresNotAllowedInProd: {
+		Code:     CodeDoltgresNotAllowedInProd,
+		Severity: SeverityBlocking,
+		Explanation: "Émission profilée REFUSÉE (DP11, back/runtime/composeemit) : la sélection croise le " +
+			"profile `non-prod` avec l'environnement `prod`. La prod impose PostgreSQL (SPEC-stack-2026 verbatim " +
+			"« PostgreSQL = la prod. Doltgres = hors prod uniquement. », ADR 0065 addendum à 0006) ; le profile " +
+			"`non-prod` porte Doltgres (git-for-data), que la prod interdit. La règle est la PORTE DP06 existante " +
+			"(back/runtime/envbindings.ValidateDatastore) réutilisée telle quelle — le filtre délègue le verdict, " +
+			"il ne le forke pas. Le croisement est une comparaison PURE (profile==non-prod ∧ env==prod), jamais un " +
+			"jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"pick_postgres_in_prod : en prod, sélectionnez un profile dont le datastore est Postgres — `non-prod` (Doltgres) reste opt-in hors prod.",
+			"deploy_non_prod_off_prod : émettez le profile `non-prod` vers local / dev / staging — Doltgres y est autorisé (ADR 0065).",
+			"rerun : relancez l'émission une fois la sélection ramenée dans la règle DP06 (le croisement non-prod×prod est le seul refus).",
+		},
+	},
 }
 
 // codeOrder is the canonical enumeration order of the Code enum. Declared, never
@@ -1128,6 +1186,8 @@ var codeOrder = []Code{
 	CodeRollbackNotEarlier,
 	CodeAgentAutonomyExceeded,
 	CodeEmittedFileHandEdited,
+	CodeUnknownProfile,
+	CodeDoltgresNotAllowedInProd,
 }
 
 // Codes returns every Code in the closed enum, in canonical order.

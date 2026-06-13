@@ -1,14 +1,24 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { EnvBundle } from "@/lib/env-emit";
+import { ENVIRONMENTS } from "@/lib/environments";
 import type { TraefikArtifact } from "@/lib/phase-emit";
 import type { ComposeArtifact } from "@/lib/stack-emit";
-import type { Service, StackManifest } from "@/lib/stack-manifest";
-import { emitAction } from "./actions";
-import { EMIT_INITIAL, type EmitView } from "./view";
+import {
+	PROFILES,
+	type Service,
+	type StackManifest,
+} from "@/lib/stack-manifest";
+import { emitAction, emitProfileAction } from "./actions";
+import {
+	EMIT_INITIAL,
+	type EmitView,
+	PROFILE_EMIT_INITIAL,
+	type ProfileEmitView,
+} from "./view";
 
 /**
  * StackEmitPanel renders the DP03 additive emitter target: the seeded
@@ -40,6 +50,177 @@ function EmitSubmit() {
 	);
 }
 
+/**
+ * ProfileSelector — the DP11 PROFILE control (ui-completeness, CLAUDE.md §7):
+ * the closed SPEC-stack-2026 profile set as a <select> (closed → an unknown
+ * profile is UNSELECTABLE), plus a target environment, both auto-submitting the
+ * profile form on change. Selecting a profile re-emits the compose of the
+ * profiled manifest NARROWED to that selection — services appear/disappear,
+ * byte-identical per selection. A DP06-refused cross (non-prod × prod) surfaces
+ * the BlockReason. The selection is DECLARED, never inferred.
+ */
+function ProfileSelector({
+	profiledServices,
+}: {
+	profiledServices: Service[];
+}) {
+	const t = useTranslations("stackEmit");
+	const [state, action] = useActionState<ProfileEmitView, FormData>(
+		emitProfileAction,
+		PROFILE_EMIT_INITIAL,
+	);
+	const formRef = useRef<HTMLFormElement>(null);
+	const [profile, setProfile] = useState<string>("full");
+	const [env, setEnv] = useState<string>("dev");
+
+	return (
+		<section
+			data-testid="profile-card"
+			className="rounded-xl border border-border bg-card p-5"
+		>
+			<h2 className="text-sm font-semibold tracking-tight text-foreground">
+				{t("profileHeading")}
+			</h2>
+			<p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+				{t("profileHint")}
+			</p>
+
+			{/* the profiled manifest declares its services + their profiles (above
+			    the line) — the selection (below the line) includes/excludes them */}
+			<div className="mt-4 flex flex-wrap gap-1.5 text-xs">
+				{profiledServices.map((s) => (
+					<span
+						key={s.name}
+						data-testid="declared-service"
+						data-profile={s.profile}
+						className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 font-mono text-foreground"
+					>
+						{s.name}
+						<span className="text-muted-foreground">·{s.profile}</span>
+					</span>
+				))}
+			</div>
+
+			<form
+				action={action}
+				ref={formRef}
+				className="mt-4 flex flex-wrap items-end gap-4"
+			>
+				<label className="flex flex-col gap-1 text-xs">
+					<span className="font-medium text-muted-foreground">
+						{t("profileLabel")}
+					</span>
+					<select
+						name="profile"
+						data-testid="stack-emit-profile"
+						data-profile={profile}
+						value={profile}
+						onChange={(e) => {
+							setProfile(e.target.value);
+							formRef.current?.requestSubmit();
+						}}
+						className="rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						{PROFILES.map((p) => (
+							<option key={p} value={p} data-testid={`profile-option-${p}`}>
+								{t(`profileName.${p}`)}
+							</option>
+						))}
+					</select>
+				</label>
+
+				<label className="flex flex-col gap-1 text-xs">
+					<span className="font-medium text-muted-foreground">
+						{t("profileEnvLabel")}
+					</span>
+					<select
+						name="env"
+						data-testid="stack-emit-env"
+						value={env}
+						onChange={(e) => {
+							setEnv(e.target.value);
+							formRef.current?.requestSubmit();
+						}}
+						className="rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						{ENVIRONMENTS.map((e) => (
+							<option key={e} value={e}>
+								{e}
+							</option>
+						))}
+					</select>
+				</label>
+
+				<ProfileSubmit />
+			</form>
+
+			{state.ok && state.yaml ? (
+				<div
+					data-testid="profile-result"
+					data-outcome="emitted"
+					className="mt-4 rounded-lg border border-border bg-muted/40 p-3 text-xs"
+				>
+					<p className="font-medium text-foreground">
+						{t("profileEmittedVerdict", {
+							profile: state.profile ?? "",
+							kept: state.keptCount ?? 0,
+							total: state.totalCount ?? 0,
+						})}
+					</p>
+					<p
+						data-testid="profile-kept"
+						className="mt-1 break-all font-mono text-muted-foreground"
+					>
+						{(state.keptServices ?? []).join(" · ")}
+					</p>
+					<p
+						data-testid="profile-output-hash"
+						className="mt-1 break-all font-mono text-muted-foreground"
+					>
+						{state.outputHash}
+					</p>
+					<pre
+						data-testid="profile-yaml"
+						className="mt-3 max-h-72 overflow-auto rounded-lg bg-background p-3 font-mono leading-relaxed text-foreground"
+					>
+						{state.yaml}
+					</pre>
+				</div>
+			) : null}
+			{!state.ok && state.block ? (
+				<div
+					data-testid="profile-result"
+					data-outcome="blocked"
+					className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs"
+				>
+					<p
+						data-testid="profile-block-code"
+						className="font-mono font-semibold text-destructive"
+					>
+						{state.block.code}
+					</p>
+					<p className="mt-1 text-muted-foreground">{state.block.message}</p>
+				</div>
+			) : null}
+		</section>
+	);
+}
+
+function ProfileSubmit() {
+	const t = useTranslations("stackEmit");
+	const { pending } = useFormStatus();
+	return (
+		<button
+			type="submit"
+			data-testid="profile-emit"
+			disabled={pending}
+			className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+		>
+			{pending ? t("working") : t("profileEmit")}
+		</button>
+	);
+}
+
 export function StackEmitPanel({
 	activeProjectId,
 	manifest,
@@ -51,6 +232,7 @@ export function StackEmitPanel({
 	seededBundleHash,
 	seededTraefik,
 	sidecar,
+	profiledServices,
 }: {
 	activeProjectId: string | null;
 	manifest: StackManifest;
@@ -69,6 +251,8 @@ export function StackEmitPanel({
 	seededTraefik: TraefikArtifact;
 	/** ADR 0040 D7 — the Go interpreter sidecar declared by the manifest. */
 	sidecar: Service | null;
+	/** DP11 — the richer profiled manifest's services (the profile-selector demo). */
+	profiledServices: Service[];
 }) {
 	const t = useTranslations("stackEmit");
 	const [state, action] = useActionState<EmitView, FormData>(
@@ -384,9 +568,18 @@ export function StackEmitPanel({
 					·{" "}
 					<span className="rounded bg-muted px-1.5 py-0.5 font-semibold">
 						stack_manifest × traefik-dynamic + EmitStack(phase) — DP05
+					</span>{" "}
+					·{" "}
+					<span className="rounded bg-muted px-1.5 py-0.5 font-semibold">
+						FilterByProfile(profil clos) — DP11
 					</span>
 				</p>
 			</section>
+
+			{/* DP11 — the PROFILE selector: the deterministic include/exclude over
+			    the closed profile set (services appear/disappear by selection,
+			    byte-identical per selection, full = the UNION) */}
+			<ProfileSelector profiledServices={profiledServices} />
 
 			{/* the control — emit the compose, a pure measure (writes nothing) */}
 			<section

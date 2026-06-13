@@ -5378,7 +5378,24 @@
 		"handEditLabel": "Closed hand-edit refusal code (the whole re-emission is blocked)",
 		"emittedBundleVerdict": "Complete bundle re-emitted — bundle_hash:",
 		"bundleSameHash": "same phase → same bundle_hash (the 5 artifacts byte-identical)",
-		"bundleNewOutput": "modified manifest → NEW phase, NEW bundle_hash (the emission follows the source, never the reverse)"
+		"bundleNewOutput": "modified manifest → NEW phase, NEW bundle_hash (the emission follows the source, never the reverse)",
+		"profileHeading": "Deterministic profiles (DP11 — closed include/exclude)",
+		"profileHint": "Each service carries one+ profile in the CLOSED set [core · docs · observability · qa · git · tickets · connectors · non-prod · full]. The SELECTION (below the line) includes/excludes services at emission, BYTE-IDENTICAL per selection — a PURE filter over the closed set, never inferred. core is always on (Hono server + Go interpreter sidecar + datastore + Valkey/PgBouncer): it survives every selection. full = the deterministic UNION (every service). A profile outside the set is unselectable (the dropdown is closed) → UNKNOWN_PROFILE; non-prod × prod env → Doltgres refused (the DP06 rule reused, never forked). The wall (§2): profiles DECLARED above the line, the selection applied at emission; this screen measures, it writes nothing.",
+		"profileLabel": "Profile (closed, declared selection)",
+		"profileEnvLabel": "Target environment (DP06 cross)",
+		"profileEmit": "Emit the profile (writes nothing)",
+		"profileEmittedVerdict": "Profile \"{profile}\" emitted — {kept}/{total} services kept (byte-identical per selection):",
+		"profileName": {
+			"core": "core — the always-on baseline (server · datastore · interpreter · cache · pooler)",
+			"docs": "docs — documentation (opt-in)",
+			"observability": "observability — telemetry (opt-in)",
+			"qa": "qa — quality workflows (opt-in)",
+			"git": "git — the code mirror (opt-in)",
+			"tickets": "tickets — the tracker (opt-in)",
+			"connectors": "connectors — external connectors (opt-in)",
+			"non-prod": "non-prod — Doltgres, non-prod only (opt-in)",
+			"full": "full — the deterministic UNION (every service)"
+		}
 	},
 	"provision": {
 		"eyebrow": "S89 · datastore provisioning",

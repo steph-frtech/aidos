@@ -4,7 +4,7 @@ import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
 import { composeEnvRefs, envKeys, isClean } from "@/lib/env-emit";
 import { emitStackBundle } from "@/lib/phase-emit";
-import { exampleManifest } from "@/lib/stack-manifest";
+import { exampleManifest, profiledManifest } from "@/lib/stack-manifest";
 import { StackEmitPanel } from "./StackEmitPanel";
 
 export const metadata: Metadata = {
@@ -106,6 +106,7 @@ export default async function StackEmitPage() {
 						seededBundleHash={seededBundle.bundleHash}
 						seededTraefik={seededBundle.traefikDynamic}
 						sidecar={sidecar}
+						profiledServices={profiledManifest().services}
 					/>
 				</div>
 			</main>
