@@ -172,6 +172,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/preview", k: "preview" },
 			{ href: "/data-migrate", k: "dataMigrate" },
 			{ href: "/deploy", k: "deploy" },
+			{ href: "/app-docs", k: "appDocs" },
 			{ href: "/domain-bind", k: "domainBind" },
 			{ href: "/env-rollback", k: "envRollback" },
 			{ href: "/cell-federation", k: "cellFederation" },

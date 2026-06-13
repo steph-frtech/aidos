@@ -19,11 +19,14 @@ import (
 	"os"
 
 	"github.com/steph-frtech/aidos/back/kernel/appauth"
+	"github.com/steph-frtech/aidos/back/kernel/entities"
 	"github.com/steph-frtech/aidos/back/kernel/operation"
 	"github.com/steph-frtech/aidos/back/kernel/scope"
+	"github.com/steph-frtech/aidos/back/runtime/apisurface"
 	"github.com/steph-frtech/aidos/back/runtime/appservicefragments"
 	"github.com/steph-frtech/aidos/back/runtime/asyncfragments"
 	"github.com/steph-frtech/aidos/back/runtime/datafragments"
+	"github.com/steph-frtech/aidos/back/runtime/docsfragments"
 	"github.com/steph-frtech/aidos/back/runtime/envbindings"
 	"github.com/steph-frtech/aidos/back/runtime/observabilityfragments"
 )
@@ -502,13 +505,158 @@ func emitAsync(project, env string) {
 	}
 }
 
+// docsFragmentOut is the per-fragment JSON the DP30 /app-docs panel renders — the
+// docsfragments.ServiceFragment plus its content address AND the wall oracle
+// (writes_truth + the below-the-line docs:* capabilities), so the screen can SHOW the
+// capital invariant: a docs fragment (site/reference/index) writes NO AIDOS truth.
+type docsFragmentOut struct {
+	docsfragments.ServiceFragment
+	Hash         string   `json:"hash"`
+	WritesTruth  bool     `json:"writes_truth"`
+	Capabilities []string `json:"capabilities"`
+}
+
+// docsOutput is the full DP30 docs-substrate emission for one (project, env): the THREE
+// docs profile fragments (Fumadocs site + Scalar reference + Pagefind index, all
+// profile=docs), the DETERMINISTIC docs PROJECTION of the emitted app (Scalar consuming
+// the S90 OpenAPI — every sync endpoint present — + the Fumadocs concept pages + the
+// Pagefind static index), the closed palette key set, and the CAPITAL indicator
+// `docs_not_aidos` (docs PER APP are a projection of the BUILT app, DISTINCT from the
+// AIDOS Mintlify build-journal — and nothing writes AIDOS truth). The panel reads this
+// single source. Same (project, env) ⇒ byte-identical JSON.
+type docsOutput struct {
+	ProjectID   string                       `json:"project_id"`
+	Env         string                       `json:"env"`
+	Docs        []docsFragmentOut            `json:"docs"`
+	Projection  docsfragments.DocsProjection `json:"projection"`
+	Keys        []string                     `json:"keys"`
+	SearchQuery string                       `json:"search_query"`
+	SearchHits  []string                     `json:"search_hits"`
+	// DocsNotAidos is true iff NO fragment writes truth, the projection writes no truth
+	// (IsProjection=true ∧ WroteKernel=false), and no capability is a truth-write scope —
+	// the screen's deterministic « docs par app ≠ docs AIDOS Mintlify » indicator
+	// (computed from the oracle, never asserted by prose).
+	DocsNotAidos bool `json:"docs_not_aidos"`
+}
+
+func toDocsOut(frags []docsfragments.ServiceFragment) ([]docsFragmentOut, error) {
+	out := make([]docsFragmentOut, 0, len(frags))
+	for _, f := range frags {
+		h, err := docsfragments.HashFragment(f)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, docsFragmentOut{
+			ServiceFragment: f,
+			Hash:            h,
+			WritesTruth:     f.WritesTruth(),
+			Capabilities:    f.Capabilities(),
+		})
+	}
+	return out, nil
+}
+
+// docsDemoSpec is the canonical S90 ApiSpec the docs projection consumes — the SAME
+// anchored « shop » spec the docsfragments fixtures and the api-surface panel use:
+// createOrder (POST, authorize) + listOrders (GET) are SYNC (rendered by Scalar);
+// archiveOrder (POST, async) carries no synchronous route (excluded from the surface, per
+// apisurface.syncOps). Build-time only; the spec is read, never authored by an LLM.
+func docsDemoSpec(project string) apisurface.ApiSpec {
+	return apisurface.ApiSpec{
+		Project: project,
+		Ops: []apisurface.Op{
+			{Name: "createOrder", Entity: entities.Order(), Verb: apisurface.VerbPost, Authorize: true},
+			{Name: "listOrders", Entity: entities.Order(), Verb: apisurface.VerbGet},
+			{Name: "archiveOrder", Entity: entities.Order(), Verb: apisurface.VerbPost, Async: true},
+		},
+	}
+}
+
+// emitDocs prints the DP30 docs-substrate emission (the three docs fragments + the
+// deterministic docs projection over the canonical S90 ApiSpec). The docs_not_aidos flag
+// is COMPUTED from the wall oracle: no fragment writes truth, the projection writes no
+// truth (IsProjection ∧ ¬WroteKernel), and no capability is a truth-write scope
+// (IsTruthWriteCapability). A demo Pagefind search proves the index FINDS a domain term
+// (deterministic token match, never an LLM). Same (project, env) ⇒ byte-identical JSON.
+func emitDocs(project, env string) {
+	frags, err := docsfragments.SubstrateDocsFragments(project, scope.Environment(env))
+	if err != nil {
+		var ref *envbindings.Refusal
+		if errors.As(err, &ref) {
+			fmt.Fprintln(os.Stderr, "aidosdatafragments:", ref.Error())
+			os.Exit(1)
+		}
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", err)
+		os.Exit(1)
+	}
+	docsOut, ferr := toDocsOut(frags)
+	if ferr != nil {
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", ferr)
+		os.Exit(1)
+	}
+
+	projection, perr := docsfragments.EmittedDocs(docsDemoSpec(project))
+	if perr != nil {
+		var ref *docsfragments.DocsRefusal
+		if docsfragments.AsRefusal(perr, &ref) {
+			fmt.Fprintln(os.Stderr, "aidosdatafragments:", ref.BlockReason.Explanation)
+			os.Exit(1)
+		}
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", perr)
+		os.Exit(1)
+	}
+
+	// A demo Pagefind search — the canonical domain term « order » (the Order entity) must
+	// FIND a page; the index is honest (deterministic token match, the « trouve »).
+	const searchQuery = "order"
+	hits := docsfragments.SearchIndex(projection.Pagefind, searchQuery)
+
+	// Compute the capital indicator from the wall oracle — never a prose assertion. No
+	// fragment writes truth, the projection writes no truth, and no capability is a
+	// truth-write scope; docs per app are a projection, DISTINCT from the AIDOS Mintlify docs.
+	docsNotAidos := !projection.WritesTruth() && projection.IsProjection && !projection.WroteKernel
+	for _, f := range docsOut {
+		if f.WritesTruth {
+			docsNotAidos = false
+		}
+		for _, c := range f.Capabilities {
+			if docsfragments.IsTruthWriteCapability(c) {
+				docsNotAidos = false
+			}
+		}
+	}
+
+	res := docsOutput{
+		ProjectID:    project,
+		Env:          env,
+		Docs:         docsOut,
+		Projection:   projection,
+		Keys:         docsfragments.Keys(),
+		SearchQuery:  searchQuery,
+		SearchHits:   hits,
+		DocsNotAidos: docsNotAidos,
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(res); err != nil {
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", err)
+		os.Exit(1)
+	}
+}
+
 func main() {
 	project := flag.String("project", "", "the project the fragments are isolated to")
 	env := flag.String("env", "dev", "the deployment environment (prod|staging|dev|local|future_cloud)")
 	async := flag.Bool("async", false, "emit the DP16 ASYNC-substrate fragments (Windmill + NATS) + the demo dispatch trace instead of the DP15 data fragments")
 	observability := flag.Bool("observability", false, "emit the DP17 OBSERVABILITY-substrate fragments (OTel collector + SigNoz + GlitchTip) + the emitted TS instrumentation instead of the DP15 data fragments")
 	appsvc := flag.Bool("appsvc", false, "emit the DP18 APP-SERVICE-substrate fragments (Forgejo + Plane + Better-Auth) + the auth cabling (S80 × S76) instead of the DP15 data fragments")
+	docs := flag.Bool("docs", false, "emit the DP30 DOCS-substrate fragments (Fumadocs + Scalar + Pagefind) + the deterministic docs projection (Scalar consuming the S90 OpenAPI, Fumadocs concept pages, Pagefind index) instead of the DP15 data fragments")
 	flag.Parse()
+
+	if *docs {
+		emitDocs(*project, *env)
+		return
+	}
 
 	if *appsvc {
 		emitAppService(*project, *env)
