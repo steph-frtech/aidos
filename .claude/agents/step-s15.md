@@ -1,7 +1,7 @@
 ---
 name: step-s15
 description: Dedicated executor for AIDOS step S15 — Truth-scope (kernel). Runs ONLY this step's KRD loop; delegate S15 to this agent.
-model: fable
+model: inherit
 maxTurns: 80
 effort: high
 color: blue

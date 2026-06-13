@@ -1,7 +1,7 @@
 ---
 name: step-s47
 description: Dedicated executor for AIDOS step S47 — Adoption / release (runtime). Runs ONLY this step's KRD loop; delegate S47 to this agent.
-model: fable
+model: inherit
 maxTurns: 120
 effort: high
 color: blue

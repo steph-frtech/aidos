@@ -59,7 +59,7 @@ func exampleLayers() []agentlayer.CoucheAgent {
 			Nom:            "builder",
 			Role:           "builder",
 			Objectif:       "drive a red work item to green in the app tree",
-			Modele:         "claude-fable-5",
+			Modele:         "claude-opus-4-8",
 			Provider:       agentlayer.ProviderAnthropic,
 			ZonesLecture:   []string{"kernel", "mirrors"},
 			ZonesEcriture:  []string{"app"},

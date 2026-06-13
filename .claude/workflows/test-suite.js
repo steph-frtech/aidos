@@ -60,7 +60,7 @@ const COMPAT_SCHEMA = {
 phase('Plan')
 const plan = await agent(
   `Read ${PLAN_PATH} and return each scenario: id, objectif, commande (the gesture to execute), attendu (expected result). Run no scenario.`,
-  { label: 'plan:parse', phase: 'Plan', schema: PLAN_SCHEMA, model: 'fable' },
+  { label: 'plan:parse', phase: 'Plan', schema: PLAN_SCHEMA, model: 'opus' },
 )
 log(`${plan.scenarios.length} scenarios`)
 

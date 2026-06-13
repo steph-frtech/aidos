@@ -1,7 +1,7 @@
 ---
 name: step-s05
 description: Dedicated executor for AIDOS step S05 — CI / cliquet (runtime). Runs ONLY this step's KRD loop; delegate S05 to this agent.
-model: fable
+model: inherit
 maxTurns: 80
 effort: high
 color: blue

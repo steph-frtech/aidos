@@ -184,8 +184,8 @@ describe("paramCatalog — le catalogue des paramètres déclarés (twin pur)", 
 				s.rows.find((r) => r.label === `${id} · outils & skills`),
 			).toBeDefined();
 		}
-		// · le modèle déclaré du fixture est bien claude-fable-5 (anthropic)
-		expect(s.rows.some((r) => r.value === "claude-fable-5 (anthropic)")).toBe(
+		// · le modèle déclaré du fixture est bien claude-opus-4-8 (anthropic)
+		expect(s.rows.some((r) => r.value === "claude-opus-4-8 (anthropic)")).toBe(
 			true,
 		);
 	});
@@ -197,7 +197,7 @@ describe("paramCatalog — le catalogue des paramètres déclarés (twin pur)", 
 		expect(anthropic?.value).toBe(
 			KNOWN_MODELS_BY_PROVIDER.anthropic.join(" · "),
 		);
-		expect(anthropic?.value).toContain("claude-fable-5");
+		expect(anthropic?.value).toContain("claude-opus-4-8");
 	});
 
 	it("AUTONOMIE — les 9 échelons A0..A8 + la ligne du plafond critique A7", () => {

@@ -83,9 +83,9 @@ fi
 # detects it and arms multi-agent workflow orchestration for the session; (2)
 # --effort xhigh (the max headless effort knob, also the settings.json effortLevel
 # default); (3) the workflow-orchestration instructions in the prompt.
-MODEL=claude-fable-5
+MODEL="${AIDOS_BUILD_MODEL:-claude-opus-4-8}"
 PROMPT="ultracode — Tu es en ULTRACODE (mot-clé actif : orchestration par workflows multi-agents + effort xhigh). REPRENDS le build AIDOS de la piste DP dans /data/dev/aidos depuis l'étape ${CURSOR}. Le plan est docs/plan/ROADMAP-provisioning-deploy.md (DP01→DP33) ; la spec canonique est docs/plan/SPEC-stack-2026.md. Exigences absolues maintenues : chaque déploiement dev = une VRAIE app visible (conteneur + route Traefik <projet>-dev.sagedesk.fr) ; la PORTE DE VALIDATION HUMAINE sur dev (événement validation_humaine + loi au miroir : staging refusé sans validation humaine du dev courant). Méthode KRD : miroir d'abord, déterminisme-first, le mur intact, vitest+e2e existants restent verts. Lance le Workflow long-run-dp (scriptPath .claude/workflows/long-run-dp.js — contrat DP + boucle d'auto-relance INTÉGRÉS au script) avec args {startFrom:'${CURSOR}'} ; il s'auto-relance sur cale infra (plan 5x / même étape 3x) et s'arrête sur vrai échec/BLOCKED. e2e via PLAYWRIGHT_WEB_PORT=3210 (ne touche pas la prod :3000). Commit+push build/s00-s47 régulièrement + 2 pages Mintlify dpNN par étape. À DP33 : le one-shot complet + rebuild prod. Ne fais RIEN d'autre."
 log "[$TRACK] RELAUNCH from $CURSOR (phase_done=$phase_done) in tmux aidos-build"
 tmux new-session -d -s aidos-build \
-  "cd $REPO && $CLAUDE --permission-mode bypassPermissions --model $MODEL --effort xhigh \"$PROMPT\" >>/tmp/aidos-autoresume-claude.log 2>&1; echo \"\$(date) claude session ended\" >>$LOG"
+  "cd $REPO && $CLAUDE --permission-mode bypassPermissions --model "$MODEL" --effort xhigh \"$PROMPT\" >>/tmp/aidos-autoresume-claude.log 2>&1; echo \"\$(date) claude session ended\" >>$LOG"
 exit 0

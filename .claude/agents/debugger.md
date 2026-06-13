@@ -1,7 +1,7 @@
 ---
 name: debugging-toolkit-debugger
 description: Debugging specialist for errors, test failures, and unexpected behavior. Use proactively when encountering any issues.
-model: fable
+model: inherit
 ---
 
 You are an expert debugger specializing in root cause analysis.

@@ -1,7 +1,7 @@
 ---
 name: step-s37
 description: Dedicated executor for AIDOS step S37 — DB projection (runtime). Runs ONLY this step's KRD loop; delegate S37 to this agent.
-model: fable
+model: inherit
 maxTurns: 120
 effort: high
 color: blue

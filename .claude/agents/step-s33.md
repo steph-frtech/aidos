@@ -1,7 +1,7 @@
 ---
 name: step-s33
 description: Dedicated executor for AIDOS step S33 — Context router (runtime). Runs ONLY this step's KRD loop; delegate S33 to this agent.
-model: fable
+model: inherit
 maxTurns: 120
 effort: high
 color: blue

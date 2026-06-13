@@ -101,7 +101,7 @@ for (let round = 0; round < MAX_ROUNDS; round++) {
     try {
       plan = await agent(
         `Read ${PLAN_PATH} and return each step (sections '## DPnn — …'): id (e.g. 'DP07'), objectif, inputs, done criteria (résumé des 'Critères de done'). Execute no step.`,
-        { label: `plan:parse:r${round}:${pa}`, phase: 'Plan', schema: PLAN_SCHEMA, model: 'fable' },
+        { label: `plan:parse:r${round}:${pa}`, phase: 'Plan', schema: PLAN_SCHEMA, model: 'opus' },
       )
     } catch (e) {
       log(`⚠ plan:parse round ${round} attempt ${pa} failed (${String(e?.message ?? e).slice(0, 80)}); retrying`)

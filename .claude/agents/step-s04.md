@@ -1,7 +1,7 @@
 ---
 name: step-s04
 description: Dedicated executor for AIDOS step S04 — Le mur (wall hook) (runtime). Runs ONLY this step's KRD loop; delegate S04 to this agent.
-model: fable
+model: inherit
 maxTurns: 80
 effort: high
 color: blue

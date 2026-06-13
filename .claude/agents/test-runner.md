@@ -1,7 +1,7 @@
 ---
 name: test-runner
 description: Runs ONE test scenario, returns PASS/FAIL + suggestions, never writes code
-model: fable
+model: inherit
 maxTurns: 30
 effort: high
 color: yellow

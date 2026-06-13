@@ -75,7 +75,7 @@ for (let pa = 0; pa < 3 && !plan; pa++) {
   try {
     plan = await agent(
       `Read ${PLAN_PATH} and return each step: id, objectif, detailDoc (its docs/plan/*.md), inputs, done criteria. Execute no step.`,
-      { label: `plan:parse:${pa}`, phase: 'Plan', schema: PLAN_SCHEMA, model: 'fable' },
+      { label: `plan:parse:${pa}`, phase: 'Plan', schema: PLAN_SCHEMA, model: 'opus' },
     )
   } catch (e) {
     log(`⚠ plan:parse attempt ${pa} failed (${String(e?.message ?? e).slice(0, 80)}); retrying`)

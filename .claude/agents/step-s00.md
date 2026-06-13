@@ -1,7 +1,7 @@
 ---
 name: step-s00
 description: Dedicated executor for AIDOS step S00 — Contrat d'exécution (runtime). Runs ONLY this step's KRD loop; delegate S00 to this agent.
-model: fable
+model: inherit
 maxTurns: 80
 effort: high
 color: blue

@@ -54,7 +54,7 @@ export async function reformulateAction(
 				"-p",
 				reformulatePrompt(clean),
 				"--model",
-				"claude-fable-5",
+				process.env.AIDOS_LLM_MODEL ?? "claude-opus-4-8",
 				"--output-format",
 				"json",
 				"--max-turns",

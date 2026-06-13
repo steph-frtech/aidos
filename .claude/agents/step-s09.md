@@ -1,7 +1,7 @@
 ---
 name: step-s09
 description: Dedicated executor for AIDOS step S09 — Policy DSL (kernel). Runs ONLY this step's KRD loop; delegate S09 to this agent.
-model: fable
+model: inherit
 maxTurns: 80
 effort: high
 color: blue

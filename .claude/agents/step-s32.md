@@ -1,7 +1,7 @@
 ---
 name: step-s32
 description: Dedicated executor for AIDOS step S32 — ContextGraphDecision (archive). Runs ONLY this step's KRD loop; delegate S32 to this agent.
-model: fable
+model: inherit
 maxTurns: 120
 effort: high
 color: blue

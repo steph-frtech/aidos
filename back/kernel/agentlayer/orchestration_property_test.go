@@ -54,7 +54,7 @@ func baseSpec() agentlayer.AgentSpec {
 		Nom:            "orchestrator",
 		Role:           "orchestrator",
 		Objectif:       "coordinate the team",
-		Modele:         "claude-fable-5",
+		Modele:         "claude-opus-4-8",
 		Provider:       agentlayer.ProviderAnthropic,
 		ZonesLecture:   []string{"kernel"},
 		ZonesEcriture:  []string{"ideas"},

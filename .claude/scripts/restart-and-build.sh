@@ -44,4 +44,4 @@ echo "▶ Reprise (-r) de la session $SID en ultracode/xhigh — build AIDOS (lo
 # orchestration, so --effort xhigh + the workflow-driven prompt = ultracode. --resume
 # reuses the fresh process (agents load) while restoring the conversation + cache.
 # Model PINNED to Fable 5 (deterministic, independent of the saved default).
-exec claude --model claude-fable-5 --effort xhigh --resume "$SID" "$PROMPT"
+exec claude --model "${AIDOS_BUILD_MODEL:-claude-opus-4-8}" --effort xhigh --resume "$SID" "$PROMPT"

@@ -4,7 +4,7 @@ description: Writes, fixes and runs Playwright end-to-end tests for a given flow
 tools: Read, Write, Edit, Bash, Grep, Glob
 skills:
   - playwright-e2e
-model: fable
+model: inherit
 maxTurns: 30
 effort: high
 color: green

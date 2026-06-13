@@ -1,7 +1,7 @@
 ---
 name: step-verifier
 description: Verifies and corrects the result of a step finished by step-executor. Use after each step, before advancing.
-model: fable
+model: inherit
 maxTurns: 60
 effort: high
 memory: project

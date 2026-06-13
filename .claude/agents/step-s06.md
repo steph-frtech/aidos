@@ -1,7 +1,7 @@
 ---
 name: step-s06
 description: Dedicated executor for AIDOS step S06 — Schéma mirrors + liveness (mirror). Runs ONLY this step's KRD loop; delegate S06 to this agent.
-model: fable
+model: inherit
 maxTurns: 80
 effort: high
 color: blue

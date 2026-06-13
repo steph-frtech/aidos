@@ -1,7 +1,7 @@
 ---
 name: step-s01
 description: Dedicated executor for AIDOS step S01 — Magasin de contenu (Postgres + Atlas) (archive). Runs ONLY this step's KRD loop; delegate S01 to this agent.
-model: fable
+model: inherit
 maxTurns: 80
 effort: high
 color: blue

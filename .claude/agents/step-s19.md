@@ -1,7 +1,7 @@
 ---
 name: step-s19
 description: Dedicated executor for AIDOS step S19 — Weighted propagation (kernel). Runs ONLY this step's KRD loop; delegate S19 to this agent.
-model: fable
+model: inherit
 maxTurns: 80
 effort: high
 color: blue

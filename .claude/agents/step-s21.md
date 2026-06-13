@@ -1,7 +1,7 @@
 ---
 name: step-s21
 description: Dedicated executor for AIDOS step S21 — SemanticDiff (archive). Runs ONLY this step's KRD loop; delegate S21 to this agent.
-model: fable
+model: inherit
 maxTurns: 80
 effort: high
 color: blue

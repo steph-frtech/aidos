@@ -69,7 +69,7 @@ export async function chatTurnAction(
 				"-p",
 				palettePrompt(clean, stateSummary.trim().slice(0, 2000)),
 				"--model",
-				"claude-fable-5",
+				process.env.AIDOS_LLM_MODEL ?? "claude-opus-4-8",
 				"--output-format",
 				"json",
 				"--max-turns",

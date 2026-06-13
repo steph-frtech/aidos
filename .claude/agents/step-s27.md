@@ -1,7 +1,7 @@
 ---
 name: step-s27
 description: Dedicated executor for AIDOS step S27 — Ideas lifecycle (kernel). Runs ONLY this step's KRD loop; delegate S27 to this agent.
-model: fable
+model: inherit
 maxTurns: 80
 effort: high
 color: blue

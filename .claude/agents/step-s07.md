@@ -1,7 +1,7 @@
 ---
 name: step-s07
 description: Dedicated executor for AIDOS step S07 — Sensors (runtime). Runs ONLY this step's KRD loop; delegate S07 to this agent.
-model: fable
+model: inherit
 maxTurns: 80
 effort: high
 color: blue

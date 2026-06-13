@@ -1,7 +1,7 @@
 ---
 name: step-s41
 description: Dedicated executor for AIDOS step S41 — Kernel debt (archive). Runs ONLY this step's KRD loop; delegate S41 to this agent.
-model: fable
+model: inherit
 maxTurns: 120
 effort: high
 color: blue

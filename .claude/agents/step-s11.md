@@ -1,7 +1,7 @@
 ---
 name: step-s11
 description: Dedicated executor for AIDOS step S11 — Control / Action (kernel). Runs ONLY this step's KRD loop; delegate S11 to this agent.
-model: fable
+model: inherit
 maxTurns: 80
 effort: high
 color: blue
