@@ -7608,7 +7608,15 @@
 		"invariantBody": "L'invariant AI-never-direct-to-DB est ENCODÉ AU NIVEAU SOURCE, par set-membership sur un ensemble clos d'hôtes datastore DÉCLARÉ (jamais inféré) : un connecteur de classification « ai » dont un egress contient un hôte datastore est REFUSÉ à la validation avec",
 		"counterFixtureNote": "Ce contre-exemple est le MÊME plan IA, mais avec un egress datastore direct ; la validation le refuse. Il n'est PAS seedé dans la liste (il ne serait jamais une source valide) — il sert seulement à rendre l'invariant visible. Egress fautif :",
 		"honestHeading": "Note honnête — seed sous la ligne",
-		"honestBody": "Cet écran rend un SEED de démonstration (une fixture/projection sous la ligne) et n'écrit AUCUNE vérité (ni kernel, ni miroirs, ni fitness). Définir le TYPE de source + sa validation + son content-addressing est du CODE, permis au build (comme AgentSpec). Écrire une INSTANCE — un vrai Connector dans le truth-store — passe par idée → miroir → /goal → approbation par le rôle écrivain de la CLI aidos ; l'agent n'a aucun GRANT."
+		"honestBody": "Cet écran rend un SEED de démonstration (une fixture/projection sous la ligne) et n'écrit AUCUNE vérité (ni kernel, ni miroirs, ni fitness). Définir le TYPE de source + sa validation + son content-addressing est du CODE, permis au build (comme AgentSpec). Écrire une INSTANCE — un vrai Connector dans le truth-store — passe par idée → miroir → /goal → approbation par le rôle écrivain de la CLI aidos ; l'agent n'a aucun GRANT.",
+		"inboxHeading": "Exécution RW — inbox d'approbation runtime (A2)",
+		"inboxBody": "DP21 ENFORCE la portée du connecteur AU RUNTIME par les cinq axes existants resserrés. AMENDEMENT A2 — deux portes : la DÉCLARATION d'un connecteur read_write se grave AU-DESSUS de la ligne (idée → miroir → /goal → approbation, S85/S110) ; l'EXÉCUTION d'une écriture est une autorisation RUNTIME sous la ligne (qui / quand / quel-effet), JAMAIS authority.Decide. Sans approbation runtime fraîche, l'écriture est REFUSÉE (CONNECTOR_RW_NEEDS_APPROVAL) ; une fois approuvée, l'effet est permis. Le verdict est COMPUTÉ par le jumeau pur (lib/connector-enforce), jamais un avis hardcodé.",
+		"inboxRequestNote": "tente une écriture",
+		"rwPermitted": "Écriture permise (approbation runtime accordée)",
+		"rwBlocked": "écriture refusée — approbation runtime requise",
+		"rwApprove": "Approuver",
+		"rwRefuse": "Refuser",
+		"roWriteNote": "Un connecteur read_only qui tente une écriture est REFUSÉ avant toute approbation : un scope read_only n'a AUCUNE porte d'écriture (la lecture est libre dans la portée, l'écriture est fail-closed). Le verdict est une comparaison PURE (op==write ∧ scope==read_only), jamais un jugement LLM."
 	},
 	"connectorsSpike": {
 		"eyebrow": "DP19 · spike gouvernance des connecteurs",

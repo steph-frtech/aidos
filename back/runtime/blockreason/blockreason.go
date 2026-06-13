@@ -467,6 +467,61 @@ const (
 	// enum extension (change_type: refine, never a removal); recorded by a
 	// ChangeSet + SemanticDiff + ADR.
 	CodeMissingSecretAtBoot Code = "MISSING_SECRET_AT_BOOT"
+	// CodeConnectorReadOnly — the RUNTIME connector-scope enforcer (DP21,
+	// back/runtime/connectorenforce, EPIC E) refused a WRITE attempted through a
+	// connector whose declared AccessScope is read_only. A read_only connector has NO
+	// write door at all (KRD §44.3 / DP19 A1, the scope axis of the connector source —
+	// kernel/connector.ScopeReadOnly): the verdict is fail-closed, the write is refused
+	// before any other axis is consulted. DISTINCT from EGRESS_NOT_ALLOWED (the host
+	// allow-list) and CONNECTOR_RW_NEEDS_APPROVAL (the A2 runtime HITL door): this code
+	// is the SCOPE axis — the connector source itself forbids the effect. The verdict is
+	// a PURE comparison (op==write ∧ scope==read_only), never an LLM judgment (§6/§8) and
+	// never authority.Decide (the Kernel truth-admitter never gates a runtime effect, A2).
+	// A scope is never widened below the line: the only door to grant write is to declare
+	// a read_write connector source above the line (idée → miroir → /goal → approbation).
+	// ADDED at DP21 (the connector-scope runtime enforcer EnforceConnectorAction) —
+	// additive enum extension (change_type: refine, never a removal).
+	CodeConnectorReadOnly Code = "CONNECTOR_READ_ONLY"
+	// CodeConnectorRWNeedsApproval — the RUNTIME connector-scope enforcer (DP21,
+	// back/runtime/connectorenforce, EPIC E) refused a WRITE through a read_write connector
+	// for which NO fresh, GRANTED ConnectorRuntimeApproval exists. This is AMENDEMENT A2:
+	// the DECLARATION of a read_write connector (its source/scope) is admitted ABOVE the
+	// line (propose → ChangeSet → approbation, S85/S110), but the EXECUTION of a write is a
+	// RUNTIME, below-the-line, human-in-the-loop authorisation (qui / quand / quel-effet) —
+	// NEVER authority.Decide (the Kernel truth-admitter governs whether a TRUTH may change;
+	// it never gates a runtime EFFECT). Absent or denied approval is FAIL-CLOSED: the write
+	// is refused with this actionable BlockReason, never executed on a self-asserted grant.
+	// The verdict is a PURE set-membership over the supplied approvals (∃ a: a.Connector ==
+	// c ∧ a.Op == write ∧ a.Granted), never an LLM judgment (§6/§8). ADDED at DP21 —
+	// additive enum extension (change_type: refine, never a removal).
+	CodeConnectorRWNeedsApproval Code = "CONNECTOR_RW_NEEDS_APPROVAL"
+	// CodeEgressNotAllowed — the RUNTIME connector-scope enforcer (DP21,
+	// back/runtime/connectorenforce, EPIC E) refused a connector action whose egress host
+	// is NOT a member of the governed implementation's egress allow-list. It REUSES the
+	// EXISTING confinement-axis enforcer agentimpl.EgressAllowed verbatim (set-membership,
+	// fail-closed — an EMPTY allow-list denies EVERY host): the connector-scope enforcer
+	// adds NO new wall, it only resserre the existing five axes by the connector source's
+	// scope. DISTINCT from AGENT_EGRESS_NOT_ALLOWED only in NAMING (the connector-scoped
+	// surfacing of the same set-membership refusal, named per the DP21 done-criteria); the
+	// underlying check is the same pure agentimpl.EgressAllowed. A host is never widened
+	// below the line: the only door is to declare it on the connector source above the line
+	// (idée → miroir → /goal → approbation). The verdict is a PURE set-membership, never an
+	// LLM judgment (§6/§8). ADDED at DP21 — additive enum extension (change_type: refine).
+	CodeEgressNotAllowed Code = "EGRESS_NOT_ALLOWED"
+	// CodeAIDirectDBAccessForbidden — the RUNTIME connector-scope enforcer (DP21,
+	// back/runtime/connectorenforce, EPIC E) refused a connector action by which an
+	// `ai`-classified connector attempted to reach a DATASTORE host directly. This is
+	// AMENDEMENT A3 enforced AT RUNTIME as a pure set-membership: egress_hosts(ai) ∩
+	// {hosts classified datastore} must be EMPTY — the AI never reaches the DB directly,
+	// EVERY AI→DB path passes through a controlled non-ai connector (KRD §44.3 / DP19 A3,
+	// the load-bearing DECLARED invariant). The datastore-host set is the DECLARED closed
+	// set kernel/connector.DatastoreHosts (pure set-membership, never inferred). It is the
+	// RUNTIME twin of the DP20 kernel.connector Validate invariant (which forbids the
+	// DECLARATION of such an egress on the source); this code refuses the ATTEMPTED EFFECT.
+	// FAIL-CLOSED: an ai connector toward a datastore host is refused, never executed. The
+	// verdict is a PURE set-membership (classification==ai ∧ IsDatastoreHost(host)), never
+	// an LLM judgment (§6/§8). ADDED at DP21 — additive enum extension (change_type: refine).
+	CodeAIDirectDBAccessForbidden Code = "AI_DIRECT_DB_ACCESS_FORBIDDEN"
 )
 
 // Severity is the gravity marker of a refusal. The KRD §44.5 example uses
@@ -1180,6 +1235,65 @@ var reasons = map[Code]BlockReason{
 			"rerun : relancez EmitBootstrapSequence une fois les secrets présents ; l'émission est déterministe (même bundle + même état hôte + mêmes secrets → même séquence).",
 		},
 	},
+	CodeConnectorReadOnly: {
+		Code:     CodeConnectorReadOnly,
+		Severity: SeverityBlocking,
+		Explanation: "Écriture REFUSÉE (DP21, back/runtime/connectorenforce) : la tentative d'écriture passe par " +
+			"un connecteur dont la portée déclarée est read_only. Un connecteur read_only n'a AUCUNE porte d'écriture " +
+			"(l'axe scope de la source connecteur, kernel/connector.ScopeReadOnly) : la lecture est libre dans la portée, " +
+			"l'écriture est fail-closed. Le verdict est une comparaison PURE (op==write ∧ scope==read_only), jamais un " +
+			"jugement LLM (§6/§8) et jamais authority.Decide (l'admetteur de vérité du Kernel ne gate pas un effet runtime, A2).",
+		HowToFix: []string{
+			"declare_read_write : pour permettre l'écriture, déclarez une source connecteur read_write AU-DESSUS de la ligne (propose → ChangeSet → approbation, S85/S110) — une portée ne s'élargit jamais en dessous de la ligne.",
+			"read_only_stays_read : si le connecteur doit rester read_only, n'émettez que des lectures dans sa portée (la lecture est libre).",
+			"rerun : rejouez EnforceConnectorAction une fois la source read_write déclarée et approuvée.",
+		},
+	},
+	CodeConnectorRWNeedsApproval: {
+		Code:     CodeConnectorRWNeedsApproval,
+		Severity: SeverityBlocking,
+		Explanation: "Écriture REFUSÉE (DP21, back/runtime/connectorenforce, AMENDEMENT A2) : l'écriture passe par un " +
+			"connecteur read_write mais AUCUNE autorisation runtime fraîche et accordée (ConnectorRuntimeApproval) ne la " +
+			"couvre. La DÉCLARATION du connecteur read_write est admise au-dessus de la ligne (propose → ChangeSet → " +
+			"approbation, S85/S110) ; l'EXÉCUTION d'une écriture est une autorisation RUNTIME below-the-line (qui / quand / " +
+			"quel-effet), JAMAIS authority.Decide (le Kernel gouverne la vérité, pas un effet runtime). L'absence d'approbation " +
+			"est fail-closed. Le verdict est une appartenance ensembliste PURE, jamais un jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"grant_runtime_approval : ouvrez la porte HITL — un humain accorde une ConnectorRuntimeApproval fraîche nommant exactement (connecteur, write) ; sans elle l'écriture est refusée.",
+			"never_authority_decide : n'utilisez PAS authority.Decide pour gater l'effet (A2) — l'admetteur de vérité du Kernel ne couvre que les changements de vérité, jamais un effet runtime.",
+			"rerun : rejouez EnforceConnectorAction en fournissant l'autorisation runtime accordée.",
+		},
+	},
+	CodeEgressNotAllowed: {
+		Code:     CodeEgressNotAllowed,
+		Severity: SeverityBlocking,
+		Explanation: "Action connecteur REFUSÉE (DP21, back/runtime/connectorenforce) : l'hôte egress visé n'est PAS membre " +
+			"de l'allow-list egress de l'implémentation gouvernée. Ce refus RÉUTILISE verbatim l'enforcer de confinement " +
+			"existant agentimpl.EgressAllowed (appartenance ensembliste, fail-closed — une allow-list vide refuse TOUT hôte) : " +
+			"l'enforcer connecteur n'ajoute AUCUN nouveau mur, il resserre les cinq axes existants par la portée de la source. " +
+			"Le verdict est une appartenance ensembliste PURE, jamais un jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"declare_egress_host : ajoutez l'hôte à l'allow-list egress de la source connecteur AU-DESSUS de la ligne (idée → miroir → /goal → approbation) — un hôte ne s'élargit jamais en dessous de la ligne.",
+			"check_allow_list : vérifiez que l'hôte visé correspond exactement à un hôte déclaré (l'allow-list est fail-closed, jamais devinée).",
+			"rerun : rejouez EnforceConnectorAction une fois l'hôte autorisé déclaré et approuvé.",
+		},
+	},
+	CodeAIDirectDBAccessForbidden: {
+		Code:     CodeAIDirectDBAccessForbidden,
+		Severity: SeverityBlocking,
+		Explanation: "Action connecteur REFUSÉE (DP21, back/runtime/connectorenforce, AMENDEMENT A3) : un connecteur " +
+			"classé `ai` tente d'atteindre un hôte DATASTORE directement. L'IA n'atteint JAMAIS la base directement — " +
+			"CHAQUE chemin IA→DB passe par un connecteur contrôlé non-ai (KRD §44.3 / DP19 A3, l'invariant porteur DÉCLARÉ). " +
+			"Enforce au runtime comme appartenance ensembliste : egress_hosts(ai) ∩ {hôtes datastore} = vide, où l'ensemble " +
+			"datastore est l'ensemble fermé DÉCLARÉ kernel/connector.DatastoreHosts (appartenance pure, jamais inférée). " +
+			"C'est le jumeau RUNTIME de l'invariant de DÉCLARATION du Kernel connector.Validate. FAIL-CLOSED. Le verdict est " +
+			"une appartenance ensembliste PURE (classification==ai ∧ IsDatastoreHost(host)), jamais un jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"route_via_controlled_connector : faites passer l'accès IA→DB par un connecteur contrôlé non-ai (la seule voie légale) — l'IA ne touche jamais le datastore en direct.",
+			"remove_datastore_egress : retirez tout hôte datastore de l'egress du connecteur `ai` (la déclaration en est déjà refusée par connector.Validate au-dessus de la ligne).",
+			"rerun : rejouez EnforceConnectorAction une fois l'accès routé par un connecteur contrôlé.",
+		},
+	},
 }
 
 // codeOrder is the canonical enumeration order of the Code enum. Declared, never
@@ -1227,6 +1341,10 @@ var codeOrder = []Code{
 	CodeUnknownProfile,
 	CodeDoltgresNotAllowedInProd,
 	CodeMissingSecretAtBoot,
+	CodeConnectorReadOnly,
+	CodeConnectorRWNeedsApproval,
+	CodeEgressNotAllowed,
+	CodeAIDirectDBAccessForbidden,
 }
 
 // Codes returns every Code in the closed enum, in canonical order.

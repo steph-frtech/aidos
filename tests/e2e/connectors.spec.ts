@@ -124,3 +124,119 @@ test.describe("DP20 — the /connectors panel (declared connector sources)", () 
 		);
 	});
 });
+
+/**
+ * DP21 Playwright e2e — the RUNTIME connector-scope enforcer made interactive on /connectors:
+ * the RW approval inbox (A2 human-in-the-loop) + the live enforcement readout.
+ * mirror record: reflects=DP21-connector-enforce, test_kind=e2e, cert_language=gherkin,
+ *               liveness=alive, authority=below (runtime effect, not a truth-write)
+ *
+ * Scenario: a read_write connector's write is gated by a runtime approval (A2)
+ *   Given the Workbench is running and I am on /connectors
+ *   When I look at the RW approval inbox for the slack-notify connector
+ *   Then without an approval the write is REFUSED with CONNECTOR_RW_NEEDS_APPROVAL
+ *   When I approve the RW request
+ *   Then the write becomes permitted (rw-permitted)
+ *   When I refuse it again
+ *   Then the write is REFUSED again with CONNECTOR_RW_NEEDS_APPROVAL
+ *   And a read_only connector attempting a write is REFUSED with CONNECTOR_READ_ONLY
+ *
+ * THE WALL (§2): the inbox is a below-the-line RUNTIME authorisation (qui/quand/quel-effet),
+ * never authority.Decide ; the declaration of the source is graved above the line via /goal.
+ * The verdict is COMPUTED by the pure twin (lib/connector-enforce), never a UI opinion.
+ */
+test.describe("DP21 — the /connectors RW approval inbox (runtime enforcement)", () => {
+	test.beforeEach(async ({ page }) => {
+		await page.goto("/connectors");
+		await expect(page.getByTestId("rw-approval-inbox")).toBeVisible({
+			timeout: 10000,
+		});
+	});
+
+	test("the RW approval inbox lists the read_write connector", async ({
+		page,
+	}) => {
+		const inbox = page.getByTestId("rw-approval-inbox");
+		await expect(inbox).toBeVisible();
+		const request = inbox
+			.getByTestId("rw-approval")
+			.filter({ has: page.locator('[data-connector="slack-notify"]') });
+		await expect(request).toHaveCount(1);
+		await expect(request).toHaveAttribute("data-connector", "slack-notify");
+	});
+
+	test("without an approval, the RW write is refused CONNECTOR_RW_NEEDS_APPROVAL", async ({
+		page,
+	}) => {
+		const blockreason = page.locator(
+			'[data-testid="rw-blockreason"][data-connector="slack-notify"]',
+		);
+		await expect(blockreason).toBeVisible();
+		await expect(blockreason).toHaveAttribute(
+			"data-code",
+			"CONNECTOR_RW_NEEDS_APPROVAL",
+		);
+		// the permitted readout is NOT shown until approval.
+		await expect(
+			page.locator(
+				'[data-testid="rw-permitted"][data-connector="slack-notify"]',
+			),
+		).toHaveCount(0);
+	});
+
+	test("approving the RW request makes the write permitted", async ({
+		page,
+	}) => {
+		await page
+			.locator('[data-testid="rw-approve"][data-connector="slack-notify"]')
+			.click();
+		const permitted = page.locator(
+			'[data-testid="rw-permitted"][data-connector="slack-notify"]',
+		);
+		await expect(permitted).toBeVisible();
+		// and the block reason disappears once the runtime approval is granted.
+		await expect(
+			page.locator(
+				'[data-testid="rw-blockreason"][data-connector="slack-notify"]',
+			),
+		).toHaveCount(0);
+	});
+
+	test("refusing again re-blocks the write with CONNECTOR_RW_NEEDS_APPROVAL", async ({
+		page,
+	}) => {
+		// approve first…
+		await page
+			.locator('[data-testid="rw-approve"][data-connector="slack-notify"]')
+			.click();
+		await expect(
+			page.locator(
+				'[data-testid="rw-permitted"][data-connector="slack-notify"]',
+			),
+		).toBeVisible();
+		// …then refuse — the runtime authorisation is revoked, the write is fail-closed again.
+		await page
+			.locator('[data-testid="rw-refuse"][data-connector="slack-notify"]')
+			.click();
+		const blockreason = page.locator(
+			'[data-testid="rw-blockreason"][data-connector="slack-notify"]',
+		);
+		await expect(blockreason).toBeVisible();
+		await expect(blockreason).toHaveAttribute(
+			"data-code",
+			"CONNECTOR_RW_NEEDS_APPROVAL",
+		);
+	});
+
+	test("a read_only connector attempting a write is refused CONNECTOR_READ_ONLY", async ({
+		page,
+	}) => {
+		const demo = page.getByTestId("ro-write-demo");
+		await expect(demo).toBeVisible();
+		await expect(demo).toHaveAttribute("data-code", "CONNECTOR_READ_ONLY");
+		await expect(demo.getByTestId("ro-write-blockreason")).toHaveAttribute(
+			"data-code",
+			"CONNECTOR_READ_ONLY",
+		);
+	});
+});

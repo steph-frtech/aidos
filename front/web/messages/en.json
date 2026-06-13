@@ -7608,7 +7608,15 @@
 		"invariantBody": "The AI-never-direct-to-DB invariant is ENCODED AT THE SOURCE LEVEL, by set-membership over a DECLARED closed datastore-host set (never inferred): an « ai »-classified connector whose egress contains a datastore host is REFUSED at validation with",
 		"counterFixtureNote": "This counter-example is the SAME AI plane, but with a direct datastore egress; validation refuses it. It is NOT seeded into the list (it would never be a valid source) — it only serves to make the invariant visible. Offending egress:",
 		"honestHeading": "Honest note — below-the-line seed",
-		"honestBody": "This screen renders a demonstration SEED (a below-the-line fixture/projection) and writes NO truth (no kernel, no mirrors, no fitness). Defining the source TYPE + its validation + its content-addressing is CODE, permitted at build (like AgentSpec). Writing an INSTANCE — a real Connector in the truth-store — goes through idea → mirror → /goal → approval by the aidos CLI writer role; the agent has NO GRANT."
+		"honestBody": "This screen renders a demonstration SEED (a below-the-line fixture/projection) and writes NO truth (no kernel, no mirrors, no fitness). Defining the source TYPE + its validation + its content-addressing is CODE, permitted at build (like AgentSpec). Writing an INSTANCE — a real Connector in the truth-store — goes through idea → mirror → /goal → approval by the aidos CLI writer role; the agent has NO GRANT.",
+		"inboxHeading": "RW execution — runtime approval inbox (A2)",
+		"inboxBody": "DP21 ENFORCES the connector scope AT RUNTIME by the five existing axes, tightened. AMENDMENT A2 — two doors: the DECLARATION of a read_write connector is graved ABOVE the line (idea → mirror → /goal → approval, S85/S110) ; the EXECUTION of a write is a RUNTIME authorisation below the line (who / when / which-effect), NEVER authority.Decide. Without a fresh runtime approval, the write is REFUSED (CONNECTOR_RW_NEEDS_APPROVAL) ; once approved, the effect is permitted. The verdict is COMPUTED by the pure twin (lib/connector-enforce), never a hardcoded opinion.",
+		"inboxRequestNote": "attempts a write",
+		"rwPermitted": "Write permitted (runtime approval granted)",
+		"rwBlocked": "write refused — runtime approval required",
+		"rwApprove": "Approve",
+		"rwRefuse": "Refuse",
+		"roWriteNote": "A read_only connector attempting a write is REFUSED before any approval: a read_only scope has NO write door (reads are free within the scope, writes are fail-closed). The verdict is a PURE comparison (op==write ∧ scope==read_only), never an LLM judgment."
 	},
 	"connectorsSpike": {
 		"eyebrow": "DP19 · connector governance spike",
