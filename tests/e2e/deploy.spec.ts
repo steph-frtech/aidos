@@ -812,3 +812,122 @@ test.describe("DP29 — the deploy & environments cockpit (EPIC F, clôture)", (
 		await expect(page.getByTestId("cockpit-profile")).toHaveCount(9);
 	});
 });
+
+/**
+ * « Déployer ce projet (Pulumi) » Playwright e2e — the REAL per-project×env Pulumi deployment tab
+ * (intention utilisatrice 2026-06-13 : « du Pulumi qui fait les docker par projet »). mirror
+ * record: reflects=pulumi-per-project-fullstack-deploy, test_kind=e2e, cert_language=playwright,
+ * liveness=live.
+ *
+ * Proves the /deploy route's Pulumi tab is action-capable (ui-completeness, CLAUDE.md §7): the
+ * « Déployer ce projet (Pulumi) » control is reachable from the screen, and the « Voir le
+ * programme émis » control reads the PURE emitter (Go honoemit.EmitPulumiStack via `aidospulumi
+ * emit`) — the byte-stable program + the live URL + the containers (<project>-<env>-app/db). The
+ * done-criteria, reached from the screen:
+ *   - the tab exposes the « Déployer ce projet (Pulumi) » button (the gated executor — `pulumi up`)
+ *     and the « Voir le programme émis » button (the read-only PURE emitter);
+ *   - emitting shows the live HTTPS URL (pulumi-url), the EMITTED Pulumi program (pulumi-program-
+ *     preview), and the EXACT containers the deploy will create (<project>-<env>-db / -app);
+ *   - the emitted program lists the project's expected containers + the gold-form anchors
+ *     (priority, tls.certresolver, the external traefik network attach).
+ *
+ * THE WALL (CLAUDE.md §2/§6/§8): the EMITTER is a PURE, byte-stable projection (it writes no
+ * truth); the EXECUTOR (`pulumi up`/`destroy`) is the GATED side-effect — we do NOT run a real
+ * `pulumi up` in e2e (no docker, no network). We exercise the read-only emission + the display +
+ * the presence of the deploy/teardown controls. The DP28 human gate stays upstream of staging.
+ * Anti-flake: anchored on the result section appearing (the state change), never on a timer.
+ */
+test.describe("Pulumi — the real per-project×env deployment tab", () => {
+	test("the tab exposes the « Déployer ce projet (Pulumi) » and « emit » controls", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("pulumi-tab").click();
+		await expect(page.getByTestId("pulumi-section")).toBeVisible();
+		await expect(page.getByTestId("pulumi-project-input")).toBeVisible();
+		await expect(page.getByTestId("pulumi-env-input")).toBeVisible();
+		// the real-deploy button (the gated executor — drives `pulumi up`).
+		await expect(page.getByTestId("pulumi-deploy")).toBeVisible();
+		// the read-only emit button (the PURE emitter preview).
+		await expect(page.getByTestId("pulumi-emit")).toBeVisible();
+	});
+
+	test("emitting shows the live URL, the emitted program and the project's expected containers", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("pulumi-tab").click();
+		// pin a known project×env so the expected container names are deterministic.
+		await page.getByTestId("pulumi-project-input").fill("demoshop");
+		await page.getByTestId("pulumi-env-input").fill("dev");
+		// read the PURE emitter (no real pulumi) — the read-only preview.
+		await page.getByTestId("pulumi-emit").click();
+
+		// anchor on the result section appearing (the state change) — never a timer.
+		await expect(page.getByTestId("pulumi-result")).toBeVisible();
+
+		// the stack identity is <project>-<env>.
+		await expect(page.getByTestId("pulumi-stack")).toHaveText("demoshop-dev");
+
+		// the live HTTPS URL the emitted program pins (https://<stack>.sagedesk.fr).
+		const url = (await page.getByTestId("pulumi-url").innerText()).trim();
+		expect(url).toBe("https://demoshop-dev.sagedesk.fr");
+
+		// the EMITTED Pulumi program is shown for review (the PURE emitter output, index.ts).
+		const program = page.getByTestId("pulumi-program-preview");
+		await expect(program).toBeVisible();
+		const programText = await program.innerText();
+		// the gold-form anchors the emitter must carry.
+		expect(programText).toContain("priority");
+		expect(programText).toContain("tls.certresolver");
+		// the external traefik network is ATTACHED (networksAdvanced), never created.
+		expect(programText).toContain("traefik_default");
+
+		// the EXACT containers the deploy will create (<project>-<env>-db / -app).
+		const containers = page.getByTestId("pulumi-container");
+		await expect(containers).toHaveCount(2);
+		await expect(
+			page.locator(
+				'[data-testid="pulumi-container"][data-name="demoshop-dev-db"]',
+			),
+		).toBeVisible();
+		await expect(
+			page.locator(
+				'[data-testid="pulumi-container"][data-name="demoshop-dev-app"]',
+			),
+		).toBeVisible();
+	});
+
+	test("the emitted program lists the per-project containers the deploy creates", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("pulumi-tab").click();
+		// a DIFFERENT project×env → the program + containers are namespaced to it (per-project×env).
+		await page.getByTestId("pulumi-project-input").fill("alphashop");
+		await page.getByTestId("pulumi-env-input").fill("staging");
+		await page.getByTestId("pulumi-emit").click();
+
+		await expect(page.getByTestId("pulumi-result")).toBeVisible();
+		await expect(page.getByTestId("pulumi-stack")).toHaveText(
+			"alphashop-staging",
+		);
+		// the emitted program names THIS project's containers + DATABASE_URL pointing the datastore.
+		const programText = await page
+			.getByTestId("pulumi-program-preview")
+			.innerText();
+		expect(programText).toContain("alphashop-staging-db");
+		expect(programText).toContain("alphashop-staging-app");
+		// the containers chips carry the per-project×env names.
+		await expect(
+			page.locator(
+				'[data-testid="pulumi-container"][data-name="alphashop-staging-db"]',
+			),
+		).toBeVisible();
+		await expect(
+			page.locator(
+				'[data-testid="pulumi-container"][data-name="alphashop-staging-app"]',
+			),
+		).toBeVisible();
+	});
+});

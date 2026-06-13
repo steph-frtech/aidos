@@ -64,10 +64,14 @@ const (
 	// TargetPulumiProgram — the emitted app's Pulumi/TS infra program (ADR 0043),
 	// projected from the StackManifest. Lands under gen/<project>/infra/index.ts.
 	TargetPulumiProgram = "pulumi-program"
+	// TargetPulumiScaffold — the Pulumi project scaffold (Pulumi.yaml + package.json) the
+	// per-project×env stack emitter (EmitPulumiStack) ships so `pulumi up` boots. Lands under
+	// gen/<project>/infra/{Pulumi.yaml,package.json}.
+	TargetPulumiScaffold = "pulumi-scaffold"
 )
 
 // targetOrder is the canonical enumeration order (declared, never from map iteration).
-var targetOrder = []string{TargetHonoServer, TargetHonoWorker, TargetPulumiProgram}
+var targetOrder = []string{TargetHonoServer, TargetHonoWorker, TargetPulumiProgram, TargetPulumiScaffold}
 
 // Targets returns every honoemit target in canonical order.
 func Targets() []string {
@@ -108,6 +112,7 @@ var (
 	ErrUnknownRole     = errors.New("honoemit: service pins an unknown role")
 	ErrNoServer        = errors.New("honoemit: manifest declares no service role=server")
 	ErrDupInternalPort = errors.New("honoemit: two services pin the same internal port")
+	ErrNoEnv           = errors.New("honoemit: stack pins no environment (project×env)")
 )
 
 // block renders the canonical S13 BlockReason for a malformed spec/manifest. It carries a

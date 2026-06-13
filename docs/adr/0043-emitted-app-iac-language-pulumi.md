@@ -50,6 +50,49 @@ La v1 de la roadmap DP fabriquait à la main un émetteur `docker-compose.yml` (
 - **Kamal 2** — exécuteur zero-downtime, mais **remplace Traefik par kamal-proxy** ; *replaceable* comme exécuteur seulement, jamais au prix de Traefik.
 - **Coolify / Dokploy / Dokku** — Coolify exclu (besoin utilisateur) ; dashboards non déclaratifs/non content-adressés, incompatibles mur/déterminisme.
 
+## Addendum — 2026-06-13 : la cible self-hosted ACTUELLE est Pulumi + `@pulumi/docker` PAR PROJET (preuve `demoshop-dev` live)
+
+> **Statut : ACCEPTÉ — à deux têtes.** Cet addendum **n'efface rien** (anti-overwrite §9) ; il confirme la décision et **gèle la cible self-hosted réelle d'aujourd'hui**, désormais prouvée par une exécution live.
+
+**Exigence utilisatrice (2026-06-13) — « du Pulumi qui fait les docker par projet ».** Chaque projet = sa **full-stack complète**, déployée **POUR DE VRAI** par Pulumi avec le provider `@pulumi/docker` — **un stack par projet×env**, déployable partout (Docker aujourd'hui, cloud demain). Ce n'est plus un objectif de roadmap : c'est la cible **réalisée**.
+
+### La preuve à généraliser (le GOLD)
+
+Le programme manuel `/data/dev/aidos/.deploy-pulumi/demoshop-dev/{index.ts, Pulumi.yaml, package.json}` a **réellement levé** le stack `demoshop-dev` (Postgres healthy + app émise) sur le réseau **EXTERNE** `traefik_default`, routé sur `https://demoshop-dev.sagedesk.fr` avec un **vrai certificat Let's Encrypt**. C'est la **forme** que l'émetteur produit désormais — généralisée par projet×env.
+
+### Décision à deux têtes (les deux cibles coexistent, une seule source)
+
+1. **Cible self-hosted ACTUELLE = Pulumi + provider `@pulumi/docker`, PAR PROJET** — *la forme réelle d'aujourd'hui.* Un **stack par projet×env** (`<project>-<env>`), conteneurs `<project>-<env>-<service>`, volume `<project>-<env>-<vol>`, attaché au réseau externe `traefik_default`, labels Traefik complets. **RÉELLEMENT exécuté** par la commande **`aidospulumi up/down`** (`back/cmd/aidospulumi`) — l'exécuteur gaté side-effectant (calqué sur `docker compose up -d` d'`ai-lab/actions.ts:deployStack`), qui matérialise le programme émis byte-stable puis pilote `pulumi up`/`pulumi destroy` sur le backend local. **Preuve : `demoshop-dev` live.**
+
+2. **Le `docker-compose`-emit reste une PROJECTION DÉRIVABLE de la MÊME source** (anti-overwrite §9). Le **StackManifest AST** reste la **source unique** au-dessus du mur ; **compose** (DP03/DP05) **et** le **programme Pulumi/TS** (cet ADR) sont **deux projections déterministes** d'une seule vérité — aucune ne supplante l'autre, aucune n'est réécrite. *Une source → N cibles.*
+
+3. **Cible `future_cloud` (DP33) = Pulumi avec un provider CLOUD** — *le même programme*, providers cloud (k8s / Fly / RDS / DNS managé) + interop HCL native, par simple changement de stack/config Pulumi. La généralisation par projet×env est la même mécanique : *le code ne change pas, seules les vars d'env + le provider changent.*
+
+### Réconciliation avec SPEC-stack-2026
+
+`SPEC-stack-2026.md` grave la stack émise et son one-shot. **Le `docker-compose` y était l'intérim** (« la v1 de la roadmap DP fabriquait à la main un émetteur `docker-compose.yml` »). **Pulumi-docker est désormais le provisioning RÉEL par projet** : la « Correspondance AIDOS » de la SPEC pointe le one-shot bootstrap vers la piste DP — cet addendum précise que **l'exécution réelle par projet×env passe par `aidospulumi`** sur le programme émis (`honoemit.EmitPulumiStack`), le compose restant une projection dérivable de la même source. La SPEC n'est pas réécrite ; cet ADR en est la **réalisation déployable**.
+
+### Les exigences découvertes par la preuve (que l'émetteur produit désormais)
+
+La forme GOLD a révélé ce que l'émetteur DP03/DP05 d'origine ne produisait pas encore — toutes intégrées :
+
+- **`traefik.http.routers.<stack>.priority=1000`** sur le routeur du service serveur, pour **PRIMER** le placeholder wildcard `aidos-dev-preview` (HostRegexp `*-dev.sagedesk.fr`). *La découverte clé* : sans cette priorité, le wildcard dev-preview capte la requête avant le routeur du projet.
+- **Réseau externe attaché, jamais créé** : `Network.External=true` ⇒ `networksAdvanced: [{ name: "traefik_default" }]` **inline**, **sans** `new docker.Network` (un réseau non-externe, lui, EST créé).
+- **Labels Traefik COMPLETS** : `Host(\`<stack>.sagedesk.fr\`)`, `entrypoints=websecure`, `tls=true`, `tls.certresolver=le`, priority, `loadbalancer.server.port=<internal_port>`.
+- **Env + volume + healthcheck** : `DATABASE_URL` pointant le datastore par son nom de conteneur (`<stack>-<db>`), volume mount du datastore, healthcheck `pg_isready`.
+- **Nommage par projet×env** : conteneurs `<project>-<env>-<service>`, volume `<project>-<env>-<vol>`, stack `<project>-<env>`.
+- **`RemoteImage{keepLocally:true}`** par image distincte ; émission du **scaffold** (`Pulumi.yaml` + `package.json`, `index.ts` appelle `program()`).
+
+### Déterminisme-first inchangé (le mur §2/§6/§8)
+
+L'**émetteur** `honoemit.EmitPulumiStack(project, env, manifest)` reste une **fonction PURE TOTALE byte-stable** (même manifest+env ⇒ programme byte-identique, FN02-pur) — du CODE + un miroir de reproductibilité (7 tests property+fixture). L'**exécuteur** (`aidospulumi up/destroy`) est le **GESTE GATÉ** side-effectant — il ne juge rien, il exécute le programme émis ; il n'écrit **aucune vérité** (projection below-the-line). L'agent écrit le code d'infra au build, jamais dans la boucle runtime.
+
+### Sur l'implémentation
+
+- **Émetteur** : `back/runtime/honoemit/pulumi_stack.go` — `func EmitPulumiStack(project, env string, m StackManifest) ([]Artifact, *blockreason.BlockReason)` → 3 artefacts content-adressés (`Pulumi.yaml`, `index.ts`, `package.json`) sous `gen/<project>/infra/`, ordre path-trié fixe. `EmitPulumiProgram` (le caller preview/DP25) **inchangé & byte-stable**.
+- **Exécuteur** : `back/cmd/aidospulumi/main.go` — `aidospulumi up/down --project <p> --env <e>` ; `Materialise`/`PulumiUp`/`PulumiDown`. Backend local `file://$HOME/.pulumi-aidos-state`, `PULUMI_CONFIG_PASSPHRASE=aidos`.
+- **OpenQuestion non-bloquant (forward dep)** : l'exécuteur lit `defaultManifest(project)` (la topologie GOLD paramétrée) jusqu'à ce que le read-path `stack_manifest` du kernel (DP02) existe ; un wrapper MCP de l'exécuteur est un suivi propre.
+
 ## Sources (tool-search, juin 2026)
 
 - Pulumi (IaC in any language ; interop HCL janv. 2026 ; testabilité) : <https://www.pulumi.com/docs/iac/> · <https://github.com/pulumi/pulumi> · <https://www.pulumi.com/docs/iac/comparisons/opentofu/>

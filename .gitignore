@@ -115,6 +115,9 @@ back/cmd/aidosdemoemit/
 .deploy-app/
 back/cmd/aidosappemit/
 
+# per-project Pulumi deploy workdirs (node_modules + emitted infra programs, not committed)
+.deploy-pulumi/
+
 # V3 persisted projects (replayable transcripts, user data — never committed)
 .aidos-projects/
 

@@ -1,5 +1,7 @@
 "use server";
 
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import {
 	buildPlan,
 	type DeployInput,
@@ -50,6 +52,7 @@ import type {
 	DomainView,
 	EnvView,
 	PreviewView,
+	PulumiView,
 } from "./view";
 
 /**
@@ -786,4 +789,110 @@ export async function cockpitAction(
 	]);
 
 	return { ok: true, projection, audit };
+}
+
+/* --- « Déployer ce projet (Pulumi) » : the REAL per-project×env Pulumi deployment ------------ */
+
+const execFileP = promisify(execFile);
+
+/** The repo root the Go executor runs from (cwd of `go run ./cmd/aidospulumi`). */
+const AIDOS_REPO = process.env.AIDOS_REPO || "/data/dev/aidos";
+
+/**
+ * Server Action for the « Déployer ce projet (Pulumi) » tab — the REAL per-project×env Pulumi
+ * deployment (intention utilisatrice 2026-06-13 : « du Pulumi qui fait les docker par projet »,
+ * mémoire pulumi-per-project-fullstack). UN stack Pulumi par projet×env, déployé POUR DE VRAI par
+ * Pulumi (@pulumi/docker), déployable partout (Docker maintenant, cloud demain).
+ *
+ * THE TWO HALVES (determinism-first, CLAUDE.md §2/§6/§8).
+ *  - `emit` reads the PURE emitter (Go honoemit.EmitPulumiStack via `aidospulumi emit`) — the
+ *    Pulumi program + URL + containers, a byte-stable projection (same input → same program). It
+ *    writes NO truth (below-the-line projection). The screen SHOWS this program for review.
+ *  - `up` / `down` are the GATED SIDE-EFFECT — EXACTLY like ai-lab/actions.ts:deployStack runs
+ *    `docker compose up -d` today. They exec `aidospulumi up`/`down`, which materialises the
+ *    emitted artifacts then drives `pulumi up`/`destroy` over the PURE emitted program. The
+ *    executor judges nothing; it executes the program. No injection surface (the project name is
+ *    passed as an execFile arg, never shell-interpolated).
+ *
+ * La porte de validation humaine DP28 reste EN AMONT du staging (l'onglet Environnements) ; ce
+ * geste cible un env NON-PROD (dev) par défaut — un déploiement réel, jamais une promotion staging.
+ *
+ * The single action is driven by an `intent` field (emit | up | down) so the tab's controls reach
+ * the same Go executor.
+ */
+export async function pulumiAction(
+	_prev: PulumiView,
+	formData: FormData,
+): Promise<PulumiView> {
+	const intent = (String(formData.get("intent") ?? "emit") || "emit") as
+		| "emit"
+		| "up"
+		| "down";
+	const project = String(formData.get("project") ?? "").trim() || "shop";
+	const env = String(formData.get("env") ?? "").trim() || "dev";
+
+	// Run the Go executor for the requested gesture. `emit` is read-only (no pulumi, no disk write):
+	// it prints the emitted program + url + containers as JSON. `up`/`down` drive the real pulumi
+	// lifecycle (the gated side-effect) and print {status, url, containers, stack}.
+	try {
+		const { stdout } = await execFileP(
+			"go",
+			["run", "./cmd/aidospulumi", intent, "--project", project, "--env", env],
+			{
+				cwd: `${AIDOS_REPO}/back`,
+				timeout: intent === "emit" ? 120_000 : 600_000,
+				maxBuffer: 16 * 1024 * 1024,
+				// GOTOOLCHAIN=auto: the bare PATH `go` may predate the go.mod toolchain; auto resolves
+				// the cached one (the SAME pattern ai-lab/actions.ts:deployStack uses for `go run`).
+				env: { ...process.env, GOTOOLCHAIN: "auto" },
+			},
+		);
+		const out = JSON.parse(stdout) as {
+			stack?: string;
+			url?: string;
+			containers?: string[];
+			path?: string;
+			program?: string;
+			status?: "up" | "down";
+			dir?: string;
+		};
+
+		if (intent === "emit") {
+			return {
+				ok: true,
+				intent: "emit",
+				project,
+				env,
+				stack: out.stack,
+				url: out.url,
+				containers: out.containers ?? [],
+				programPath: out.path,
+				program: out.program,
+			};
+		}
+
+		return {
+			ok: true,
+			intent,
+			project,
+			env,
+			stack: out.stack,
+			url: out.url,
+			containers: out.containers ?? [],
+			status: out.status,
+			detail:
+				intent === "up"
+					? `pulumi up --stack ${out.stack} → ${out.dir ?? ""}`
+					: `pulumi destroy --stack ${out.stack}`,
+		};
+	} catch (e) {
+		return {
+			ok: false,
+			intent,
+			project,
+			env,
+			blockCode: intent === "emit" ? "EMIT_FAILED" : "PULUMI_FAILED",
+			blockExplanation: String(e).slice(0, 400),
+		};
+	}
 }

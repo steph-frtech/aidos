@@ -11,6 +11,7 @@ import {
 	domainAction,
 	envAction,
 	previewAction,
+	pulumiAction,
 } from "./actions";
 import {
 	COCKPIT_INITIAL,
@@ -23,6 +24,8 @@ import {
 	type EnvView,
 	PREVIEW_INITIAL,
 	type PreviewView,
+	PULUMI_INITIAL,
+	type PulumiView,
 } from "./view";
 
 /** The DP06 closed environment set the domain-cabling selector offers (prod/staging/dev/
@@ -115,7 +118,7 @@ export function DeployPanel({
 		DEPLOY_INITIAL,
 	);
 	const [tab, setTab] = useState<
-		"cockpit" | "deploy" | "preview" | "env" | "domain"
+		"cockpit" | "deploy" | "preview" | "env" | "domain" | "pulumi"
 	>("deploy");
 
 	return (
@@ -207,6 +210,20 @@ export function DeployPanel({
 				>
 					{t("tabDomain")}
 				</button>
+				<button
+					type="button"
+					role="tab"
+					data-testid="pulumi-tab"
+					aria-selected={tab === "pulumi"}
+					onClick={() => setTab("pulumi")}
+					className={
+						tab === "pulumi"
+							? "flex-1 rounded-md bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm"
+							: "flex-1 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+					}
+				>
+					{t("tabPulumi")}
+				</button>
 			</div>
 
 			{tab === "cockpit" ? (
@@ -217,6 +234,8 @@ export function DeployPanel({
 				<EnvSection activeProjectId={activeProjectId} />
 			) : tab === "domain" ? (
 				<DomainSection activeProjectId={activeProjectId} />
+			) : tab === "pulumi" ? (
+				<PulumiSection activeProjectId={activeProjectId} />
 			) : (
 				<DeploySection state={state} action={action} />
 			)}
@@ -1905,6 +1924,265 @@ function DomainSection({
 							))}
 						</ul>
 					</section>
+				</div>
+			)}
+		</div>
+	);
+}
+
+/** A Pulumi-section control button — submits the form with its `intent`. */
+function PulumiButton({
+	label,
+	intent,
+	testid,
+	variant = "primary",
+}: {
+	label: string;
+	intent: "emit" | "up" | "down";
+	testid: string;
+	variant?: "primary" | "secondary" | "destructive";
+}) {
+	const t = useTranslations("deploy");
+	const { pending } = useFormStatus();
+	const cls =
+		variant === "destructive"
+			? "border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20"
+			: variant === "secondary"
+				? "border border-border bg-background text-foreground hover:bg-muted"
+				: "bg-primary text-primary-foreground hover:bg-primary/90";
+	return (
+		<button
+			type="submit"
+			name="intent"
+			value={intent}
+			data-testid={testid}
+			disabled={pending}
+			className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 ${cls}`}
+		>
+			{pending ? t("working") : label}
+		</button>
+	);
+}
+
+/**
+ * PulumiSection — the « Déployer ce projet (Pulumi) » tab (intention utilisatrice 2026-06-13 :
+ * « du Pulumi qui fait les docker par projet »). It makes the /deploy route REALLY deploy a
+ * per-project×env Pulumi stack (one stack per project×env, deployed FOR REAL by @pulumi/docker).
+ *
+ * Action-capable surfaces (ui-completeness, CLAUDE.md §7):
+ *  - « Voir le programme émis » (pulumi-emit) — reads the PURE emitter (Go honoemit.EmitPulumiStack
+ *    via `aidospulumi emit`): the program text, the URL, the containers — a byte-stable projection,
+ *    NO truth written. Shown for review (pulumi-program-preview).
+ *  - « Déployer ce projet (Pulumi) » (pulumi-deploy) — the GATED SIDE-EFFECT (exactly like
+ *    deployStack runs `docker compose up -d`): execs `aidospulumi up`, drives a real `pulumi up`.
+ *    Shows the live URL (pulumi-url) + the created containers (pulumi-container).
+ *  - « Démonter » (pulumi-down) — `aidospulumi down` (`pulumi destroy`).
+ *
+ * La porte de validation humaine DP28 reste EN AMONT du staging (onglet Environnements) ; ce geste
+ * cible un env NON-PROD (dev) par défaut. DETERMINISM-FIRST : l'émetteur est PUR, byte-stable ;
+ * l'exécuteur ne juge rien, il exécute le programme émis (le mur §2/§6/§8).
+ */
+function PulumiSection({
+	activeProjectId,
+}: {
+	activeProjectId: string | null;
+}) {
+	const t = useTranslations("deploy");
+	const [state, action] = useActionState<PulumiView, FormData>(
+		pulumiAction,
+		PULUMI_INITIAL,
+	);
+
+	return (
+		<div className="space-y-6" data-testid="pulumi-section">
+			<form
+				action={action}
+				className="space-y-5 rounded-xl border border-border p-5"
+			>
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					{t("pulumiIntro")}
+				</p>
+				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<div className="space-y-2">
+						<label
+							htmlFor="pulumi-project"
+							className="text-sm font-medium text-foreground"
+						>
+							{t("projectLabel")}
+						</label>
+						<input
+							id="pulumi-project"
+							name="project"
+							defaultValue={activeProjectId ?? "shop"}
+							data-testid="pulumi-project-input"
+							className="block w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						/>
+					</div>
+					<div className="space-y-2">
+						<label
+							htmlFor="pulumi-env"
+							className="text-sm font-medium text-foreground"
+						>
+							{t("pulumiEnvLabel")}
+						</label>
+						<input
+							id="pulumi-env"
+							name="env"
+							defaultValue="dev"
+							data-testid="pulumi-env-input"
+							className="block w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						/>
+						<p className="text-xs text-muted-foreground">
+							{t("pulumiEnvHint")}
+						</p>
+					</div>
+				</div>
+				<div className="flex flex-wrap gap-3">
+					<PulumiButton
+						label={t("pulumiEmitLabel")}
+						intent="emit"
+						testid="pulumi-emit"
+						variant="secondary"
+					/>
+					<PulumiButton
+						label={t("pulumiDeployLabel")}
+						intent="up"
+						testid="pulumi-deploy"
+					/>
+					{state.ok && (state.intent === "up" || state.intent === "down") && (
+						<PulumiButton
+							label={t("pulumiDownLabel")}
+							intent="down"
+							testid="pulumi-down"
+							variant="destructive"
+						/>
+					)}
+				</div>
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					{t("pulumiGateNote")}
+				</p>
+			</form>
+
+			{state.blockExplanation && !state.ok && (
+				<section
+					data-testid="pulumi-block-reason"
+					data-code={state.blockCode}
+					className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/5 p-5"
+				>
+					<h2 className="text-sm font-semibold text-destructive">
+						{t("blockedHeading")} · {state.blockCode}
+					</h2>
+					<p className="font-mono text-xs leading-relaxed text-muted-foreground">
+						{state.blockExplanation}
+					</p>
+				</section>
+			)}
+
+			{state.ok && (
+				<div className="space-y-6" data-testid="pulumi-result">
+					{/* The stack identity + the live URL + the containers (created on `up`, listed on `emit`). */}
+					<section className="space-y-3 rounded-xl border border-border p-5">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<h2 className="text-sm font-semibold text-foreground">
+								{t("pulumiStackHeading")}
+							</h2>
+							{state.url && (
+								<a
+									href={state.url}
+									data-testid="pulumi-url"
+									className="font-mono text-xs text-blue-600 underline"
+								>
+									{state.url}
+								</a>
+							)}
+						</div>
+						<dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+							<div>
+								<dt className="text-muted-foreground">{t("stackLabel")}</dt>
+								<dd
+									data-testid="pulumi-stack"
+									className="font-mono text-foreground"
+								>
+									{state.stack}
+								</dd>
+							</div>
+							<div>
+								<dt className="text-muted-foreground">
+									{t("pulumiStatusLabel")}
+								</dt>
+								<dd
+									data-testid="pulumi-status"
+									data-status={state.status ?? state.intent}
+									className="font-mono text-foreground"
+								>
+									{state.status === "up"
+										? t("pulumiStatusUp")
+										: state.status === "down"
+											? t("pulumiStatusDown")
+											: t("pulumiStatusEmitted")}
+								</dd>
+							</div>
+						</dl>
+						{state.detail && (
+							<p
+								data-testid="pulumi-detail"
+								className="font-mono text-xs text-muted-foreground"
+							>
+								{state.detail}
+							</p>
+						)}
+						{/* The containers the stack runs / will run (<stack>-app, <stack>-db). */}
+						{(state.containers?.length ?? 0) > 0 && (
+							<div className="space-y-1">
+								<p className="text-xs font-medium text-foreground">
+									{t("pulumiContainersHeading")}
+								</p>
+								<ul
+									className="flex flex-wrap gap-2"
+									data-testid="pulumi-containers"
+								>
+									{(state.containers ?? []).map((c) => (
+										<li
+											key={c}
+											data-testid="pulumi-container"
+											data-name={c}
+											className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 font-mono text-xs text-foreground"
+										>
+											{c}
+										</li>
+									))}
+								</ul>
+							</div>
+						)}
+					</section>
+
+					{/* The EMITTED Pulumi program (the index.ts) — the PURE emitter output, shown for review. */}
+					{state.program && (
+						<section className="space-y-2 rounded-xl border border-border p-5">
+							<div className="flex flex-wrap items-center justify-between gap-2">
+								<h2 className="text-sm font-semibold text-foreground">
+									{t("pulumiProgramHeading")}
+								</h2>
+								{state.programPath && (
+									<span
+										data-testid="pulumi-program-path"
+										className="font-mono text-xs text-muted-foreground"
+									>
+										{state.programPath}
+									</span>
+								)}
+							</div>
+							<p className="text-xs leading-relaxed text-muted-foreground">
+								{t("pulumiProgramNote")}
+							</p>
+							<pre
+								data-testid="pulumi-program-preview"
+								className="max-h-96 overflow-auto rounded-lg border border-border bg-muted/40 p-4 font-mono text-xs leading-relaxed text-foreground"
+							>
+								{state.program}
+							</pre>
+						</section>
+					)}
 				</div>
 			)}
 		</div>

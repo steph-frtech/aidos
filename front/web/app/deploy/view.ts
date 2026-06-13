@@ -166,3 +166,45 @@ export interface CockpitView {
 }
 
 export const COCKPIT_INITIAL: CockpitView = { ok: false };
+
+/**
+ * View model for the « Déployer ce projet (Pulumi) » tab — the REAL per-project×env Pulumi
+ * deployment (intention utilisatrice 2026-06-13 : « du Pulumi qui fait les docker par projet »).
+ *
+ * THE TWO HALVES (determinism-first, CLAUDE.md §2/§6/§8). The EMITTER (Go honoemit.EmitPulumiStack,
+ * read via `aidospulumi emit`) is a PURE, byte-stable projection of (project, env, manifest) → the
+ * Pulumi program + scaffold; it writes NO truth (below-the-line projection). The EXECUTOR
+ * (`aidospulumi up`/`down`, exactly like ai-lab/actions.ts:deployStack runs `docker compose up -d`)
+ * is the GATED SIDE-EFFECT — it judges nothing, it drives `pulumi up`/`destroy` over the emitted
+ * program. La porte de validation humaine DP28 reste EN AMONT du staging (l'onglet Environnements) ;
+ * ce déploiement Pulumi cible un env non-prod (dev) par défaut.
+ */
+export interface PulumiView {
+	ok: boolean;
+	/** the intent the action ran (emit | up | down). */
+	intent?: "emit" | "up" | "down";
+	/** the project deployed (the per-project namespace). */
+	project?: string;
+	/** the environment (dev default — non-prod ; staging stays behind the DP28 human gate). */
+	env?: string;
+	/** the Pulumi stack identity (<project>-<env>). */
+	stack?: string;
+	/** the live HTTPS URL the emitted program pins (https://<stack>.sagedesk.fr). */
+	url?: string;
+	/** the container names the stack runs / will run (<stack>-app, <stack>-db). */
+	containers?: string[];
+	/** the emitter Path of the program (gen/<project>/infra/index.ts) — read-only preview source. */
+	programPath?: string;
+	/** the emitted Pulumi program text (index.ts) — the PURE emitter output, shown for review. */
+	program?: string;
+	/** the executor status (« up » when pulumi up succeeded, « down » when destroyed). */
+	status?: "up" | "down";
+	/** a short detail line from the executor (the gesture log). */
+	detail?: string;
+	/** the refusal code when the gesture is refused / the executor errored. */
+	blockCode?: string;
+	/** the BlockReason / error explanation when refused or the executor failed. */
+	blockExplanation?: string;
+}
+
+export const PULUMI_INITIAL: PulumiView = { ok: false };
