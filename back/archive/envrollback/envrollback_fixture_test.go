@@ -93,6 +93,13 @@ func phaseHashOf(t *testing.T, p envrollback.PhaseInput) string {
 
 func TestPromoteFixtures(t *testing.T) {
 	stable := stablePhaseN("createOrder", "v2")
+	// DP28 — the dev/preview → staging hop is now GATED by a human validation of the EXACT phase.
+	// A stable phase still promotes to staging, now WITH the human gate satisfied (the behaviour is
+	// preserved under the new law; the prod/preview hops are not gated).
+	stableHash := phaseHashOf(t, stable)
+	stableDevValidation := envrollback.RecordHumanValidation(envrollback.HumanValidationInput{
+		Env: envrollback.EnvPreview, PhaseHash: stableHash, Validated: true, By: "alice",
+	})
 	cases := []struct {
 		name     string
 		in       envrollback.PromoteInput
@@ -105,8 +112,8 @@ func TestPromoteFixtures(t *testing.T) {
 			wantOK: true,
 		},
 		{
-			name:   "stable phase promotes to staging",
-			in:     envrollback.PromoteInput{Env: envrollback.EnvStaging, Project: "shop", Phase: stable},
+			name:   "stable phase promotes to staging (DP28: with the dev human validation)",
+			in:     envrollback.PromoteInput{Env: envrollback.EnvStaging, Project: "shop", Phase: stable, DevValidation: &stableDevValidation},
 			wantOK: true,
 		},
 		{
@@ -252,6 +259,121 @@ func TestRollbackFixtures(t *testing.T) {
 				t.Fatalf("refusal code = %q, want %q", br.Code, c.wantCode)
 			}
 		})
+	}
+}
+
+// TestPromoteToStagingHumanGateFixtures is the DP28 PORTE DE VALIDATION HUMAINE in fixture form
+// (state → command → events): the human SEES the live dev deployment (DP25) then validates|refuses
+// it; the promotion preview/dev → staging is GATED by a validation_humaine validated=true of the
+// EXACT phase. NO validation, a validation of ANOTHER phase, or validated=false ⇒ fail-closed
+// DEV_NOT_HUMAN_VALIDATED. The validation is a HITL-runtime decision (qui/quand/quelle phase),
+// NEVER authority.Decide.
+func TestPromoteToStagingHumanGateFixtures(t *testing.T) {
+	target := stablePhaseN("createOrder", "v2")
+	targetHash := phaseHashOf(t, target)
+	other := stablePhaseN("createOrder", "v7")
+	otherHash := phaseHashOf(t, other)
+
+	validation := func(phaseHash string, validated bool) *envrollback.HumanValidation {
+		v := envrollback.RecordHumanValidation(envrollback.HumanValidationInput{
+			Env: envrollback.EnvPreview, PhaseHash: phaseHash, Validated: validated, By: "alice",
+		})
+		return &v
+	}
+
+	cases := []struct {
+		name     string
+		dev      *envrollback.HumanValidation
+		wantOK   bool
+		wantCode blockreason.Code
+	}{
+		{
+			name:     "no validation ⇒ DEV_NOT_HUMAN_VALIDATED (fail-closed)",
+			dev:      nil,
+			wantOK:   false,
+			wantCode: blockreason.CodeDevNotHumanValidated,
+		},
+		{
+			name:   "validation of the EXACT phase validated=true ⇒ permitted",
+			dev:    validation(targetHash, true),
+			wantOK: true,
+		},
+		{
+			name:     "validation of ANOTHER phase ⇒ DEV_NOT_HUMAN_VALIDATED (per-phase)",
+			dev:      validation(otherHash, true),
+			wantOK:   false,
+			wantCode: blockreason.CodeDevNotHumanValidated,
+		},
+		{
+			name:     "validation of the exact phase validated=false ⇒ DEV_NOT_HUMAN_VALIDATED (fail-closed)",
+			dev:      validation(targetHash, false),
+			wantOK:   false,
+			wantCode: blockreason.CodeDevNotHumanValidated,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			prom, br := envrollback.Promote(envrollback.PromoteInput{
+				Env: envrollback.EnvStaging, Project: "shop", Phase: target, DevValidation: c.dev,
+			})
+			if c.wantOK {
+				if br != nil {
+					t.Fatalf("staging promotion refused: %v", br.Explanation)
+				}
+				if prom.ID == "" || prom.Env != envrollback.EnvStaging {
+					t.Fatalf("staging promotion incomplete: %+v", prom)
+				}
+				return
+			}
+			if br == nil {
+				t.Fatalf("expected refusal %s, got plan %+v", c.wantCode, prom)
+			}
+			if br.Code != c.wantCode {
+				t.Fatalf("refusal code = %q, want %q", br.Code, c.wantCode)
+			}
+		})
+	}
+}
+
+// TestPromoteToProdAndPreviewNotGatedByDevValidation — the human-validation gate is the dev→staging
+// hop ONLY. A promotion to prod or to preview (the dev deployment itself) is NOT gated by it (a
+// prod promotion is gated upstream by the staging→prod flow; the preview IS the dev the human sees).
+func TestPromoteToProdAndPreviewNotGatedByDevValidation(t *testing.T) {
+	ph := stablePhaseN("createOrder", "v2")
+	for _, env := range []envrollback.Environment{envrollback.EnvPreview, envrollback.EnvProd} {
+		prom, br := envrollback.Promote(envrollback.PromoteInput{
+			Env: env, Project: "shop", Phase: ph,
+		})
+		if br != nil {
+			t.Fatalf("promotion to %q refused (must not be gated by the dev validation): %v", env, br.Explanation)
+		}
+		if prom.ID == "" {
+			t.Fatalf("promotion to %q incomplete", env)
+		}
+	}
+}
+
+// TestRecordHumanValidationIsAppendOnlyDecision — RecordHumanValidation builds an append-only,
+// content-addressed HITL-runtime decision (qui/quand/quelle phase/validated), with provenance —
+// NEVER authority.Decide. Its id is content-addressed and the body is self-contained.
+func TestRecordHumanValidationIsAppendOnlyDecision(t *testing.T) {
+	ph := stablePhaseN("createOrder", "v2")
+	h := phaseHashOf(t, ph)
+	v := envrollback.RecordHumanValidation(envrollback.HumanValidationInput{
+		Env: envrollback.EnvPreview, PhaseHash: h, Validated: true, By: "alice",
+	})
+	if v.ID == "" {
+		t.Fatalf("validation has no content address")
+	}
+	if v.PhaseHash != h || !v.Validated || v.By != "alice" || v.Env != envrollback.EnvPreview {
+		t.Fatalf("validation does not preserve who/what/which-phase: %+v", v)
+	}
+	// A missing actor defaults to "human" (provenance §9 never invents an actor but is never empty).
+	anon := envrollback.RecordHumanValidation(envrollback.HumanValidationInput{
+		Env: envrollback.EnvPreview, PhaseHash: h, Validated: true,
+	})
+	if anon.By != "human" {
+		t.Fatalf("missing actor must default to \"human\", got %q", anon.By)
 	}
 }
 

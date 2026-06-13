@@ -117,10 +117,99 @@ func (p PhaseInput) reProjectedHash() (string, error) {
 	return preview.EmittedAppHash(preview.PhaseRef{PhaseHash: h}, p.Surface)
 }
 
+// ─── HUMAN-VALIDATION GATE ON THE DEV (DP28) ────────────────────────────────────────────────
+
+// HumanValidation is the « validation_humaine » event (DP28): the human SAW the live dev/preview
+// deployment of an EXACT phase (DP25 — the real app has a URL the human opens) and VALIDATED or
+// REFUSED it. It is a HITL RUNTIME, below-the-line authorisation (qui / quand / quelle PHASE /
+// validated) — calqued on connectorenforce.ConnectorRuntimeApproval (A2), NEVER authority.Decide:
+// the Kernel truth-admitter (back/kernel/authority) governs whether a TRUTH may change; it NEVER
+// gates a runtime deploy EFFECT. It is APPEND-ONLY and CONTENT-ADDRESSED (the id is the address of
+// the whole body) — recording a validation is a recorded DECISION (provenance §9), never an edit.
+// The promotion gate consults it by PURE set-membership (the EXACT phase, validated true), never by
+// inference. Pure data.
+type HumanValidation struct {
+	// ID is the content address of the whole validation (the idempotency key). Same input → same ID.
+	ID string `json:"id"`
+	// Env is the environment the human VALIDATED — the dev/preview deployment they saw (EnvPreview).
+	Env Environment `json:"env"`
+	// PhaseHash is the EXACT phase the human validated (DP25 — the phase the dev deployment served).
+	// The gate matches this against the phase being promoted: a validation of phase A never unlocks
+	// phase B (per-phase, fail-closed).
+	PhaseHash string `json:"phase_hash"`
+	// Validated is the human verdict: true = « j'ai vu la vraie app et je la valide », false = refusée.
+	// Only true unlocks the promotion; false (or a missing validation) keeps it fail-closed.
+	Validated bool `json:"validated"`
+	// By records WHO validated/refused (provenance §9 — defaults to "human", never empty, never invented).
+	By string `json:"by"`
+}
+
+// HumanValidationInput is a request to RECORD a validation_humaine over a dev/preview deployment:
+// who, the exact phase seen, and the verdict (validated true|false). PURE input — no clock (the
+// timestamp is stamped by the writer role at ChangeSet-apply time, determinism-first §6).
+type HumanValidationInput struct {
+	// Env is the environment the human saw and validated (typically EnvPreview — the dev deployment).
+	Env Environment `json:"env"`
+	// PhaseHash is the EXACT phase content address the human validated (the phase the dev served).
+	PhaseHash string `json:"phase_hash"`
+	// Validated is the human verdict (true = validated, false = refused).
+	Validated bool `json:"validated"`
+	// By is the human/role recording the decision (defaults to "human").
+	By string `json:"by,omitempty"`
+}
+
+// RecordHumanValidation builds the content-addressed, append-only HumanValidation for a
+// validate|refuse over a dev/preview deployment. PURE, TOTAL — same input → byte-identical
+// validation (same id). It RECORDS a HITL-runtime decision (qui/quand/quelle phase/validated) with
+// provenance; it writes NOTHING (the wall) — the /deploy screen proposes it as an append-only
+// decision. It is NEVER authority.Decide (a runtime EFFECT gate, not a truth admission). A missing
+// actor defaults to "human" (provenance §9 — never empty, never invented).
+func RecordHumanValidation(in HumanValidationInput) HumanValidation {
+	by := strings.TrimSpace(in.By)
+	if by == "" {
+		by = "human"
+	}
+	v := HumanValidation{
+		Env:       in.Env,
+		PhaseHash: in.PhaseHash,
+		Validated: in.Validated,
+		By:        by,
+	}
+	// A content-address body failure is a programming fault (plain JSON shapes) — mustJSON folds it
+	// into a distinct hash, never a silent collision; the id is then non-empty and stable.
+	v.ID = records.Hash(canonOrEmpty(map[string]any{
+		"env":        string(v.Env),
+		"phase_hash": v.PhaseHash,
+		"validated":  v.Validated,
+		"by":         v.By,
+	}))
+	return v
+}
+
+// canonOrEmpty canonicalises a JSON-marshalable body and returns the canonical bytes; a failure
+// (a programming fault — the shapes are plain maps) surfaces as the canonicalisation of "{}", so
+// the hash differs, never silently equal. PURE, TOTAL.
+func canonOrEmpty(body map[string]any) []byte {
+	canon, err := records.Canonicalize(mustJSON(body))
+	if err != nil {
+		return []byte("{}")
+	}
+	return canon
+}
+
+// covers reports whether this validation is a fresh, VALIDATED authorisation for the EXACT phase.
+// PURE set-membership, fail-closed (calque connectorenforce.ConnectorRuntimeApproval.covers, A2):
+// nil, a validation of ANOTHER phase, or Validated=false ⇒ false. The promotion gate consults this,
+// never an inference. Pure, total.
+func (v *HumanValidation) covers(phaseHash string) bool {
+	return v != nil && v.PhaseHash == phaseHash && v.Validated
+}
+
 // ─── PROMOTION ────────────────────────────────────────────────────────────────────────────
 
-// PromoteInput is a promotion request: the target environment, the phase to promote, and the
-// deploy domain root (per-env stacks under it). PURE input.
+// PromoteInput is a promotion request: the target environment, the phase to promote, the deploy
+// domain root (per-env stacks under it), and — for the dev/preview → staging hop — the optional
+// human validation of the dev deployment (DP28). PURE input.
 type PromoteInput struct {
 	// Env is the environment the phase is promoted into (preview/staging/prod). Must be known.
 	Env Environment `json:"env"`
@@ -131,6 +220,12 @@ type PromoteInput struct {
 	// DomainRoot is the optional custom domain to LINK to this env (S99/DP29). Empty ⇒ the
 	// default AIDOS deploy root. TLS is provisioned via the ACME certresolver (DP27/S97).
 	DomainRoot string `json:"domain_root,omitempty"`
+	// DevValidation is the human validation_humaine of the dev/preview deployment (DP28). It GATES
+	// the dev/preview → staging hop ONLY: promotion to staging is refused DEV_NOT_HUMAN_VALIDATED
+	// unless this carries a HumanValidation of the EXACT phase being promoted, Validated=true
+	// (fail-closed — nil / another phase / Validated=false ⇒ refused). A HITL RUNTIME gate, never
+	// authority.Decide (A2). nil for the prod/preview hops (they are not gated by this door).
+	DevValidation *HumanValidation `json:"dev_validation,omitempty"`
 }
 
 // Promotion is the DETERMINISTIC, content-addressed record of an env←phase binding: the env now
@@ -165,6 +260,23 @@ func promoteNotStableBlock(reasons []string) blockreason.BlockReason {
 	br := blockreason.For(blockreason.CodeEnvPromoteNotStable)
 	if len(reasons) > 0 {
 		br.Explanation += " Raisons : " + strings.Join(reasons, ", ") + "."
+	}
+	return br
+}
+
+// devNotHumanValidatedBlock is the DEV_NOT_HUMAN_VALIDATED refusal (DP28). It REUSES the canonical
+// registry entry and appends WHY the dev validation does not cover the promoted phase so the screen
+// names the exact gap (no validation / wrong phase / refused).
+func devNotHumanValidatedBlock(promotedPhase string, dev *HumanValidation) blockreason.BlockReason {
+	br := blockreason.For(blockreason.CodeDevNotHumanValidated)
+	switch {
+	case dev == nil:
+		br.Explanation += " Cause : aucune validation_humaine n'accompagne la promotion de cette phase dev."
+	case dev.PhaseHash != promotedPhase:
+		br.Explanation += " Cause : la validation_humaine porte sur une AUTRE phase (" + subdomainOf(dev.PhaseHash) +
+			") que la phase promue (" + subdomainOf(promotedPhase) + ") — la validation est PAR PHASE."
+	case !dev.Validated:
+		br.Explanation += " Cause : la validation_humaine de cette phase est validated=false (un REFUS humain) — fail-closed."
 	}
 	return br
 }
@@ -237,6 +349,18 @@ func Promote(in PromoteInput) (Promotion, *blockreason.BlockReason) {
 		br := outOfScopeBlock(fmt.Errorf("cannot content-address the phase: %w", err))
 		return Promotion{}, &br
 	}
+
+	// DP28 — THE HUMAN-VALIDATION GATE on the dev/preview → staging hop. The human must have SEEN
+	// the live dev deployment (DP25) of THIS EXACT phase and VALIDATED it. FAIL-CLOSED set-membership
+	// (calque ConnectorRuntimeApproval A2, NEVER authority.Decide): no validation, a validation of
+	// another phase, or validated=false ⇒ refused DEV_NOT_HUMAN_VALIDATED. Gated AFTER the stop-gate
+	// (a red dev phase never reaches the human gate) and only on the staging hop (prod/preview are
+	// not gated by this door). It is a PURE comparison (the exact phase hash), never an LLM.
+	if in.Env == EnvStaging && !in.DevValidation.covers(phaseHash) {
+		br := devNotHumanValidatedBlock(phaseHash, in.DevValidation)
+		return Promotion{}, &br
+	}
+
 	appHash, err := in.Phase.reProjectedHash()
 	if err != nil {
 		br := outOfScopeBlock(fmt.Errorf("cannot re-emit the phase's app: %w", err))

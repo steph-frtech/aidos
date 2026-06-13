@@ -17,13 +17,26 @@ import {
 	isBlocked as isDomainBlocked,
 } from "@/lib/env-domainbind";
 import {
+	type EmittedSurface,
+	type Environment,
+	type HumanValidation,
+	isBlocked as isEnvBlocked,
+	liveUrl,
+	type PhaseInput,
+	type Promotion,
+	promote,
+	type RollbackDecision,
+	recordHumanValidation,
+	rollback,
+} from "@/lib/env-rollback";
+import {
 	buildPreviewWithBootstrap,
 	isBlocked as isPreviewBlocked,
 	type StackManifest,
 	servedMatchesEmitted,
 	teardownOf,
 } from "@/lib/preview-bootstrap";
-import type { DeployView, DomainView, PreviewView } from "./view";
+import type { DeployView, DomainView, EnvView, PreviewView } from "./view";
 
 /**
  * Server Action for the /deploy Workbench panel (S96 — the phase-keyed deploy pipeline,
@@ -370,4 +383,205 @@ export async function domainAction(
 		servesHTTPS: envServesHTTPS(binding),
 		labels: binding.labels,
 	};
+}
+
+/* --- DP28: the env-promotion + human-validation gate + rollback section ----------------------- */
+
+/** envSurface — the per-app emitted surface a phase re-emits (the twin reads the project; the Go
+ * truth-store is authoritative for the bytes). Deterministic — a fixture, never drawn. */
+function envSurface(project: string): EmittedSurface {
+	return {
+		project,
+		serverBundleHash: `srv-${project}-001`,
+		frontBundleHash: `frt-${project}-001`,
+		infraHash: `inf-${project}-001`,
+		datastoreHash: `dst-${project}-001`,
+	};
+}
+
+/** A stable PhaseInput fixture for the env ladder (« done is computed » — green, no monster). */
+function stableEnvPhase(project: string, phaseHash: string): PhaseInput {
+	return {
+		phase: { phaseHash, stable: true, reasons: [] },
+		gate: { mutationScore: 0.9, mutationThreshold: 0.8, monsterCount: 0 },
+		surface: envSurface(project),
+	};
+}
+
+/** The CURRENT dev/preview phase (N) — the one the human SEES and validates (DP25). */
+const DEV_PHASE = "phase-dev-current";
+/** An EARLIER stable phase (N-1) in the DAG lineage — the rollback target (re-projected on demand). */
+const PREV_PHASE = "phase-dev-prev";
+
+/** parseValidation — re-hydrate the validation_humaine the screen threads back on a promote
+ * (server actions are stateless). A malformed/absent value ⇒ null (fail-closed — the gate refuses). */
+function parseValidation(raw: string): HumanValidation | null {
+	if (!raw.trim()) return null;
+	try {
+		const v = JSON.parse(raw) as Partial<HumanValidation>;
+		if (
+			typeof v.phaseHash === "string" &&
+			typeof v.validated === "boolean" &&
+			typeof v.env === "string"
+		) {
+			// re-derive the content-address from the body — never trust a forged id.
+			return recordHumanValidation({
+				env: v.env as Environment,
+				phaseHash: v.phaseHash,
+				validated: v.validated,
+				by: v.by,
+			});
+		}
+	} catch {
+		return null;
+	}
+	return null;
+}
+
+/**
+ * Server Action for the DP28 « Promotion d'environnement + porte humaine + rollback » tab (EPIC F —
+ * EXTENDS S98 envrollback, never duplicates).
+ *
+ * THE HUMAN-VALIDATION GATE (the heart of DP28). The human SEES the live dev/preview deployment of
+ * an EXACT phase (DP25 — the real app has a URL) and VALIDATES (`validate`) or REFUSES (`refuse`)
+ * it: a validation_humaine (a HITL RUNTIME, below-the-line decision — qui/quand/quelle phase/
+ * validated, JAMAIS authority.Decide). APRÈS une validation validated=true de CETTE phase, la
+ * promotion preview/dev → STAGING (`promote-staging`) devient permise ; SANS validation (ou un
+ * refus, ou la validation d'une AUTRE phase) la promotion STAGING est REFUSÉE
+ * DEV_NOT_HUMAN_VALIDATED (fail-closed, PAR PHASE). La promotion vers prod (`promote-prod`) et le
+ * rollback (`rollback`, re-projeter la phase antérieure → l'app re-émise de N-1, hash égal) ne sont
+ * pas gatés par cette porte.
+ *
+ * DETERMINISM-FIRST (CLAUDE.md §6/§8): promote/rollback/recordHumanValidation sont des fonctions
+ * PURES (lib/env-rollback, le twin verdict-pour-verdict de back/archive/envrollback) — même input →
+ * sortie byte-identique, jamais un LLM. La porte est une comparaison PURE fail-closed (set-membership
+ * de la validation par phase). THE WALL (§2/§9): planifier/valider n'écrit AUCUNE vérité ; la
+ * validation_humaine et le rollback sont des décisions enregistrées (provenance §9), jamais une
+ * écriture-vers-le-kernel.
+ *
+ * The single action is driven by an `intent` field so the tab's controls reach the same pure twin.
+ */
+export async function envAction(
+	_prev: EnvView,
+	formData: FormData,
+): Promise<EnvView> {
+	const intent = String(formData.get("intent") ?? "validate");
+	const project = String(formData.get("project") ?? "").trim() || "shop";
+	const devPhase = String(formData.get("devPhase") ?? "").trim() || DEV_PHASE;
+	// The validation_humaine the screen threads back (per-phase: it carries the phase it was made for).
+	const carried = parseValidation(
+		String(formData.get("devValidationJson") ?? ""),
+	);
+
+	// The live dev/preview URL the human SEES (DP25) — always recomputed for the current dev phase.
+	const devUrl = liveUrl("preview", devPhase);
+
+	// (1) VALIDATE / REFUSE — record the validation_humaine over the dev deployment (DP25).
+	if (intent === "validate" || intent === "refuse") {
+		const validation = recordHumanValidation({
+			env: "preview",
+			phaseHash: devPhase,
+			validated: intent === "validate",
+			by: "human",
+		});
+		return {
+			ok: true,
+			env: "preview",
+			phaseHash: devPhase,
+			devUrl,
+			devValidation: validation,
+		};
+	}
+
+	// (2) PROMOTE to staging — GATED by the human validation of the EXACT dev phase (DP28).
+	if (intent === "promote-staging") {
+		const result = promote({
+			env: "staging",
+			project,
+			phase: stableEnvPhase(project, devPhase),
+			devValidation: carried,
+		});
+		if (isEnvBlocked(result)) {
+			return {
+				ok: false,
+				env: "staging",
+				phaseHash: devPhase,
+				devUrl,
+				devValidation: carried,
+				blockCode: result.code,
+				blockExplanation: result.explanation,
+			};
+		}
+		return {
+			ok: true,
+			env: "staging",
+			phaseHash: devPhase,
+			devUrl,
+			devValidation: carried,
+			promotion: result as Promotion,
+		};
+	}
+
+	// (3) PROMOTE to prod — not gated by the dev validation door (DP28).
+	if (intent === "promote-prod") {
+		const result = promote({
+			env: "prod",
+			project,
+			phase: stableEnvPhase(project, devPhase),
+		});
+		if (isEnvBlocked(result)) {
+			return {
+				ok: false,
+				env: "prod",
+				phaseHash: devPhase,
+				devUrl,
+				devValidation: carried,
+				blockCode: result.code,
+				blockExplanation: result.explanation,
+			};
+		}
+		return {
+			ok: true,
+			env: "prod",
+			phaseHash: devPhase,
+			devUrl,
+			devValidation: carried,
+			promotion: result as Promotion,
+		};
+	}
+
+	// (4) ROLLBACK — re-project an EARLIER stable phase (N-1). The served app of prod (N) incidented;
+	// the rollback serves a FRESH re-emit of N-1 (hash égal), never a stale sandbox artifact.
+	if (intent === "rollback") {
+		const result = rollback({
+			env: "prod",
+			project,
+			current: stableEnvPhase(project, devPhase),
+			target: stableEnvPhase(project, PREV_PHASE),
+			lineage: [PREV_PHASE],
+			actor: "human",
+			reason: "incident en prod — retour à la phase antérieure (DP28)",
+		});
+		if (isEnvBlocked(result)) {
+			return {
+				ok: false,
+				env: "prod",
+				phaseHash: devPhase,
+				devUrl,
+				devValidation: carried,
+				blockCode: result.code,
+				blockExplanation: result.explanation,
+			};
+		}
+		return {
+			ok: true,
+			env: "prod",
+			phaseHash: devPhase,
+			devUrl,
+			devValidation: carried,
+			rollback: result as RollbackDecision,
+		};
+	}
+
+	return { ok: false, env: "preview", phaseHash: devPhase, devUrl };
 }

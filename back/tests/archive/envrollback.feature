@@ -49,3 +49,30 @@ Feature: Environments and rollback by re-projection
     And the DAG lineage of "N" is empty
     When prod is rolled back to phase "N-1" by "alice" because "wrong target"
     Then the rollback is refused with code "ROLLBACK_NOT_EARLIER"
+
+  # DP28 — LA PORTE DE VALIDATION HUMAINE sur le DEV. L'humain VOIT la vraie app dev déployée
+  # (DP25 preview, une URL live) puis la VALIDE ou la REFUSE. La promotion preview/dev → staging
+  # est REFUSÉE (DEV_NOT_HUMAN_VALIDATED) tant que la phase dev courante n'a pas une
+  # validation_humaine validated=true POUR CETTE phase exacte. Fail-closed, par phase. La
+  # validation est une décision HITL RUNTIME below-the-line (qui/quand/quelle phase), JAMAIS
+  # authority.Decide (calque ConnectorRuntimeApproval A2).
+
+  Scenario: Promoting a dev phase to staging without a human validation is refused
+    When phase "N" is promoted to "staging" without a dev validation
+    Then the promotion is refused with code "DEV_NOT_HUMAN_VALIDATED"
+
+  Scenario: A human validates the dev phase, then promotion to staging is permitted
+    Given the human "alice" validates the dev deployment of phase "N"
+    When phase "N" is promoted to "staging" with the dev validation
+    Then the promotion is permitted
+    And staging serves the re-emitted app of phase "N"
+
+  Scenario: A validation of another phase does not unlock the promotion (per-phase)
+    Given the human "alice" validates the dev deployment of phase "N-1"
+    When phase "N" is promoted to "staging" with the dev validation
+    Then the promotion is refused with code "DEV_NOT_HUMAN_VALIDATED"
+
+  Scenario: A human REFUSAL of the dev phase keeps the promotion fail-closed
+    Given the human "alice" refuses the dev deployment of phase "N"
+    When phase "N" is promoted to "staging" with the dev validation
+    Then the promotion is refused with code "DEV_NOT_HUMAN_VALIDATED"

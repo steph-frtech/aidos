@@ -3,12 +3,20 @@
 import { useTranslations } from "next-intl";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { deployAction, domainAction, previewAction } from "./actions";
+import { liveUrl } from "@/lib/env-rollback";
+import {
+	deployAction,
+	domainAction,
+	envAction,
+	previewAction,
+} from "./actions";
 import {
 	DEPLOY_INITIAL,
 	type DeployView,
 	DOMAIN_INITIAL,
 	type DomainView,
+	ENV_INITIAL,
+	type EnvView,
 	PREVIEW_INITIAL,
 	type PreviewView,
 } from "./view";
@@ -102,7 +110,9 @@ export function DeployPanel({
 		deployAction,
 		DEPLOY_INITIAL,
 	);
-	const [tab, setTab] = useState<"deploy" | "preview" | "domain">("deploy");
+	const [tab, setTab] = useState<"deploy" | "preview" | "env" | "domain">(
+		"deploy",
+	);
 
 	return (
 		<div className="space-y-8">
@@ -154,6 +164,20 @@ export function DeployPanel({
 				<button
 					type="button"
 					role="tab"
+					data-testid="env-tab"
+					aria-selected={tab === "env"}
+					onClick={() => setTab("env")}
+					className={
+						tab === "env"
+							? "flex-1 rounded-md bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm"
+							: "flex-1 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+					}
+				>
+					{t("tabEnv")}
+				</button>
+				<button
+					type="button"
+					role="tab"
 					data-testid="domain-tab"
 					aria-selected={tab === "domain"}
 					onClick={() => setTab("domain")}
@@ -169,6 +193,8 @@ export function DeployPanel({
 
 			{tab === "preview" ? (
 				<PreviewSection activeProjectId={activeProjectId} />
+			) : tab === "env" ? (
+				<EnvSection activeProjectId={activeProjectId} />
 			) : tab === "domain" ? (
 				<DomainSection activeProjectId={activeProjectId} />
 			) : (
@@ -802,6 +828,357 @@ function PreviewSection({
 						</section>
 					)}
 				</div>
+			)}
+		</div>
+	);
+}
+
+/** An env-section control button — submits the form with its `intent`. */
+function EnvButton({
+	label,
+	intent,
+	testid,
+	enabled = true,
+	variant = "primary",
+}: {
+	label: string;
+	intent:
+		| "validate"
+		| "refuse"
+		| "promote-staging"
+		| "promote-prod"
+		| "rollback";
+	testid: string;
+	enabled?: boolean;
+	variant?: "primary" | "secondary" | "destructive";
+}) {
+	const t = useTranslations("deploy");
+	const { pending } = useFormStatus();
+	const cls =
+		variant === "destructive"
+			? "border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20"
+			: variant === "secondary"
+				? "border border-border bg-background text-foreground hover:bg-muted"
+				: "bg-primary text-primary-foreground hover:bg-primary/90";
+	return (
+		<button
+			type="submit"
+			name="intent"
+			value={intent}
+			data-testid={testid}
+			disabled={pending || !enabled}
+			className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 ${cls}`}
+		>
+			{pending ? t("working") : label}
+		</button>
+	);
+}
+
+/**
+ * EnvSection — the DP28 « Promotion d'environnement + porte humaine + rollback » tab (EPIC F —
+ * EXTENDS S98 envrollback, never duplicates).
+ *
+ * THE HUMAN-VALIDATION GATE (the heart of DP28). The human SEES the live dev/preview deployment of
+ * an EXACT phase (DP25 — the real app has a URL, data-testid=dev-deploy-url) and VALIDATES
+ * (data-testid=dev-validate) or REFUSES (data-testid=dev-refuse) it — the validation_humaine.
+ * APRÈS une validation validated=true de CETTE phase, « Promouvoir vers staging »
+ * (data-testid=promote-staging) est permise → data-testid=staging-promoted ; SANS validation (ou un
+ * refus) la promotion staging est REFUSÉE DEV_NOT_HUMAN_VALIDATED (data-testid=promote-blockreason).
+ * La validation est PAR PHASE : « Redéployer le dev (nouvelle phase) » change la phase dev courante
+ * et redemande une validation. La PROMOTION (env-ladder) et le ROLLBACK (re-projeter une phase
+ * antérieure → l'app re-émise de N-1, hash = N-1) sont exécutables depuis l'écran.
+ *
+ * The source is the PURE twin (lib/env-rollback, the verdict-for-verdict twin of Go envrollback).
+ * THE WALL (§2/§9): la validation_humaine + le rollback sont des décisions HITL RUNTIME below-the-
+ * line (provenancées, append-only), JAMAIS authority.Decide / une écriture-vers-le-kernel.
+ */
+function EnvSection({ activeProjectId }: { activeProjectId: string | null }) {
+	const t = useTranslations("deploy");
+	const [state, action] = useActionState<EnvView, FormData>(
+		envAction,
+		ENV_INITIAL,
+	);
+	// The CURRENT dev phase the screen operates on. « Redéployer le dev » bumps it → a NEW phase that
+	// REQUIRES a fresh validation (per-phase law). Local state so the screen reflects re-deploys.
+	const [devPhase, setDevPhase] = useState("phase-dev-current");
+
+	// The validation_humaine for the CURRENT dev phase — only counts if it MATCHES the current phase
+	// (per-phase fail-closed). A validation of a previous dev phase does NOT unlock the current one.
+	const validation = state.devValidation ?? null;
+	const validatedForCurrent =
+		validation != null &&
+		validation.phaseHash === devPhase &&
+		validation.validated === true;
+	const refusedForCurrent =
+		validation != null &&
+		validation.phaseHash === devPhase &&
+		validation.validated === false;
+
+	// The validation we thread back on a promote (the gate compares its phaseHash to the promoted
+	// phase). Empty when no validation for the current phase → the staging promote is fail-closed.
+	const carriedJson =
+		validation != null && validation.phaseHash === devPhase
+			? JSON.stringify(validation)
+			: "";
+
+	const project = activeProjectId ?? "shop";
+
+	return (
+		<div className="space-y-6" data-testid="env-section">
+			{/* THE HUMAN-VALIDATION GATE (the heart of DP28). */}
+			<section
+				data-testid="human-validation-gate"
+				data-validated={validatedForCurrent ? "true" : "false"}
+				data-phase={devPhase}
+				className="space-y-4 rounded-xl border border-border p-5"
+			>
+				<h2 className="text-sm font-semibold text-foreground">
+					{t("humanGateHeading")}
+				</h2>
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					{t("humanGateIntro")}
+				</p>
+
+				{/* The live dev/preview deployment the human SEES (DP25 — the real app has a URL). */}
+				<div className="space-y-1">
+					<p className="text-xs font-medium text-foreground">
+						{t("devDeployHeading")}
+					</p>
+					<a
+						href={liveUrl("preview", devPhase)}
+						data-testid="dev-deploy-url"
+						className="font-mono text-xs text-blue-600 underline"
+					>
+						{liveUrl("preview", devPhase)}
+					</a>
+					<p className="font-mono text-xs text-muted-foreground">
+						{t("phaseLabel")}:{" "}
+						<span data-testid="dev-current-phase">{devPhase}</span>
+					</p>
+				</div>
+
+				{/* Valider / Refuser the dev deployment → the validation_humaine. */}
+				<form action={action} className="flex flex-wrap items-center gap-3">
+					<input type="hidden" name="project" value={project} />
+					<input type="hidden" name="devPhase" value={devPhase} />
+					<EnvButton
+						label={t("devValidateLabel")}
+						intent="validate"
+						testid="dev-validate"
+					/>
+					<EnvButton
+						label={t("devRefuseLabel")}
+						intent="refuse"
+						testid="dev-refuse"
+						variant="destructive"
+					/>
+				</form>
+
+				{/* The recorded validation_humaine verdict for the current phase. */}
+				{validatedForCurrent && (
+					<p
+						data-testid="dev-validated-badge"
+						className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700"
+					>
+						{t("devValidatedBadge")} · {validation?.by}
+					</p>
+				)}
+				{refusedForCurrent && (
+					<p
+						data-testid="dev-refused-badge"
+						className="inline-flex items-center rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-medium text-destructive"
+					>
+						{t("devRefusedBadge")}
+					</p>
+				)}
+
+				{/* « Redéployer le dev » — a NEW dev phase REQUIRES a fresh validation (per-phase law). */}
+				<button
+					type="button"
+					data-testid="dev-redeploy"
+					onClick={() => setDevPhase(`phase-dev-${Date.now().toString(36)}`)}
+					className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+				>
+					{t("devRedeployLabel")}
+				</button>
+			</section>
+
+			{/* THE ENV LADDER (preview/dev → staging → prod). */}
+			<section className="space-y-3 rounded-xl border border-border p-5">
+				<h2 className="text-sm font-semibold text-foreground">
+					{t("ladderHeading")}
+				</h2>
+				<ol
+					className="flex flex-wrap items-center gap-2"
+					data-testid="env-ladder"
+				>
+					{(["preview", "staging", "prod"] as const).map((env) => (
+						<li
+							key={env}
+							data-testid="env-rung"
+							data-env={env}
+							data-current={state.env === env ? "true" : "false"}
+							className={
+								state.env === env
+									? "inline-flex items-center rounded-full bg-primary px-3 py-1 font-mono text-xs font-semibold text-primary-foreground"
+									: "inline-flex items-center rounded-full bg-muted px-3 py-1 font-mono text-xs text-foreground"
+							}
+						>
+							{env}
+						</li>
+					))}
+				</ol>
+			</section>
+
+			{/* PROMOTE — preview/dev → staging (gated) ; → prod (ungated). */}
+			<form
+				action={action}
+				className="space-y-4 rounded-xl border border-border p-5"
+			>
+				<input type="hidden" name="project" value={project} />
+				<input type="hidden" name="devPhase" value={devPhase} />
+				{/* The validation_humaine threaded back — the gate compares its phase to the promoted one. */}
+				<input type="hidden" name="devValidationJson" value={carriedJson} />
+				<h2 className="text-sm font-semibold text-foreground">
+					{t("promoteHeading")}
+				</h2>
+				<div className="flex flex-wrap gap-3">
+					{/* « Promouvoir vers staging » — fail-closed without a validation, but always submittable
+					    (the screen surfaces the DEV_NOT_HUMAN_VALIDATED refusal — ui-completeness). */}
+					<EnvButton
+						label={t("promoteStagingLabel")}
+						intent="promote-staging"
+						testid="promote-staging"
+					/>
+					<EnvButton
+						label={t("promoteProdLabel")}
+						intent="promote-prod"
+						testid="promote-prod"
+						variant="secondary"
+					/>
+				</div>
+				{validatedForCurrent && (
+					<p
+						className="text-xs text-emerald-700"
+						data-testid="promote-unlocked"
+					>
+						{t("promoteUnlocked")}
+					</p>
+				)}
+			</form>
+
+			{/* The promotion result — staging now serves the RE-EMITTED app of the validated phase. */}
+			{state.ok && state.promotion && (
+				<section
+					data-testid={
+						state.promotion.env === "staging"
+							? "staging-promoted"
+							: "prod-promoted"
+					}
+					className="space-y-2 rounded-xl border border-emerald-500/40 bg-emerald-50/40 p-5"
+				>
+					<div className="flex flex-wrap items-center justify-between gap-2">
+						<h2 className="text-sm font-semibold text-foreground">
+							{t("promotedHeading")} · {state.promotion.env}
+						</h2>
+						<a
+							href={state.promotion.liveUrl}
+							data-testid="promoted-url"
+							className="font-mono text-xs text-blue-600 underline"
+						>
+							{state.promotion.liveUrl}
+						</a>
+					</div>
+					<p
+						data-testid="promoted-app-hash"
+						className="font-mono text-xs text-emerald-700"
+					>
+						{t("appHashLabel")}: {state.promotion.emittedAppHash}
+					</p>
+				</section>
+			)}
+
+			{/* The DEV_NOT_HUMAN_VALIDATED / ENV_PROMOTE_NOT_STABLE / ROLLBACK_NOT_EARLIER refusal. */}
+			{state.blockExplanation && !state.ok && (
+				<section
+					data-testid="promote-blockreason"
+					data-code={state.blockCode}
+					className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/5 p-5"
+				>
+					<h2 className="text-sm font-semibold text-destructive">
+						{t("blockedHeading")} · {state.blockCode}
+					</h2>
+					<p className="text-sm leading-relaxed text-muted-foreground">
+						{state.blockExplanation}
+					</p>
+				</section>
+			)}
+
+			{/* ROLLBACK — re-project an EARLIER stable phase (N-1). */}
+			<form
+				action={action}
+				className="space-y-4 rounded-xl border border-border p-5"
+			>
+				<input type="hidden" name="project" value={project} />
+				<input type="hidden" name="devPhase" value={devPhase} />
+				<h2 className="text-sm font-semibold text-foreground">
+					{t("rollbackHeading")}
+				</h2>
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					{t("rollbackIntro")}
+				</p>
+				<EnvButton
+					label={t("rollbackLaunchLabel")}
+					intent="rollback"
+					testid="rollback-launch"
+					variant="destructive"
+				/>
+			</form>
+
+			{/* The rollback result — prod serves the RE-EMITTED app of N-1 (hash = N-1). */}
+			{state.ok && state.rollback && (
+				<section
+					data-testid="rollback-done"
+					className="space-y-2 rounded-xl border border-border p-5"
+				>
+					<h2 className="text-sm font-semibold text-foreground">
+						{t("rollbackDoneHeading")}
+					</h2>
+					<dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+						<div>
+							<dt className="text-muted-foreground">
+								{t("rollbackFromLabel")}
+							</dt>
+							<dd
+								data-testid="rollback-from-phase"
+								className="font-mono text-foreground"
+							>
+								{state.rollback.fromPhaseHash}
+							</dd>
+						</div>
+						<div>
+							<dt className="text-muted-foreground">{t("rollbackToLabel")}</dt>
+							<dd
+								data-testid="rollback-to-phase"
+								className="font-mono text-foreground"
+							>
+								{state.rollback.toPhaseHash}
+							</dd>
+						</div>
+					</dl>
+					{/* The app the env serves AFTER rollback = the RE-EMISSION of N-1 (hash égal). */}
+					<p
+						data-testid="rollback-app-hash"
+						data-phase={state.rollback.toPhaseHash}
+						className="font-mono text-xs text-emerald-700"
+					>
+						{t("rollbackAppHashLabel")}: {state.rollback.reProjectedAppHash}
+					</p>
+					<p className="font-mono text-xs text-muted-foreground">
+						{t("provenanceLabel")}: {state.rollback.provenance.actor} ·{" "}
+						{state.rollback.provenance.reason}
+					</p>
+				</section>
 			)}
 		</div>
 	);

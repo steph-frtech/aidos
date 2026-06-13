@@ -80,6 +80,112 @@ export function stackName(
 	return `${env}-${project}-${subdomainOf(phaseHash)}`;
 }
 
+// ─── HUMAN-VALIDATION GATE ON THE DEV (DP28) ─────────────────────────────────────────────────
+
+/**
+ * HumanValidation is the « validation_humaine » event (DP28): the human SAW the live dev/preview
+ * deployment of an EXACT phase (DP25 — the real app has a URL the human opens) and VALIDATED or
+ * REFUSED it. It is a HITL RUNTIME, below-the-line authorisation (qui / quand / quelle PHASE /
+ * validated) — the verdict-for-verdict twin of Go envrollback.HumanValidation, calqued on
+ * connectorenforce.ConnectorRuntimeApproval (A2), NEVER authority.Decide: the Kernel truth-admitter
+ * governs whether a TRUTH may change; it NEVER gates a runtime deploy EFFECT. It is APPEND-ONLY and
+ * content-addressed (the id is the digest of the whole body) — recording a validation is a recorded
+ * DECISION (provenance §9), never an edit. The promotion gate consults it by PURE set-membership
+ * (the EXACT phase, validated true), never by inference. Pure data.
+ */
+export interface HumanValidation {
+	/** the content-address digest of the whole validation (the idempotency key). Same input → same id. */
+	id: string;
+	/** the environment the human VALIDATED — the dev/preview deployment they saw (preview). */
+	env: Environment;
+	/** the EXACT phase the human validated (DP25 — the phase the dev deployment served). The gate
+	 * matches this against the phase being promoted: a validation of phase A never unlocks phase B. */
+	phaseHash: string;
+	/** the human verdict: true = « j'ai vu la vraie app et je la valide », false = refusée. Only true
+	 * unlocks the promotion; false (or a missing validation) keeps it fail-closed. */
+	validated: boolean;
+	/** WHO validated/refused (provenance §9 — defaults to "human", never empty). */
+	by: string;
+}
+
+export interface HumanValidationInput {
+	env: Environment;
+	phaseHash: string;
+	validated: boolean;
+	by?: string;
+}
+
+/** recordHumanValidation — build the content-addressed, append-only HumanValidation for a
+ * validate|refuse over a dev/preview deployment. PURE, TOTAL — same input → byte-identical
+ * validation (same id). It RECORDS a HITL-runtime decision (qui/quand/quelle phase/validated) with
+ * provenance; it writes NOTHING (the wall) — the /deploy screen proposes it as an append-only
+ * decision. It is NEVER authority.Decide (a runtime EFFECT gate, not a truth admission). A missing
+ * actor defaults to "human". The verdict-for-verdict twin of Go RecordHumanValidation. */
+export function recordHumanValidation(
+	input: HumanValidationInput,
+): HumanValidation {
+	const by = (input.by ?? "").trim() || "human";
+	const id = bodyDigest({
+		by,
+		env: input.env,
+		phase_hash: input.phaseHash,
+		validated: input.validated,
+	});
+	return {
+		id,
+		env: input.env,
+		phaseHash: input.phaseHash,
+		validated: input.validated,
+		by,
+	};
+}
+
+/** humanValidationCovers — true IFF this validation is a fresh, VALIDATED authorisation for the
+ * EXACT phase. PURE set-membership, fail-closed (calque ConnectorRuntimeApproval.covers, A2):
+ * null/undefined, a validation of ANOTHER phase, or validated=false ⇒ false. The promotion gate
+ * consults this, never an inference. The verdict-for-verdict twin of Go HumanValidation.covers. */
+export function humanValidationCovers(
+	v: HumanValidation | null | undefined,
+	phaseHash: string,
+): boolean {
+	return v != null && v.phaseHash === phaseHash && v.validated === true;
+}
+
+const DEV_NOT_HUMAN_VALIDATED_FIX = [
+	"Ouvrez le déploiement dev/preview (DP25 — la vraie app a une URL), VOYEZ l'app, puis VALIDEZ cette phase exacte (validation_humaine validated=true).",
+	"La validation est PAR PHASE : chaque nouveau déploiement dev redemande une validation_humaine de CETTE phase — une validation d'une autre phase ne débloque rien.",
+	"Un REFUS (validated=false) ou l'absence de validation maintient la promotion fail-closed — c'est volontaire (DP28).",
+	"La porte est une autorisation HITL RUNTIME below-the-line (qui/quand/quelle phase/validated), jamais authority.Decide (l'admetteur de vérité Kernel).",
+];
+
+/** devNotHumanValidated — the DEV_NOT_HUMAN_VALIDATED refusal (DP28). It NAMES why the dev
+ * validation does not cover the promoted phase so the screen shows the exact gap (no validation /
+ * wrong phase / refused). The verdict-for-verdict twin of Go devNotHumanValidatedBlock. */
+function devNotHumanValidated(
+	promotedPhase: string,
+	v: HumanValidation | null | undefined,
+): BlockReason {
+	let explanation =
+		"La promotion preview/dev → STAGING est REFUSÉE (DP28) : la phase dev courante n'a pas de validation_humaine validated=true POUR CETTE phase exacte (fail-closed).";
+	if (v == null) {
+		explanation +=
+			" Cause : aucune validation_humaine n'accompagne la promotion de cette phase dev.";
+	} else if (v.phaseHash !== promotedPhase) {
+		explanation += ` Cause : la validation_humaine porte sur une AUTRE phase (${subdomainOf(
+			v.phaseHash,
+		)}) que la phase promue (${subdomainOf(promotedPhase)}) — la validation est PAR PHASE.`;
+	} else if (!v.validated) {
+		explanation +=
+			" Cause : la validation_humaine de cette phase est validated=false (un REFUS humain) — fail-closed.";
+	}
+	return {
+		code: "DEV_NOT_HUMAN_VALIDATED",
+		severity: "blocking",
+		explanation,
+		how_to_fix: DEV_NOT_HUMAN_VALIDATED_FIX,
+	};
+}
+
 // ─── PROMOTION ──────────────────────────────────────────────────────────────────────────────
 
 export interface PromoteInput {
@@ -88,6 +194,12 @@ export interface PromoteInput {
 	phase: PhaseInput;
 	/** Optional custom domain to LINK to this env (S99/DP29) — defaults to the AIDOS deploy root. */
 	domainRoot?: string;
+	/** The human validation_humaine of the dev/preview deployment (DP28). It GATES the dev/preview →
+	 * staging hop ONLY: promotion to staging is refused DEV_NOT_HUMAN_VALIDATED unless this carries a
+	 * HumanValidation of the EXACT phase being promoted, validated=true (fail-closed — null / another
+	 * phase / validated=false ⇒ refused). A HITL RUNTIME gate, never authority.Decide (A2). null for
+	 * the prod/preview hops (they are not gated by this door). */
+	devValidation?: HumanValidation | null;
 }
 
 export interface Promotion {
@@ -158,6 +270,20 @@ export function promote(input: PromoteInput): Promotion | BlockReason {
 	if (!gate.deployable) return promoteNotStable(gate.reasons);
 
 	const phaseHash = input.phase.phase.phaseHash;
+
+	// DP28 — THE HUMAN-VALIDATION GATE on the dev/preview → staging hop. The human must have SEEN the
+	// live dev deployment (DP25) of THIS EXACT phase and VALIDATED it. FAIL-CLOSED set-membership
+	// (calque ConnectorRuntimeApproval A2, NEVER authority.Decide): no validation, a validation of
+	// another phase, or validated=false ⇒ refused DEV_NOT_HUMAN_VALIDATED. Gated AFTER the stop-gate
+	// (a red dev phase never reaches the human gate) and only on the staging hop (prod/preview are
+	// not gated by this door). It is a PURE comparison (the exact phase hash), never an LLM.
+	if (
+		input.env === "staging" &&
+		!humanValidationCovers(input.devValidation, phaseHash)
+	) {
+		return devNotHumanValidated(phaseHash, input.devValidation);
+	}
+
 	const appHash = reProjectedHash(input.phase);
 	const stack = stackName(input.env, input.project, phaseHash);
 	const domainRoot = (input.domainRoot ?? "").trim() || DEFAULT_DOMAIN_ROOT;

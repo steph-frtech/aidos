@@ -27,6 +27,8 @@ type envState struct {
 	dec       envrollback.RollbackDecision
 	block     *struct{ code, expl string }
 	staleHash string // the served hash BEFORE rollback (must NOT be served after)
+
+	devValidation *envrollback.HumanValidation // the recorded dev validation_humaine (per-phase gate)
 }
 
 func TestEnvRollbackBDD(t *testing.T) {
@@ -89,6 +91,71 @@ func TestEnvRollbackBDD(t *testing.T) {
 			}
 
 			sc.Step(`^phase "([^"]*)" is promoted to "([^"]*)"$`, promote)
+
+			// DP28 — the human-validation gate. The human SEES the live dev deployment then
+			// validates|refuses it. RecordHumanValidation builds a HITL-runtime decision (qui/quand/
+			// quelle phase), NEVER authority.Decide.
+			recordValidation := func(actor, label string, validated bool) error {
+				ph, ok := st.phases[label]
+				if !ok {
+					return fmt.Errorf("unknown phase %q", label)
+				}
+				h, err := ph.Phase.Version()
+				if err != nil {
+					return err
+				}
+				v := envrollback.RecordHumanValidation(envrollback.HumanValidationInput{
+					Env: envrollback.EnvPreview, PhaseHash: h, Validated: validated, By: actor,
+				})
+				st.devValidation = &v
+				return nil
+			}
+			sc.Step(`^the human "([^"]*)" validates the dev deployment of phase "([^"]*)"$`,
+				func(actor, label string) error { return recordValidation(actor, label, true) })
+			sc.Step(`^the human "([^"]*)" refuses the dev deployment of phase "([^"]*)"$`,
+				func(actor, label string) error { return recordValidation(actor, label, false) })
+
+			promoteWithValidation := func(label, env string, attach bool) error {
+				ph, ok := st.phases[label]
+				if !ok {
+					return fmt.Errorf("unknown phase %q", label)
+				}
+				in := envrollback.PromoteInput{
+					Env: envrollback.Environment(env), Project: st.project, Phase: ph,
+				}
+				if attach {
+					in.DevValidation = st.devValidation
+				}
+				prom, br := envrollback.Promote(in)
+				if br != nil {
+					st.block = &struct{ code, expl string }{string(br.Code), br.Explanation}
+					return nil
+				}
+				st.prom = prom
+				st.servedAppHash = prom.EmittedAppHash
+				st.servedLabel = label
+				return nil
+			}
+			sc.Step(`^phase "([^"]*)" is promoted to "([^"]*)" without a dev validation$`,
+				func(label, env string) error { return promoteWithValidation(label, env, false) })
+			sc.Step(`^phase "([^"]*)" is promoted to "([^"]*)" with the dev validation$`,
+				func(label, env string) error { return promoteWithValidation(label, env, true) })
+
+			sc.Step(`^staging serves the re-emitted app of phase "([^"]*)"$`, func(label string) error {
+				ph := st.phases[label]
+				h, err := ph.Phase.Version()
+				if err != nil {
+					return err
+				}
+				fresh, err := preview.EmittedAppHash(preview.PhaseRef{PhaseHash: h}, ph.Surface)
+				if err != nil {
+					return err
+				}
+				if st.servedAppHash != fresh {
+					return fmt.Errorf("staging serves %q, not the re-emit of %q (%q)", st.servedAppHash, label, fresh)
+				}
+				return nil
+			})
 
 			sc.Step(`^an incident "([^"]*)" happens in prod$`, func(_ string) error {
 				// The served phase incidented — capture its served hash as the STALE artifact that

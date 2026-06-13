@@ -28,12 +28,29 @@ func genStablePhase(t *rapid.T, name string) envrollback.PhaseInput {
 	return stablePhaseN("createOrder", v)
 }
 
+// devValidationFor builds (when env is staging) the dev human validation the DP28 gate requires
+// for the EXACT phase, validated=true — so a staging promotion is reproducible/permitted under the
+// new law. nil for prod/preview (those hops are not gated by the human-validation door).
+func devValidationFor(env envrollback.Environment, ph envrollback.PhaseInput) *envrollback.HumanValidation {
+	if env != envrollback.EnvStaging {
+		return nil
+	}
+	h, err := ph.Phase.Version()
+	if err != nil {
+		return nil
+	}
+	v := envrollback.RecordHumanValidation(envrollback.HumanValidationInput{
+		Env: envrollback.EnvPreview, PhaseHash: h, Validated: true, By: "alice",
+	})
+	return &v
+}
+
 // TestPromoteReproducible — same PromoteInput → byte-identical Promotion (same id, app hash, stack).
 func TestPromoteReproducible(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		env := rapid.SampledFrom(envrollback.Environments()).Draw(t, "env")
 		ph := genStablePhase(t, "ph")
-		in := envrollback.PromoteInput{Env: env, Project: "shop", Phase: ph}
+		in := envrollback.PromoteInput{Env: env, Project: "shop", Phase: ph, DevValidation: devValidationFor(env, ph)}
 		a, bra := envrollback.Promote(in)
 		b, brb := envrollback.Promote(in)
 		if bra != nil || brb != nil {
@@ -76,7 +93,7 @@ func TestPromoteLiveURLDeterministicAndHTTPS(t *testing.T) {
 		if custom {
 			root = "shop.example.com"
 		}
-		in := envrollback.PromoteInput{Env: env, Project: "shop", Phase: ph, DomainRoot: root}
+		in := envrollback.PromoteInput{Env: env, Project: "shop", Phase: ph, DomainRoot: root, DevValidation: devValidationFor(env, ph)}
 		a, bra := envrollback.Promote(in)
 		b, brb := envrollback.Promote(in)
 		if bra != nil || brb != nil {
@@ -171,6 +188,126 @@ func TestRollbackNonAncestorAlwaysRefused(t *testing.T) {
 		}
 		if br.Code != blockreason.CodeRollbackNotEarlier {
 			t.Fatalf("refusal code = %q, want ROLLBACK_NOT_EARLIER", br.Code)
+		}
+	})
+}
+
+// validatedPromoteInput builds a staging promotion of `ph` carrying a dev validation_humaine
+// for the EXACT phase, validated=true — the precondition the human-validation gate requires.
+func validatedPromoteInput(t *rapid.T, ph envrollback.PhaseInput) envrollback.PromoteInput {
+	h, err := ph.Phase.Version()
+	if err != nil {
+		t.Fatalf("phase hash: %v", err)
+	}
+	v := envrollback.RecordHumanValidation(envrollback.HumanValidationInput{
+		Env: envrollback.EnvPreview, PhaseHash: h, Validated: true, By: "alice",
+	})
+	return envrollback.PromoteInput{
+		Env: envrollback.EnvStaging, Project: "shop", Phase: ph, DevValidation: &v,
+	}
+}
+
+// TestPromoteToStagingRequiresHumanValidation — DP28 PORTE HUMAINE (∀): a promotion to staging
+// of a dev phase is PERMITTED iff a validation_humaine validated=true of the EXACT phase is
+// carried; absent ⇒ ALWAYS refused DEV_NOT_HUMAN_VALIDATED (fail-closed). The promote to prod
+// and to preview is NOT gated by this door (only the dev→staging hop is).
+func TestPromoteToStagingRequiresHumanValidation(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		ph := genStablePhase(t, "ph")
+		// (a) staging WITHOUT a dev validation ⇒ ALWAYS refused DEV_NOT_HUMAN_VALIDATED.
+		prom, br := envrollback.Promote(envrollback.PromoteInput{
+			Env: envrollback.EnvStaging, Project: "shop", Phase: ph,
+		})
+		if br == nil {
+			t.Fatalf("staging without a dev validation was promoted: %+v", prom)
+		}
+		if br.Code != blockreason.CodeDevNotHumanValidated {
+			t.Fatalf("refusal code = %q, want DEV_NOT_HUMAN_VALIDATED", br.Code)
+		}
+		if prom.ID != "" {
+			t.Fatalf("a refused promotion must emit NO promotion")
+		}
+		// (b) staging WITH a validated dev validation of the EXACT phase ⇒ permitted.
+		ok, okBr := envrollback.Promote(validatedPromoteInput(t, ph))
+		if okBr != nil {
+			t.Fatalf("validated staging promotion refused: %v", okBr.Explanation)
+		}
+		if ok.ID == "" || ok.Env != envrollback.EnvStaging {
+			t.Fatalf("validated staging promotion incomplete: %+v", ok)
+		}
+	})
+}
+
+// TestStagingValidationIsPerPhase — DP28 PER-PHASE: a validation of phase A NEVER unlocks the
+// promotion of a DISTINCT phase B. Validating B's dev deployment does not let A through, and a
+// validation of the wrong phase is refused DEV_NOT_HUMAN_VALIDATED.
+func TestStagingValidationIsPerPhase(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		a := genStablePhase(t, "a")
+		b := genStablePhase(t, "b")
+		aHash, _ := a.Phase.Version()
+		bHash, _ := b.Phase.Version()
+		if aHash == bHash {
+			return // need two distinct phases to test per-phase isolation.
+		}
+		// A validation of phase B, attached to a promotion of phase A ⇒ refused (wrong phase).
+		vB := envrollback.RecordHumanValidation(envrollback.HumanValidationInput{
+			Env: envrollback.EnvPreview, PhaseHash: bHash, Validated: true, By: "alice",
+		})
+		prom, br := envrollback.Promote(envrollback.PromoteInput{
+			Env: envrollback.EnvStaging, Project: "shop", Phase: a, DevValidation: &vB,
+		})
+		if br == nil {
+			t.Fatalf("a validation of phase B unlocked the promotion of phase A: %+v", prom)
+		}
+		if br.Code != blockreason.CodeDevNotHumanValidated {
+			t.Fatalf("refusal code = %q, want DEV_NOT_HUMAN_VALIDATED", br.Code)
+		}
+	})
+}
+
+// TestStagingValidationRefusedIsFailClosed — DP28 FAIL-CLOSED: a validation_humaine validated=false
+// (a human REFUSAL) NEVER unlocks the promotion, even for the exact phase. Only validated=true does.
+func TestStagingValidationRefusedIsFailClosed(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		ph := genStablePhase(t, "ph")
+		h, _ := ph.Phase.Version()
+		vFalse := envrollback.RecordHumanValidation(envrollback.HumanValidationInput{
+			Env: envrollback.EnvPreview, PhaseHash: h, Validated: false, By: "alice",
+		})
+		prom, br := envrollback.Promote(envrollback.PromoteInput{
+			Env: envrollback.EnvStaging, Project: "shop", Phase: ph, DevValidation: &vFalse,
+		})
+		if br == nil {
+			t.Fatalf("a validated=false refusal unlocked the promotion: %+v", prom)
+		}
+		if br.Code != blockreason.CodeDevNotHumanValidated {
+			t.Fatalf("refusal code = %q, want DEV_NOT_HUMAN_VALIDATED", br.Code)
+		}
+	})
+}
+
+// TestHumanValidationReproducible — same HumanValidationInput ⇒ byte-identical HumanValidation
+// (same content-address id), and a different (phase|validated|actor|env) ⇒ a distinct id. The
+// validation is a deterministic, content-addressed, append-only HITL-runtime decision (never an LLM).
+func TestHumanValidationReproducible(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		h := rapid.StringMatching(`[0-9a-f]{8,16}`).Draw(t, "phase")
+		validated := rapid.Bool().Draw(t, "validated")
+		by := rapid.StringMatching(`[a-z]{3,8}`).Draw(t, "by")
+		in := envrollback.HumanValidationInput{
+			Env: envrollback.EnvPreview, PhaseHash: h, Validated: validated, By: by,
+		}
+		a := envrollback.RecordHumanValidation(in)
+		b := envrollback.RecordHumanValidation(in)
+		if a != b {
+			t.Fatalf("validation not reproducible:\n %+v\n %+v", a, b)
+		}
+		// flipping validated ⇒ a distinct decision.
+		flip := in
+		flip.Validated = !validated
+		if c := envrollback.RecordHumanValidation(flip); c.ID == a.ID {
+			t.Fatalf("flipping validated must yield a distinct decision id")
 		}
 	})
 }

@@ -8,7 +8,13 @@
 //
 //	promote        — PromoteInput → content-addressed Promotion, but ONLY when the phase is
 //	                 stable (« done is computed »). A non-stable phase is refused
-//	                 ENV_PROMOTE_NOT_STABLE (the Stop-gate, inherited from S96). PURE.
+//	                 ENV_PROMOTE_NOT_STABLE (the Stop-gate, inherited from S96). The dev/preview →
+//	                 staging hop is GATED by the human-validation door (DP28): a missing/wrong/
+//	                 refused validation_humaine ⇒ DEV_NOT_HUMAN_VALIDATED (fail-closed). PURE.
+//	record_validation — HumanValidationInput → content-addressed, append-only HumanValidation
+//	                 (DP28): the human SAW the live dev deployment (DP25) and validates|refuses it
+//	                 for the EXACT phase. A HITL RUNTIME, below-the-line decision, NEVER
+//	                 authority.Decide (calque ConnectorRuntimeApproval A2). PURE.
 //	rollback       — RollbackInput → content-addressed RollbackDecision (re-projection of N-1 +
 //	                 datastore reconciliation + provenance), but ONLY when the target is a distinct,
 //	                 earlier, stable phase — else ROLLBACK_NOT_EARLIER / ENV_PROMOTE_NOT_STABLE. PURE.
@@ -34,7 +40,7 @@ import (
 )
 
 type promoteInput struct {
-	Input envrollback.PromoteInput `json:"input" jsonschema:"the promotion request: the target environment (preview|staging|prod), the phase to promote (its cut verdict, gate and emitted surface), and the project"`
+	Input envrollback.PromoteInput `json:"input" jsonschema:"the promotion request: the target environment (preview|staging|prod), the phase to promote (its cut verdict, gate and emitted surface), the project, and — for the dev/preview → staging hop (DP28) — the dev_validation (a validation_humaine of the EXACT phase, validated=true; absent ⇒ DEV_NOT_HUMAN_VALIDATED)"`
 }
 
 type promoteOutput struct {
@@ -69,6 +75,20 @@ func rollbackTool(_ context.Context, _ *mcp.CallToolRequest, in rollbackInput) (
 	return nil, rollbackOutput{OK: true, Decision: &d}, nil
 }
 
+type recordValidationInput struct {
+	Input envrollback.HumanValidationInput `json:"input" jsonschema:"the validation_humaine to record over a dev/preview deployment (DP28): the env the human saw (preview), the EXACT phase content address, the verdict (validated true|false), and who. The human SEES the live dev app (DP25) then validates|refuses it — a HITL RUNTIME, below-the-line decision, NEVER authority.Decide"`
+}
+
+type recordValidationOutput struct {
+	OK         bool                         `json:"ok"`
+	Validation *envrollback.HumanValidation `json:"validation,omitempty"`
+}
+
+func recordValidationTool(_ context.Context, _ *mcp.CallToolRequest, in recordValidationInput) (*mcp.CallToolResult, recordValidationOutput, error) {
+	v := envrollback.RecordHumanValidation(in.Input)
+	return nil, recordValidationOutput{OK: true, Validation: &v}, nil
+}
+
 type checkServedInput struct {
 	Decision      envrollback.RollbackDecision `json:"decision" jsonschema:"the rollback decision built by the rollback tool"`
 	Target        envrollback.PhaseInput       `json:"target" jsonschema:"the target phase (N-1) the env rolled back to"`
@@ -99,7 +119,8 @@ func ladderTool(_ context.Context, _ *mcp.CallToolRequest, _ ladderInput) (*mcp.
 
 func newMCPServer() *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "aidos-env-rollback", Version: "v0.1.0"}, nil)
-	mcp.AddTool(srv, &mcp.Tool{Name: "promote", Description: "S98: promote a STABLE phase into an environment (preview→staging→prod) — the env serves the RE-EMITTED app of the phase (S78). A non-stable phase is refused ENV_PROMOTE_NOT_STABLE (Stop-gate inherited from S96). PURE, content-addressed, writes nothing (the wall)."}, promoteTool)
+	mcp.AddTool(srv, &mcp.Tool{Name: "promote", Description: "S98/DP28: promote a STABLE phase into an environment (preview→staging→prod) — the env serves the RE-EMITTED app of the phase (S78). A non-stable phase is refused ENV_PROMOTE_NOT_STABLE (Stop-gate inherited from S96). The dev/preview → staging hop is GATED by the human-validation door (DP28): unless a validation_humaine validated=true of the EXACT phase is carried, it is refused DEV_NOT_HUMAN_VALIDATED (fail-closed, per-phase, a HITL RUNTIME gate, NEVER authority.Decide). PURE, content-addressed, writes nothing (the wall)."}, promoteTool)
+	mcp.AddTool(srv, &mcp.Tool{Name: "record_validation", Description: "DP28: RECORD a validation_humaine over a dev/preview deployment — the human SAW the live dev app (DP25) and VALIDATES or REFUSES it for the EXACT phase. Returns a content-addressed, append-only HumanValidation (qui/quand/quelle phase/validated). A HITL RUNTIME, below-the-line decision (calque ConnectorRuntimeApproval A2), NEVER authority.Decide. PURE, writes nothing (the wall — the screen proposes it as an append-only decision)."}, recordValidationTool)
 	mcp.AddTool(srv, &mcp.Tool{Name: "rollback", Description: "S98: roll an environment back to an EARLIER stable phase = re-projection (S78) of N-1 + datastore reconciliation (S95 inverse) + recorded provenance (§9). The target must be distinct, earlier and stable — else ROLLBACK_NOT_EARLIER / ENV_PROMOTE_NOT_STABLE. NEVER restores a stale sandbox artifact. PURE, append-only; the screen proposes it as a ChangeSet."}, rollbackTool)
 	mcp.AddTool(srv, &mcp.Tool{Name: "check_served", Description: "S98 re-projection property: assert the env's served-app hash AFTER rollback EQUALS a fresh re-emit of the target phase; a stale sandbox artifact is a BlockReason. Code judges the equality."}, checkServedTool)
 	mcp.AddTool(srv, &mcp.Tool{Name: "ladder", Description: "S98: the closed promotion ladder in order (preview, staging, prod)."}, ladderTool)

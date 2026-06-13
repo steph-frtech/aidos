@@ -508,3 +508,145 @@ test.describe("DP27 — custom domain + TLS (EPIC F)", () => {
 		await expect(page.getByTestId("domain-result")).toHaveCount(0);
 	});
 });
+
+/**
+ * DP28 Playwright e2e — the « Promotion d'environnement + porte de validation humaine + rollback »
+ * tab (EPIC F, EXTENDS S98 envrollback, never duplicates). mirror record:
+ * reflects=DP28-env-promotion-human-gate-rollback, test_kind=e2e, cert_language=playwright,
+ * liveness=live.
+ *
+ * Proves the /deploy route's env tab is action-capable (ui-completeness, CLAUDE.md §7), bound to a
+ * Server Action running the REAL pure twin (lib/env-rollback, the verdict-for-verdict twin of Go
+ * back/archive/envrollback DP28). THE USER-CAPITAL REQUIREMENT, reached from the screen:
+ *   - THE HUMAN-VALIDATION GATE — the human SEES the live dev/preview deployment (the real app's
+ *     URL) and VALIDATES it; tenter de promouvoir vers staging SANS validation est REFUSÉ
+ *     DEV_NOT_HUMAN_VALIDATED (fail-closed); APRÈS validation la promotion vers staging est permise
+ *     (staging sert l'app re-émise); un REFUS (validated=false) maintient le refus; la validation
+ *     est PAR PHASE (un nouveau déploiement dev redemande une validation);
+ *   - the ENV LADDER (preview/dev → staging → prod) + an executable ROLLBACK to an earlier phase —
+ *     prod serves the RE-EMITTED app of N-1 (the rollback-app-hash carries the N-1 phase).
+ *
+ * THE WALL (CLAUDE.md §2/§9): la validation_humaine + le rollback sont des décisions HITL RUNTIME
+ * below-the-line (provenancées, append-only), JAMAIS authority.Decide / une écriture-vers-le-kernel.
+ * La porte = une comparaison PURE fail-closed (set-membership par phase), jamais un LLM.
+ */
+test.describe("DP28 — env promotion + human gate + rollback (EPIC F)", () => {
+	test("the env tab exposes the human-validation gate with the live dev URL", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("env-tab").click();
+		await expect(page.getByTestId("env-section")).toBeVisible();
+		await expect(page.getByTestId("human-validation-gate")).toBeVisible();
+		// the live dev/preview deployment URL the human SEES (DP25 — the real app).
+		const devUrl = await page.getByTestId("dev-deploy-url").innerText();
+		expect(devUrl).toMatch(/^https:\/\/preview-/);
+		await expect(page.getByTestId("dev-validate")).toBeVisible();
+		await expect(page.getByTestId("dev-refuse")).toBeVisible();
+		// the closed env ladder is rendered (preview → staging → prod).
+		await expect(page.getByTestId("env-rung")).toHaveCount(3);
+	});
+
+	test("promoting to staging WITHOUT a human validation is refused DEV_NOT_HUMAN_VALIDATED", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("env-tab").click();
+		// no validation recorded yet → fail-closed.
+		await page.getByTestId("promote-staging").click();
+
+		const block = page.getByTestId("promote-blockreason");
+		await expect(block).toBeVisible();
+		await expect(block).toHaveAttribute("data-code", "DEV_NOT_HUMAN_VALIDATED");
+		// no staging promotion is produced without a validation.
+		await expect(page.getByTestId("staging-promoted")).toHaveCount(0);
+	});
+
+	test("VALIDATING the dev unlocks the promotion to staging (staging serves the re-emitted app)", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("env-tab").click();
+
+		// (1) the human SEES the dev deployment and VALIDATES this exact phase.
+		await page.getByTestId("dev-validate").click();
+		await expect(page.getByTestId("dev-validated-badge")).toBeVisible();
+		await expect(page.getByTestId("human-validation-gate")).toHaveAttribute(
+			"data-validated",
+			"true",
+		);
+
+		// (2) promotion to staging is now permitted.
+		await page.getByTestId("promote-staging").click();
+		await expect(page.getByTestId("staging-promoted")).toBeVisible();
+		// staging serves the RE-EMITTED app of the validated phase (the re-projection).
+		const appHash = await page.getByTestId("promoted-app-hash").innerText();
+		expect(appHash.length).toBeGreaterThan(0);
+		// no refusal once validated.
+		await expect(page.getByTestId("promote-blockreason")).toHaveCount(0);
+	});
+
+	test("REFUSING the dev keeps the promotion to staging blocked", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("env-tab").click();
+
+		await page.getByTestId("dev-refuse").click();
+		await expect(page.getByTestId("dev-refused-badge")).toBeVisible();
+
+		await page.getByTestId("promote-staging").click();
+		const block = page.getByTestId("promote-blockreason");
+		await expect(block).toBeVisible();
+		await expect(block).toHaveAttribute("data-code", "DEV_NOT_HUMAN_VALIDATED");
+		await expect(page.getByTestId("staging-promoted")).toHaveCount(0);
+	});
+
+	test("validation is PER PHASE — a new dev deploy re-requires a validation", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("env-tab").click();
+
+		// validate the current dev phase, then re-deploy the dev (a NEW phase).
+		await page.getByTestId("dev-validate").click();
+		await expect(page.getByTestId("dev-validated-badge")).toBeVisible();
+		await page.getByTestId("dev-redeploy").click();
+		// the new dev phase has NO validation badge (per-phase: the old validation does not carry).
+		await expect(page.getByTestId("dev-validated-badge")).toHaveCount(0);
+		await expect(page.getByTestId("human-validation-gate")).toHaveAttribute(
+			"data-validated",
+			"false",
+		);
+
+		// promoting the NEW phase to staging is refused (the prior validation was for another phase).
+		await page.getByTestId("promote-staging").click();
+		const block = page.getByTestId("promote-blockreason");
+		await expect(block).toBeVisible();
+		await expect(block).toHaveAttribute("data-code", "DEV_NOT_HUMAN_VALIDATED");
+	});
+
+	test("promoting, then rolling back to an earlier phase, serves the re-emitted app of N-1", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("env-tab").click();
+
+		// promote to prod (not gated by the dev validation door), then incident → rollback to N-1.
+		await page.getByTestId("promote-prod").click();
+		await expect(page.getByTestId("prod-promoted")).toBeVisible();
+
+		await page.getByTestId("rollback-launch").click();
+		await expect(page.getByTestId("rollback-done")).toBeVisible();
+		// the rolled-back app is the RE-EMISSION of the earlier phase N-1 (phase-dev-prev).
+		await expect(page.getByTestId("rollback-to-phase")).toHaveText(
+			"phase-dev-prev",
+		);
+		await expect(page.getByTestId("rollback-app-hash")).toHaveAttribute(
+			"data-phase",
+			"phase-dev-prev",
+		);
+		const appHash = await page.getByTestId("rollback-app-hash").innerText();
+		expect(appHash.length).toBeGreaterThan(0);
+	});
+});

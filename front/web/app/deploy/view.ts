@@ -1,5 +1,11 @@
 import type { DeployPlan } from "@/lib/deploy";
 import type { EnvDomainBinding, Label } from "@/lib/env-domainbind";
+import type {
+	Environment,
+	HumanValidation,
+	Promotion,
+	RollbackDecision,
+} from "@/lib/env-rollback";
 import type { PreviewPlanWithBootstrap } from "@/lib/preview-bootstrap";
 
 /**
@@ -94,3 +100,45 @@ export interface DomainView {
 }
 
 export const DOMAIN_INITIAL: DomainView = { ok: false };
+
+/**
+ * View model for the DP28 « Promotion d'environnement + porte humaine + rollback » tab (EPIC F —
+ * EXTENDS S98 envrollback, never duplicates).
+ *
+ * THE HUMAN-VALIDATION GATE (the heart of DP28). The human SEES the live dev/preview deployment of
+ * an EXACT phase (DP25 — the real app has a URL), then VALIDATES or REFUSES it — the
+ * validation_humaine. APRÈS validation → la promotion preview/dev → STAGING devient permise ; SANS
+ * validation (ou un refus) → la promotion STAGING est REFUSÉE DEV_NOT_HUMAN_VALIDATED (fail-closed).
+ * La validation est PAR PHASE : un nouveau déploiement dev (une autre phase) redemande une
+ * validation. Plus la PROMOTION (preview/dev → staging → prod) et le ROLLBACK (re-projeter une phase
+ * antérieure → l'app re-émise de N-1, hash égal).
+ *
+ * THE WALL (CLAUDE.md §2/§9): /deploy PLANS ; la validation_humaine est une décision HITL RUNTIME
+ * below-the-line (provenancée, append-only), JAMAIS authority.Decide ; un rollback est une décision
+ * enregistrée (ChangeSet + provenance), jamais une écriture-vers-le-kernel.
+ */
+export interface EnvView {
+	ok: boolean;
+	/** the env the action targeted (preview | staging | prod). */
+	env?: Environment;
+	/** the content-addressed phase the action operated on (the dev/promoted/rolled-back phase). */
+	phaseHash?: string;
+	/* --- the human-validation gate on the dev (DP28) ------------------------------------------ */
+	/** the live dev/preview URL the human SEES (DP25) — the real app they validate or refuse. */
+	devUrl?: string;
+	/** the validation_humaine recorded for the CURRENT dev phase (null until the human acts). */
+	devValidation?: HumanValidation | null;
+	/* --- promotion (the env ladder) ----------------------------------------------------------- */
+	/** the Promotion produced when a hop is permitted (staging only when the dev phase is validated). */
+	promotion?: Promotion;
+	/* --- rollback ----------------------------------------------------------------------------- */
+	/** the RollbackDecision produced when rolling back to an earlier stable phase (re-projection). */
+	rollback?: RollbackDecision;
+	/* --- refusals ----------------------------------------------------------------------------- */
+	/** the refusal code (DEV_NOT_HUMAN_VALIDATED / ENV_PROMOTE_NOT_STABLE / ROLLBACK_NOT_EARLIER / …). */
+	blockCode?: string;
+	/** the BlockReason explanation when refused (no validation / wrong phase / refused / not earlier). */
+	blockExplanation?: string;
+}
+
+export const ENV_INITIAL: EnvView = { ok: false };

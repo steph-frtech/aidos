@@ -395,6 +395,20 @@ const (
 	// actionable BlockReason. The ordering and stability are COMPUTED over the DAG, never an LLM
 	// judgment (§6/§8). ADDED at S98 — additive enum extension.
 	CodeRollbackNotEarlier Code = "ROLLBACK_NOT_EARLIER"
+	// CodeDevNotHumanValidated — the per-app PROMOTION ladder (DP28, back/archive/envrollback,
+	// EPIC F deploy) refused to promote a preview/dev phase UP to staging because the human has
+	// NOT yet VALIDATED the live dev deployment for THAT EXACT phase. The user requirement is
+	// capital: « je dois VOIR la vraie app déployée et la VALIDER ou non à chaque fois sur dev. »
+	// The dev deployment (DP25 preview) has a live URL the human SEES; promotion preview/dev →
+	// staging is GATED by a HumanValidation{Env:preview, PhaseHash:==the promoted phase,
+	// Validated:true} — a HITL RUNTIME, below-the-line authorisation (qui/quand/quelle PHASE),
+	// calqued on connectorenforce.ConnectorRuntimeApproval (A2), NEVER authority.Decide (the
+	// Kernel truth-admitter governs whether a TRUTH may change; it NEVER gates a runtime deploy
+	// EFFECT). The gate is FAIL-CLOSED set-membership: NO validation, a validation of ANOTHER
+	// phase, or Validated:false ⇒ refused. Each new dev deployment is a NEW phase ⇒ a NEW
+	// validation is required (per-phase). The membership is COMPUTED (pure comparison), never an
+	// LLM judgment (§6/§8). ADDED at DP28 — additive enum extension.
+	CodeDevNotHumanValidated Code = "DEV_NOT_HUMAN_VALIDATED"
 	// CodeAgentAutonomyExceeded — the FK10 AUTONOMY enforcer (back/kernel/autonomy,
 	// ROADMAP-fke FKE-11/34) refused an action whose REQUIRED autonomy level is strictly
 	// greater than the level the CoucheAgent DECLARED — fail-closed. autonomy_level ∈
@@ -1166,6 +1180,27 @@ var reasons = map[Code]BlockReason{
 			"rollback_is_re_projection : le rollback RÉ-ÉMET l'app depuis la phase antérieure (S78), réconcilie le datastore (migration inverse expand-contract / Doltgres as-of), et ENREGISTRE la décision (append-only, provenance §9) — il ne restaure JAMAIS un artefact sandbox tel quel.",
 		},
 	},
+	CodeDevNotHumanValidated: {
+		Code:     CodeDevNotHumanValidated,
+		Severity: SeverityBlocking,
+		Explanation: "La promotion vers staging est REFUSÉE (DP28, back/archive/envrollback, EPIC F deploy) : " +
+			"la phase dev/preview courante n'a PAS de validation humaine validated=true POUR CETTE phase exacte. " +
+			"L'exigence utilisatrice est capitale : « je dois VOIR la vraie app déployée et la VALIDER ou non à chaque " +
+			"fois sur dev. » Le déploiement dev (DP25 preview) a une URL live que l'humain VOIT ; la promotion " +
+			"preview/dev → staging est GATÉE par une validation_humaine (HumanValidation{Env:preview, " +
+			"PhaseHash:==la phase promue, Validated:true}) — une décision HITL RUNTIME, sous la ligne (qui/quand/quelle " +
+			"PHASE), calquée sur ConnectorRuntimeApproval (A2), JAMAIS authority.Decide (l'admetteur de vérité Kernel " +
+			"gouverne si une VÉRITÉ change ; il ne gate JAMAIS un EFFET de déploiement runtime). La porte est " +
+			"FAIL-CLOSED par set-membership : PAS de validation, une validation d'une AUTRE phase, ou validated=false " +
+			"⇒ refusé. Chaque nouveau déploiement dev est une NOUVELLE phase ⇒ une NOUVELLE validation est requise " +
+			"(par phase). La comparaison est CALCULÉE (pure), jamais un jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"see_and_validate_the_dev_deployment : ouvrez l'URL live du déploiement dev (DP25 preview) de la phase, vérifiez la VRAIE app, puis enregistrez une validation_humaine validated=true POUR CETTE phase exacte (qui/quand/quelle phase).",
+			"validate_the_exact_phase : la validation est PAR PHASE — valider la phase A ne débloque PAS la promotion de la phase B ; un nouveau déploiement dev = une nouvelle phase = une nouvelle validation requise.",
+			"a_refusal_is_a_recorded_decision : si vous refusez (validated=false), c'est une décision HITL runtime enregistrée (append-only, provenance §9) — la promotion reste fail-closed jusqu'à une validation validated=true de la phase exacte.",
+			"never_authority_decide : la validation_humaine n'est PAS authority.Decide (qui gouverne la vérité Kernel) — c'est une porte runtime below-the-line, proposée par l'écran /deploy, jamais une écriture-vérité directe.",
+		},
+	},
 	CodeAgentAutonomyExceeded: {
 		Code:     CodeAgentAutonomyExceeded,
 		Severity: SeverityBlocking,
@@ -1366,6 +1401,7 @@ var codeOrder = []Code{
 	CodeDomainAlreadyBound,
 	CodeEnvPromoteNotStable,
 	CodeRollbackNotEarlier,
+	CodeDevNotHumanValidated,
 	CodeAgentAutonomyExceeded,
 	CodeEmittedFileHandEdited,
 	CodeUnknownProfile,
