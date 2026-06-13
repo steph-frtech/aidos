@@ -3,7 +3,9 @@ import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
 import { hashDemoMatrix } from "@/lib/connections";
+import { NETWORKS, sensorStatus } from "@/lib/env-binding-cockpit";
 import { bindings, hashBindings } from "@/lib/environments";
+import { BindingCockpit } from "./BindingCockpit";
 import { ConnectionsMatrix } from "./ConnectionsMatrix";
 import { EnvironmentsPanel } from "./EnvironmentsPanel";
 
@@ -82,6 +84,17 @@ export default async function EnvironmentsPage() {
 				{/* DP07 — the connection-mode matrix (resolveConnection), recomputed on screen */}
 				<div className="mt-8">
 					<ConnectionsMatrix seededHash={seededMatrixHash} />
+				</div>
+
+				{/* DP09 — the cockpit: declare/edit a binding as propose → ChangeSet →
+				    approval, the matrix recomputed as the PURE DP07 projection, the
+				    DP08 sensor status, and the wall probe (kernel_write refused). */}
+				<div className="mt-8">
+					<BindingCockpit
+						networks={NETWORKS}
+						sensor={sensorStatus()}
+						seededMatrixHash={seededMatrixHash}
+					/>
 				</div>
 			</main>
 		</div>
