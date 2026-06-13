@@ -245,13 +245,13 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 		).toBeGreaterThanOrEqual(14);
 
 		// « Les types d'agent avec leur harness » : la section agents expose le
-		// modèle gouverné (claude-fable-5) noir sur blanc — la spec entière vient
+		// modèle gouverné (claude-opus-4-8) noir sur blanc — la spec entière vient
 		// de lib/agentlayer-data.ts, jamais découverte à l'exécution.
 		await expect(
 			page
 				.locator('[data-testid="v3-param-section"][data-section="agents"]')
 				.getByTestId("v3-param")
-				.filter({ hasText: "claude-fable-5" })
+				.filter({ hasText: "claude-opus-4-8" })
 				.first(),
 		).toBeVisible();
 
