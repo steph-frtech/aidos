@@ -143,7 +143,7 @@ func TestTransport_ToolsAndServersOverHTTP(t *testing.T) {
 		t.Fatalf("gateway_servers: %v", err)
 	}
 	servers := decode[serversOutput](t, sr, "gateway_servers")
-	if len(servers.Servers) != 13 {
-		t.Fatalf("expected the 13 fronted MCP servers, got %d", len(servers.Servers))
+	if len(servers.Servers) != 14 {
+		t.Fatalf("expected the 14 fronted MCP servers, got %d", len(servers.Servers))
 	}
 }

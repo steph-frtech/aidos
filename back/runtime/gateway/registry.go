@@ -1,23 +1,27 @@
 package gateway
 
 // DefaultRegistry is the CLOSED, content-addressable set of MCP tools the S58 gateway
-// exposes over HTTP — EVERY tool of the 13 existing AIDOS MCP servers the roadmap
+// exposes over HTTP — EVERY tool of the 14 existing AIDOS MCP servers the roadmap
 // names (store · mirror-runner · changeset · dag · idea-intake · memory · context ·
-// evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project),
+// evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project ·
+// provision — the 14th ACTIVATED at DP13: the stack/bootstrap/profile tools),
 // PLUS the explicitly-fenced truth-zone write namespace (CLAUDE.md §2).
 //
-// THE WALL, ENCODED AS DATA (server-side). All 13 servers' real tools are BELOW THE
+// THE WALL, ENCODED AS DATA (server-side). All 14 servers' real tools are BELOW THE
 // LINE — they read/op the archive·brain·context·ideas·changesets·dag·besoin schemas
 // the agent role MAY touch (the changeset_* tools ARE the legal ChangeSet door, the
 // only path truth moves: they stay below-line because they propose/stage/apply through
-// the gate, never a raw kernel write). None of the 13 holds a GRANT to write
-// kernel/mirrors/fitness — that is the wall by construction.
+// the gate, never a raw kernel write; the provision stack.* tools re-emit/project over
+// the StackManifest AST + the observed host state, never a kernel write). None of the
+// 14 holds a GRANT to write kernel/mirrors/fitness — that is the wall by construction.
 //
-// The truth-zone WRITE namespace (kernel_write · mirror_write · fitness_write) is NOT a
-// real tool of any server — it is the door a naïve or hostile caller might craft to
-// move truth directly. The gateway registers these names with DispositionTruthWrite so
-// that such a call is REFUSED with an actionable BlockReason (use a ChangeSet), rather
-// than silently 404'd — the server-side wall is explicit, not incidental.
+// The truth-zone WRITE namespace (kernel_write · mirror_write · fitness_write ·
+// stack.engrave_manifest) is NOT a real tool of any server — it is the door a naïve or
+// hostile caller might craft to move truth directly (the last is the DP13 provisioning
+// twin: a StackManifest is above-the-line truth). The gateway registers these names
+// with DispositionTruthWrite so that such a call is REFUSED with an actionable
+// BlockReason (use a ChangeSet), rather than silently 404'd — the server-side wall is
+// explicit, not incidental.
 //
 // DETERMINISM (CLAUDE.md §6): DefaultRegistry is a pure constant builder — same call,
 // byte-identical registry (the reproducibility mirror pins it).
@@ -68,24 +72,38 @@ func DefaultTools() []Tool {
 	// 13. project — the project lifecycle (create·list·get·archive·restore·delete,
 	// the `projects` schema, below the line — an isolated DAG root, never kernel truth).
 	t = append(t, below("project", "project_create", "project_list", "project_get", "project_archive", "project_restore", "project_delete", "project_duplicate", "project_branch", "project_rebranch", "project_checkout_ancestor", "project_merge_guard", "project_genesis")...)
+	// 14. provision — the DP13 STACK / BOOTSTRAP / PROFILE tools + the S89 datastore
+	// planner (ROADMAP-provisioning-deploy EPIC C, ADR 0009). All BELOW THE LINE: they
+	// re-emit/project/resolve over the StackManifest AST (the SELECT-only kernel mirror)
+	// + the observed host state, writing no truth. The `stack.engrave_manifest` door is
+	// the fenced truth-write namespace below (refused with a ChangeSet-pointing reason).
+	t = append(t, below("provision", "plan", "images", "stack.emit", "stack.select_profile", "stack.bootstrap", "stack.resolve_ports", "stack.print_urls")...)
 
 	// THE FENCED TRUTH-ZONE WRITE NAMESPACE (§2). Not a real tool of any server — the
 	// door a caller might craft to move truth directly. Registered as TruthWrite so the
 	// gateway refuses it with a ChangeSet-pointing BlockReason (server-side wall).
+	// `stack.engrave_manifest` (DP13) is the provisioning twin: a StackManifest is
+	// above-the-line truth, so a direct write of one is refused at the edge — truth
+	// moves only via idea → mirror → /goal → ChangeSet (the provision server mirrors
+	// this refusal independently; both layers fail-close).
 	t = append(t,
 		Tool{Name: "kernel_write", Server: "kernel", Disposition: DispositionTruthWrite},
 		Tool{Name: "mirror_write", Server: "mirrors", Disposition: DispositionTruthWrite},
 		Tool{Name: "fitness_write", Server: "fitness", Disposition: DispositionTruthWrite},
+		Tool{Name: "stack.engrave_manifest", Server: "provision", Disposition: DispositionTruthWrite},
 	)
 	return t
 }
 
-// GatewayServers is the closed list of the 13 MCP servers S58 exposes (display + the
-// completeness assertion: every named server has ≥1 exposed tool). Ordered.
+// GatewayServers is the closed list of the 14 MCP servers the gateway exposes (display
+// + the completeness assertion: every named server has ≥1 exposed tool). Ordered. The
+// 14th — `provision` — is ACTIVATED at DP13 (the scaffold the gateway now fronts:
+// every provisioning op is an MCP tool, ADR 0009; a scaffold the gateway never fronts
+// is dead).
 func GatewayServers() []string {
 	return []string{
 		"store", "mirror-runner", "changeset", "dag", "idea-intake", "memory",
 		"context", "evolve", "backtester", "telemetry-reader", "pact-verifier",
-		"mutation-runner", "project",
+		"mutation-runner", "project", "provision",
 	}
 }

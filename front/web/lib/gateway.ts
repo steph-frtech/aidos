@@ -61,7 +61,7 @@ export interface RouteDecision {
 	blockReason?: GatewayBlockReason;
 }
 
-/** The 13 MCP servers the gateway fronts — byte-identical to Go GatewayServers(). */
+/** The 14 MCP servers the gateway fronts — byte-identical to Go GatewayServers(). */
 export const GATEWAY_SERVERS: readonly string[] = [
 	"store",
 	"mirror-runner",
@@ -76,6 +76,9 @@ export const GATEWAY_SERVERS: readonly string[] = [
 	"pact-verifier",
 	"mutation-runner",
 	"project",
+	// 14th — `provision` — ACTIVATED at DP13: the DP13 stack/bootstrap/profile tools
+	// (re-emit/project/resolve over the StackManifest AST + the observed host state).
+	"provision",
 ];
 
 /** defaultTools mirrors Go DefaultTools() — the closed exposed surface. */
@@ -153,10 +156,29 @@ export function defaultTools(): Tool[] {
 			"project_merge_guard",
 			"project_genesis",
 		]),
+		// 14. provision — the DP13 STACK / BOOTSTRAP / PROFILE tools + the S89 datastore
+		// planner. All BELOW THE LINE: they re-emit/project/resolve over the StackManifest
+		// AST + the observed host state, writing no truth (the engrave door is fenced below).
+		...below("provision", [
+			"plan",
+			"images",
+			"stack.emit",
+			"stack.select_profile",
+			"stack.bootstrap",
+			"stack.resolve_ports",
+			"stack.print_urls",
+		]),
 		// The fenced truth-zone write namespace (§2) — refused with a ChangeSet hint.
 		{ name: "kernel_write", server: "kernel", disposition: "truth_write" },
 		{ name: "mirror_write", server: "mirrors", disposition: "truth_write" },
 		{ name: "fitness_write", server: "fitness", disposition: "truth_write" },
+		// `stack.engrave_manifest` (DP13): a StackManifest is above-the-line truth — a
+		// direct write is refused at the edge (truth moves only via a ChangeSet).
+		{
+			name: "stack.engrave_manifest",
+			server: "provision",
+			disposition: "truth_write",
+		},
 	];
 }
 

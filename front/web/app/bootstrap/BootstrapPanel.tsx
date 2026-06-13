@@ -139,6 +139,23 @@ export function BootstrapPanel({
 				>
 					{t("gatedNote")}
 				</p>
+				{/* DP13 — la porte empruntée : l'outil MCP stack.bootstrap (passerelle S58).
+				    Visible dès qu'une action a tourné ; data-source distingue live / twin. */}
+				{state.ok && state.viaMcp !== undefined && (
+					<p
+						data-testid="bootstrap-via-mcp"
+						data-source={state.viaMcp}
+						data-tool="stack.bootstrap"
+						className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs leading-relaxed text-foreground"
+					>
+						<span className="inline-flex items-center rounded-full bg-primary px-2.5 py-0.5 font-mono text-[0.7rem] font-semibold text-primary-foreground">
+							stack.bootstrap
+						</span>
+						<span className="text-muted-foreground">
+							{state.viaMcp === "live" ? t("viaMcpLive") : t("viaMcpTwin")}
+						</span>
+					</p>
+				)}
 			</section>
 
 			{/* le BlockReason fail-closed — MISSING_SECRET_AT_BOOT (le mur en action) */}

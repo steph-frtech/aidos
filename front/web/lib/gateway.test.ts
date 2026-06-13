@@ -133,4 +133,34 @@ describe("gateway registry completeness", () => {
 	it("defaultTools is reproducible", () => {
 		expect(defaultTools()).toEqual(defaultTools());
 	});
+
+	it("fronts the DP13 provision server (the 14th) with the stack tools", () => {
+		expect(GATEWAY_SERVERS).toContain("provision");
+		// the five DP13 stack.* projections route below the line (never the kernel).
+		for (const tool of [
+			"stack.emit",
+			"stack.select_profile",
+			"stack.bootstrap",
+			"stack.resolve_ports",
+			"stack.print_urls",
+		]) {
+			const d = route({ identity: "alice", activeProject: "proj-a" }, tool, {
+				projectId: "proj-a",
+			});
+			expect(d.outcome).toBe("route");
+			expect(d.tool?.server).toBe("provision");
+		}
+	});
+
+	it("refuses stack.engrave_manifest as a truth-write (a manifest is truth)", () => {
+		const d = route(
+			{ identity: "alice", activeProject: "proj-a" },
+			"stack.engrave_manifest",
+			{
+				projectId: "proj-a",
+			},
+		);
+		expect(d.outcome).toBe("refused_truth_write");
+		expect(d.blockReason?.code).toBe(CODE_TRUTH_WRITE_NEEDS_CHANGESET);
+	});
 });

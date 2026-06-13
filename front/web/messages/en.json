@@ -7571,6 +7571,8 @@
 		"sequenceHeading": "Emitted bootstrap sequence (ordered)",
 		"resolvedPortLabel": "resolved host port",
 		"urlsLabel": "printed URLs",
-		"sequenceHashLabel": "sequence hash (byte-stable replay)"
+		"sequenceHashLabel": "sequence hash (byte-stable replay)",
+		"viaMcpLive": "emitted via the S58 gateway MCP tool (DP13) — the gateway answered live.",
+		"viaMcpTwin": "emitted via the MCP tool (DP13) — gateway unreachable, the pure TS twin re-derived the SAME sequence (byte-identical to the authoritative Go)."
 	}
 }

@@ -7571,6 +7571,8 @@
 		"sequenceHeading": "Séquence d'amorçage émise (ordonnée)",
 		"resolvedPortLabel": "port hôte résolu",
 		"urlsLabel": "URLs imprimées",
-		"sequenceHashLabel": "empreinte de la séquence (replay byte-stable)"
+		"sequenceHashLabel": "empreinte de la séquence (replay byte-stable)",
+		"viaMcpLive": "émis via l'outil MCP de la passerelle S58 (DP13) — la passerelle a répondu en direct.",
+		"viaMcpTwin": "émis via l'outil MCP (DP13) — passerelle injoignable, le jumeau TS pur a re-dérivé la MÊME séquence (byte-identique au Go autoritaire)."
 	}
 }

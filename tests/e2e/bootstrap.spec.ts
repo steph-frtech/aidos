@@ -105,4 +105,30 @@ test.describe("DP12 — deterministic one-shot bootstrap emitter", () => {
 		// a blocked bootstrap emits NO event sequence.
 		await expect(page.getByTestId("bootstrap-events")).toHaveCount(0);
 	});
+
+	// ── DP13 — the bootstrap action now goes THROUGH the MCP tool stack.bootstrap ──
+	test("triggering stack.bootstrap from the screen emits the ordered events via the MCP tool", async ({
+		page,
+	}) => {
+		await page.goto("/bootstrap");
+		await page.getByTestId("bootstrap-run").click();
+
+		// the SAME ordered sequence appears (DP13 routes through the gateway tool; the
+		// pure TS twin re-derives the identical sequence when the seam is unreachable).
+		const rows = page.getByTestId("bootstrap-event");
+		await expect(rows).toHaveCount(10);
+		const steps = await rows.evaluateAll((els) =>
+			els.map((el) => el.getAttribute("data-step")),
+		);
+		expect(steps).toEqual(ORDERED_KINDS);
+
+		// the DP13 indicator proves the MCP tool stack.bootstrap is the SOURCE/door.
+		const viaMcp = page.getByTestId("bootstrap-via-mcp");
+		await expect(viaMcp).toBeVisible();
+		await expect(viaMcp).toHaveAttribute("data-tool", "stack.bootstrap");
+		await expect(viaMcp).toContainText("stack.bootstrap");
+		// the transport is either the live gateway or the byte-identical twin fallback.
+		const source = await viaMcp.getAttribute("data-source");
+		expect(["live", "twin-fallback"]).toContain(source);
+	});
 });

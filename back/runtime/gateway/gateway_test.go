@@ -80,6 +80,42 @@ func TestLookup(t *testing.T) {
 	}
 }
 
+// TestRouteProvisionStackToolsBelowLine: the DP13 provisioning tools the gateway now
+// fronts are BELOW THE LINE — a same-project, same-identity call routes through (they
+// re-emit/project, never write truth). Fault-injection: the gateway really routes them.
+func TestRouteProvisionStackToolsBelowLine(t *testing.T) {
+	reg := gateway.DefaultRegistry()
+	scope := projectwall.Scope{Identity: "alice", ActiveProject: "proj-a"}
+	target := projectwall.Target{ProjectID: "proj-a"}
+	for _, tool := range []string{"stack.emit", "stack.select_profile", "stack.bootstrap", "stack.resolve_ports", "stack.print_urls"} {
+		d := reg.Route(gateway.Call{Scope: scope, Tool: tool, Target: target})
+		if d.Outcome != gateway.OutcomeRoute {
+			t.Fatalf("DP13 below-line tool %q not routed: %v", tool, d.Outcome)
+		}
+		if d.Tool == nil || d.Tool.Server != "provision" {
+			t.Fatalf("DP13 tool %q routed to the wrong server: %+v", tool, d.Tool)
+		}
+	}
+}
+
+// TestRouteStackEngraveIsTruthWrite: the fenced stack.engrave_manifest door is refused
+// at the edge with GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET — a StackManifest is above-the-
+// line truth, it never moves through a direct provisioning write.
+func TestRouteStackEngraveIsTruthWrite(t *testing.T) {
+	reg := gateway.DefaultRegistry()
+	d := reg.Route(gateway.Call{
+		Scope:  projectwall.Scope{Identity: "alice", ActiveProject: "proj-a"},
+		Tool:   "stack.engrave_manifest",
+		Target: projectwall.Target{ProjectID: "proj-a"},
+	})
+	if d.Outcome != gateway.OutcomeRefusedTruthWrite {
+		t.Fatalf("stack.engrave_manifest not refused as a truth-write: %v", d.Outcome)
+	}
+	if d.BlockReason == nil || d.BlockReason.Code != gateway.CodeTruthWriteNeedsChangeset {
+		t.Fatalf("stack.engrave_manifest refusal without GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET: %+v", d.BlockReason)
+	}
+}
+
 func TestDefaultToolsReproducible(t *testing.T) {
 	a := gateway.DefaultTools()
 	b := gateway.DefaultTools()
