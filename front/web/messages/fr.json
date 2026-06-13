@@ -175,7 +175,8 @@
 		"aiLabNav": "AI Lab (cockpit)",
 		"environments": "Environnements & bindings (DP06)",
 		"endpointsFitness": "Endpoints — senseur arch-fitness (DP08)",
-		"bootstrapSpike": "Spike bootstrap one-shot (DP10)"
+		"bootstrapSpike": "Spike bootstrap one-shot (DP10)",
+		"bootstrap": "Bootstrap one-shot déterministe (DP12)"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -7543,5 +7544,33 @@
 		"remeasureDiff": "adresses différentes — dérive détectée",
 		"harvestHeading": "Récolte (/harvest) — proposition DRAFT",
 		"recordHashLabel": "adresse du record (sha256)"
+	},
+	"bootstrap": {
+		"eyebrow": "DP12 · bootstrap one-shot déterministe",
+		"title": "Bootstrap one-shot déterministe",
+		"subtitle": "amorcer la stack émise — séquence ordonnée",
+		"intro": "DP12 émet DÉTERMINISTIQUEMENT la séquence d'amorçage one-shot d'un bundle émis : un ensemble CLOS, ORDONNÉ d'events (network-created → volumes-created → env-materialized → secrets-checked → ports-resolved → traefik-up → datastore-up → server-up → healthy → urls-printed) + le port résolu depuis l'état hôte observé (ss ∪ docker ps, fonction pure, jamais un prompt). Un secret requis manquant → MISSING_SECRET_AT_BOOT (actionnable). Sur le GO mesuré DP10 + ADR 0067.",
+		"tutorialHeading": "Comment lire cet écran",
+		"tutorialBody": "Le moteur AUTORITAIRE est le Go (back/runtime/bootstrap, 11/11 tests verts) ; l'écran re-dérive la séquence par le jumeau TS pur (lib/bootstrap) — résolution de ports / ordre / merge-env = fonctions pures, contrôle des secrets = scan (différence d'ensembles), jamais un LLM. Même (bundle, hôte, secrets) → même séquence (empreinte byte-stable). NOTE HONNÊTE : l'exécution docker réelle est GATÉE (comme le spike DP10) — l'écran montre la séquence ÉMISE, pas un run docker live.",
+		"activeProjectLabel": "Projet actif",
+		"noProject": "aucun",
+		"bundleHeading": "Bundle émis (la source DP02)",
+		"bundleNote": "Le StackManifest sur lequel on amorce — la topologie déclarée (rôles, ports internes, scopes de connecteur). Lecture seule : c'est une vérité au-dessus de la ligne.",
+		"svcName": "service",
+		"svcRole": "rôle",
+		"svcPort": "port interne",
+		"scopesLabel": "scopes de connecteur",
+		"noScopes": "(aucun)",
+		"runHeading": "Amorcer la stack",
+		"runNote": "Émet la séquence déterministe d'amorçage. Deux scénarios : nominal (secrets présents → séquence complète) et secret manquant (le mur en action → MISSING_SECRET_AT_BOOT).",
+		"runNominal": "Amorcer la stack",
+		"runSecretMissing": "Amorcer sans le secret requis",
+		"working": "amorçage…",
+		"gatedNote": "L'exécution docker réelle reste GATÉE (comme le spike DP10) : cet écran émet et rend la SÉQUENCE déterministe (un plan-as-data), il ne lance aucun conteneur. Le .env concret + les secrets vivent dans l'appliance au boot (chmod 600, gitignored), jamais dans le source émis (le mur §2).",
+		"blockHeading": "Amorçage refusé (fail-closed)",
+		"sequenceHeading": "Séquence d'amorçage émise (ordonnée)",
+		"resolvedPortLabel": "port hôte résolu",
+		"urlsLabel": "URLs imprimées",
+		"sequenceHashLabel": "empreinte de la séquence (replay byte-stable)"
 	}
 }

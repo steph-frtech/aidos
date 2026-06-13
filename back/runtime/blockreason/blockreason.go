@@ -447,6 +447,26 @@ const (
 	// judgment (§6/§8). ADDED at DP11 — additive enum extension (change_type:
 	// refine, never a removal); recorded by a ChangeSet + SemanticDiff + ADR.
 	CodeDoltgresNotAllowedInProd Code = "DOLTGRES_NOT_ALLOWED_IN_PROD"
+	// CodeMissingSecretAtBoot — the deterministic one-shot BOOTSTRAP emitter
+	// (DP12, back/runtime/bootstrap, ROADMAP-provisioning-deploy, on the DP10
+	// measured GO + ADR 0067) refused to emit the bootstrap sequence of an
+	// emitted bundle because a REQUIRED secret (one per declared connector
+	// scope of the StackManifest — the set DP04 envemit already derives) is
+	// ABSENT from the appliance at boot. The bootstrap sequence is a PURE
+	// PROJECTION (network-created → … → urls-printed); a missing required
+	// secret is FAIL-CLOSED at the secrets-checked rung: the boot is refused
+	// with this actionable BlockReason naming the missing keys, never started
+	// with a blank/guessed credential (honesty, §8). DISTINCT from the S91
+	// SECRET_MISSING_AT_BOOT (secretstore.InjectEnv, the runtime injection of an
+	// already-deployed app): this code is the EMITTER's pre-flight gate over the
+	// bundle's declared connector scopes, before the appliance ever runs. The
+	// concrete .env + secrets live ONLY in the appliance at boot (chmod 600,
+	// gitignored) — NEVER in the emitted source, the truth-store or git (the
+	// wall §2). The check is a DETERMINISTIC set-difference (required keys −
+	// present keys), never an LLM judgment (§6/§8). ADDED at DP12 — additive
+	// enum extension (change_type: refine, never a removal); recorded by a
+	// ChangeSet + SemanticDiff + ADR.
+	CodeMissingSecretAtBoot Code = "MISSING_SECRET_AT_BOOT"
 )
 
 // Severity is the gravity marker of a refusal. The KRD §44.5 example uses
@@ -1142,6 +1162,24 @@ var reasons = map[Code]BlockReason{
 			"rerun : relancez l'émission une fois la sélection ramenée dans la règle DP06 (le croisement non-prod×prod est le seul refus).",
 		},
 	},
+	CodeMissingSecretAtBoot: {
+		Code:     CodeMissingSecretAtBoot,
+		Severity: SeverityBlocking,
+		Explanation: "Bootstrap REFUSÉ (DP12, back/runtime/bootstrap, sur le GO mesuré DP10 + ADR 0067) : " +
+			"un secret REQUIS par le bundle émis (un par scope de connecteur déclaré dans le StackManifest — " +
+			"l'ensemble que DP04 envemit dérive déjà) est ABSENT de l'appliance au boot. La séquence d'amorçage " +
+			"est une PROJECTION pure (network-created → … → urls-printed) ; un secret requis manquant est " +
+			"FAIL-CLOSED au cran secrets-checked : l'amorçage est refusé, jamais démarré avec un identifiant " +
+			"blanc ou deviné (honnêteté, §8). Le .env concret et les secrets vivent UNIQUEMENT dans l'appliance " +
+			"au boot (chmod 600, gitignored) — JAMAIS dans le source émis, le truth-store ou git (le mur §2). " +
+			"Le contrôle est une différence d'ensembles DÉTERMINISTE (clés requises − clés présentes), jamais " +
+			"un jugement LLM (§6/§8).",
+		HowToFix: []string{
+			"set_the_secret : déposez le secret manquant dans le secret store du projet (S91, scopé project_id, chiffré au repos) — la clé est nommée APP_SECRET_<SCOPE> (secretstore.EnvVar) ; jamais en dur dans le source.",
+			"check_declared_scopes : la liste des secrets requis est DÉRIVÉE des connector_scopes déclarés du StackManifest — ni inventée, ni devinée ; vérifiez que chaque scope déclaré a son secret.",
+			"rerun : relancez EmitBootstrapSequence une fois les secrets présents ; l'émission est déterministe (même bundle + même état hôte + mêmes secrets → même séquence).",
+		},
+	},
 }
 
 // codeOrder is the canonical enumeration order of the Code enum. Declared, never
@@ -1188,6 +1226,7 @@ var codeOrder = []Code{
 	CodeEmittedFileHandEdited,
 	CodeUnknownProfile,
 	CodeDoltgresNotAllowedInProd,
+	CodeMissingSecretAtBoot,
 }
 
 // Codes returns every Code in the closed enum, in canonical order.

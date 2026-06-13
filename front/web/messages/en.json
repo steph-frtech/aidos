@@ -175,7 +175,8 @@
 		"aiLabNav": "AI Lab (cockpit)",
 		"environments": "Environments & bindings (DP06)",
 		"endpointsFitness": "Endpoints — arch-fitness sensor (DP08)",
-		"bootstrapSpike": "One-shot bootstrap spike (DP10)"
+		"bootstrapSpike": "One-shot bootstrap spike (DP10)",
+		"bootstrap": "Deterministic one-shot bootstrap (DP12)"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -7543,5 +7544,33 @@
 		"remeasureDiff": "different addresses — drift detected",
 		"harvestHeading": "Harvest (/harvest) — DRAFT proposal",
 		"recordHashLabel": "record address (sha256)"
+	},
+	"bootstrap": {
+		"eyebrow": "DP12 · deterministic one-shot bootstrap",
+		"title": "Deterministic one-shot bootstrap",
+		"subtitle": "bootstrap the emitted stack — ordered sequence",
+		"intro": "DP12 emits DETERMINISTICALLY the one-shot bootstrap sequence of an emitted bundle: a CLOSED, ORDERED set of events (network-created → volumes-created → env-materialized → secrets-checked → ports-resolved → traefik-up → datastore-up → server-up → healthy → urls-printed) + the host port resolved from the observed state (ss ∪ docker ps, a pure function, never a prompt). A missing required secret → MISSING_SECRET_AT_BOOT (actionable). On the DP10 measured GO + ADR 0067.",
+		"tutorialHeading": "How to read this screen",
+		"tutorialBody": "The AUTHORITATIVE engine is the Go (back/runtime/bootstrap, 11/11 tests green); the screen re-derives the sequence with the pure TS twin (lib/bootstrap) — port resolution / order / env-merge = pure functions, the secrets check = a scan (set-difference), never an LLM. The same (bundle, host, secrets) → the same sequence (a byte-stable hash). HONEST NOTE: the real docker execution is GATED (like the DP10 spike) — the screen shows the EMITTED sequence, not a live docker run.",
+		"activeProjectLabel": "Active project",
+		"noProject": "none",
+		"bundleHeading": "Emitted bundle (the DP02 source)",
+		"bundleNote": "The StackManifest we bootstrap on — the declared topology (roles, internal ports, connector scopes). Read-only: it is a truth above the line.",
+		"svcName": "service",
+		"svcRole": "role",
+		"svcPort": "internal port",
+		"scopesLabel": "connector scopes",
+		"noScopes": "(none)",
+		"runHeading": "Bootstrap the stack",
+		"runNote": "Emits the deterministic bootstrap sequence. Two scenarios: nominal (secrets present → full sequence) and missing secret (the wall in action → MISSING_SECRET_AT_BOOT).",
+		"runNominal": "Bootstrap the stack",
+		"runSecretMissing": "Bootstrap without the required secret",
+		"working": "bootstrapping…",
+		"gatedNote": "The real docker execution stays GATED (like the DP10 spike): this screen emits and renders the deterministic SEQUENCE (a plan-as-data), it runs no container. The concrete .env + secrets live in the appliance at boot (chmod 600, gitignored), never in the emitted source (the wall §2).",
+		"blockHeading": "Bootstrap refused (fail-closed)",
+		"sequenceHeading": "Emitted bootstrap sequence (ordered)",
+		"resolvedPortLabel": "resolved host port",
+		"urlsLabel": "printed URLs",
+		"sequenceHashLabel": "sequence hash (byte-stable replay)"
 	}
 }
