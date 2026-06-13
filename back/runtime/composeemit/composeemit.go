@@ -154,12 +154,64 @@ func envVarImage(serviceName string) string {
 	return "${" + mapped + "_IMAGE}"
 }
 
+// TraefikLabel is ONE structured Traefik docker label — a key and its value,
+// the canonical /data/dockers HTTPS-routing vocabulary, rendered (never
+// hand-authored). The SINGLE source of the Traefik label set: this package's
+// compose YAML rendering AND the DP27 custom-domain binding (domainbind) both
+// derive from TraefikHTTPSLabels, so the two emitters can never drift.
+type TraefikLabel struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// TraefikHTTPSLabels is the PURE, CANONICAL Traefik HTTPS label set for ONE
+// reverse-proxied service/route (DP03, the /data/dockers convention): a
+// websecure HTTPS router on Host(`host`) with tls + an ACME certresolver, the
+// loadbalancer's server port, and a companion HTTP→HTTPS redirect router +
+// middleware. It is the SINGLE SOURCE of the HTTPS label vocabulary — the
+// compose YAML rendering (renderTraefikLabels) and the DP27 custom-domain
+// binding (domainbind.ResolveInEnvironment) both consume it, so there is never
+// a second divergent label jeu.
+//
+// Parameters are REFERENCES or values supplied by the caller: `router` the
+// Traefik router name (e.g. ${APP_NAME} for the compose env-var form, or
+// "app-<domain>" for a concrete custom-domain binding), `host` the Host(`…`)
+// rule body (e.g. ${APP_SUBDOMAIN}.${DOMAIN} or a literal custom domain),
+// `certResolver` the ACME certresolver, `redirectMiddleware` the shared
+// HTTP→HTTPS redirect middleware name (${APP_NAME}-https-redirect in compose),
+// and `port` the loadbalancer server port (≤0 ⇒ the port label is omitted, e.g.
+// a custom-domain binding that routes to an already-declared service). PURE —
+// no clock, no rng; same inputs ⇒ the same labels in the same canonical order.
+func TraefikHTTPSLabels(router, host, certResolver, redirectMiddleware string, port int) []TraefikLabel {
+	labels := []TraefikLabel{
+		{Key: "traefik.enable", Value: "true"},
+		{Key: "traefik.http.routers." + router + ".rule", Value: "Host(`" + host + "`)"},
+		{Key: "traefik.http.routers." + router + ".entrypoints", Value: "websecure"},
+		{Key: "traefik.http.routers." + router + ".tls", Value: "true"},
+		{Key: "traefik.http.routers." + router + ".tls.certresolver", Value: certResolver},
+	}
+	if port > 0 {
+		labels = append(labels, TraefikLabel{
+			Key:   "traefik.http.services." + router + ".loadbalancer.server.port",
+			Value: strconv.Itoa(port),
+		})
+	}
+	return append(labels,
+		TraefikLabel{Key: "traefik.http.routers." + router + "-http.rule", Value: "Host(`" + host + "`)"},
+		TraefikLabel{Key: "traefik.http.routers." + router + "-http.entrypoints", Value: "web"},
+		TraefikLabel{Key: "traefik.http.routers." + router + "-http.middlewares", Value: redirectMiddleware},
+		TraefikLabel{Key: "traefik.http.middlewares." + redirectMiddleware + ".redirectscheme.scheme", Value: "https"},
+	)
+}
+
 // renderTraefikLabels renders the /data/dockers Traefik label block of a
 // role=server service: the HTTPS router (websecure + tls + certresolver) on
 // the loadbalancer's internal port, and the HTTP→HTTPS redirect middleware.
 // The primary server routes Host(`${APP_SUBDOMAIN}.${DOMAIN}`) under router
 // ${APP_NAME}; an additional server routes the boilerplate's sub-subdomain
-// Host(`<svc>.${APP_SUBDOMAIN}.${DOMAIN}`) under router ${APP_NAME}-<svc>.
+// Host(`<svc>.${APP_SUBDOMAIN}.${DOMAIN}`) under router ${APP_NAME}-<svc>. It
+// renders the canonical TraefikHTTPSLabels set (the SINGLE source) into the
+// compose YAML lines — byte-identical to the prior hand-written block.
 func renderTraefikLabels(svc stackmanifest.Service, primary string) []string {
 	router := "${APP_NAME}"
 	host := "${APP_SUBDOMAIN}.${DOMAIN}"
@@ -167,19 +219,12 @@ func renderTraefikLabels(svc stackmanifest.Service, primary string) []string {
 		router = "${APP_NAME}-" + svc.Name
 		host = svc.Name + ".${APP_SUBDOMAIN}.${DOMAIN}"
 	}
-	return []string{
-		`    labels:`,
-		`      - "traefik.enable=true"`,
-		`      - "traefik.http.routers.` + router + ".rule=Host(`" + host + "`)\"",
-		`      - "traefik.http.routers.` + router + `.entrypoints=websecure"`,
-		`      - "traefik.http.routers.` + router + `.tls=true"`,
-		`      - "traefik.http.routers.` + router + `.tls.certresolver=${CERT_RESOLVER_NAME}"`,
-		`      - "traefik.http.services.` + router + `.loadbalancer.server.port=` + strconv.Itoa(svc.InternalPort) + `"`,
-		`      - "traefik.http.routers.` + router + "-http.rule=Host(`" + host + "`)\"",
-		`      - "traefik.http.routers.` + router + `-http.entrypoints=web"`,
-		`      - "traefik.http.routers.` + router + `-http.middlewares=${APP_NAME}-https-redirect"`,
-		`      - "traefik.http.middlewares.${APP_NAME}-https-redirect.redirectscheme.scheme=https"`,
+	labels := TraefikHTTPSLabels(router, host, "${CERT_RESOLVER_NAME}", "${APP_NAME}-https-redirect", svc.InternalPort)
+	lines := []string{`    labels:`}
+	for _, l := range labels {
+		lines = append(lines, `      - "`+l.Key+`=`+l.Value+`"`)
 	}
+	return lines
 }
 
 // renderHealthcheck renders the per-service healthcheck block with the

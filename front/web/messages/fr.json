@@ -5588,7 +5588,19 @@
 		"emittedHeading": "Bouton émis — l'opération liée déclarée (sidecar web-preview)",
 		"emittedDeclared": "Opération liée déclarée",
 		"teardownHeading": "Démontage déterministe — services en ordre de boot INVERSE",
-		"teardownNote": "Le démontage est l'inverse exact de l'amorçage : full démonte un sur-ensemble d'un profile resserré. Même plan → même teardown (déterministe)."
+		"teardownNote": "Le démontage est l'inverse exact de l'amorçage : full démonte un sur-ensemble d'un profile resserré. Même plan → même teardown (déterministe).",
+		"tabDomain": "Domaine custom (DP27)",
+		"domainHeading": "Domaine custom + TLS",
+		"domainIntro": "Câblez un domaine custom dans l'environnement DP06 : le binding RÉSOUT l'URL HTTPS (TLS via le certresolver ACME) et ÉMET les labels Traefik (DP03 réutilisé, source unique : websecure + tls.certresolver + redirect HTTP→HTTPS). Un domaine appartient à EXACTEMENT UN projet — le binding domaine→projet est INJECTIF : un domaine déjà lié à un autre projet est REFUSÉ (DOMAIN_ALREADY_BOUND, nommant le propriétaire). Le déploiement Traefik (qui POSSÈDE traefik_default + publie 80/443) reste l'UNIQUE propriétaire du réseau/des ports — DP27 n'émet QUE des labels. Résoudre n'écrit AUCUNE vérité (le mur) ; le domaine DANS l'Environment est une vérité qui passe par propose → ChangeSet → approbation.",
+		"domainLabel": "Domaine custom (un hôte DNS, ex. shop.acme.com)",
+		"environmentLabel": "Environnement (DP06)",
+		"environmentHint": "L'ensemble clos DP06 : prod/staging/dev/future_cloud terminent le TLS ; local NE termine PAS le TLS — câbler un domaine custom HTTPS dans local est refusé (jamais un downgrade http silencieux).",
+		"bindLabel": "Lier",
+		"domainResolvedHeading": "Domaine câblé — sert l'app en HTTPS",
+		"routerLabel": "Routeur Traefik (déterministe, DNS-safe)",
+		"tlsOk": "Sert l'app en HTTPS (websecure + tls + certresolver ACME) — certresolver",
+		"tlsFail": "Ne sert PAS l'app en HTTPS",
+		"labelsHeading": "Labels Traefik émis (DP03 réutilisé — source unique)"
 	},
 	"domainBind": {
 		"eyebrow": "S97 · Domaines custom & TLS",

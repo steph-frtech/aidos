@@ -5588,7 +5588,19 @@
 		"emittedHeading": "Emitted button — the linked operation it declares (web-preview sidecar)",
 		"emittedDeclared": "Linked operation declared",
 		"teardownHeading": "Deterministic demount — services in REVERSE boot order",
-		"teardownNote": "The demount is the exact inverse of the bootstrap: full demounts a superset of a narrowed profile. Same plan → same teardown (deterministic)."
+		"teardownNote": "The demount is the exact inverse of the bootstrap: full demounts a superset of a narrowed profile. Same plan → same teardown (deterministic).",
+		"tabDomain": "Custom domain (DP27)",
+		"domainHeading": "Custom domain + TLS",
+		"domainIntro": "Cable a custom domain into the DP06 environment: the binding RESOLVES the HTTPS URL (TLS via the ACME certresolver) and EMITS the Traefik labels (DP03 reused, single source: websecure + tls.certresolver + HTTP→HTTPS redirect). A domain belongs to EXACTLY ONE project — the domain→project binding is INJECTIVE: a domain already bound to another project is REFUSED (DOMAIN_ALREADY_BOUND, naming the owner). The Traefik deployment (which OWNS traefik_default + publishes 80/443) stays the SOLE owner of the network/ports — DP27 emits ONLY labels. Resolving writes NO truth (the wall); the domain IN the Environment is a truth that moves through propose → ChangeSet → approval.",
+		"domainLabel": "Custom domain (a DNS host, e.g. shop.acme.com)",
+		"environmentLabel": "Environment (DP06)",
+		"environmentHint": "The closed DP06 set: prod/staging/dev/future_cloud terminate TLS; local does NOT terminate TLS — cabling a custom HTTPS domain into local is refused (never a silent http downgrade).",
+		"bindLabel": "Bind",
+		"domainResolvedHeading": "Domain cabled — serves the app over HTTPS",
+		"routerLabel": "Traefik router (deterministic, DNS-safe)",
+		"tlsOk": "Serves the app over HTTPS (websecure + tls + ACME certresolver) — certresolver",
+		"tlsFail": "Does NOT serve the app over HTTPS",
+		"labelsHeading": "Emitted Traefik labels (DP03 reused — single source)"
 	},
 	"domainBind": {
 		"eyebrow": "S97 · Custom domains & TLS",

@@ -11,13 +11,19 @@ import {
 	type OrderManifest,
 } from "@/lib/deploy";
 import {
+	cableInEnvironment,
+	type EnvBindRequest,
+	envServesHTTPS,
+	isBlocked as isDomainBlocked,
+} from "@/lib/env-domainbind";
+import {
 	buildPreviewWithBootstrap,
 	isBlocked as isPreviewBlocked,
 	type StackManifest,
 	servedMatchesEmitted,
 	teardownOf,
 } from "@/lib/preview-bootstrap";
-import type { DeployView, PreviewView } from "./view";
+import type { DeployView, DomainView, PreviewView } from "./view";
 
 /**
  * Server Action for the /deploy Workbench panel (S96 — the phase-keyed deploy pipeline,
@@ -295,5 +301,73 @@ export async function previewAction(
 		teardownDone: intent === "teardown",
 		emittedOp,
 		emittedRun: intent === "emitted",
+	};
+}
+
+/**
+ * domainRegistry — the per-project domain→project registry the injective check runs against (the
+ * DP27 demonstration fixture). It pins ONE foreign binding ("billing.acme.com" → "billing") so the
+ * screen can PROVE the injectivity refusal (DOMAIN_ALREADY_BOUND naming the owner) when a second
+ * project tries to claim the same domain. Deterministic — a fixture, never drawn. The Go-
+ * authoritative registry lives in the truth-store; this is the screen's read-only view.
+ */
+const DOMAIN_REGISTRY = {
+	bindings: [{ domain: "billing.acme.com", project: "billing" }],
+};
+
+/**
+ * Server Action for the DP27 « Domaine custom + TLS » section (EPIC F — EXTENDS S97 domainbind,
+ * never duplicates).
+ *
+ * THE STEP (DP27). A custom domain is CABLED into a DP06 environment (environments.ts) — the
+ * binding RESOLVES the HTTPS URL (TLS via the ACME certresolver) and EMITS the DP03-canonical
+ * Traefik labels (env-domainbind.cableInEnvironment, the twin of Go ResolveInEnvironment). The
+ * done-criteria, reached from the screen: a custom domain SERVES the app over HTTPS (websecure +
+ * tls.certresolver + redirect HTTP→HTTPS) ; a domain owned by ANOTHER project is refused
+ * DOMAIN_ALREADY_BOUND naming the owner (the binding domain→project is INJECTIVE).
+ *
+ * DETERMINISM-FIRST (CLAUDE.md §6/§8): cableInEnvironment + envServesHTTPS are PURE functions of
+ * the input (lib/env-domainbind, the twin of back/runtime/domainbind/envdomain.go) — same
+ * registry + domain + env → byte-identical binding, never an LLM. The injectivity check is a pure
+ * name-match (S97 reused, never forked); the emitted labels are EXACTLY the DP03 canonical set
+ * (one source, never a 2nd divergent jeu). THE WALL (§2): resolving the cabling writes NO truth ;
+ * the domain IN the Environment is an environment truth that moves through propose → ChangeSet →
+ * approval (Go ProposeEnvironmentDomain), never a direct write from the screen.
+ */
+export async function domainAction(
+	_prev: DomainView,
+	formData: FormData,
+): Promise<DomainView> {
+	const domain = String(formData.get("domain") ?? "").trim();
+	const project = String(formData.get("project") ?? "").trim() || "shop";
+	const environment =
+		String(formData.get("environment") ?? "").trim() || "prod";
+
+	const req: EnvBindRequest = {
+		domain,
+		project,
+		environment,
+		registry: DOMAIN_REGISTRY,
+	};
+
+	const binding = cableInEnvironment(req);
+	if (isDomainBlocked(binding)) {
+		// DOMAIN_ALREADY_BOUND names the owner project in the explanation; we surface it as a
+		// data attribute so the screen proves the injectivity violation (« déjà lié au projet … »).
+		const ownerMatch = binding.explanation.match(/projet "([^"]+)"/);
+		return {
+			ok: false,
+			blockCode: binding.code,
+			blockOwner: ownerMatch ? ownerMatch[1] : undefined,
+			blockExplanation: binding.explanation,
+		};
+	}
+
+	return {
+		ok: true,
+		binding,
+		// The emitted labels actually serve the app over HTTPS — judged by CODE, never an agent.
+		servesHTTPS: envServesHTTPS(binding),
+		labels: binding.labels,
 	};
 }

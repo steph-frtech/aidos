@@ -208,6 +208,10 @@ test.describe("DP25 — the ephemeral preview (profile + bootstrap, EPIC F)", ()
 		// Then: the complete `full` profile.
 		await page.getByTestId("preview-profile-select").selectOption("full");
 		await page.getByTestId("preview-launch").click();
+		// preview-result stays visible from the first launch, so toBeVisible() is a no-op
+		// wait for the SECOND submission. Anchor on the plan id actually changing (git→full)
+		// before reading, else useActionState races and we read the stale `git` values.
+		await expect(page.getByTestId("preview-plan-id")).not.toHaveText(planGit);
 		await expect(page.getByTestId("preview-result")).toBeVisible();
 		const urlFull = (await page.getByTestId("preview-url").innerText()).trim();
 		const hashFull = (
@@ -389,5 +393,118 @@ test.describe("DP26 — « Déployer cette phase » (complete order, EPIC F)", (
 			"false",
 		);
 		await expect(page.getByTestId("deploy-launch")).toBeDisabled();
+	});
+});
+
+/**
+ * DP27 Playwright e2e — the « Domaine custom + TLS » section (EPIC F, EXTENDS S97 domainbind,
+ * never duplicates). mirror record: reflects=DP27-custom-domain-tls-binding, test_kind=e2e,
+ * cert_language=playwright, liveness=live.
+ *
+ * Proves the /deploy route's domain section is action-capable (ui-completeness, CLAUDE.md §7):
+ * a domain field + an environment selector + a « Lier » control, reachable AND executable from
+ * the screen, bound to a Server Action running the REAL pure twin (lib/env-domainbind, the twin
+ * of back/runtime/domainbind/envdomain.go DP27). The DP27 done-criteria, reached from the screen:
+ *   - cabling a custom domain into a TLS-terminating environment SERVES the app over HTTPS — the
+ *     HTTPS URL, the TLS status (the ACME certresolver), the EMITTED DP03 Traefik labels
+ *     (websecure + tls.certresolver + redirect HTTP→HTTPS) ;
+ *   - a domain owned by ANOTHER project is refused DOMAIN_ALREADY_BOUND, naming the owner (the
+ *     domain→project binding is INJECTIVE).
+ *
+ * THE WALL (CLAUDE.md §2): resolving the cabling writes NO truth; the domain IN the Environment
+ * moves through propose → ChangeSet → approval. Resolving = a pure function, never an LLM.
+ */
+test.describe("DP27 — custom domain + TLS (EPIC F)", () => {
+	test("the section exposes the domain field, environment selector and bind control", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("domain-tab").click();
+		await expect(page.getByTestId("domain-section")).toBeVisible();
+		await expect(page.getByTestId("domain-input")).toBeVisible();
+		await expect(page.getByTestId("domain-environment-select")).toBeVisible();
+		await expect(page.getByTestId("domain-bind")).toBeVisible();
+	});
+
+	test("cabling a custom domain shows the HTTPS URL, the TLS status and the Traefik labels", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("domain-tab").click();
+		await page.getByTestId("domain-input").fill("shop.example.com");
+		await page.getByTestId("domain-environment-select").selectOption("prod");
+		await page.getByTestId("domain-bind").click();
+
+		await expect(page.getByTestId("domain-result")).toBeVisible();
+		// the HTTPS URL the custom domain serves the app at.
+		const url = await page.getByTestId("domain-https-url").innerText();
+		expect(url.trim()).toBe("https://shop.example.com");
+		// the TLS status — the ACME certresolver mints the certificate (data-resolver=letsencrypt).
+		const tls = page.getByTestId("domain-tls-status");
+		await expect(tls).toBeVisible();
+		await expect(tls).toHaveAttribute("data-resolver", "letsencrypt");
+		await expect(tls).toHaveAttribute("data-tls", "true");
+		// the EMITTED DP03 Traefik labels — websecure + tls.certresolver + the HTTP→HTTPS redirect.
+		const labels = page.getByTestId("domain-traefik-label");
+		expect(await labels.count()).toBeGreaterThan(0);
+		// the websecure entrypoint label is emitted (the HTTPS router).
+		await expect(
+			page
+				.getByTestId("domain-traefik-label")
+				.filter({ hasText: "entrypoints" })
+				.filter({ hasText: "websecure" }),
+		).toBeVisible();
+		// the ACME certresolver label is emitted.
+		await expect(
+			page
+				.getByTestId("domain-traefik-label")
+				.filter({ hasText: "tls.certresolver" })
+				.filter({ hasText: "letsencrypt" }),
+		).toBeVisible();
+		// the HTTP→HTTPS redirect middleware label is emitted.
+		await expect(
+			page
+				.getByTestId("domain-traefik-label")
+				.filter({ hasText: "redirectscheme.scheme" })
+				.filter({ hasText: "https" }),
+		).toBeVisible();
+		// no refusal for a free domain in a TLS-terminating env.
+		await expect(page.getByTestId("domain-blockreason")).toHaveCount(0);
+	});
+
+	test("a domain already bound to another project is refused DOMAIN_ALREADY_BOUND, naming the owner", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("domain-tab").click();
+		// "billing.acme.com" is pinned to project "billing" in the registry; claim it for "shop".
+		await page.getByTestId("domain-project-input").fill("shop");
+		await page.getByTestId("domain-input").fill("billing.acme.com");
+		await page.getByTestId("domain-environment-select").selectOption("prod");
+		await page.getByTestId("domain-bind").click();
+
+		const block = page.getByTestId("domain-blockreason");
+		await expect(block).toBeVisible();
+		await expect(block).toHaveAttribute("data-code", "DOMAIN_ALREADY_BOUND");
+		// the refusal names the owner project (the injectivity violation).
+		await expect(block).toHaveAttribute("data-owner", "billing");
+		await expect(block).toContainText("billing");
+		// no result is produced for a refused (already-bound) domain.
+		await expect(page.getByTestId("domain-result")).toHaveCount(0);
+	});
+
+	test("cabling a custom HTTPS domain into local (no TLS) is refused", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("domain-tab").click();
+		await page.getByTestId("domain-input").fill("shop.example.com");
+		await page.getByTestId("domain-environment-select").selectOption("local");
+		await page.getByTestId("domain-bind").click();
+
+		const block = page.getByTestId("domain-blockreason");
+		await expect(block).toBeVisible();
+		await expect(block).toHaveAttribute("data-code", "OUT_OF_SCOPE");
+		await expect(page.getByTestId("domain-result")).toHaveCount(0);
 	});
 });

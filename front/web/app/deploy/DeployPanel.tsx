@@ -3,13 +3,25 @@
 import { useTranslations } from "next-intl";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { deployAction, previewAction } from "./actions";
+import { deployAction, domainAction, previewAction } from "./actions";
 import {
 	DEPLOY_INITIAL,
 	type DeployView,
+	DOMAIN_INITIAL,
+	type DomainView,
 	PREVIEW_INITIAL,
 	type PreviewView,
 } from "./view";
+
+/** The DP06 closed environment set the domain-cabling selector offers (prod/staging/dev/
+ * future_cloud terminate TLS; local does NOT — cabling a custom HTTPS domain into local is refused). */
+const DOMAIN_ENVIRONMENTS = [
+	"prod",
+	"staging",
+	"dev",
+	"local",
+	"future_cloud",
+] as const;
 
 /** The DP11 closed profile set the preview selector offers (core default, full = complete). */
 const PREVIEW_PROFILES = [
@@ -90,7 +102,7 @@ export function DeployPanel({
 		deployAction,
 		DEPLOY_INITIAL,
 	);
-	const [tab, setTab] = useState<"deploy" | "preview">("deploy");
+	const [tab, setTab] = useState<"deploy" | "preview" | "domain">("deploy");
 
 	return (
 		<div className="space-y-8">
@@ -139,10 +151,26 @@ export function DeployPanel({
 				>
 					{t("tabPreview")}
 				</button>
+				<button
+					type="button"
+					role="tab"
+					data-testid="domain-tab"
+					aria-selected={tab === "domain"}
+					onClick={() => setTab("domain")}
+					className={
+						tab === "domain"
+							? "flex-1 rounded-md bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm"
+							: "flex-1 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+					}
+				>
+					{t("tabDomain")}
+				</button>
 			</div>
 
 			{tab === "preview" ? (
 				<PreviewSection activeProjectId={activeProjectId} />
+			) : tab === "domain" ? (
+				<DomainSection activeProjectId={activeProjectId} />
 			) : (
 				<DeploySection state={state} action={action} />
 			)}
@@ -773,6 +801,209 @@ function PreviewSection({
 							</p>
 						</section>
 					)}
+				</div>
+			)}
+		</div>
+	);
+}
+
+/** The « Lier » control — submits the domain-cabling form. */
+function BindDomain({ label }: { label: string }) {
+	const t = useTranslations("deploy");
+	const { pending } = useFormStatus();
+	return (
+		<button
+			type="submit"
+			data-testid="domain-bind"
+			disabled={pending}
+			className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50"
+		>
+			{pending ? t("working") : label}
+		</button>
+	);
+}
+
+/**
+ * DomainSection — the DP27 « Domaine custom + TLS » tab (EPIC F — EXTENDS S97 domainbind, never
+ * duplicates). A domain field + an environment selector + a « Lier » button cable a custom domain
+ * into a DP06 environment: on success the HTTPS URL (TLS via the ACME certresolver), the TLS
+ * status (data-resolver=letsencrypt), and the EMITTED DP03-canonical Traefik labels are shown —
+ * proving the domain SERVES the app over HTTPS. A domain owned by ANOTHER project is refused
+ * DOMAIN_ALREADY_BOUND naming the owner: the binding domain→project is INJECTIVE. The source is
+ * the PURE twin of the cabling (lib/env-domainbind, the twin of Go ResolveInEnvironment) — calques
+ * the DP25/26 twins. THE WALL (§2): resolving writes NO truth; the domain IN the Environment moves
+ * through propose → ChangeSet → approval (Go ProposeEnvironmentDomain).
+ */
+function DomainSection({
+	activeProjectId,
+}: {
+	activeProjectId: string | null;
+}) {
+	const t = useTranslations("deploy");
+	const [state, action] = useActionState<DomainView, FormData>(
+		domainAction,
+		DOMAIN_INITIAL,
+	);
+
+	return (
+		<div className="space-y-6" data-testid="domain-section">
+			<form
+				action={action}
+				className="space-y-5 rounded-xl border border-border p-5"
+			>
+				<h2 className="text-sm font-semibold text-foreground">
+					{t("domainHeading")}
+				</h2>
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					{t("domainIntro")}
+				</p>
+				<div className="space-y-2">
+					<label
+						htmlFor="domain-project"
+						className="text-sm font-medium text-foreground"
+					>
+						{t("projectLabel")}
+					</label>
+					<input
+						id="domain-project"
+						name="project"
+						defaultValue={activeProjectId ?? "shop"}
+						data-testid="domain-project-input"
+						className="block w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					/>
+				</div>
+				<div className="space-y-2">
+					<label
+						htmlFor="domain-input"
+						className="text-sm font-medium text-foreground"
+					>
+						{t("domainLabel")}
+					</label>
+					<input
+						id="domain-input"
+						name="domain"
+						defaultValue="shop.acme.com"
+						placeholder="shop.acme.com"
+						data-testid="domain-input"
+						className="block w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					/>
+				</div>
+				<div className="space-y-2">
+					<label
+						htmlFor="domain-environment"
+						className="text-sm font-medium text-foreground"
+					>
+						{t("environmentLabel")}
+					</label>
+					<select
+						id="domain-environment"
+						name="environment"
+						defaultValue="prod"
+						data-testid="domain-environment-select"
+						className="block w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						{DOMAIN_ENVIRONMENTS.map((e) => (
+							<option key={e} value={e}>
+								{e}
+							</option>
+						))}
+					</select>
+					<p className="text-xs text-muted-foreground">
+						{t("environmentHint")}
+					</p>
+				</div>
+				<BindDomain label={t("bindLabel")} />
+			</form>
+
+			{state.blockExplanation && !state.ok && (
+				<section
+					data-testid="domain-blockreason"
+					data-code={state.blockCode}
+					data-owner={state.blockOwner}
+					className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/5 p-5"
+				>
+					<h2 className="text-sm font-semibold text-destructive">
+						{t("blockedHeading")} · {state.blockCode}
+					</h2>
+					<p className="text-sm leading-relaxed text-muted-foreground">
+						{state.blockExplanation}
+					</p>
+				</section>
+			)}
+
+			{state.ok && state.binding && (
+				<div className="space-y-6" data-testid="domain-result">
+					{/* The resolved cabling — the HTTPS URL + the TLS status (ACME certresolver). */}
+					<section className="space-y-3 rounded-xl border border-border p-5">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<h2 className="text-sm font-semibold text-foreground">
+								{t("domainResolvedHeading")}
+							</h2>
+							<a
+								href={state.binding.url}
+								data-testid="domain-https-url"
+								className="font-mono text-xs text-blue-600 underline"
+							>
+								{state.binding.url}
+							</a>
+						</div>
+						<dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+							<div>
+								<dt className="text-muted-foreground">
+									{t("environmentLabel")}
+								</dt>
+								<dd
+									data-testid="domain-environment-value"
+									className="font-mono text-foreground"
+								>
+									{state.binding.environment}
+								</dd>
+							</div>
+							<div>
+								<dt className="text-muted-foreground">{t("routerLabel")}</dt>
+								<dd
+									data-testid="domain-router"
+									className="font-mono text-foreground"
+								>
+									{state.binding.routerName}
+								</dd>
+							</div>
+						</dl>
+						{/* The TLS status — the ACME certresolver that mints the domain's certificate. */}
+						<p
+							data-testid="domain-tls-status"
+							data-resolver={state.binding.certResolver}
+							data-tls={state.servesHTTPS ? "true" : "false"}
+							className={
+								state.servesHTTPS
+									? "font-mono text-xs text-emerald-600"
+									: "font-mono text-xs text-destructive"
+							}
+						>
+							{state.servesHTTPS ? t("tlsOk") : t("tlsFail")} ·{" "}
+							{state.binding.certResolver}
+						</p>
+					</section>
+
+					{/* The EMITTED DP03-canonical Traefik labels (one source, never a 2nd divergent jeu). */}
+					<section className="space-y-3 rounded-xl border border-border p-5">
+						<h2 className="text-sm font-semibold text-foreground">
+							{t("labelsHeading")}
+						</h2>
+						<ul className="space-y-1" data-testid="domain-traefik-labels">
+							{(state.labels ?? []).map((l) => (
+								<li
+									key={l.label}
+									data-testid="domain-traefik-label"
+									data-label={l.label}
+									className="flex flex-col gap-0.5 rounded-lg bg-muted p-2 font-mono text-xs sm:flex-row sm:items-center sm:gap-2"
+								>
+									<span className="text-foreground">{l.label}</span>
+									<span className="text-muted-foreground">= {l.value}</span>
+								</li>
+							))}
+						</ul>
+					</section>
 				</div>
 			)}
 		</div>

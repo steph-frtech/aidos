@@ -1,4 +1,5 @@
 import type { DeployPlan } from "@/lib/deploy";
+import type { EnvDomainBinding, Label } from "@/lib/env-domainbind";
 import type { PreviewPlanWithBootstrap } from "@/lib/preview-bootstrap";
 
 /**
@@ -62,3 +63,34 @@ export interface PreviewView {
 }
 
 export const PREVIEW_INITIAL: PreviewView = { ok: false };
+
+/**
+ * View model for the DP27 « Domaine custom + TLS » section (EPIC F — EXTENDS S97 domainbind,
+ * never duplicates). Cabling a custom domain into a DP06 environment (environments.ts) resolves
+ * the HTTPS URL (TLS via the ACME certresolver) and EMITS the DP03-canonical Traefik labels
+ * (env-domainbind.cableInEnvironment, the twin of Go ResolveInEnvironment). A domain belongs to
+ * EXACTLY ONE project: a domain owned by another project is refused DOMAIN_ALREADY_BOUND, naming
+ * the owner (the binding domain→project is INJECTIVE).
+ *
+ * THE WALL (CLAUDE.md §2): resolving the cabling (the emitted labels + URL) is a below-the-line
+ * projection — it writes no truth. The domain IN the Environment is an environment truth: it goes
+ * through propose → ChangeSet → approval (Go ProposeEnvironmentDomain), never a direct write.
+ */
+export interface DomainView {
+	ok: boolean;
+	/** the resolved env-domain binding (HTTPS URL + TLS + certresolver + emitted DP03 labels). */
+	binding?: EnvDomainBinding;
+	/** whether the emitted labels actually serve the app over HTTPS (envServesHTTPS — code judges). */
+	servesHTTPS?: boolean;
+	/** the EMITTED Traefik HTTPS labels (DP03 reused — one source, never a 2nd divergent jeu). */
+	labels?: Label[];
+	/** the refusal code (DOMAIN_ALREADY_BOUND when the domain is owned by another project; OUT_OF_SCOPE
+	 * for a malformed domain / unknown env / a no-TLS env like local). */
+	blockCode?: string;
+	/** the owner project named in a DOMAIN_ALREADY_BOUND refusal (the injectivity violation). */
+	blockOwner?: string;
+	/** the BlockReason explanation when refused. */
+	blockExplanation?: string;
+}
+
+export const DOMAIN_INITIAL: DomainView = { ok: false };
