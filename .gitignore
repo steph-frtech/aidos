@@ -120,3 +120,4 @@ back/cmd/aidosappemit/
 
 # V3 instance config (les URLs des outils de VOTRE instance — jamais committé)
 .aidos-instance.json
+back/aidosdatafragments
