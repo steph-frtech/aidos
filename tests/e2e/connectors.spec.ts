@@ -526,3 +526,149 @@ test.describe("DP23 — the /connectors connector-infra (emitted app substrate)"
 		await expect(page.getByTestId("webhook-replay-once")).toBeVisible();
 	});
 });
+
+/**
+ * DP24 Playwright e2e — the EXECUTABLE connector cockpit on /connectors (the connector cockpit,
+ * CLÔT EPIC E). THIS spec IS the step's mirror: the WHOLE journey is driven from the screen, with
+ * NO headless connector capability (ui-completeness, CLAUDE.md §6.7).
+ * mirror record: reflects=DP24-connector-declare, test_kind=e2e, cert_language=gherkin,
+ *               liveness=alive, authority=above (a declaration PROPOSES a ChangeSet, never applied)
+ *
+ * Scenario: declare → ChangeSet « proposed » → approve → execute RO → toggle RW → 2nd approval →
+ *           execute RW → ledger entry ; and an ai → DB attempt → AI_DIRECT_DB_ACCESS_FORBIDDEN.
+ *   Given the Workbench is running and I am on /connectors
+ *   When I declare a connector via the « déclarer un connecteur » form
+ *   Then the screen PROPOSES a ChangeSet (data-status="proposed", never applied)
+ *   When I « Approuver » it (a simulation of the human's /goal → approbation)
+ *   Then I can execute it in RO (admitted)
+ *   When I toggle it to RW
+ *   Then a SECOND runtime approval is required before the write is admitted
+ *   When I approve the write and execute it in RW
+ *   Then a DP22 ledger entry records the admitted write
+ *   When I try an ai → DB connector
+ *   Then the AI_DIRECT_DB_ACCESS_FORBIDDEN BlockReason is surfaced
+ *
+ * THE WALL (§2): a declaration PROPOSES a « proposed » ChangeSet (DRAFT, appliedAt null) — the
+ * screen NEVER applies it; the real apply is the human's via idée → miroir → /goal → approbation.
+ * Every verdict is COMPUTED by the pure twins (connector-declare / connector-enforce /
+ * connector-audit), verdict-for-verdict with the Go, never a UI opinion.
+ */
+test.describe("DP24 — the /connectors EXECUTABLE cockpit (declare → propose → approve → execute)", () => {
+	test.beforeEach(async ({ page }) => {
+		await page.goto("/connectors");
+		await expect(page.getByTestId("connector-cockpit")).toBeVisible({
+			timeout: 10000,
+		});
+	});
+
+	test("the cockpit, the declare form and the register-mcp door are present", async ({
+		page,
+	}) => {
+		await expect(page.getByTestId("declare-connector")).toBeVisible();
+		await expect(page.getByTestId("declare-submit")).toBeVisible();
+		await expect(page.getByTestId("register-mcp")).toBeVisible();
+		await expect(page.getByTestId("try-ai-db")).toBeVisible();
+	});
+
+	test("declaring a connector PROPOSES a ChangeSet (proposed, never applied)", async ({
+		page,
+	}) => {
+		// the default form is a valid read_only source — submit it.
+		await page.getByTestId("declare-submit").click();
+		const changeset = page.getByTestId("connector-changeset");
+		await expect(changeset).toBeVisible();
+		// the ChangeSet is « proposed » — DRAFT, NEVER applied (the wall).
+		await expect(changeset).toHaveAttribute("data-status", "proposed");
+		await expect(changeset).toHaveAttribute("data-applied", "false");
+		await expect(changeset.getByTestId("changeset-applied-at")).toContainText(
+			"null",
+		);
+		// the « Approuver » door is offered (the simulation of /goal → approbation).
+		await expect(page.getByTestId("changeset-approve")).toBeVisible();
+	});
+
+	test("an invalid (ai → datastore egress) declaration is refused with NO draft", async ({
+		page,
+	}) => {
+		// pick an ai classification with a datastore egress host — the invariant refuses it.
+		await page.getByTestId("declare-classification").selectOption("ai");
+		await page
+			.getByTestId("declare-egress")
+			.fill("postgres://truth-store/direct");
+		await page.getByTestId("declare-submit").click();
+		// no ChangeSet is proposed (no proposal for a monster) — the BlockReason is surfaced.
+		await expect(page.getByTestId("connector-changeset")).toHaveCount(0);
+		const refusal = page.getByTestId("declare-refusal");
+		await expect(refusal).toBeVisible();
+		await expect(refusal).toHaveAttribute(
+			"data-code",
+			"AI_DIRECT_DB_ACCESS_FORBIDDEN",
+		);
+	});
+
+	test("the full lane: approve → execute RO → toggle RW → 2nd approval → execute RW → ledger", async ({
+		page,
+	}) => {
+		// 1) declare (default valid RO source) ⇒ proposed ChangeSet.
+		await page.getByTestId("declare-submit").click();
+		const changeset = page.getByTestId("connector-changeset");
+		await expect(changeset).toHaveAttribute("data-status", "proposed");
+
+		// 2) approve (the on-screen simulation of /goal → approbation).
+		await page.getByTestId("changeset-approve").click();
+		await expect(page.getByTestId("changeset-approved")).toBeVisible();
+		await expect(page.getByTestId("execution-lane")).toBeVisible();
+
+		// 3) execute in RO ⇒ admitted.
+		await page.getByTestId("execute-ro").click();
+		await expect(page.getByTestId("ro-admitted")).toBeVisible();
+
+		// 4) toggle to RW ⇒ a SECOND runtime approval is required.
+		await page.getByTestId("toggle-rw").click();
+		await expect(page.getByTestId("rw-second-approve")).toBeVisible();
+
+		// without the 2nd approval, executing the write is REFUSED CONNECTOR_RW_NEEDS_APPROVAL.
+		await page.getByTestId("execute-rw").click();
+		await expect(page.getByTestId("rw-exec-blockreason")).toHaveAttribute(
+			"data-code",
+			"CONNECTOR_RW_NEEDS_APPROVAL",
+		);
+
+		// 5) approve the write (the 2nd runtime A2 authorisation) then execute ⇒ admitted + ledger.
+		await page.getByTestId("rw-second-approve").click();
+		await expect(page.getByTestId("rw-second-approved")).toBeVisible();
+		await page.getByTestId("execute-rw").click();
+		await expect(page.getByTestId("rw-exec-admitted")).toBeVisible();
+		// the DP22 ledger entry records the admitted write.
+		const ledger = page.getByTestId("cockpit-ledger");
+		await expect(ledger).toBeVisible();
+		const entry = ledger.getByTestId("audit-entry").first();
+		await expect(entry).toHaveAttribute("data-result", "permitted");
+		await expect(entry).toHaveAttribute("data-op", "write");
+	});
+
+	test("trying an ai → DB connector surfaces AI_DIRECT_DB_ACCESS_FORBIDDEN", async ({
+		page,
+	}) => {
+		await page.getByTestId("try-ai-db").click();
+		const blockreason = page.getByTestId("ai-db-blockreason");
+		await expect(blockreason).toBeVisible();
+		await expect(blockreason).toHaveAttribute(
+			"data-code",
+			"AI_DIRECT_DB_ACCESS_FORBIDDEN",
+		);
+	});
+
+	test("registering an MCP-server / Skill makes it route (Tool-Registry)", async ({
+		page,
+	}) => {
+		await page.getByTestId("register-mcp-name").fill("send_report_email");
+		await page.getByTestId("register-mcp-submit").click();
+		const tool = page.locator(
+			'[data-testid="registered-tool"][data-tool="send_report_email"]',
+		);
+		await expect(tool).toBeVisible();
+		await expect(tool).toHaveAttribute("data-routed", "true");
+		await expect(tool.getByTestId("registered-tool-routed")).toBeVisible();
+	});
+});

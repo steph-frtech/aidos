@@ -13,6 +13,11 @@ import {
 	verify as verifyLedger,
 } from "@/lib/connector-audit";
 import {
+	type ProposedChangeSet,
+	type ProposeRefusalCode,
+	proposeConnectorDeclaration,
+} from "@/lib/connector-declare";
+import {
 	type ConnectorAction,
 	enforceConnectorAction,
 } from "@/lib/connector-enforce";
@@ -31,10 +36,17 @@ import {
 	substrateConnectorInfraFragments,
 } from "@/lib/connector-infra";
 import {
+	ACCESS_SCOPES,
+	type AccessScope,
+	CLASSIFICATIONS,
 	type Classification,
 	type ConnectorSource,
 	contentId,
 	isDatastoreHost,
+	KINDS,
+	type Kind,
+	TARGETS,
+	type Target,
 	validate,
 } from "@/lib/connector-source";
 
@@ -955,6 +967,732 @@ function ConnectorInfraSection({
 }
 
 /**
+ * DeclareConnectorCockpit is the DP24 EXECUTABLE declaration cockpit (the heart of the connector
+ * cockpit, CLÔT EPIC E). One screen drives the WHOLE journey — NO headless connector capability
+ * (ui-completeness, CLAUDE.md §6.7):
+ *
+ *  1. DÉCLARER — a form (kind / classification / scope RO·RW / egress / target) that, on submit,
+ *     PROPOSES a ChangeSet (status « proposed », appliedAt null) via the PURE twin
+ *     proposeConnectorDeclaration. THE WALL (§2): never applied from the screen — the agent has
+ *     no GRANT; an invalid source surfaces its verbatim DP20 BlockReason and proposes NO draft.
+ *  2. APPROUVER — a « Approuver » button SIMULATES the human's /goal → approbation as a LOCAL
+ *     projection (the connector becomes "active" on the cockpit). The real apply is the human's,
+ *     through the aidos writer role; this is an on-screen simulation of that approbation (the
+ *     screen NEVER writes the kernel).
+ *  3. EXÉCUTER RO — once active, a RO read is ADMITTED (enforceConnectorAction, below the line).
+ *  4. BASCULER RW — toggling to read_write requires a SECOND approval (the DP21 runtime A2): an
+ *     un-approved write is REFUSED; an approved write is ADMITTED.
+ *  5. EXÉCUTER RW — the admitted write is recorded as a DP22 ledger entry (the Merkle audit trail).
+ *  6. ai → DB — a counter-attempt (an ai connector reaching a datastore) surfaces the
+ *     AI_DIRECT_DB_ACCESS_FORBIDDEN BlockReason (the load-bearing invariant, at runtime).
+ *
+ * DETERMINISM-FIRST (§6/§8): every verdict — the propose, the RO/RW enforcement, the ai→DB
+ * refusal, the ledger — is COMPUTED by the pure twins (connector-declare / connector-enforce /
+ * connector-audit), verdict-for-verdict with the Go, never a UI opinion. Themed on ADR 0010
+ * tokens; strings via next-intl (ADR 0011, FR first).
+ */
+function DeclareConnectorCockpit({
+	activeProjectId,
+}: {
+	activeProjectId: string | null;
+}) {
+	const t = useTranslations("connectors");
+
+	// the form state — the declared connector facets (closed sets, the twin judges them).
+	const [kind, setKind] = useState<Kind>("connector");
+	const [name, setName] = useState("payments-webhook");
+	const [classification, setClassification] =
+		useState<Classification>("external");
+	const [scope, setScope] = useState<AccessScope>("read_only");
+	const [egress, setEgress] = useState("hooks.stripe.com");
+	const [target, setTarget] = useState<Target>("crm");
+
+	// the proposed ChangeSet (« proposed », never applied) OR the refusal code — COMPUTED.
+	const [proposed, setProposed] = useState<ProposedChangeSet | null>(null);
+	const [refusal, setRefusal] = useState<ProposeRefusalCode | null>(null);
+
+	// the on-screen simulation of the human's /goal → approbation (a LOCAL projection).
+	const [approved, setApproved] = useState(false);
+	// the SECOND, runtime A2 approval required once the connector is toggled to read_write.
+	const [scopeNow, setScopeNow] = useState<AccessScope>("read_only");
+	const [rwApproved, setRwApproved] = useState(false);
+
+	// the RO / RW execution verdicts + the recorded ledger entries (DP22).
+	const [roAdmitted, setRoAdmitted] = useState<boolean | null>(null);
+	const [rwDecisionCode, setRwDecisionCode] = useState<string | null>(null);
+	const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+
+	// the ai→DB counter-attempt verdict (the load-bearing invariant, surfaced at runtime).
+	const [aiDbCode, setAiDbCode] = useState<string | null>(null);
+
+	// the source the form describes — rebuilt from the form (a read_write source needs an
+	// authority to validate; we attach a well-formed S16 graph when the user picks read_write).
+	const formSource = useMemo<ConnectorSource>(() => {
+		const egressHosts = egress
+			.split(",")
+			.map((h) => h.trim())
+			.filter((h) => h !== "");
+		return {
+			layer: "above",
+			kind,
+			name,
+			classification,
+			scope,
+			egressHosts,
+			target,
+			dataTruthScope: ["new_records"],
+			authority:
+				scope === "read_write"
+					? {
+							domain: "connectors",
+							truthKind: "behavioral",
+							approvers: ["security", "product_owner"],
+						}
+					: null,
+			truthScope: { region: "fr", environment: "prod" },
+		};
+	}, [kind, name, classification, scope, egress, target]);
+
+	// the active (approved) source — its current runtime scope tracks the RW toggle.
+	const activeSource = useMemo<ConnectorSource | null>(() => {
+		if (!approved || proposed === null) {
+			return null;
+		}
+		return {
+			...formSource,
+			scope: scopeNow,
+			// a read_write runtime scope needs the authority to stay enforceable.
+			authority:
+				scopeNow === "read_write"
+					? (formSource.authority ?? {
+							domain: "connectors",
+							truthKind: "behavioral",
+							approvers: ["security", "product_owner"],
+						})
+					: formSource.authority,
+		};
+	}, [approved, proposed, formSource, scopeNow]);
+
+	function declare() {
+		const res = proposeConnectorDeclaration(formSource);
+		if (res.ok) {
+			setProposed(res.changeSet);
+			setRefusal(null);
+		} else {
+			setProposed(null);
+			setRefusal(res.code);
+		}
+		// declaring resets the downstream journey (a fresh proposal starts unapproved).
+		setApproved(false);
+		setScopeNow("read_only");
+		setRwApproved(false);
+		setRoAdmitted(null);
+		setRwDecisionCode(null);
+		setLedger([]);
+	}
+
+	function approve() {
+		// the on-screen SIMULATION of the human's /goal → approbation (a local projection).
+		setApproved(true);
+	}
+
+	function executeRo() {
+		if (!activeSource) return;
+		const host = activeSource.egressHosts[0] ?? "";
+		const decision = enforceConnectorAction(activeSource, { op: "read", host });
+		setRoAdmitted(decision.admitted);
+	}
+
+	function toggleRw() {
+		// basculer RO → RW : the runtime scope widens; a NEW (second) approval is required.
+		setScopeNow("read_write");
+		setRwApproved(false);
+		setRwDecisionCode(null);
+	}
+
+	function approveRw() {
+		setRwApproved(true);
+	}
+
+	function executeRw() {
+		if (!activeSource) return;
+		const host = activeSource.egressHosts[0] ?? "";
+		const action: ConnectorAction = {
+			op: "write",
+			host,
+			approval: rwApproved
+				? {
+						connector: activeSource.name,
+						op: "write",
+						granted: true,
+						by: "humain",
+					}
+				: null,
+		};
+		const decision = enforceConnectorAction(activeSource, action);
+		setRwDecisionCode(decision.code);
+		if (decision.admitted) {
+			// record the admitted write as a DP22 ledger entry (the Merkle audit trail).
+			const versioned: ConnectorSource = {
+				...activeSource,
+				version: contentId(activeSource),
+			};
+			const audited: AuditedAction[] = [
+				{
+					source: versioned,
+					identity: { subject: "agent-builder" },
+					action,
+				},
+			];
+			setLedger(buildLedger(audited));
+		}
+	}
+
+	function tryAiDb() {
+		// a COUNTER-attempt: an ai connector reaching a datastore host — the invariant at runtime.
+		const aiSource: ConnectorSource = {
+			layer: "above",
+			kind: "mcp_server",
+			name: "ai-plane-probe",
+			classification: "ai",
+			scope: "read_only",
+			egressHosts: ["postgres://truth-store/direct"],
+			target: "postgres_ro",
+			dataTruthScope: ["existing_records"],
+			authority: null,
+			truthScope: { region: "fr", environment: "prod" },
+		};
+		const decision = enforceConnectorAction(aiSource, {
+			op: "read",
+			host: "postgres://truth-store/direct",
+		});
+		setAiDbCode(decision.code);
+	}
+
+	const roHost = activeSource?.egressHosts[0] ?? "";
+
+	return (
+		<section
+			data-testid="connector-cockpit"
+			data-project={activeProjectId ?? "demo-project"}
+			className="space-y-6 rounded-xl border border-border bg-card p-5"
+		>
+			<div>
+				<h2 className="text-sm font-semibold tracking-tight text-foreground">
+					{t("cockpitHeading")}
+				</h2>
+				<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+					{t("cockpitBody")}
+				</p>
+			</div>
+
+			{/* 1) DÉCLARER UN CONNECTEUR — the form that PROPOSES a ChangeSet */}
+			<form
+				data-testid="declare-connector"
+				onSubmit={(e) => {
+					e.preventDefault();
+					declare();
+				}}
+				className="grid gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-2"
+			>
+				<label className="flex flex-col gap-1 text-xs">
+					<span className="font-medium text-foreground">{t("formKind")}</span>
+					<select
+						data-testid="declare-kind"
+						value={kind}
+						onChange={(e) => setKind(e.target.value as Kind)}
+						className="rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground"
+					>
+						{KINDS.map((k) => (
+							<option key={k} value={k}>
+								{k}
+							</option>
+						))}
+					</select>
+				</label>
+
+				<label className="flex flex-col gap-1 text-xs">
+					<span className="font-medium text-foreground">{t("formName")}</span>
+					<input
+						data-testid="declare-name"
+						value={name}
+						onChange={(e) => setName(e.target.value)}
+						className="rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground"
+					/>
+				</label>
+
+				<label className="flex flex-col gap-1 text-xs">
+					<span className="font-medium text-foreground">
+						{t("formClassification")}
+					</span>
+					<select
+						data-testid="declare-classification"
+						value={classification}
+						onChange={(e) =>
+							setClassification(e.target.value as Classification)
+						}
+						className="rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground"
+					>
+						{CLASSIFICATIONS.map((c) => (
+							<option key={c} value={c}>
+								{c}
+							</option>
+						))}
+					</select>
+				</label>
+
+				<label className="flex flex-col gap-1 text-xs">
+					<span className="font-medium text-foreground">{t("formScope")}</span>
+					<select
+						data-testid="declare-scope"
+						value={scope}
+						onChange={(e) => setScope(e.target.value as AccessScope)}
+						className="rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground"
+					>
+						{ACCESS_SCOPES.map((s) => (
+							<option key={s} value={s}>
+								{s === "read_write" ? t("scopeRW") : t("scopeRO")}
+							</option>
+						))}
+					</select>
+				</label>
+
+				<label className="flex flex-col gap-1 text-xs sm:col-span-2">
+					<span className="font-medium text-foreground">{t("formEgress")}</span>
+					<input
+						data-testid="declare-egress"
+						value={egress}
+						onChange={(e) => setEgress(e.target.value)}
+						placeholder="hooks.stripe.com, api.stripe.com"
+						className="rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground"
+					/>
+				</label>
+
+				<label className="flex flex-col gap-1 text-xs">
+					<span className="font-medium text-foreground">{t("formTarget")}</span>
+					<select
+						data-testid="declare-target"
+						value={target}
+						onChange={(e) => setTarget(e.target.value as Target)}
+						className="rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground"
+					>
+						{TARGETS.map((tg) => (
+							<option key={tg} value={tg}>
+								{tg}
+							</option>
+						))}
+					</select>
+				</label>
+
+				<div className="flex items-end sm:col-span-1">
+					<button
+						type="submit"
+						data-testid="declare-submit"
+						className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+					>
+						{t("declareSubmit")}
+					</button>
+				</div>
+			</form>
+
+			{/* the refusal — an invalid source proposes NO draft, surfaces its BlockReason */}
+			{refusal !== null && (
+				<div
+					data-testid="declare-refusal"
+					data-code={refusal}
+					className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-xs"
+				>
+					<p className="font-medium text-destructive">{t("declareRefused")}</p>
+					<code className="mt-1 inline-block rounded bg-destructive/15 px-1.5 py-0.5 font-mono text-[0.7rem] font-bold text-destructive">
+						{refusal}
+					</code>
+				</div>
+			)}
+
+			{/* 2) the PROPOSED ChangeSet (« proposed », never applied) + the « Approuver » door */}
+			{proposed !== null && (
+				<div
+					data-testid="connector-changeset"
+					data-status={proposed.status}
+					data-id={proposed.id}
+					data-applied={proposed.appliedAt === null ? "false" : "true"}
+					className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-4"
+				>
+					<div className="flex flex-wrap items-center gap-2">
+						<span className="font-mono text-sm font-medium text-foreground">
+							{proposed.label}
+						</span>
+						<span
+							data-testid="changeset-status"
+							className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-primary"
+						>
+							{t("statusProposed")}
+						</span>
+						<code className="ml-auto break-all font-mono text-[0.65rem] text-muted-foreground">
+							{proposed.id}
+						</code>
+					</div>
+					<p className="text-xs leading-relaxed text-muted-foreground">
+						{t("changesetWallNote")}
+					</p>
+					<dl className="grid grid-cols-1 gap-1 text-[0.7rem] sm:grid-cols-2">
+						<div className="flex gap-2">
+							<dt className="text-muted-foreground">{t("changesetParent")}:</dt>
+							<dd className="font-mono text-foreground">
+								{proposed.parentPhase}
+							</dd>
+						</div>
+						<div className="flex gap-2">
+							<dt className="text-muted-foreground">{t("changesetSpec")}:</dt>
+							<dd className="font-mono text-foreground">
+								{proposed.specDelta.kind} → {proposed.specDelta.target}
+							</dd>
+						</div>
+						<div className="flex gap-2">
+							<dt className="text-muted-foreground">{t("changesetMirror")}:</dt>
+							<dd className="font-mono text-foreground">
+								{proposed.mirrorDelta.kind} → {proposed.mirrorDelta.target}
+							</dd>
+						</div>
+						<div className="flex gap-2">
+							<dt className="text-muted-foreground">
+								{t("changesetApplied")}:
+							</dt>
+							<dd
+								data-testid="changeset-applied-at"
+								className="font-mono text-foreground"
+							>
+								{proposed.appliedAt === null ? t("changesetNeverApplied") : "—"}
+							</dd>
+						</div>
+					</dl>
+
+					{!approved ? (
+						<button
+							type="button"
+							data-testid="changeset-approve"
+							onClick={approve}
+							className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+						>
+							{t("changesetApprove")}
+						</button>
+					) : (
+						<p
+							data-testid="changeset-approved"
+							className="inline-flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary"
+						>
+							<span aria-hidden>✓</span>
+							{t("changesetApproved")}
+						</p>
+					)}
+				</div>
+			)}
+
+			{/* 3·4·5) the EXECUTION lane — RO read, RW toggle + 2nd approval, RW write + ledger */}
+			{approved && activeSource && (
+				<div
+					data-testid="execution-lane"
+					data-scope={scopeNow}
+					className="space-y-4 rounded-lg border border-border bg-background p-4"
+				>
+					<h3 className="text-sm font-semibold tracking-tight text-foreground">
+						{t("executeHeading")}
+					</h3>
+
+					{/* 3) EXÉCUTER en RO */}
+					<div className="flex flex-wrap items-center gap-3">
+						<button
+							type="button"
+							data-testid="execute-ro"
+							onClick={executeRo}
+							className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+						>
+							{t("executeRo", { host: roHost || "—" })}
+						</button>
+						{roAdmitted !== null &&
+							(roAdmitted ? (
+								<span
+									data-testid="ro-admitted"
+									className="inline-flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-primary-foreground"
+								>
+									{t("roAdmitted")}
+								</span>
+							) : (
+								<span
+									data-testid="ro-refused"
+									className="inline-flex items-center gap-1.5 rounded-full bg-destructive px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-destructive-foreground"
+								>
+									{t("roRefused")}
+								</span>
+							))}
+					</div>
+
+					{/* 4) BASCULER en RW — requires a SECOND approval (the DP21 A2 runtime gate) */}
+					<div className="space-y-3 border-t border-border pt-3">
+						<div className="flex flex-wrap items-center gap-3">
+							<button
+								type="button"
+								data-testid="toggle-rw"
+								disabled={scopeNow === "read_write"}
+								onClick={toggleRw}
+								className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								{t("toggleRw")}
+							</button>
+							{scopeNow === "read_write" && (
+								<span
+									data-testid="rw-scope-on"
+									className="inline-flex items-center rounded-full border border-primary/40 px-2 py-0.5 text-[0.65rem] font-medium uppercase text-primary"
+								>
+									{t("scopeRW")}
+								</span>
+							)}
+						</div>
+
+						{scopeNow === "read_write" && (
+							<div className="space-y-3 rounded-lg border border-border bg-card p-3">
+								<p className="text-xs text-muted-foreground">
+									{t("rwSecondApprovalNote")}
+								</p>
+								{!rwApproved ? (
+									<button
+										type="button"
+										data-testid="rw-second-approve"
+										onClick={approveRw}
+										className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+									>
+										{t("rwSecondApprove")}
+									</button>
+								) : (
+									<p
+										data-testid="rw-second-approved"
+										className="inline-flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary"
+									>
+										<span aria-hidden>✓</span>
+										{t("rwSecondApproved")}
+									</p>
+								)}
+
+								{/* 5) EXÉCUTER en RW ⇒ a DP22 ledger entry */}
+								<div className="flex flex-wrap items-center gap-3">
+									<button
+										type="button"
+										data-testid="execute-rw"
+										onClick={executeRw}
+										className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+									>
+										{t("executeRw")}
+									</button>
+									{rwDecisionCode === null && ledger.length > 0 && (
+										<span
+											data-testid="rw-exec-admitted"
+											className="inline-flex items-center rounded-full bg-primary px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-primary-foreground"
+										>
+											{t("rwExecAdmitted")}
+										</span>
+									)}
+									{rwDecisionCode !== null && (
+										<code
+											data-testid="rw-exec-blockreason"
+											data-code={rwDecisionCode}
+											className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1 font-mono text-[0.7rem] font-bold text-destructive"
+										>
+											{rwDecisionCode}
+										</code>
+									)}
+								</div>
+
+								{/* the DP22 ledger entry of the admitted write */}
+								{ledger.length > 0 && (
+									<ol data-testid="cockpit-ledger" className="space-y-2">
+										{ledger.map((e) => (
+											<li
+												key={`${e.index}-${e.entry_hash}`}
+												data-testid="audit-entry"
+												data-connector={e.bom.connector}
+												data-scope={e.bom.scope}
+												data-result={e.bom.permitted ? "permitted" : "refused"}
+												data-op={e.bom.op}
+												className="rounded-lg border border-border bg-background p-3 text-[0.7rem]"
+											>
+												<div className="flex flex-wrap items-center gap-2">
+													<span className="font-mono font-medium text-foreground">
+														{e.bom.identity}
+													</span>
+													<span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 font-mono text-[0.65rem] text-foreground">
+														{e.bom.op}
+													</span>
+													<span className="text-muted-foreground">
+														→ {e.bom.target}
+													</span>
+													<span
+														data-testid="audit-result-permitted"
+														className="ml-auto inline-flex items-center rounded-full bg-primary px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-primary-foreground"
+													>
+														{t("auditPermitted")}
+													</span>
+												</div>
+												<p className="mt-1 break-all font-mono text-[0.65rem] text-muted-foreground">
+													{t("auditEntryHash")}: {e.entry_hash}
+												</p>
+											</li>
+										))}
+									</ol>
+								)}
+							</div>
+						)}
+					</div>
+				</div>
+			)}
+
+			{/* 6) the ai → DB counter-attempt — AI_DIRECT_DB_ACCESS_FORBIDDEN at runtime */}
+			<div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					{t("aiDbNote")}
+				</p>
+				<div className="flex flex-wrap items-center gap-3">
+					<button
+						type="button"
+						data-testid="try-ai-db"
+						onClick={tryAiDb}
+						className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20"
+					>
+						{t("tryAiDb")}
+					</button>
+					{aiDbCode !== null && (
+						<code
+							data-testid="ai-db-blockreason"
+							data-code={aiDbCode}
+							className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1 font-mono text-[0.7rem] font-bold text-destructive"
+						>
+							{aiDbCode}
+						</code>
+					)}
+				</div>
+			</div>
+		</section>
+	);
+}
+
+/**
+ * RegisterMcpCockpit is the DP24 « enregistrer un MCP-server / Skill » door (DP23 Tool-Registry,
+ * below the line): a form that registers a tool name into the EMITTED app's Tool-Registry; a
+ * registered tool ROUTES (set-membership), an unregistered one is REFUSED TOOL_NOT_REGISTERED.
+ *
+ * DETERMINISM-FIRST (§6/§8): the routing verdict is COMPUTED by the pure twin routeTool,
+ * verdict-for-verdict with the Go connectorinfra.RouteTool. THE WALL (§2): the registry is the
+ * EMITTED app's substrate (ADR 0040) — it writes NO AIDOS truth; the registration mutates a
+ * local React-state copy.
+ */
+function RegisterMcpCockpit({ projectId }: { projectId: string }) {
+	const t = useTranslations("connectors");
+	const [toolName, setToolName] = useState("send_invoice_email");
+	const [registered, setRegistered] = useState<string[]>([]);
+
+	const registry = useMemo(
+		() => newToolRegistry(projectId, registered),
+		[projectId, registered],
+	);
+	// the routing verdict of the last-registered tool — COMPUTED by the pure twin.
+	const lastRouted =
+		registered.length > 0
+			? routeTool(registry, registered[registered.length - 1]).decision
+			: null;
+
+	return (
+		<section
+			data-testid="register-mcp-cockpit"
+			className="space-y-4 rounded-xl border border-border bg-card p-5"
+		>
+			<div>
+				<h2 className="text-sm font-semibold tracking-tight text-foreground">
+					{t("registerMcpHeading")}
+				</h2>
+				<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+					{t("registerMcpBody")}
+				</p>
+			</div>
+
+			<form
+				data-testid="register-mcp"
+				onSubmit={(e) => {
+					e.preventDefault();
+					if (toolName.trim() !== "") {
+						setRegistered((s) =>
+							s.includes(toolName.trim()) ? s : [...s, toolName.trim()],
+						);
+					}
+				}}
+				className="flex flex-wrap items-end gap-3"
+			>
+				<label className="flex flex-1 flex-col gap-1 text-xs">
+					<span className="font-medium text-foreground">
+						{t("registerMcpToolLabel")}
+					</span>
+					<input
+						data-testid="register-mcp-name"
+						value={toolName}
+						onChange={(e) => setToolName(e.target.value)}
+						className="rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground"
+					/>
+				</label>
+				<button
+					type="submit"
+					data-testid="register-mcp-submit"
+					className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+				>
+					{t("registerMcpSubmit")}
+				</button>
+			</form>
+
+			{registered.length > 0 && (
+				<ul data-testid="registered-tools" className="space-y-2">
+					{registered.map((tool) => {
+						const { decision } = routeTool(registry, tool);
+						return (
+							<li
+								key={tool}
+								data-testid="registered-tool"
+								data-tool={tool}
+								data-routed={decision.admitted ? "true" : "false"}
+								className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-background p-3 text-xs"
+							>
+								<code className="font-mono font-medium text-foreground">
+									{tool}
+								</code>
+								{decision.admitted ? (
+									<span
+										data-testid="registered-tool-routed"
+										className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-primary-foreground"
+									>
+										<span aria-hidden>→</span>
+										{t("toolRouted")}
+									</span>
+								) : (
+									<code
+										data-code={decision.code}
+										className="ml-auto inline-flex items-center rounded-full bg-destructive px-2.5 py-0.5 font-mono text-[0.65rem] font-bold text-destructive-foreground"
+									>
+										{decision.code}
+									</code>
+								)}
+							</li>
+						);
+					})}
+				</ul>
+			)}
+			{lastRouted?.admitted && (
+				<p data-testid="register-mcp-done" className="text-xs text-primary">
+					{t("registerMcpDone", {
+						tool: registered[registered.length - 1],
+					})}
+				</p>
+			)}
+		</section>
+	);
+}
+
+/**
  * ConnectorsPanel renders the DP20 list of DECLARED connector SOURCES (read-only with
  * respect to truth): the active project, a closed-set legend, the per-connector list (each
  * row carrying its kind, classification badge, scope RO/RW, egress allow-list, bind target,
@@ -1011,6 +1749,14 @@ export function ConnectorsPanel({
 					{activeProjectId ?? t("noProject")}
 				</span>
 			</div>
+
+			{/* DP24 — the EXECUTABLE declaration cockpit: déclarer → ChangeSet « proposed » →
+			    approuver → exécuter RO → basculer RW (2e approbation) → exécuter RW → ledger ;
+			    plus la tentative ai → DB (BlockReason). Tout se fait par écran. */}
+			<DeclareConnectorCockpit activeProjectId={activeProjectId} />
+
+			{/* DP24 — la porte « enregistrer un MCP-server / Skill » (DP23 Tool-Registry) */}
+			<RegisterMcpCockpit projectId={activeProjectId ?? "demo-project"} />
 
 			{/* the closed-set legend — the front reads the single sources from the twin */}
 			<section
