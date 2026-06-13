@@ -413,6 +413,7 @@ async function hashVerdict(
 
 const OPEN_QUESTIONS = [
 	"OQ-DP10-1 secrets-check : le spike couvre réseau→ports→ordre→healthchecks→URLs ; la matérialisation .env + secret-store + gitleaks-scan est l'affaire de DP12/S91 (le mot de passe jetable vient d'une variable d'environnement, jamais en dur).",
+	// biome-ignore lint/suspicious/noTemplateCurlyInString: ${APP_DATA_PATH} est la convention compose littérale citée, pas un placeholder TS
 	"OQ-DP10-2 volumes : le spike ne monte aucun volume bind (probe éphémère) ; les volumes nommés bind ${APP_DATA_PATH} (convention /data/dockers) sont émis par DP03/DP12.",
 	"OQ-DP10-3 traefik prod : le traefik jetable porte un constraint Label(dp10.spike.expose) et son propre réseau — le traefik de prod (traefik_default) n'est jamais touché ; DP12 cible le VRAI traefik_default (exigence utilisateur 1 : https://<projet>-dev.sagedesk.fr).",
 	"OQ-DP10-4 le mur : le spike ne persiste RIEN ; l'écriture réelle du verdict en `ideas` passe par idea_capture (provenance human) — ce record MODÉLISE la capture, il ne l'exécute pas.",
