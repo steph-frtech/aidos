@@ -161,6 +161,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/environments", k: "environments" },
 			{ href: "/endpoints-fitness", k: "endpointsFitness" },
 			{ href: "/bootstrap-spike", k: "bootstrapSpike" },
+			{ href: "/substrate-spike", k: "substrateSpike" },
 			{ href: "/bootstrap", k: "bootstrap" },
 			{ href: "/provision", k: "provision" },
 			{ href: "/api-surface", k: "apiSurface" },

@@ -176,6 +176,7 @@
 		"environments": "Environnements & bindings (DP06)",
 		"endpointsFitness": "Endpoints — senseur arch-fitness (DP08)",
 		"bootstrapSpike": "Spike bootstrap one-shot (DP10)",
+		"substrateSpike": "Spike palette substrat (DP14)",
 		"bootstrap": "Bootstrap one-shot déterministe (DP12)"
 	},
 	"home": {
@@ -7544,6 +7545,32 @@
 		"remeasureDiff": "adresses différentes — dérive détectée",
 		"harvestHeading": "Récolte (/harvest) — proposition DRAFT",
 		"recordHashLabel": "adresse du record (sha256)"
+	},
+	"substrateSpike": {
+		"eyebrow": "DP14 · spike palette substrat",
+		"title": "Spike go/no-go palette substrat open-source-2026",
+		"subtitle": "12 services × verdict mesuré",
+		"intro": "Avant de graver la palette en fragments StackManifest, le spike VALIDE PAR MESURE chacun des 12 services candidats de la spec open-source-stack-2026 (Postgres, Valkey, PgBouncer, Windmill, NATS, OTel, SigNoz, GlitchTip, Forgejo, Plane, Better-Auth, Docs). Le verdict d'un service est une MESURE — booté + healthcheck vert + joignable docker_internal (ou déjà conteneurisé sain sur l'hôte : docker ps compte) → go ; sinon no-go ENREGISTRÉ, jamais deviné. Jamais un avis.",
+		"tutorialHeading": "Comment lire cet écran",
+		"tutorialBody": "La matrice ci-dessous est la palette GRAVÉE par le spike (lib/substrate-palette), jamais un avis hardcodé dans l'UI. Chaque ligne porte son verdict mesuré au boot + la preuve exacte (port / healthcheck / docker ps / cause du no-go). Honnêteté (§8) : un no-go réduit le sujet, il ne le devine pas — Windmill est no-go ici pour une indisponibilité-de-registre (ghcr.io refusé en sandbox), PAS un défaut de service ; il reste le moteur de workflows validé du slot (Temporal est REFUSÉ — contrainte dure). Le mur : zone /spike, cliquet OFF, T0, aucune écriture-vérité.",
+		"activeProjectLabel": "Projet actif",
+		"noProject": "aucun",
+		"countsHeading": "Comptes mesurés",
+		"go": "go",
+		"noGo": "no-go",
+		"slotSplit": "{mandatory} mandatory · {replaceable} replaceable",
+		"matrixHeading": "Matrice service × verdict",
+		"matrixNote": "Les 12 services sondés, chacun avec son verdict mesuré, sa preuve, son slot frozen-stack et l'alternative comparée. Source : la palette gravée au spike, jamais un avis.",
+		"colService": "service",
+		"colLayer": "couche",
+		"colVerdict": "verdict",
+		"colSlot": "slot",
+		"colProof": "preuve (mesure)",
+		"colAlternative": "alternative comparée",
+		"slotMandatory": "mandatory",
+		"slotReplaceable": "replaceable",
+		"honestHeading": "Note honnête — spike jetable",
+		"honestBody": "Ceci est un spike T0 (cliquet OFF, zone /spike) : la mesure est jetable et n'écrit aucune vérité. La gravure de la palette en fragments StackManifest passe par la marche suivante (harvest du spike → idée → /goal → approbation humaine), jamais par un écran. Windmill : son boot reste à re-mesurer quand ghcr.io est de nouveau pullable — son no-go n'est pas un défaut, l'image officielle + le contrat health sont confirmés ; seul le boot in-window manque."
 	},
 	"bootstrap": {
 		"eyebrow": "DP12 · bootstrap one-shot déterministe",
