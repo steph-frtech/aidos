@@ -5,8 +5,10 @@ import {
 	type DeployInput,
 	deployedMatchesPhase,
 	isBlocked,
+	isDeployable,
 	type MigrationStep,
 	migrationIsForwardOnly,
+	type OrderManifest,
 } from "@/lib/deploy";
 import {
 	buildPreviewWithBootstrap,
@@ -56,6 +58,27 @@ const RENAME_MIGRATION: MigrationStep[] = [
 	},
 ];
 
+/**
+ * deployManifest — the per-app DP02 StackManifest the DP26 complete deploy order is computed
+ * over (the minimal /data/dockers-convention stack: one reverse-proxied server, one datastore,
+ * the Go interpreter sidecar, one named bind volume, the external traefik network, one connector
+ * scope). Its `app` equals the surface project (the deploy is per-app, S96). Deterministic — a
+ * fixture, never drawn. Supplying it opts the plan into the seven ordered stages (DP26, additive).
+ */
+function deployManifest(project: string): OrderManifest {
+	return {
+		app: project,
+		services: [
+			{ name: "app", role: "server" },
+			{ name: "postgres", role: "datastore" },
+			{ name: "interpreter", role: "interpreter" },
+		],
+		volumes: [{ name: "app_data", device_var: "APP_DATA_PATH" }],
+		network: { name: "traefik_default", external: true },
+		connector_scopes: ["crm"],
+	};
+}
+
 export async function deployAction(
 	_prev: DeployView,
 	formData: FormData,
@@ -68,11 +91,14 @@ export async function deployAction(
 	// Toggle: carry a forward-only data migration (the rename lifecycle).
 	const withMigration = formData.get("withMigration") === "on";
 
+	const phase = unstable
+		? { phaseHash, stable: false, reasons: ["createOrder.fixture"] }
+		: { phaseHash, stable: true, reasons: [] };
+	const gate = { mutationScore: 0.9, mutationThreshold: 0.8, monsterCount: 0 };
+
 	const input: DeployInput = {
-		phase: unstable
-			? { phaseHash, stable: false, reasons: ["createOrder.fixture"] }
-			: { phaseHash, stable: true, reasons: [] },
-		gate: { mutationScore: 0.9, mutationThreshold: 0.8, monsterCount: 0 },
+		phase,
+		gate,
 		surface: {
 			project,
 			serverBundleHash: `srv-${project}-001`,
@@ -83,12 +109,22 @@ export async function deployAction(
 		programPath: `gen/${project}/infra/index.ts`,
 		programBytes: "export function program() {}\n",
 		migration: withMigration ? RENAME_MIGRATION : [],
+		// DP26 — opt into the complete deploy ORDER (network → … → URL). The deploy targets prod
+		// (a lasting environment) by default. The Stop-gate stays inherited (isDeployable).
+		manifest: deployManifest(project),
+		env: "prod",
 	};
+
+	// The « done is computed » Stop-gate verdict — the SAME gate the plan inherits (no separate
+	// deploy-approval gate, DP26). Drives the gate badge + whether the « Déployer » is enabled.
+	const { deployable, reasons } = isDeployable(phase, gate);
 
 	const plan = buildPlan(input);
 	if (isBlocked(plan))
 		return {
 			ok: false,
+			stable: deployable,
+			reasons,
 			blockCode: plan.code,
 			blockExplanation: plan.explanation,
 		};
@@ -107,11 +143,21 @@ export async function deployAction(
 			servedAppHash,
 			servedMatches: false,
 			forwardOnly,
+			stable: deployable,
+			reasons,
 			blockCode: match.code,
 			blockExplanation: match.explanation,
 		};
 
-	return { ok: true, plan, servedAppHash, servedMatches: true, forwardOnly };
+	return {
+		ok: true,
+		plan,
+		servedAppHash,
+		servedMatches: true,
+		forwardOnly,
+		stable: deployable,
+		reasons,
+	};
 }
 
 /**

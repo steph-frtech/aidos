@@ -22,6 +22,8 @@ import {
 	isBlocked,
 	type MigrationStep,
 	migrationIsForwardOnly,
+	ORDERED_DEPLOY_STAGES,
+	type OrderManifest,
 } from "./deploy";
 
 const validMigration: MigrationStep[] = [
@@ -150,5 +152,142 @@ describe("S96 deploy twin", () => {
 				if (isBlocked(out)) expect(out.code).toBe("OUT_OF_SCOPE");
 			}),
 		);
+	});
+});
+
+/* ---------------------------------------------------------------------------------------------
+ * DP26 — the COMPLETE deploy ORDER (EPIC F, extends S96). The order is OPT-IN: an input with no
+ * manifest is EXACTLY the S96 plan (no order). Supplying a manifest opts into the seven ordered
+ * stages (network → volumes → datastore-provision → migration → bootstrap → healthcheck → URL).
+ * The order NEVER alters the emittedAppHash/url/stackName; same phase → byte-identical order.
+ * ------------------------------------------------------------------------------------------- */
+
+function orderManifest(project: string): OrderManifest {
+	return {
+		app: project,
+		services: [
+			{ name: "app", role: "server" },
+			{ name: "postgres", role: "datastore" },
+			{ name: "interpreter", role: "interpreter" },
+		],
+		volumes: [{ name: "app_data", device_var: "APP_DATA_PATH" }],
+		network: { name: "traefik_default", external: true },
+		connector_scopes: ["crm"],
+	};
+}
+
+describe("DP26 deploy ORDER twin", () => {
+	it("opt-in additive — no manifest ⇒ the exact S96 plan (no order field)", () => {
+		fc.assert(
+			fc.property(genHash, genProject, (h, p) => {
+				const plan = buildPlan(stableInput(h, p)) as DeployPlan;
+				expect(isBlocked(plan)).toBe(false);
+				expect(plan.order).toBeUndefined();
+			}),
+		);
+	});
+
+	it("ordered — the seven stages appear in the canonical network→…→url order", () => {
+		fc.assert(
+			fc.property(genHash, genProject, (h, p) => {
+				const input = { ...stableInput(h, p), manifest: orderManifest(p) };
+				const plan = buildPlan(input) as DeployPlan;
+				expect(isBlocked(plan)).toBe(false);
+				expect(plan.order).toBeDefined();
+				const kinds = (plan.order?.stages ?? []).map((s) => s.kind);
+				expect(kinds).toEqual([...ORDERED_DEPLOY_STAGES]);
+				// 1-based seq is dense and ordered.
+				(plan.order?.stages ?? []).forEach((s, i) => {
+					expect(s.seq).toBe(i + 1);
+				});
+			}),
+		);
+	});
+
+	it("re-projection preserved — the order NEVER alters the emitted app hash / url / stack", () => {
+		fc.assert(
+			fc.property(genHash, genProject, (h, p) => {
+				const base = buildPlan(stableInput(h, p)) as DeployPlan;
+				const withOrder = buildPlan({
+					...stableInput(h, p),
+					manifest: orderManifest(p),
+				}) as DeployPlan;
+				// the deployed artifact is the phase's app, ∀ order.
+				expect(withOrder.emittedAppHash).toBe(base.emittedAppHash);
+				expect(withOrder.url).toBe(base.url);
+				expect(withOrder.stackName).toBe(base.stackName);
+				// the order folds into the deploy id — a different shape → a different id.
+				expect(withOrder.id).not.toBe(base.id);
+				// the re-projection still holds against the unchanged emitted hash.
+				expect(deployedMatchesPhase(withOrder, withOrder.emittedAppHash)).toBe(
+					true,
+				);
+			}),
+		);
+	});
+
+	it("reproducible — same phase ⇒ byte-identical order (same order hash)", () => {
+		fc.assert(
+			fc.property(genHash, genProject, (h, p) => {
+				const a = buildPlan({
+					...stableInput(h, p),
+					manifest: orderManifest(p),
+				}) as DeployPlan;
+				const b = buildPlan({
+					...stableInput(h, p),
+					manifest: orderManifest(p),
+				}) as DeployPlan;
+				expect(a.order).toEqual(b.order);
+				expect(a.order?.hash).toBe(b.order?.hash);
+			}),
+		);
+	});
+
+	it("Stop-gate still first — a non-stable phase with a manifest is refused PHASE_NOT_STABLE", () => {
+		fc.assert(
+			fc.property(genHash, genProject, (h, p) => {
+				const out = buildPlan({
+					...stableInput(h, p),
+					phase: { phaseHash: h, stable: false, reasons: ["x.fixture"] },
+					manifest: orderManifest(p),
+				});
+				expect(isBlocked(out)).toBe(true);
+				if (isBlocked(out)) expect(out.code).toBe("PHASE_NOT_STABLE");
+			}),
+		);
+	});
+
+	it("per-app — a manifest for another app is refused OUT_OF_SCOPE (cross-app order)", () => {
+		fc.assert(
+			fc.property(genHash, genProject, (h, p) => {
+				const out = buildPlan({
+					...stableInput(h, p),
+					manifest: orderManifest("someOtherApp"),
+				});
+				expect(isBlocked(out)).toBe(true);
+				if (isBlocked(out)) expect(out.code).toBe("OUT_OF_SCOPE");
+			}),
+		);
+	});
+
+	it("datastore stage — prod omits doltgres, non-prod includes it (the DP06 gate delegated)", () => {
+		const prod = buildPlan({
+			...stableInput("aaaaaaaa", "shop"),
+			manifest: orderManifest("shop"),
+			env: "prod",
+		}) as DeployPlan;
+		const dev = buildPlan({
+			...stableInput("aaaaaaaa", "shop"),
+			manifest: orderManifest("shop"),
+			env: "dev",
+		}) as DeployPlan;
+		const prodDS = prod.order?.stages.find(
+			(s) => s.kind === "datastore-provision",
+		)?.detail;
+		const devDS = dev.order?.stages.find(
+			(s) => s.kind === "datastore-provision",
+		)?.detail;
+		expect(prodDS).not.toContain("doltgres");
+		expect(devDS).toContain("doltgres");
 	});
 });

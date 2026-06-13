@@ -20,6 +20,13 @@ export interface DeployView {
 	blockCode?: string;
 	/** a non-stable phase / malformed surface / breaking migration → the BlockReason explanation. */
 	blockExplanation?: string;
+	/* --- DP26: the « Déployer cette phase » Stop-gate state + the complete order ---------- */
+	/** whether the targeted phase is STABLE (« done is computed ») — drives the gate badge +
+	 * whether the « Déployer » button is enabled. Computed by the pure twin (isDeployable). */
+	stable?: boolean;
+	/** the gate's offending reasons when the phase is NOT deployable (the red mirrors, a
+	 * below-threshold mutation score, a present monster) — named in the refusal. */
+	reasons?: string[];
 }
 
 export const DEPLOY_INITIAL: DeployView = { ok: false };

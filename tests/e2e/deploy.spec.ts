@@ -294,3 +294,100 @@ test.describe("DP25 — the ephemeral preview (profile + bootstrap, EPIC F)", ()
 		await expect(page.getByTestId("preview-result")).toHaveCount(0);
 	});
 });
+
+/**
+ * DP26 Playwright e2e — the « Déployer cette phase » section (EPIC F, EXTENDS S96, never
+ * duplicates). mirror record: reflects=DP26-deploy-this-phase-complete-order, test_kind=e2e,
+ * cert_language=playwright, liveness=live.
+ *
+ * Proves the /deploy route's deploy section is action-capable (ui-completeness, CLAUDE.md §7):
+ * a « Déployer cette phase » control, ENABLED only from a stable phase (the INHERITED Stop-gate,
+ * never a separate deploy-approval gate), bound to a Server Action running the REAL pure twin
+ * (lib/deploy, the twin of back/runtime/deploy DP26). The DP26 done-criteria, reached from the
+ * screen:
+ *   - a STABLE phase shows the deployed URL, the artefact hash with the hash-artefact = hash-phase
+ *     indicator (ok — the re-projection: the deployed artefact IS the phase's app, never a stale
+ *     sandbox artifact), and the COMPLETE ORDER (network → volumes → datastore → migration →
+ *     bootstrap → healthcheck → URL);
+ *   - a NON-STABLE phase is REFUSED with PHASE_NOT_STABLE, naming the gate reasons.
+ *
+ * THE WALL (CLAUDE.md §2): the screen RE-PROJECTS a phase — it writes no truth. The deploy
+ * inherits the Stop-gate (no separate gate). Planning = a pure function, never an LLM.
+ */
+test.describe("DP26 — « Déployer cette phase » (complete order, EPIC F)", () => {
+	const ORDER = [
+		"network",
+		"volumes",
+		"datastore-provision",
+		"migration",
+		"bootstrap",
+		"healthcheck",
+		"url",
+	];
+
+	test("the section exposes the gate state and the launch control", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await expect(page.getByTestId("deploy-phase-section")).toBeVisible();
+		const gate = page.getByTestId("deploy-gate");
+		await expect(gate).toBeVisible();
+		// before any submit, the default form deploys a STABLE phase → the gate is stable.
+		await expect(gate).toHaveAttribute("data-stable", "true");
+		await expect(page.getByTestId("deploy-launch")).toBeVisible();
+		await expect(page.getByTestId("deploy-launch")).toBeEnabled();
+	});
+
+	test("deploying a STABLE phase shows the URL, hash-matches=ok and the ordered steps", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("deploy-launch").click();
+		await expect(page.getByTestId("deploy-result")).toBeVisible();
+
+		// the per-phase DEPLOY URL ("d-…").
+		const url = await page.getByTestId("deploy-url").innerText();
+		expect(url).toMatch(/^https:\/\/d-[a-z0-9]+\./);
+
+		// the artefact hash + the hash-artefact = hash-phase indicator (the re-projection).
+		const artifact = (
+			await page.getByTestId("deploy-artifact-hash").innerText()
+		).trim();
+		expect(artifact.length).toBeGreaterThan(0);
+		await expect(page.getByTestId("deploy-hash-matches")).toHaveAttribute(
+			"data-ok",
+			"true",
+		);
+
+		// the COMPLETE ORDER — the seven stages in the canonical sequence.
+		const steps = page.getByTestId("deploy-step");
+		await expect(steps).toHaveCount(7);
+		for (let i = 0; i < ORDER.length; i++) {
+			await expect(steps.nth(i)).toHaveAttribute("data-step", ORDER[i]);
+		}
+	});
+
+	test("a NON-STABLE phase is refused PHASE_NOT_STABLE, naming the reasons", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("unstable-toggle").check();
+		await expect(page.getByTestId("unstable-toggle")).toBeChecked();
+		// the legacy deploy control submits the (now non-stable) form.
+		await page.getByTestId("deploy-button").click();
+
+		const block = page.getByTestId("deploy-blockreason");
+		await expect(block).toBeVisible();
+		await expect(block).toHaveAttribute("data-code", "PHASE_NOT_STABLE");
+		// the refusal names the gate reason (the red fixture mirror).
+		await expect(block).toContainText("createOrder.fixture");
+		// no deploy result is produced for a non-stable phase.
+		await expect(page.getByTestId("deploy-result")).toHaveCount(0);
+		// the gate badge flips to non-stable, and the launch control is disabled.
+		await expect(page.getByTestId("deploy-gate")).toHaveAttribute(
+			"data-stable",
+			"false",
+		);
+		await expect(page.getByTestId("deploy-launch")).toBeDisabled();
+	});
+});

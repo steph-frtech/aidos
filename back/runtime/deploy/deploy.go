@@ -40,6 +40,30 @@
 // breaking migration with no backfill — each is a typed BlockReason (the S13 shape), never a
 // panic, never an invented URL/phase, never a silent deploy of a red mirror or a stale
 // artifact.
+//
+// DP26 — THE COMPLETE DEPLOY ORDER (EPIC F, extends S96, never duplicates). DP26 CABLES the
+// full deploy ORDER onto the S96 plan: a deployable phase RE-EMITS the stack from the phase
+// (DP05 stackemit.EmitStack), then orders the deterministic sequence
+//
+//	network → volumes → datastore-provision (DP15 datafragments) → migration (S95
+//	datamigrate, forward-only, DataTruthScope-gated) → bootstrap (DP12, ordered) →
+//	healthcheck → URL.
+//
+// The ORDER is a PURE sequence DERIVED from the phase — a closed, declared kind set
+// (OrderedDeployStages), content-addressed via records.Hash, reproducible (same phase →
+// byte-identical Order). DP26 REUSES S96/S78/S95/S86, NEVER duplicates: the Stop-gate stays
+// IsDeployable (no new deploy-approval gate); the re-projection stays DeployedMatchesPhase
+// (hash artefact = hash phase); the migration stays datamigrate (forward-only,
+// DataTruthScope-gated); the datastore fragments stay datafragments (the DP06 prod×doltgres
+// gate DELEGATED); the bootstrap stays bootstrap.EmitBootstrapSequence (the DP12 ordered
+// amorçage). The re-emission is the DP05 EmitStack composition (compose ⊕ env ⊕ traefik).
+//
+// ADDITIVE (CLAUDE.md §9 anti-overwrite). The DP26 order section is OPT-IN: an Input with no
+// Manifest is EXACTLY the S96 plan (no Order) — every S96 test stays byte-identical green.
+// Supplying a Manifest + Env opts into the DP15 datastore provision + the DP12 bootstrap
+// ordering, NEVER altering the EmittedAppHash/URL/StackName (they never read the manifest —
+// the deployed artifact is the phase's app, the order is HOW it boots). The deploy is NOT a
+// truth-write — it RE-PROJECTS an existing phase (the phase is the unit of deployment).
 package deploy
 
 import (
@@ -51,10 +75,15 @@ import (
 
 	"github.com/steph-frtech/aidos/back/archive/phases"
 	"github.com/steph-frtech/aidos/back/kernel/records"
+	"github.com/steph-frtech/aidos/back/kernel/scope"
+	"github.com/steph-frtech/aidos/back/kernel/stackmanifest"
 	"github.com/steph-frtech/aidos/back/runtime/blockreason"
+	"github.com/steph-frtech/aidos/back/runtime/bootstrap"
+	"github.com/steph-frtech/aidos/back/runtime/datafragments"
 	"github.com/steph-frtech/aidos/back/runtime/datamigrate"
 	"github.com/steph-frtech/aidos/back/runtime/honoemit"
 	"github.com/steph-frtech/aidos/back/runtime/preview"
+	"github.com/steph-frtech/aidos/back/runtime/stackemit"
 )
 
 // mustJSON marshals a value to JSON for the canonical content-address body. The shapes passed
@@ -72,6 +101,90 @@ func mustJSON(v any) []byte {
 // DefaultDomainRoot is the deploy wildcard root used when Input.DomainRoot is empty. Distinct
 // from the preview root (S94): a deploy is a LASTING environment, a preview is ephemeral.
 const DefaultDomainRoot = "deploy.aidos.app"
+
+// DefaultDeployEnv is the environment a deploy targets when Input.Env is empty (a deploy is a
+// LASTING prod environment by default — distinct from the preview default, which is dev).
+const DefaultDeployEnv = scope.EnvProd
+
+// DeployStageKind is one rung of the CLOSED, ORDERED DP26 deploy sequence. The set is CLOSED
+// (DP26): an unknown stage does not exist — BuildPlan orders EXACTLY these, in this order, or
+// it never reaches the order (the Stop-gate refuses first). The order is the spec's
+// done-criteria sequence: network → volumes → datastore-provision → migration → bootstrap →
+// healthcheck → URL.
+type DeployStageKind string
+
+const (
+	// StageNetwork — the shared reverse-proxy network is created (the external traefik network
+	// the appliance joins). The first rung — nothing runs before the network exists.
+	StageNetwork DeployStageKind = "network"
+	// StageVolumes — the named bind volumes are created (${VAR} device references — the data
+	// substrate's persistence lands before the datastore boots).
+	StageVolumes DeployStageKind = "volumes"
+	// StageDatastoreProvision — the data-substrate services are provisioned (DP15 datafragments:
+	// postgres + valkey + pgbouncer, doltgres non-prod-only — the DP06 gate delegated).
+	StageDatastoreProvision DeployStageKind = "datastore-provision"
+	// StageMigration — the per-app data migration runs FORWARD-ONLY (S95 datamigrate: expand →
+	// backfill → contract, DataTruthScope-gated). Empty (no step) when the deploy carries no
+	// schema change, but the stage stays in the canonical order (the order is phase-derived).
+	StageMigration DeployStageKind = "migration"
+	// StageBootstrap — the DP12 ordered amorçage runs over the re-emitted stack (the closed
+	// network→volumes→…→urls-printed bootstrap sequence, MISSING_SECRET_AT_BOOT-gated).
+	StageBootstrap DeployStageKind = "bootstrap"
+	// StageHealthcheck — every service must pass its healthcheck (the blocking gate before the
+	// URL is announced — a deploy is not live until it is healthy).
+	StageHealthcheck DeployStageKind = "healthcheck"
+	// StageURL — the per-phase deploy URL is provisioned and announced (the last rung — the
+	// app is reachable at its content-addressed subdomain).
+	StageURL DeployStageKind = "url"
+)
+
+// orderedStages is the CLOSED DP26 deploy sequence in its DECLARED order. Declared once;
+// OrderedDeployStages copies it out (never derived from map iteration — determinism).
+var orderedStages = []DeployStageKind{
+	StageNetwork,
+	StageVolumes,
+	StageDatastoreProvision,
+	StageMigration,
+	StageBootstrap,
+	StageHealthcheck,
+	StageURL,
+}
+
+// OrderedDeployStages returns the closed DP26 deploy sequence in its declared order (a copy —
+// never mutable). The Workbench legend and the order mirror read this single source.
+func OrderedDeployStages() []DeployStageKind {
+	out := make([]DeployStageKind, len(orderedStages))
+	copy(out, orderedStages)
+	return out
+}
+
+// DeployStage is one rung of the ordered deploy sequence: its 1-based position, its closed
+// kind, and a deterministic detail (a NAME or a ${VAR} reference / a service list — never a
+// secret value, never a hardcoded endpoint). Pure data the Workbench renders as the timeline.
+type DeployStage struct {
+	Seq    int             `json:"seq"`
+	Kind   DeployStageKind `json:"kind"`
+	Detail string          `json:"detail"`
+}
+
+// DeployOrder is the DP26 COMPLETE deploy order: the ordered stages + the content address of
+// the sequence (so "same phase → same order" is one comparison) + the re-emitted stack's
+// bundle hash (DP05 EmitStack — the deployed artifact is RE-PROJECTED from the phase, never a
+// stale sandbox artifact). PURE: same phase → byte-identical DeployOrder.
+type DeployOrder struct {
+	// Stages are the ordered deploy rungs (network → volumes → datastore → migration →
+	// bootstrap → healthcheck → URL) — the spec's done-criteria sequence, deterministic.
+	Stages []DeployStage `json:"stages"`
+	// StackBundleHash is the content address of the RE-EMITTED stack (DP05 stackemit.EmitStack
+	// BundleHash) — the deploy re-emits from the phase (DP05), never an existing artifact.
+	StackBundleHash string `json:"stack_bundle_hash"`
+	// BootstrapHash is the content address of the DP12 ordered bootstrap sequence (the
+	// profile-independent amorçage of the re-emitted stack).
+	BootstrapHash string `json:"bootstrap_hash"`
+	// Hash is the content address of the whole order (records.Hash over the canonical
+	// rendering — S02 reused). Same phase → same Hash (the reproducibility oracle).
+	Hash string `json:"hash"`
+}
 
 // Gate is the « done is computed » Stop-gate inputs that, crossed with the phase's coherent-cut
 // verdict (phases.StablePhase), decide whether a phase may deploy (KRD §43/§44, CLAUDE.md §8).
@@ -145,6 +258,23 @@ type Input struct {
 	// DomainRoot is the deploy wildcard root (e.g. "deploy.aidos.app"). The per-phase subdomain
 	// is minted under it deterministically from the phase hash. Defaults to DefaultDomainRoot.
 	DomainRoot string `json:"domain_root"`
+
+	// --- DP26: the optional COMPLETE-ORDER section (network→…→URL). ----------------------
+	// Manifest is the DP02 StackManifest the phase pinned — what DP05 RE-EMITS and what the
+	// DP15 datastore provision + DP12 bootstrap order over. ABSENT (empty AppName) ⇒ the S96
+	// plan (no Order); SUPPLIED ⇒ the DP26-ordered deploy. The manifest MUST be pinned in the
+	// phase cut (EmitStack refuses an unpinned one — the phase is authoritative, DP05).
+	Manifest stackmanifest.StackManifest `json:"manifest,omitempty"`
+	// Env is the deployment environment the datastore is provisioned for (DP15). It gates
+	// doltgres-in-prod (the DP06 rule, delegated). Defaults to DefaultDeployEnv (prod) when a
+	// Manifest is supplied with an empty Env (a deploy targets prod by default).
+	Env scope.Environment `json:"env,omitempty"`
+	// Host is the OBSERVED host snapshot AS DATA the DP12 bootstrap resolves the port from
+	// (ss ∪ docker ps). Optional: the empty snapshot resolves the first free port ≥ base.
+	Host bootstrap.HostState `json:"host,omitempty"`
+	// Secrets is the set of secret env-var NAMES present in the appliance at boot (DP12). A
+	// missing required secret fails the bootstrap closed (MISSING_SECRET_AT_BOOT), inherited.
+	Secrets bootstrap.SecretsState `json:"secrets,omitempty"`
 }
 
 // DeployPlan is the DETERMINISTIC, content-addressed plan that deploys a stable phase's
@@ -181,6 +311,14 @@ type DeployPlan struct {
 	Boot []string `json:"boot"`
 	// Teardown is the deterministic command sequence that tears the deploy down (`pulumi destroy`).
 	Teardown []string `json:"teardown"`
+
+	// --- DP26: the optional COMPLETE-ORDER section (nil for an S96 plan) ------------------
+	// Order is the DP26 complete deploy order (network → volumes → datastore-provision →
+	// migration → bootstrap → healthcheck → URL), the re-emitted stack hash and the bootstrap
+	// hash. nil when no Manifest is supplied (the S96 plan is preserved byte-identically);
+	// computed when a Manifest + Env opts into the DP26 ordering. The order NEVER alters the
+	// EmittedAppHash/URL/StackName above — it is HOW the phase's app boots, not WHICH app.
+	Order *DeployOrder `json:"order,omitempty"`
 }
 
 // Typed causes — every refusal that is NOT a delegated S95/S94 block is one of these (honesty
@@ -193,6 +331,9 @@ var (
 	ErrNoInfra    = errors.New("deploy: surface has no infra program (nothing to `pulumi up`)")
 	ErrNoProgram  = errors.New("deploy: no emitted Pulumi program to boot")
 	ErrProjectMix = errors.New("deploy: program project does not match the surface project")
+	// ErrManifestProjectMix — the DP26 manifest belongs to another app than the surface (a
+	// cross-app deploy order). The deploy is per-app (S96).
+	ErrManifestProjectMix = errors.New("deploy: manifest app does not match the surface project")
 )
 
 // surfaceBlock wraps a surface/program cause into a typed BlockReason (the S13 shape). deploy
@@ -357,6 +498,20 @@ func BuildPlan(in Input) (DeployPlan, *blockreason.BlockReason) {
 		Boot:           boot,
 		Teardown:       teardown,
 	}
+
+	// 6. DP26 — the OPTIONAL complete-order section. Only when a DP02 manifest is supplied
+	// (else the S96 shape is preserved byte-identically, §9). The EmittedAppHash/URL/StackName
+	// above are already computed and NEVER read here: the order changes HOW the phase boots,
+	// never WHICH app (the re-projection property is preserved — DeployedMatchesPhase still
+	// asserts hash artefact = hash phase). The order REUSES the same forward-only migration plan.
+	if in.Manifest.AppName != "" {
+		order, obr := buildOrder(in, url, migration)
+		if obr != nil {
+			return DeployPlan{}, obr
+		}
+		plan.Order = order
+	}
+
 	id, err := plan.contentAddress()
 	if err != nil {
 		br := surfaceBlock(fmt.Errorf("deploy: cannot content-address the plan: %w", err))
@@ -366,11 +521,180 @@ func BuildPlan(in Input) (DeployPlan, *blockreason.BlockReason) {
 	return plan, nil
 }
 
+// buildOrder computes the DP26 COMPLETE deploy order, REUSING DP05 + DP15 + S95 + DP12
+// verbatim (never forking the rules):
+//
+//  1. the manifest must belong to the SAME app as the surface (per-app deploy, S96);
+//  2. DP05 stackemit.EmitStack RE-EMITS the stack from the phase (the deployed artifact is
+//     the phase's app — the re-projection; an unpinned manifest / unstable phase / hand-edit
+//     surfaces the DP05 BlockReason verbatim);
+//  3. DP15 datafragments provisions the data substrate (the DP06 prod×doltgres gate delegated
+//     — DOLTGRES_NOT_ALLOWED_IN_PROD / UNKNOWN_ENVIRONMENT surface verbatim);
+//  4. DP12 bootstrap.EmitBootstrapSequence renders the ordered amorçage over the manifest
+//     (MISSING_SECRET_AT_BOOT / invalid-manifest surface verbatim);
+//  5. the seven stages are ordered (network → volumes → datastore → migration → bootstrap →
+//     healthcheck → URL) and content-addressed.
+//
+// PURE: same (phase, manifest, env, migration, host, secrets) → byte-identical DeployOrder.
+// It runs NO real docker — the order is a deterministic plan-as-data the gated executor and
+// the Workbench consume. The order NEVER reads/alters the EmittedAppHash/URL/StackName.
+func buildOrder(in Input, url string, migration datamigrate.Plan) (*DeployOrder, *blockreason.BlockReason) {
+	// (1) per-app: the manifest's app must match the surface's project.
+	if in.Manifest.AppName != in.Surface.Project {
+		br := surfaceBlock(ErrManifestProjectMix)
+		return nil, &br
+	}
+
+	// (2) DP05 — RE-EMIT the stack FROM THE PHASE (deploy = re-emit, DP26). EmitStack owns the
+	// stable-phase + manifest-pinned + hand-edit gates; its refusal surfaces verbatim. The
+	// deploy plans no hand-edit drift over a fresh re-emission (empty ledger/disk).
+	bundle, sbr := stackemit.EmitStack(in.Phase, in.Manifest, nil, nil)
+	if sbr != nil {
+		return nil, sbr
+	}
+
+	// (3) DP15 — provision the data substrate for the env (the DP06 gate delegated). The CORE
+	// path omits the env-forbidden fragments cleanly (prod omits doltgres) — never an error.
+	env := in.Env
+	if env == "" {
+		env = DefaultDeployEnv
+	}
+	fragments, ferr := datafragments.SubstrateCoreFragments(in.Surface.Project, env)
+	if ferr != nil {
+		br := surfaceBlock(fmt.Errorf("deploy: cannot provision the datastore: %w", ferr))
+		return nil, &br
+	}
+
+	// (4) DP12 — render the deterministic ordered bootstrap over the manifest.
+	seq, bbr := bootstrap.EmitBootstrapSequence(in.Manifest, in.Host, in.Secrets)
+	if bbr != nil {
+		return nil, bbr
+	}
+
+	// (5) order the seven stages — every detail is a NAME / ${VAR} ref / a service list, never
+	// a secret value, never a hardcoded endpoint (the bootstrap-honesty rule, reused).
+	details := map[DeployStageKind]string{
+		StageNetwork:            in.Manifest.Network.Name,
+		StageVolumes:            volumeRefs(in.Manifest),
+		StageDatastoreProvision: fragmentNames(fragments),
+		StageMigration:          migrationDetail(migration),
+		StageBootstrap:          "amorçage ordonné DP12 (" + bootstrapDetail(seq) + ")",
+		StageHealthcheck:        healthcheckDetail(in.Manifest),
+		StageURL:                url,
+	}
+	stages := make([]DeployStage, 0, len(orderedStages))
+	for i, kind := range orderedStages {
+		stages = append(stages, DeployStage{Seq: i + 1, Kind: kind, Detail: details[kind]})
+	}
+
+	order := &DeployOrder{
+		Stages:          stages,
+		StackBundleHash: bundle.BundleHash,
+		BootstrapHash:   seq.Hash(),
+	}
+	order.Hash = order.contentAddress()
+	return order, nil
+}
+
+// contentAddress folds the DeployOrder's identity into ONE content address (records.Hash over
+// the canonical "stack\nbootstrap\nseq:kind:detail\n…" summary — S02 reused, never forked).
+// Same phase → same stages → same Hash: the «même phase → même ordre» proof is one comparison.
+func (o DeployOrder) contentAddress() string {
+	var b strings.Builder
+	b.WriteString("stack=")
+	b.WriteString(o.StackBundleHash)
+	b.WriteString("\nbootstrap=")
+	b.WriteString(o.BootstrapHash)
+	b.WriteString("\n")
+	for _, s := range o.Stages {
+		b.WriteString(fmt.Sprintf("s=%d:%s:%s\n", s.Seq, s.Kind, s.Detail))
+	}
+	return records.Hash([]byte(b.String()))
+}
+
+// --- DP26 deterministic stage-detail helpers (NAMES + ${VAR} refs only, no secret/host) ----
+
+// volumeRefs renders the manifest's bind-volume device references (${VAR}) in sorted order —
+// never a hardcoded path (the same discipline bootstrap uses, the SPEC-stack-2026 law).
+func volumeRefs(m stackmanifest.StackManifest) string {
+	refs := make([]string, 0, len(m.Volumes))
+	for _, v := range m.Volumes {
+		refs = append(refs, "${"+v.DeviceVar+"}")
+	}
+	sort.Strings(refs)
+	if len(refs) == 0 {
+		return "(aucun volume nommé)"
+	}
+	return strings.Join(refs, ", ")
+}
+
+// fragmentNames lists the DP15 provisioned data-substrate service keys in sorted order — the
+// deterministic breakdown the Workbench surfaces (prod omits doltgres via the DP06 gate).
+func fragmentNames(fragments []datafragments.ServiceFragment) string {
+	names := make([]string, 0, len(fragments))
+	for _, f := range fragments {
+		names = append(names, f.Key)
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		return "(aucun datastore)"
+	}
+	return strings.Join(names, ", ")
+}
+
+// migrationDetail names the S95 forward-only migration: the staged step count or "(aucune
+// migration de schéma)" when the deploy carries no schema change (the stage stays in order).
+func migrationDetail(p datamigrate.Plan) string {
+	if len(p.Steps) == 0 {
+		return "(aucune migration de schéma)"
+	}
+	stages := make([]string, 0, len(p.Steps))
+	for _, s := range p.Steps {
+		stages = append(stages, s.Stage)
+	}
+	return "S95 forward-only: " + strings.Join(stages, " → ")
+}
+
+// bootstrapDetail names the DP12 bootstrap rungs in order (the closed event kinds) — NAMES
+// only, never a resolved port/secret.
+func bootstrapDetail(seq bootstrap.Sequence) string {
+	kinds := make([]string, 0, len(seq.Events))
+	for _, e := range seq.Events {
+		kinds = append(kinds, string(e.Kind))
+	}
+	return strings.Join(kinds, " → ")
+}
+
+// healthcheckDetail lists the manifest's service container names whose healthcheck must pass —
+// in sorted order (NAMES only, the bootstrap convention reused).
+func healthcheckDetail(m stackmanifest.StackManifest) string {
+	svcs := make([]stackmanifest.Service, len(m.Services))
+	copy(svcs, m.Services)
+	sort.Slice(svcs, func(i, j int) bool { return svcs[i].Name < svcs[j].Name })
+	names := make([]string, 0, len(svcs))
+	for i := range svcs {
+		if svcs[i].Role == stackmanifest.RoleServer {
+			names = append(names, "${APP_NAME}")
+			continue
+		}
+		names = append(names, "${APP_NAME}-"+svcs[i].Name)
+	}
+	if len(names) == 0 {
+		return "(aucun service)"
+	}
+	return strings.Join(names, ", ")
+}
+
 // contentAddress hashes the canonical plan body (every field except ID) into the plan's ID —
 // the idempotency key. S02 reused (Canonicalize+Hash), never a forked scheme. The migration's
 // own content address (datamigrate.Plan.ID) rides in, so a different migration → a different
-// deploy ID.
+// deploy ID. The DP26 order's content address (when present) also rides in, so a different
+// deploy order → a different deploy ID (an S96 plan with no order folds an empty order hash).
 func (p DeployPlan) contentAddress() (string, error) {
+	orderHash := ""
+	if p.Order != nil {
+		orderHash = p.Order.Hash
+	}
 	body := map[string]any{
 		"project":          p.Project,
 		"phase_hash":       p.PhaseHash,
@@ -383,6 +707,7 @@ func (p DeployPlan) contentAddress() (string, error) {
 		"has_migration":    p.HasMigration,
 		"boot":             p.Boot,
 		"teardown":         p.Teardown,
+		"order_hash":       orderHash,
 	}
 	canon, err := records.Canonicalize(mustJSON(body))
 	if err != nil {

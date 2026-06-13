@@ -58,6 +58,28 @@ function Submit({ label }: { label: string }) {
 	);
 }
 
+/**
+ * LaunchPhase — the DP26 « Déployer cette phase » button. The control is ENABLED only when the
+ * phase is stable (« done is computed » : red→vert ∧ vert antérieur ∧ mutation ≥ seuil ∧ aucun
+ * monstre — the inherited Stop-gate, never a separate deploy-approval gate). A non-stable phase
+ * keeps the button DISABLED — the action still runs (the form submit) and the screen surfaces
+ * the PHASE_NOT_STABLE refusal, but the affordance reflects the gate.
+ */
+function LaunchPhase({ enabled }: { enabled: boolean }) {
+	const t = useTranslations("deploy");
+	const { pending } = useFormStatus();
+	return (
+		<button
+			type="submit"
+			data-testid="deploy-launch"
+			disabled={pending || !enabled}
+			className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50"
+		>
+			{pending ? t("working") : t("launchPhaseLabel")}
+		</button>
+	);
+}
+
 export function DeployPanel({
 	activeProjectId,
 }: {
@@ -137,13 +159,23 @@ function DeploySection({
 }) {
 	const t = useTranslations("deploy");
 
+	// The Stop-gate verdict drives the « Déployer » affordance. Before the first submit
+	// (state.stable === undefined) the default form deploys a STABLE phase, so the button is
+	// enabled; after a submit it reflects the COMPUTED verdict (a non-stable phase disables it).
+	const gateStable = state.stable !== false;
+
 	return (
 		<div className="space-y-8">
-			{/* Control 1 — DEPLOY the phase deterministically. */}
+			{/* DP26 — « Déployer cette phase » : the inherited Stop-gate state + the launch
+			    control (enabled ONLY from a stable phase) + the complete ordered plan. */}
 			<form
 				action={action}
+				data-testid="deploy-phase-section"
 				className="space-y-5 rounded-xl border border-border p-5"
 			>
+				<h2 className="text-sm font-semibold text-foreground">
+					{t("launchPhaseHeading")}
+				</h2>
 				<div className="space-y-2">
 					<label
 						htmlFor="project"
@@ -193,7 +225,29 @@ function DeploySection({
 					/>
 					{t("unstableLabel")}
 				</label>
-				<Submit label={t("deployLabel")} />
+
+				{/* The inherited Stop-gate state — « done is computed ». */}
+				<div
+					data-testid="deploy-gate"
+					data-stable={gateStable ? "true" : "false"}
+					className={
+						gateStable
+							? "rounded-lg border border-emerald-500/40 bg-emerald-50/40 p-3 text-xs text-emerald-700"
+							: "rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive"
+					}
+				>
+					{gateStable ? t("gateStable") : t("gateNotStable")}
+					{!gateStable && state.reasons && state.reasons.length > 0 && (
+						<span className="font-mono"> · {state.reasons.join(", ")}</span>
+					)}
+				</div>
+
+				<div className="flex flex-wrap gap-3">
+					{/* « Déployer cette phase » — enabled ONLY from a stable phase. */}
+					<LaunchPhase enabled={gateStable} />
+					{/* The legacy deploy control (kept — anti-overwrite §9, S96 e2e relies on it). */}
+					<Submit label={t("deployLabel")} />
+				</div>
 			</form>
 
 			{state.blockExplanation && !state.ok && (
@@ -205,7 +259,12 @@ function DeploySection({
 					<h2 className="text-sm font-semibold text-destructive">
 						{t("blockedHeading")} · {state.blockCode}
 					</h2>
-					<p className="text-sm leading-relaxed text-muted-foreground">
+					{/* DP26 — the « Déployer cette phase » refusal, naming the gate reasons. */}
+					<p
+						data-testid="deploy-blockreason"
+						data-code={state.blockCode}
+						className="text-sm leading-relaxed text-muted-foreground"
+					>
 						{state.blockExplanation}
 					</p>
 				</section>
@@ -304,6 +363,78 @@ function DeploySection({
 							{state.servedAppHash}
 						</p>
 					</section>
+
+					{/* DP26 — the artefact hash + the hash-artefact = hash-phase indicator (the
+					    re-projection: the deployed artefact IS the phase's app, never stale). */}
+					<section className="space-y-2 rounded-xl border border-border p-5">
+						<h2 className="text-sm font-semibold text-foreground">
+							{t("artifactHeading")}
+						</h2>
+						<dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+							<div>
+								<dt className="text-muted-foreground">
+									{t("artifactHashLabel")}
+								</dt>
+								<dd
+									data-testid="deploy-artifact-hash"
+									className="font-mono text-foreground"
+								>
+									{state.plan.emittedAppHash}
+								</dd>
+							</div>
+						</dl>
+						<p
+							data-testid="deploy-hash-matches"
+							data-ok={state.servedMatches ? "true" : "false"}
+							className={
+								state.servedMatches
+									? "font-mono text-xs text-emerald-600"
+									: "font-mono text-xs text-destructive"
+							}
+						>
+							{state.servedMatches
+								? t("hashArtefactOk")
+								: t("hashArtefactFail")}
+						</p>
+					</section>
+
+					{/* DP26 — the COMPLETE deploy ORDER: network → volumes → datastore →
+					    migration → bootstrap → healthcheck → URL (the deterministic timeline). */}
+					{state.plan.order && (
+						<section className="space-y-3 rounded-xl border border-border p-5">
+							<div className="flex flex-wrap items-center justify-between gap-2">
+								<h2 className="text-sm font-semibold text-foreground">
+									{t("orderHeading")}
+								</h2>
+								<span className="font-mono text-xs text-muted-foreground">
+									{t("orderHashLabel")}: {state.plan.order.hash}
+								</span>
+							</div>
+							<ol className="space-y-2" data-testid="deploy-order">
+								{state.plan.order.stages.map((s) => (
+									<li
+										key={s.kind}
+										data-testid="deploy-step"
+										data-step={s.kind}
+										data-seq={s.seq}
+										className="flex items-start gap-3 rounded-lg bg-muted p-3"
+									>
+										<span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+											{s.seq}
+										</span>
+										<div className="min-w-0">
+											<p className="text-xs font-semibold tracking-wide text-foreground uppercase">
+												{s.kind}
+											</p>
+											<p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+												{s.detail}
+											</p>
+										</div>
+									</li>
+								))}
+							</ol>
+						</section>
+					)}
 
 					{/* The forward-only data migration (expand → backfill → contract). */}
 					{state.plan.hasMigration && (
