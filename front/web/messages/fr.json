@@ -174,7 +174,8 @@
 		"accountRelease": "Release v0 (compte)",
 		"aiLabNav": "AI Lab (cockpit)",
 		"environments": "Environnements & bindings (DP06)",
-		"endpointsFitness": "Endpoints — senseur arch-fitness (DP08)"
+		"endpointsFitness": "Endpoints — senseur arch-fitness (DP08)",
+		"bootstrapSpike": "Spike bootstrap one-shot (DP10)"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -7493,5 +7494,37 @@
 		"working": "Mesure…",
 		"injectedBadge": "fault-injection active : gen/app/leak.ts",
 		"wallNote": "Le mur (§2) : le senseur est déterministe et below-the-line — l'écran mesure, n'écrit rien. La règle déclarée vit above-the-line (arch-fitness.json) : l'élargir ou l'adoucir passe par idée → miroir → /goal, jamais une édition silencieuse."
+	},
+	"bootstrapSpike": {
+		"eyebrow": "DP10 · spike bootstrap one-shot",
+		"title": "Spike go/no-go bootstrap déterministe",
+		"subtitle": "bootstrap émis vs deploy.sh direct",
+		"intro": "Avant d'écrire DP11-DP13, le spike PROUVE PAR MESURE qu'un bootstrap déterministe one-shot émis (réseau→résolution-ports→démarrage ordonné traefik→datastore→serveur→healthchecks→print-URLs) bat l'appel direct de /data/dockers/deploy.sh : 2 runs docker RÉELS reproductibles (mêmes événements ordonnés, même port résolu), résolution de ports = fonction pure de l'état observé (ss + docker ps), jamais un prompt. Verdict = conjonction booléenne, jamais un avis LLM.",
+		"tutorialHeading": "Comment lire cet écran",
+		"tutorialBody": "Le moteur AUTORITAIRE est le spike Go jetable (spike/bootstrap, zone /spike, cliquet OFF, T0) : il a réellement démarré deux fois la pile traefik→postgres→caddy sur le daemon local, healthchecks verts, URL en 200 via le traefik jetable, puis tout démonté. L'écran re-dérive le verdict par le jumeau TS pur, épinglé par parité de hash au verdict mesuré par Go. Le bouton « re-mesurer » re-décide purement — il n'écrit RIEN (le mur) : le réseau jetable n'est jamais traefik_default, la prod n'est pas touchée.",
+		"activeProjectLabel": "Projet actif",
+		"noProject": "aucun",
+		"verdictHeading": "Verdict mesuré",
+		"go": "go",
+		"noGo": "no-go",
+		"winnerLabel": "candidat gagnant",
+		"verdictHashLabel": "adresse du verdict (sha256)",
+		"logHeading": "Log de démarrage réel (run 1)",
+		"logNote": "Les événements ordonnés du run docker réel — le run 2 est identique (reproductibilité mesurée).",
+		"eventKind": "événement",
+		"eventDetail": "détail",
+		"urlsLabel": "URLs imprimées",
+		"candidatesHeading": "≤ 3 candidats — score par critères DÉCLARÉS",
+		"scriptFacts": "Faits mesurés sur les octets de deploy.sh : {prompts} prompts interactifs (select + read -rp), {refs} références /data/dockers en dur, {lines} lignes.",
+		"candidateLabel": "candidat",
+		"scoreLabel": "score",
+		"remeasureHeading": "Re-mesurer (pur, n'écrit rien)",
+		"remeasureNote": "Re-décide le verdict par le jumeau pur sur la mesure épinglée et compare les adresses sha256 — même mesure → même adresse.",
+		"remeasure": "Re-mesurer le verdict",
+		"working": "mesure…",
+		"remeasureEqual": "même adresse — verdict reproductible",
+		"remeasureDiff": "adresses différentes — dérive détectée",
+		"harvestHeading": "Récolte (/harvest) — proposition DRAFT",
+		"recordHashLabel": "adresse du record (sha256)"
 	}
 }

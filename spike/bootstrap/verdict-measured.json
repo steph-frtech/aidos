@@ -1,0 +1,194 @@
+{
+  "verdict": {
+    "go": true,
+    "reasons": [
+      "✓ résolution de ports pure (même snapshot → même plan)",
+      "✓ ordre de démarrage pur (permutation → même ordre)",
+      "✓ démarrage ordonné traefik→datastore→serveur (2 runs réels)",
+      "✓ healthchecks verts (2 runs réels)",
+      "✓ URL imprimée répond 200 via traefik (2 runs réels)",
+      "✓ reproductibilité (mêmes événements ordonnés, même port résolu)",
+      "✓ le candidat natif Go score strictement le plus haut"
+    ],
+    "winner": "native-go",
+    "measurement": {
+      "planDeterministic": true,
+      "orderDeterministic": true,
+      "run1": {
+        "events": [
+          {
+            "seq": 1,
+            "kind": "network-created",
+            "detail": "dp10spike_net"
+          },
+          {
+            "seq": 2,
+            "kind": "traefik-up",
+            "detail": "dp10spike-traefik"
+          },
+          {
+            "seq": 3,
+            "kind": "healthy:traefik",
+            "detail": "tcp 127.0.0.1:18080"
+          },
+          {
+            "seq": 4,
+            "kind": "datastore-up",
+            "detail": "dp10spike-postgres"
+          },
+          {
+            "seq": 5,
+            "kind": "healthy:postgres",
+            "detail": "pg_isready"
+          },
+          {
+            "seq": 6,
+            "kind": "server-up",
+            "detail": "dp10spike-server"
+          },
+          {
+            "seq": 7,
+            "kind": "healthy:server",
+            "detail": "running"
+          },
+          {
+            "seq": 8,
+            "kind": "url-probed",
+            "detail": "GET http://127.0.0.1:18080/ (Host: dp10spike.localhost) → 200"
+          },
+          {
+            "seq": 9,
+            "kind": "urls-printed",
+            "detail": "http://127.0.0.1:18080/ (Host: dp10spike.localhost)"
+          }
+        ],
+        "resolvedPort": 18080,
+        "orderedOk": true,
+        "healthyAll": true,
+        "urlProbe": true,
+        "urls": [
+          "http://127.0.0.1:18080/ (Host: dp10spike.localhost)"
+        ]
+      },
+      "run2": {
+        "events": [
+          {
+            "seq": 1,
+            "kind": "network-created",
+            "detail": "dp10spike_net"
+          },
+          {
+            "seq": 2,
+            "kind": "traefik-up",
+            "detail": "dp10spike-traefik"
+          },
+          {
+            "seq": 3,
+            "kind": "healthy:traefik",
+            "detail": "tcp 127.0.0.1:18080"
+          },
+          {
+            "seq": 4,
+            "kind": "datastore-up",
+            "detail": "dp10spike-postgres"
+          },
+          {
+            "seq": 5,
+            "kind": "healthy:postgres",
+            "detail": "pg_isready"
+          },
+          {
+            "seq": 6,
+            "kind": "server-up",
+            "detail": "dp10spike-server"
+          },
+          {
+            "seq": 7,
+            "kind": "healthy:server",
+            "detail": "running"
+          },
+          {
+            "seq": 8,
+            "kind": "url-probed",
+            "detail": "GET http://127.0.0.1:18080/ (Host: dp10spike.localhost) → 200"
+          },
+          {
+            "seq": 9,
+            "kind": "urls-printed",
+            "detail": "http://127.0.0.1:18080/ (Host: dp10spike.localhost)"
+          }
+        ],
+        "resolvedPort": 18080,
+        "orderedOk": true,
+        "healthyAll": true,
+        "urlProbe": true,
+        "urls": [
+          "http://127.0.0.1:18080/ (Host: dp10spike.localhost)"
+        ]
+      },
+      "runsReproducible": true,
+      "script": {
+        "promptCount": 7,
+        "dataDockersRefs": 3,
+        "scriptLineCount": 322
+      },
+      "candidates": [
+        {
+          "id": "native-go",
+          "label": "émetteur bootstrap natif Go déterministe",
+          "features": {
+            "future_cloud_portable": true,
+            "independent_of_data_dockers": true,
+            "non_interactive_invocation": true,
+            "plan_is_data": true,
+            "zero_prompt_in_path": true
+          },
+          "score": 5
+        },
+        {
+          "id": "wrapper",
+          "label": "wrapper non-interactif autour de deploy.sh",
+          "features": {
+            "future_cloud_portable": false,
+            "independent_of_data_dockers": false,
+            "non_interactive_invocation": true,
+            "plan_is_data": false,
+            "zero_prompt_in_path": false
+          },
+          "score": 1
+        },
+        {
+          "id": "deploy-sh",
+          "label": "appel direct de /data/dockers/deploy.sh",
+          "features": {
+            "future_cloud_portable": false,
+            "independent_of_data_dockers": false,
+            "non_interactive_invocation": false,
+            "plan_is_data": false,
+            "zero_prompt_in_path": false
+          },
+          "score": 0
+        }
+      ]
+    },
+    "verdictHash": "a2f23a64ab7769597ed983eb6413239db526995233924b27c4b3122288662dd0"
+  },
+  "harvest": {
+    "proposes": "operation",
+    "intent": "émettre le bootstrap one-shot déterministe (DP12) : la mesure DP10 prouve qu'un plan-as-data pur (résolution de ports sur ss+docker ps, ordre traefik→datastore→serveur, healthchecks bloquants, print-URLs) démarre une stack réelle de façon REPRODUCTIBLE (2 runs, mêmes événements ordonnés, même port) là où deploy.sh impose 7 prompts interactifs et 3 références /data/dockers en dur — DP11-DP13 peuvent s'écrire.",
+    "go": true,
+    "verdictHash": "a2f23a64ab7769597ed983eb6413239db526995233924b27c4b3122288662dd0",
+    "provenanceKind": "human",
+    "provenanceFrom": "spike:DP10 (spike/bootstrap)",
+    "status": "draft",
+    "hasMirror": false,
+    "hasVersion": false,
+    "recordHash": "017fd529d9e3569d28d00b73f95909746ea908341ebecbbaccaa194b61b1dc22",
+    "openQuestions": [
+      "OQ-DP10-1 secrets-check : le spike couvre réseau→ports→ordre→healthchecks→URLs ; la matérialisation .env + secret-store + gitleaks-scan est l'affaire de DP12/S91 (le mot de passe jetable vient d'une variable d'environnement, jamais en dur).",
+      "OQ-DP10-2 volumes : le spike ne monte aucun volume bind (probe éphémère) ; les volumes nommés bind ${APP_DATA_PATH} (convention /data/dockers) sont émis par DP03/DP12.",
+      "OQ-DP10-3 traefik prod : le traefik jetable porte un constraint Label(dp10.spike.expose) et son propre réseau — le traefik de prod (traefik_default) n'est jamais touché ; DP12 cible le VRAI traefik_default (exigence utilisateur 1 : https://\u003cprojet\u003e-dev.sagedesk.fr).",
+      "OQ-DP10-4 le mur : le spike ne persiste RIEN ; l'écriture réelle du verdict en `ideas` passe par idea_capture (provenance human) — ce record MODÉLISE la capture, il ne l'exécute pas."
+    ]
+  }
+}

@@ -174,7 +174,8 @@
 		"accountRelease": "Release v0 (account)",
 		"aiLabNav": "AI Lab (cockpit)",
 		"environments": "Environments & bindings (DP06)",
-		"endpointsFitness": "Endpoints — arch-fitness sensor (DP08)"
+		"endpointsFitness": "Endpoints — arch-fitness sensor (DP08)",
+		"bootstrapSpike": "One-shot bootstrap spike (DP10)"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -7493,5 +7494,37 @@
 		"working": "Measuring…",
 		"injectedBadge": "fault-injection active: gen/app/leak.ts",
 		"wallNote": "The wall (§2): the sensor is deterministic and below-the-line — the screen measures, writes nothing. The declared rule lives above the line (arch-fitness.json): widening or softening it flows through idea → mirror → /goal, never a silent edit."
+	},
+	"bootstrapSpike": {
+		"eyebrow": "DP10 · one-shot bootstrap spike",
+		"title": "Deterministic bootstrap go/no-go spike",
+		"subtitle": "emitted bootstrap vs direct deploy.sh",
+		"intro": "Before writing DP11-DP13, the spike PROVES BY MEASUREMENT that a deterministic one-shot emitted bootstrap (network→port-resolution→ordered start traefik→datastore→server→healthchecks→print-URLs) beats calling /data/dockers/deploy.sh directly: 2 REAL reproducible docker runs (identical ordered events, identical resolved port), port resolution = a pure function of the observed state (ss + docker ps), never a prompt. Verdict = a boolean conjunction, never an LLM opinion.",
+		"tutorialHeading": "How to read this screen",
+		"tutorialBody": "The AUTHORITATIVE engine is the throwaway Go spike (spike/bootstrap, /spike zone, ratchet OFF, T0): it really started the traefik→postgres→caddy stack twice on the local daemon, healthchecks green, URL answering 200 through the throwaway traefik, then tore everything down. The screen re-derives the verdict with the pure TS twin, parity-pinned to the Go-measured verdict hash. The « re-measure » button re-decides purely — it writes NOTHING (the wall): the throwaway network is never traefik_default, prod is untouched.",
+		"activeProjectLabel": "Active project",
+		"noProject": "none",
+		"verdictHeading": "Measured verdict",
+		"go": "go",
+		"noGo": "no-go",
+		"winnerLabel": "winning candidate",
+		"verdictHashLabel": "verdict address (sha256)",
+		"logHeading": "Real startup log (run 1)",
+		"logNote": "The ordered events of the real docker run — run 2 is identical (measured reproducibility).",
+		"eventKind": "event",
+		"eventDetail": "detail",
+		"urlsLabel": "printed URLs",
+		"candidatesHeading": "≤ 3 candidates — scored on DECLARED criteria",
+		"scriptFacts": "Facts measured on deploy.sh's bytes: {prompts} interactive prompts (select + read -rp), {refs} hardcoded /data/dockers references, {lines} lines.",
+		"candidateLabel": "candidate",
+		"scoreLabel": "score",
+		"remeasureHeading": "Re-measure (pure, writes nothing)",
+		"remeasureNote": "Re-decides the verdict with the pure twin over the pinned measurement and compares sha256 addresses — same measurement → same address.",
+		"remeasure": "Re-measure the verdict",
+		"working": "measuring…",
+		"remeasureEqual": "same address — reproducible verdict",
+		"remeasureDiff": "different addresses — drift detected",
+		"harvestHeading": "Harvest (/harvest) — DRAFT proposal",
+		"recordHashLabel": "record address (sha256)"
 	}
 }
