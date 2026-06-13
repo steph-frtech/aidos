@@ -154,7 +154,7 @@ for (let round = 0; round < MAX_ROUNDS; round++) {
           `If much of this step already exists on disk from a prior interrupted attempt (files present, Linear issue already Done), do NOT redo it — verify it meets the done-criteria and report status:'done' quickly.`
 
         // Dispatch DIRECT à step-executor (pas d'agent dédié DP — décision utilisateur).
-        report = await agent(execPrompt, { label: `exec:${s.id}:${attempt}`, phase: 'Run', schema: EXEC_SCHEMA, agentType: 'step-executor' })
+        report = await agent(execPrompt, { label: `exec:${s.id}:${attempt}`, phase: 'Run', schema: EXEC_SCHEMA, agentType: 'step-executor', model: 'opus' })
 
         if (report.status === 'blocked') {
           return { verdict: 'BLOCKED', stoppedAt: s.id, reason: report.notes, ranBefore: done, rounds }
@@ -171,7 +171,7 @@ for (let round = 0; round < MAX_ROUNDS; round++) {
           `- les 2 exigences utilisateur (vraie app dev visible via Traefik <projet>-dev.sagedesk.fr ; porte de validation humaine — événement « validation_humaine » dans lib/v2/builder.ts + loi au miroir « staging refusé sans validation du dev courant ») ne sont PAS régressées si elles existent déjà.\n` +
           `SPIKE RULE : pour les SPIKE-gates (DP01, DP10, DP14, DP19), un verdict no-go MESURÉ + harvesté + ADR est un PASS (le spike a fait son travail) ; ne bloque jamais un spike pour absence de ratchet — le ratchet y est OFF par design.\n` +
           `BOOTSTRAP RULE (CLAUDE.md §6): a by-design forward-dependency — substrate owned by a LATER step — is an OpenQuestion, NOT a residual issue. PASS the step if its OWN done-criteria are met. residual_issues holds ONLY blocking gaps fixable now; never block a step for what it cannot fix by design.`,
-          { label: `verify:${s.id}:${attempt}`, phase: 'Run', agentType: 'step-verifier', schema: VERIFY_SCHEMA },
+          { label: `verify:${s.id}:${attempt}`, phase: 'Run', agentType: 'step-verifier', schema: VERIFY_SCHEMA, model: 'opus' },
         )
 
         if (verdict.verification_status === 'passed' && verdict.residual_issues.length === 0) break
