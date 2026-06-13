@@ -159,6 +159,7 @@ const GROUPS: { key: string; items: { href: string; k: string }[] }[] = [
 			{ href: "/stack-manifest", k: "stackManifest" },
 			{ href: "/stack-emit", k: "stackEmit" },
 			{ href: "/environments", k: "environments" },
+			{ href: "/endpoints-fitness", k: "endpointsFitness" },
 			{ href: "/provision", k: "provision" },
 			{ href: "/api-surface", k: "apiSurface" },
 			{ href: "/front-emitter", k: "frontEmitter" },

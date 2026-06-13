@@ -20,6 +20,24 @@
       "EMITTED_CALL_GRAPH_ACYCLIC"
     ]
   },
+  "emitted_no_hardcoded_endpoint": {
+    "$comment": "DP08 — the EMITTED_NO_HARDCODED_ENDPOINT arch-fitness invariant (ROADMAP-provisioning-deploy, SPEC-stack-2026: 'AUCUNE URL/secret en dur'). The DECLARED above-the-line rule the deterministic pass back/runtime/endpointfitness enforces over the EMITTED TS tree (Hono handlers, workers, boot config): no host/URL/IP/concrete host:port literal in emitted source — every endpoint flows through the DP07 projection (resolveConnection → process.env/requireEnv at boot). Detection is a literal parse (Go lexer twin) / the real TypeScript compiler API AST pass (front/web/lib/endpoint-fitness.ts, A7 ADR 0066) — NEVER an LLM judge. The verdict feeds the S84 archfit sensor (selfcert.SensorArchFit — the dependency-cruiser slot of ADR 0036 routing): a red verdict BLOCKS THE CUT, fail-closed. Kept in sync with endpointfitness.Reasons() (the parity fixture pins it). Widening the allowed forms or softening a reason is a truth change (idée → miroir → /goal), never a silent edit.",
+    "rule": "EMITTED_NO_HARDCODED_ENDPOINT",
+    "sensor": "archfit",
+    "scope": "emitted TS tree (gen/ — Hono handlers, workers, boot config)",
+    "reasons": [
+      "localhost_literal",
+      "ip_literal",
+      "url_concrete_host",
+      "host_port_literal"
+    ],
+    "allowed_forms": [
+      "process.env.* / requireEnv(...) at boot (fail-closed MISSING_ENV_AT_BOOT)",
+      "${VAR} textual placeholder (compose/env-file convention)",
+      "template ${expr} span (env-derived fragment poisons host adjacency)",
+      "resolveConnection / connection() accessor (DP07 projection)"
+    ]
+  },
   "emitted_target": {
     "$comment": "EL00 — the DECLARED target of the EMITTED app (ADR 0040). The constructrice≠construite frontier: AIDOS la constructrice stays governable Go (never rewritten in TS, never emits Go for the user app); la construite (the gen/ tree) is Hono front+back, pure-functional TypeScript, with its own MCP+Skills, datastore = Postgres dialect (ADR 0006 unchanged) via a TS client, Operation-DSL via a Go interpreter-service callback (Décision 7). The FN02 invariants are LANGUAGE-NEUTRAL — the exact EmittedInvariantCodes() list, no fork on the Go→TS pivot. EL00 is ADR-only, above-the-wall: writes_truth=false. Kept in sync with agentloop.EmittedTargetEL00() (the parity test pins it). Widening/softening the frontier is a truth change (idée → miroir → /goal), never a silent edit.",
     "adr": "0040",

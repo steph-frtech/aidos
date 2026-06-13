@@ -173,7 +173,8 @@
 		"strangler": "Legacy absorption (strangler-fig)",
 		"accountRelease": "Release v0 (account)",
 		"aiLabNav": "AI Lab (cockpit)",
-		"environments": "Environments & bindings (DP06)"
+		"environments": "Environments & bindings (DP06)",
+		"endpointsFitness": "Endpoints — arch-fitness sensor (DP08)"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -7447,5 +7448,34 @@
 		"matrixMeasure": "Measure the matrix",
 		"matrixHashLabel": "Matrix address",
 		"matrixWallNote": "The wall (§2): this matrix is a below-the-line projection — the screen measures, writes nothing. Managed URLs come from the secret store (S91) at boot, never from the emitted source; declaring a binding-truth will flow through propose → ChangeSet → approval (DP09)."
+	},
+	"endpointsFitness": {
+		"eyebrow": "DP08 · Endpoint arch-fitness",
+		"title": "EMITTED_NO_HARDCODED_ENDPOINT — the sensor",
+		"subtitle": "engraved arch-fitness invariant · deterministic TS AST pass",
+		"intro": "No host, URL, IP or host:port hardcoded in the emitted source (Hono handlers, workers, config) — every endpoint flows through the DP07 projection (resolveConnection → process.env/requireEnv at boot). Detection is a deterministic TypeScript AST pass (never an LLM judge); a red verdict reddens the S84 auto-certification archfit sensor and BLOCKS THE CUT, fail-closed.",
+		"tutorialHeading": "How to read this panel",
+		"tutorialBody": "The table shows the endpoints resolved by resolveConnection (DP07) — ${VAR} references only, never localhost, never an IP. The sensor card scans the canonical emitted tree: “inject a hardcoded endpoint” adds gen/app/leak.ts (https://1.2.3.4:5432) → the sensor goes red and names the file; “remove the literal” → green; “measure the verdict” replays the scan — same tree → same verdict → same address (pinned to the authoritative Go).",
+		"endpointsHeading": "Resolved endpoints (DP07, prod environment)",
+		"serviceCol": "Service",
+		"modeCol": "Mode",
+		"endpointCol": "Endpoint pattern ($'{VAR}' references)",
+		"envVarsCol": "Env vars",
+		"sensorHeading": "EMITTED_NO_HARDCODED_ENDPOINT sensor",
+		"stateGreen": "green — no hardcoded endpoint",
+		"stateRed": "red — the cut is blocked",
+		"addressLabel": "Verdict address",
+		"treeLabel": "Scanned emitted tree",
+		"findingsHeading": "Findings (file:line — literal — reason)",
+		"noFindings": "No finding — the emitted tree carries environment references only.",
+		"blockHeading": "BlockReason — the cut is blocked",
+		"blockBody": "The emitted source carries a hardcoded endpoint. Replace the literal with the DP07 projection (resolveConnection → requireEnv/process.env at boot), re-emit the connections module, then replay the sensor.",
+		"inject": "Inject a hardcoded endpoint",
+		"remove": "Remove the literal",
+		"measure": "Measure the verdict",
+		"measuresLabel": "Measures",
+		"working": "Measuring…",
+		"injectedBadge": "fault-injection active: gen/app/leak.ts",
+		"wallNote": "The wall (§2): the sensor is deterministic and below-the-line — the screen measures, writes nothing. The declared rule lives above the line (arch-fitness.json): widening or softening it flows through idea → mirror → /goal, never a silent edit."
 	}
 }

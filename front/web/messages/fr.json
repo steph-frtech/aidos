@@ -173,7 +173,8 @@
 		"strangler": "Absorption de legacy (strangler-fig)",
 		"accountRelease": "Release v0 (compte)",
 		"aiLabNav": "AI Lab (cockpit)",
-		"environments": "Environnements & bindings (DP06)"
+		"environments": "Environnements & bindings (DP06)",
+		"endpointsFitness": "Endpoints — senseur arch-fitness (DP08)"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -7447,5 +7448,34 @@
 		"matrixMeasure": "Mesurer la matrice",
 		"matrixHashLabel": "Adresse de la matrice",
 		"matrixWallNote": "Le mur (§2) : cette matrice est une projection below-the-line — l'écran mesure, n'écrit rien. Les URLs managées proviennent du secret store (S91) au boot, jamais du source émis ; déclarer un binding-vérité passera par propose → ChangeSet → approbation (DP09)."
+	},
+	"endpointsFitness": {
+		"eyebrow": "DP08 · Arch-fitness des endpoints",
+		"title": "EMITTED_NO_HARDCODED_ENDPOINT — le senseur",
+		"subtitle": "invariant arch-fitness gravé · passe AST TS déterministe",
+		"intro": "Aucun host, URL, IP ou host:port en dur dans le source émis (handlers Hono, workers, config) — tout endpoint passe par la projection DP07 (resolveConnection → process.env/requireEnv au boot). La détection est une passe AST TypeScript déterministe (jamais un LLM-juge) ; un verdict rouge rougit le senseur archfit de l'auto-certification S84 et BLOQUE LA COUPE, fail-closed.",
+		"tutorialHeading": "Comment lire ce panneau",
+		"tutorialBody": "La table montre les endpoints résolus par resolveConnection (DP07) — des références ${VAR} uniquement, jamais localhost, jamais une IP. La carte senseur scanne l'arbre émis canonique : « injecter un endpoint en dur » ajoute gen/app/leak.ts (https://1.2.3.4:5432) → le senseur rougit et nomme le fichier ; « retirer le littéral » → vert ; « mesurer le verdict » rejoue le scan — même arbre → même verdict → même adresse (épinglée au Go autoritatif).",
+		"endpointsHeading": "Endpoints résolus (DP07, environnement prod)",
+		"serviceCol": "Service",
+		"modeCol": "Mode",
+		"endpointCol": "Motif d'endpoint (références $'{VAR}')",
+		"envVarsCol": "Variables d'env",
+		"sensorHeading": "Senseur EMITTED_NO_HARDCODED_ENDPOINT",
+		"stateGreen": "vert — aucun endpoint en dur",
+		"stateRed": "rouge — la coupe est bloquée",
+		"addressLabel": "Adresse du verdict",
+		"treeLabel": "Arbre émis scanné",
+		"findingsHeading": "Constats (fichier:ligne — littéral — raison)",
+		"noFindings": "Aucun constat — l'arbre émis ne porte que des références d'environnement.",
+		"blockHeading": "BlockReason — la coupe est bloquée",
+		"blockBody": "Le source émis porte un endpoint en dur. Remplacez le littéral par la projection DP07 (resolveConnection → requireEnv/process.env au boot), ré-émettez le module de connexions, puis rejouez le senseur.",
+		"inject": "Injecter un endpoint en dur",
+		"remove": "Retirer le littéral",
+		"measure": "Mesurer le verdict",
+		"measuresLabel": "Mesures",
+		"working": "Mesure…",
+		"injectedBadge": "fault-injection active : gen/app/leak.ts",
+		"wallNote": "Le mur (§2) : le senseur est déterministe et below-the-line — l'écran mesure, n'écrit rien. La règle déclarée vit above-the-line (arch-fitness.json) : l'élargir ou l'adoucir passe par idée → miroir → /goal, jamais une édition silencieuse."
 	}
 }
