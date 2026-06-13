@@ -522,6 +522,20 @@ const (
 	// verdict is a PURE set-membership (classification==ai ∧ IsDatastoreHost(host)), never
 	// an LLM judgment (§6/§8). ADDED at DP21 — additive enum extension (change_type: refine).
 	CodeAIDirectDBAccessForbidden Code = "AI_DIRECT_DB_ACCESS_FORBIDDEN"
+	// CodeToolNotRegistered — the EMITTED app's MCP-Gateway (DP23,
+	// back/runtime/connectorinfra, EPIC E) refused to route an MCP tool whose name is NOT a
+	// member of the EMITTED app's Tool-Registry. Every op of the emitted app is ONE MCP tool
+	// reached through the MCP-Gateway (ADR 0009), and a tool is exposed ONLY once it is
+	// declared in the Tool-Registry: an UNREGISTERED tool is refused FAIL-CLOSED — nothing is
+	// exposed by default. The verdict is a PURE set-membership over the registry's declared
+	// names (∃ t: t == toolName), never an LLM judgment and never an opaque runtime decision
+	// (§6/§8 — the MCP-Gateway routing is deterministic, zero LLM). The Tool-Registry of the
+	// EMITTED app is DISTINCT from AIDOS's own MCP servers (ADR 0040: l'app émise reçoit SES
+	// PROPRES MCP+Skills) — this refusal never touches the AIDOS kernel/mirrors/fitness (no
+	// GRANT de vérité, the wall §2). The only door to expose a tool is to register it at the
+	// Tool-Registry above the line (idée → miroir → /goal → approbation). ADDED at DP23 —
+	// additive enum extension (change_type: refine, never a removal).
+	CodeToolNotRegistered Code = "TOOL_NOT_REGISTERED"
 )
 
 // Severity is the gravity marker of a refusal. The KRD §44.5 example uses
@@ -1294,6 +1308,22 @@ var reasons = map[Code]BlockReason{
 			"rerun : rejouez EnforceConnectorAction une fois l'accès routé par un connecteur contrôlé.",
 		},
 	},
+	CodeToolNotRegistered: {
+		Code:     CodeToolNotRegistered,
+		Severity: SeverityBlocking,
+		Explanation: "Outil MCP REFUSÉ (DP23, back/runtime/connectorinfra) : la MCP-Gateway de l'app ÉMISE refuse de " +
+			"router un outil dont le nom n'est PAS membre du Tool-Registry de l'app émise. Chaque op de l'app émise est UN " +
+			"outil MCP atteint via la MCP-Gateway (ADR 0009), et un outil n'est exposé QU'UNE FOIS déclaré au Tool-Registry : " +
+			"un outil NON ENREGISTRÉ est refusé FAIL-CLOSED — rien n'est exposé par défaut. Le verdict est une appartenance " +
+			"ensembliste PURE (∃ t: t == toolName), jamais un jugement LLM ni une décision runtime opaque (§6/§8 — le routage " +
+			"MCP-Gateway est déterministe, zéro LLM). Le Tool-Registry de l'app émise est DISTINCT des serveurs MCP d'AIDOS " +
+			"(ADR 0040 : l'app émise reçoit SES PROPRES MCP+Skills) ; ce refus ne touche jamais le kernel/mirrors/fitness d'AIDOS.",
+		HowToFix: []string{
+			"register_tool : déclarez l'outil au Tool-Registry de l'app émise AU-DESSUS de la ligne (idée → miroir → /goal → approbation) — un outil ne s'expose jamais en dessous de la ligne.",
+			"check_tool_name : vérifiez que le nom de l'outil correspond exactement à un nom enregistré (l'appartenance est fail-closed, jamais devinée).",
+			"rerun : rejouez RouteTool une fois l'outil enregistré au Tool-Registry.",
+		},
+	},
 }
 
 // codeOrder is the canonical enumeration order of the Code enum. Declared, never
@@ -1345,6 +1375,7 @@ var codeOrder = []Code{
 	CodeConnectorRWNeedsApproval,
 	CodeEgressNotAllowed,
 	CodeAIDirectDBAccessForbidden,
+	CodeToolNotRegistered,
 }
 
 // Codes returns every Code in the closed enum, in canonical order.

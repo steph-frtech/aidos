@@ -387,3 +387,142 @@ test.describe("DP22 — the /connectors audit timeline (tamper-evident Merkle le
 		await expect(verify).toHaveAttribute("data-ok", "true");
 	});
 });
+
+/**
+ * DP23 Playwright e2e — the « Infra des connecteurs (app émise) » surface on /connectors: the FOUR
+ * services-substrat (MCP-Gateway / Connector-Registry / Tool-Registry / Webhook-Gateway, profile
+ * connectors), the Tool-Registry routing (set-membership, TOOL_NOT_REGISTERED) and the
+ * Webhook-Gateway inbound demo (⇒ async op, S73/DP16).
+ * mirror record: reflects=DP23-connector-infra, test_kind=e2e, cert_language=gherkin,
+ *               liveness=alive, authority=below (infra ÉMISE below the line, never a truth-write)
+ *
+ * Scenario: the emitted app's connector-infra is rendered, the Tool-Registry routes/refuses, a webhook fires an async op
+ *   Given the Workbench is running and I am on /connectors
+ *   When I look at the « Infra des connecteurs (app émise) » section
+ *   Then I see the FOUR profile-connectors services (MCP-Gateway/Connector-Registry/Tool-Registry/Webhook-Gateway)
+ *   And the Connector-Registry lists the declared connectors (DP20)
+ *   When I look at the Tool-Registry routing demo
+ *   Then a registered tool ROUTES and the unregistered tool is REFUSED with TOOL_NOT_REGISTERED
+ *   When I register the unregistered tool
+ *   Then it then ROUTES (set-membership)
+ *   When I receive the inbound webhook
+ *   Then the webhook is PROCESSED (the async op fired, its effect dispatched)
+ *
+ * THE WALL (§2): the infra is EMITTED below the line; the emitted app's MCP servers are DISTINCT
+ * from AIDOS's (ADR 0040); the screen writes no truth. Every verdict is COMPUTED by the pure twins
+ * (lib/connector-infra routeTool / realizeInboundWebhook), verdict-for-verdict with the Go.
+ */
+test.describe("DP23 — the /connectors connector-infra (emitted app substrate)", () => {
+	test.beforeEach(async ({ page }) => {
+		await page.goto("/connectors");
+		await expect(page.getByTestId("connector-infra")).toBeVisible({
+			timeout: 10000,
+		});
+	});
+
+	test("the four profile-connectors services are rendered", async ({
+		page,
+	}) => {
+		const services = page.getByTestId("infra-service");
+		await expect(services).toHaveCount(4);
+		// each is profile connectors and carries its key.
+		for (const key of [
+			"mcp-gateway",
+			"connector-registry",
+			"tool-registry",
+			"webhook-gateway",
+		]) {
+			const svc = page.locator(
+				`[data-testid="infra-service"][data-key="${key}"]`,
+			);
+			await expect(svc).toHaveCount(1);
+			await expect(svc).toHaveAttribute("data-profile", "connectors");
+		}
+	});
+
+	test("the Connector-Registry lists the declared connectors (DP20)", async ({
+		page,
+	}) => {
+		const registry = page.getByTestId("connector-registry");
+		await expect(registry).toBeVisible();
+		// the seeded connectors appear in the registry.
+		await expect(
+			registry.locator('[data-testid="registry-connector"]'),
+		).not.toHaveCount(0);
+		await expect(
+			registry.locator(
+				'[data-testid="registry-connector"][data-connector="slack-notify"]',
+			),
+		).toHaveCount(1);
+	});
+
+	test("a registered tool routes; the unregistered tool is refused TOOL_NOT_REGISTERED", async ({
+		page,
+	}) => {
+		const toolRegistry = page.getByTestId("tool-registry");
+		await expect(toolRegistry).toBeVisible();
+		// a registered tool routes (data-registered="true").
+		const routed = toolRegistry.locator(
+			'[data-testid="tool-row"][data-tool="create_invoice"]',
+		);
+		await expect(routed).toHaveAttribute("data-registered", "true");
+		await expect(routed.getByTestId("tool-routed")).toBeVisible();
+		// the unregistered tool is refused with the TOOL_NOT_REGISTERED block reason.
+		const refused = toolRegistry.locator(
+			'[data-testid="tool-row"][data-tool="drop_database"]',
+		);
+		await expect(refused).toHaveAttribute("data-registered", "false");
+		await expect(refused.getByTestId("tool-blockreason")).toHaveAttribute(
+			"data-code",
+			"TOOL_NOT_REGISTERED",
+		);
+	});
+
+	test("registering the unregistered tool makes it route", async ({ page }) => {
+		const refused = page.locator(
+			'[data-testid="tool-row"][data-tool="drop_database"]',
+		);
+		await expect(refused).toHaveAttribute("data-registered", "false");
+		// register it…
+		await page
+			.locator('[data-testid="register-tool"][data-tool="drop_database"]')
+			.click();
+		// …and it now routes (set-membership: a registered tool is admitted).
+		await expect(refused).toHaveAttribute("data-registered", "true");
+		await expect(refused.getByTestId("tool-routed")).toBeVisible();
+		await expect(refused.getByTestId("tool-blockreason")).toHaveCount(0);
+	});
+
+	test("an inbound webhook triggers a processed async operation", async ({
+		page,
+	}) => {
+		const demo = page.getByTestId("webhook-gateway-demo");
+		await expect(demo).toBeVisible();
+		// no processed readout until the webhook is received.
+		await expect(page.getByTestId("webhook-processed")).toHaveCount(0);
+		// receive the inbound webhook (the Webhook-Gateway entry).
+		await page.getByTestId("receive-webhook").click();
+		const processed = page.getByTestId("webhook-processed");
+		await expect(processed).toBeVisible();
+		// the target async op fired and its effect was dispatched.
+		await expect(processed).toHaveAttribute(
+			"data-operation",
+			"onPaymentReceived",
+		);
+		await expect(processed).toHaveAttribute("data-events", "1");
+		await expect(processed.getByTestId("webhook-effect")).toHaveAttribute(
+			"data-kind",
+			"notification",
+		);
+	});
+
+	test("replaying the webhook delivers the effect once (exactly-once relative)", async ({
+		page,
+	}) => {
+		await page.getByTestId("receive-webhook").click();
+		await expect(page.getByTestId("webhook-processed")).toBeVisible();
+		// replay — the redelivery is suppressed (no new effect).
+		await page.getByTestId("replay-webhook").click();
+		await expect(page.getByTestId("webhook-replay-once")).toBeVisible();
+	});
+});

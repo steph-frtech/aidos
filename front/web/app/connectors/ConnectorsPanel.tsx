@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
+import type { OutboxEntry } from "@/lib/async-operation";
 import {
 	type AuditedAction,
 	buildLedger,
@@ -15,6 +16,20 @@ import {
 	type ConnectorAction,
 	enforceConnectorAction,
 } from "@/lib/connector-enforce";
+import {
+	DEMO_INBOUND_WEBHOOK,
+	DEMO_REGISTERED_TOOLS,
+	DEMO_UNREGISTERED_TOOL,
+	DEMO_WEBHOOK_ASYNC,
+	DEMO_WEBHOOK_OP,
+	hashFragment,
+	INFRA_ROLE_NOTE,
+	newToolRegistry,
+	realizeInboundWebhook,
+	routeTool,
+	type ServiceFragment,
+	substrateConnectorInfraFragments,
+} from "@/lib/connector-infra";
 import {
 	type Classification,
 	type ConnectorSource,
@@ -519,6 +534,427 @@ function RWEnforcementInbox({
 }
 
 /**
+ * ToolRegistryDemo is the DP23 Tool-Registry routing surface (below the line): the registry of
+ * the EMITTED app's EXPOSED MCP tools (a closed set) and a live MCP-Gateway routing readout. A
+ * registered tool ROUTES ; an unregistered tool is REFUSED with TOOL_NOT_REGISTERED (set-membership
+ * fail-closed, the routing is DETERMINISTIC — zero LLM). A « enregistrer un outil » button adds the
+ * unregistered tool to the registry (a below-the-line runtime state copy) so it then routes.
+ *
+ * DETERMINISM-FIRST (§6/§8): every routing verdict is COMPUTED by the pure twin (lib/connector-infra
+ * routeTool), verdict-for-verdict with the Go connectorinfra.RouteTool — never a UI opinion. THE
+ * WALL (§2): the registry is the EMITTED app's substrate (its OWN MCP tools, DISTINCT from AIDOS's,
+ * ADR 0040) — it writes NO AIDOS truth; the « enregistrer » demo mutates a local React-state copy.
+ */
+function ToolRegistryDemo({ projectId }: { projectId: string }) {
+	const t = useTranslations("connectors");
+	// the below-the-line runtime set of registered tool names (the EMITTED app's exposure).
+	const [extraTools, setExtraTools] = useState<string[]>([]);
+	const registeredNames = useMemo(
+		() => [...DEMO_REGISTERED_TOOLS, ...extraTools],
+		[extraTools],
+	);
+	const registry = useMemo(
+		() => newToolRegistry(projectId, registeredNames),
+		[projectId, registeredNames],
+	);
+
+	// the demonstration rows: the seeded registered tools + the unregistered probe tool.
+	const rows = useMemo(() => {
+		const names = [...DEMO_REGISTERED_TOOLS, DEMO_UNREGISTERED_TOOL];
+		return names.map((name) => ({ name, ...routeTool(registry, name) }));
+	}, [registry]);
+
+	const unregisteredRouted = registry.tools.has(DEMO_UNREGISTERED_TOOL);
+
+	return (
+		<section
+			data-testid="tool-registry"
+			className="space-y-4 rounded-xl border border-border bg-card p-5"
+		>
+			<div>
+				<h3 className="text-sm font-semibold tracking-tight text-foreground">
+					{t("toolRegistryHeading")}
+				</h3>
+				<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+					{t("toolRegistryBody")}
+				</p>
+			</div>
+
+			<ul className="space-y-2">
+				{rows.map((row) => (
+					<li
+						key={row.name}
+						data-testid="tool-row"
+						data-tool={row.name}
+						data-registered={row.decision.admitted ? "true" : "false"}
+						className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-background p-3 text-xs"
+					>
+						<code className="font-mono font-medium text-foreground">
+							{row.name}
+						</code>
+						{row.decision.admitted ? (
+							<span
+								data-testid="tool-routed"
+								className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-primary-foreground"
+							>
+								<span aria-hidden>→</span>
+								{t("toolRouted")}
+							</span>
+						) : (
+							<span
+								data-testid="tool-blockreason"
+								data-code={row.decision.code}
+								className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-destructive px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-destructive-foreground"
+							>
+								{t("toolRefused")}
+								<code className="font-mono normal-case">
+									{row.decision.code}
+								</code>
+							</span>
+						)}
+					</li>
+				))}
+			</ul>
+
+			{/* the actionable demo: register the unregistered tool ⇒ it then routes */}
+			<div className="flex flex-wrap items-center gap-3">
+				<button
+					type="button"
+					data-testid="register-tool"
+					data-tool={DEMO_UNREGISTERED_TOOL}
+					disabled={unregisteredRouted}
+					onClick={() => setExtraTools((s) => [...s, DEMO_UNREGISTERED_TOOL])}
+					className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+				>
+					{t("registerToolButton", { tool: DEMO_UNREGISTERED_TOOL })}
+				</button>
+				{unregisteredRouted && (
+					<span className="text-xs text-primary">
+						{t("registerToolDone", { tool: DEMO_UNREGISTERED_TOOL })}
+					</span>
+				)}
+				{unregisteredRouted && (
+					<button
+						type="button"
+						data-testid="reset-tool-registry"
+						onClick={() => setExtraTools([])}
+						className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+					>
+						{t("resetToolRegistry")}
+					</button>
+				)}
+			</div>
+		</section>
+	);
+}
+
+/**
+ * WebhookGatewayDemo is the DP23 Webhook-Gateway surface (below the line): an INBOUND webhook
+ * (received at the Webhook-Gateway) is realised into an ASYNC operation (S73/DP16, reused verbatim
+ * — the worker EMITTED for the app is a TS worker, ADR 0040/S74). A « recevoir le webhook » button
+ * realises the inbound webhook ⇒ the target async op's effect is DISPATCHED through the S73 outbox;
+ * the processed readout shows the delivered effect. A replay delivers the effect ONCE (exactly-once
+ * relative).
+ *
+ * DETERMINISM-FIRST (§6/§8): the realisation REUSES the pure S73 twin (lib/async-operation dispatch
+ * + effectId), verdict-for-verdict with connectorinfra.RealizeInboundWebhook. THE WALL (§2): the
+ * webhook is a runtime command on the EMITTED app's substrate — it writes NO AIDOS truth; the outbox
+ * is a local React-state seam.
+ */
+function WebhookGatewayDemo() {
+	const t = useTranslations("connectors");
+	// the below-the-line outbox seam + the already-dispatched id set (a runtime state copy).
+	const [received, setReceived] = useState(false);
+	// the dispatch events of the LAST realisation — COMPUTED by the pure twin.
+	const [events, setEvents] = useState<
+		{ operation: string; kind: string; target: string }[]
+	>([]);
+	const [replayed, setReplayed] = useState(false);
+	// the persistent outbox + dispatched set (kept across the two realisations of the demo).
+	const outboxRef = useMemo(
+		() => ({ entries: [] as OutboxEntry[], dispatched: new Set<string>() }),
+		[],
+	);
+
+	function receive() {
+		const { events: ev } = realizeInboundWebhook(
+			DEMO_INBOUND_WEBHOOK,
+			DEMO_WEBHOOK_OP,
+			DEMO_WEBHOOK_ASYNC,
+			outboxRef.entries,
+			outboxRef.dispatched,
+		);
+		setEvents(
+			ev.map((e) => ({
+				operation: e.operation,
+				kind: e.kind,
+				target: e.target,
+			})),
+		);
+		setReceived(true);
+	}
+
+	function replay() {
+		const { events: ev } = realizeInboundWebhook(
+			DEMO_INBOUND_WEBHOOK,
+			DEMO_WEBHOOK_OP,
+			DEMO_WEBHOOK_ASYNC,
+			outboxRef.entries,
+			outboxRef.dispatched,
+		);
+		// the redelivery is suppressed ⇒ no new event (exactly-once relative).
+		setReplayed(ev.length === 0);
+	}
+
+	function reset() {
+		outboxRef.entries.length = 0;
+		outboxRef.dispatched.clear();
+		setReceived(false);
+		setEvents([]);
+		setReplayed(false);
+	}
+
+	return (
+		<section
+			data-testid="webhook-gateway-demo"
+			className="space-y-4 rounded-xl border border-border bg-card p-5"
+		>
+			<div>
+				<h3 className="text-sm font-semibold tracking-tight text-foreground">
+					{t("webhookHeading")}
+				</h3>
+				<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+					{t("webhookBody")}
+				</p>
+			</div>
+
+			<div className="flex flex-wrap items-center gap-3">
+				<button
+					type="button"
+					data-testid="receive-webhook"
+					data-source={DEMO_INBOUND_WEBHOOK.source}
+					data-operation={DEMO_WEBHOOK_OP}
+					disabled={received}
+					onClick={receive}
+					className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+				>
+					{t("receiveWebhookButton", {
+						source: DEMO_INBOUND_WEBHOOK.source,
+					})}
+				</button>
+				{received && (
+					<>
+						<button
+							type="button"
+							data-testid="replay-webhook"
+							onClick={replay}
+							className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+						>
+							{t("replayWebhookButton")}
+						</button>
+						<button
+							type="button"
+							data-testid="reset-webhook"
+							onClick={reset}
+							className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+						>
+							{t("resetWebhook")}
+						</button>
+					</>
+				)}
+			</div>
+
+			{received && (
+				<div
+					data-testid="webhook-processed"
+					data-operation={DEMO_WEBHOOK_OP}
+					data-events={events.length}
+					className="rounded-lg border border-primary/40 bg-primary/10 p-4 text-xs"
+				>
+					<p className="font-medium text-primary">
+						<span aria-hidden>✓</span> {t("webhookProcessed")}
+					</p>
+					<dl className="mt-2 space-y-1 text-[0.7rem] text-muted-foreground">
+						{events.map((e) => (
+							<div
+								key={`${e.operation}-${e.target}`}
+								data-testid="webhook-effect"
+								data-kind={e.kind}
+								className="flex flex-wrap gap-2"
+							>
+								<dt className="text-muted-foreground">
+									{t("webhookEffectOp")}:
+								</dt>
+								<dd className="font-mono text-foreground">{e.operation}</dd>
+								<dt className="ml-2 text-muted-foreground">
+									{t("webhookEffectKind")}:
+								</dt>
+								<dd className="font-mono text-foreground">{e.kind}</dd>
+								<dt className="ml-2 text-muted-foreground">→</dt>
+								<dd className="font-mono text-foreground">{e.target}</dd>
+							</div>
+						))}
+					</dl>
+				</div>
+			)}
+
+			{replayed && (
+				<p
+					data-testid="webhook-replay-once"
+					className="text-xs text-muted-foreground"
+				>
+					{t("webhookReplayOnce")}
+				</p>
+			)}
+		</section>
+	);
+}
+
+/**
+ * ConnectorInfraSection is the DP23 « Infra des connecteurs (app émise) » surface (below the
+ * line): the FOUR services-substrat profile connectors EMITTED for the app — MCP-Gateway,
+ * Connector-Registry, Tool-Registry, Webhook-Gateway — each with its image/port/volume; the
+ * Connector-Registry lists the DECLARED connectors (DP20); the Tool-Registry routing demo; and
+ * the Webhook-Gateway inbound demo.
+ *
+ * DETERMINISM-FIRST (§6/§8): the four fragments are RENDERED by the pure twin
+ * (substrateConnectorInfraFragments), byte-identical re-emission, verdict-for-verdict with the Go
+ * connectorinfra. THE WALL (§2): infra ÉMISE below the line ; the MCP of the emitted app are
+ * DISTINCT from AIDOS's (ADR 0040) ; no GRANT de vérité — writesTruth is false on every fragment.
+ * Themed on ADR 0010 tokens; strings via next-intl (ADR 0011, FR first).
+ */
+function ConnectorInfraSection({
+	projectId,
+	connectors,
+}: {
+	projectId: string;
+	connectors: ConnectorSource[];
+}) {
+	const t = useTranslations("connectors");
+	// the four connector-infra fragments — RENDERED by the pure twin (byte-stable, project-isolated).
+	const fragments: ServiceFragment[] = useMemo(
+		() => substrateConnectorInfraFragments(projectId),
+		[projectId],
+	);
+
+	return (
+		<section
+			data-testid="connector-infra"
+			className="space-y-6 rounded-xl border border-border bg-card p-5"
+		>
+			<div>
+				<h2 className="text-sm font-semibold tracking-tight text-foreground">
+					{t("infraHeading")}
+				</h2>
+				<p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+					{t("infraBody")}
+				</p>
+			</div>
+
+			{/* the four services-substrat profile connectors (MCP-Gateway / Connector-Registry / … ) */}
+			<ul data-testid="infra-services" className="grid gap-3 sm:grid-cols-2">
+				{fragments.map((f) => (
+					<li
+						key={f.key}
+						data-testid="infra-service"
+						data-key={f.key}
+						data-profile={f.service.profile}
+						data-port={f.service.internalPort}
+						className="rounded-lg border border-border bg-background p-4 text-xs"
+					>
+						<div className="flex flex-wrap items-center gap-2">
+							<span className="font-mono text-sm font-medium text-foreground">
+								{f.key}
+							</span>
+							<span className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[0.65rem] font-medium uppercase text-primary">
+								{f.service.profile}
+							</span>
+							<span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 font-mono text-[0.65rem] text-muted-foreground">
+								:{f.service.internalPort}
+							</span>
+						</div>
+						<p className="mt-1.5 leading-relaxed text-muted-foreground">
+							{INFRA_ROLE_NOTE[f.key]}
+						</p>
+						<dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-[0.7rem]">
+							<div className="flex gap-2">
+								<dt className="text-muted-foreground">{t("infraColImage")}:</dt>
+								<dd className="font-mono text-foreground">
+									{f.service.image === "" ? t("infraEmitted") : f.service.image}
+								</dd>
+							</div>
+							<div className="flex gap-2">
+								<dt className="text-muted-foreground">
+									{t("infraColVolume")}:
+								</dt>
+								<dd
+									data-testid="infra-volume"
+									className="break-all font-mono text-foreground"
+								>
+									{f.volumes[0]?.name ?? "—"}
+								</dd>
+							</div>
+							{f.service.dependsOn.length > 0 && (
+								<div className="flex gap-2">
+									<dt className="text-muted-foreground">
+										{t("infraColDependsOn")}:
+									</dt>
+									<dd className="font-mono text-foreground">
+										{f.service.dependsOn.join(", ")}
+									</dd>
+								</div>
+							)}
+							<div className="flex gap-2 sm:col-span-1">
+								<dt className="text-muted-foreground">
+									{t("infraColContentId")}:
+								</dt>
+								<dd className="break-all font-mono text-[0.65rem] text-muted-foreground">
+									{hashFragment(f)}
+								</dd>
+							</div>
+						</dl>
+					</li>
+				))}
+			</ul>
+
+			{/* the Connector-Registry — the list of DECLARED connectors (DP20) */}
+			<div
+				data-testid="connector-registry"
+				className="rounded-lg border border-border bg-background p-4"
+			>
+				<h3 className="text-sm font-semibold tracking-tight text-foreground">
+					{t("connectorRegistryHeading")}
+				</h3>
+				<p className="mt-1 text-xs text-muted-foreground">
+					{t("connectorRegistryBody")}
+				</p>
+				<ul className="mt-3 flex flex-wrap gap-2">
+					{connectors.map((c) => (
+						<li
+							key={c.name}
+							data-testid="registry-connector"
+							data-connector={c.name}
+							className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-[0.7rem]"
+						>
+							<code className="font-mono text-foreground">{c.name}</code>
+							<span className="text-muted-foreground">
+								{t(`class.${c.classification}`)}
+							</span>
+						</li>
+					))}
+				</ul>
+			</div>
+
+			{/* the Tool-Registry routing demo (MCP-Gateway set-membership) */}
+			<ToolRegistryDemo projectId={projectId} />
+
+			{/* the Webhook-Gateway inbound demo (⇒ async op, S73/DP16) */}
+			<WebhookGatewayDemo />
+		</section>
+	);
+}
+
+/**
  * ConnectorsPanel renders the DP20 list of DECLARED connector SOURCES (read-only with
  * respect to truth): the active project, a closed-set legend, the per-connector list (each
  * row carrying its kind, classification badge, scope RO/RW, egress allow-list, bind target,
@@ -716,6 +1152,13 @@ export function ConnectorsPanel({
 
 			{/* the DP21 RUNTIME enforcement — RW approval inbox (A2) + RO write refusal */}
 			<RWEnforcementInbox rwConnectors={rwConnectors} />
+
+			{/* the DP23 « Infra des connecteurs (app émise) » — the four services-substrat
+			    profile connectors + the Tool-Registry routing + the Webhook-Gateway inbound demo */}
+			<ConnectorInfraSection
+				projectId={activeProjectId ?? "demo-project"}
+				connectors={connectors}
+			/>
 
 			{/* the DP22 audit explainer — what the per-connector tamper-evident ledger proves */}
 			<section
