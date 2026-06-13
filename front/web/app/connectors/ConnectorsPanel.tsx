@@ -1,7 +1,16 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import {
+	type AuditedAction,
+	buildLedger,
+	type Identity,
+	type LedgerEntry,
+	root as ledgerRoot,
+	tamperEntryHash,
+	verify as verifyLedger,
+} from "@/lib/connector-audit";
 import {
 	type ConnectorAction,
 	enforceConnectorAction,
@@ -13,6 +22,308 @@ import {
 	isDatastoreHost,
 	validate,
 } from "@/lib/connector-source";
+
+/**
+ * AUDIT_IDENTITY — the actor every demonstration action is attributed to in the audit trail
+ * (WHO reached the connector). A below-the-line fixture; the BOM records it verbatim, never an
+ * inference.
+ */
+const AUDIT_IDENTITY: Identity = { subject: "agent-builder" };
+
+/**
+ * auditActionsFor builds the demonstration set of ENFORCED connector actions for a given source —
+ * the audited inputs the per-connector timeline folds into a Merkle ledger. It covers the action
+ * shapes that APPLY to the source's scope/plane so the timeline shows a mix of admitted + refused
+ * effects (each a verifiable entry):
+ *
+ *  - a read on the source's first declared egress host (RO read / a legal read);
+ *  - for a read_write source: an approved write (admitted, A2) AND an un-approved write (refused
+ *    CONNECTOR_RW_NEEDS_APPROVAL) — the two A2 doors;
+ *  - for a read_only source: a write attempt (refused CONNECTOR_READ_ONLY — no write door);
+ *  - for an "ai" source: an attempt to reach a datastore host (refused AI_DIRECT_DB_ACCESS_FORBIDDEN).
+ *
+ * Each action carries the source's contentId as its @version so the BOM is load-bearing. PURE,
+ * TOTAL — the verdict is RE-COMPUTED inside auditConnectorAction by the DP21 enforcer (the audit
+ * never re-implements the wall). A below-the-line fixture; it writes NOTHING.
+ */
+function auditActionsFor(source: ConnectorSource): AuditedAction[] {
+	// pin the @version (DP20 content-id) onto the source the audit records.
+	const versioned: ConnectorSource = {
+		...source,
+		version: source.version ?? contentId(source),
+	};
+	const host = versioned.egressHosts[0] ?? "";
+	const actions: AuditedAction[] = [];
+
+	// 1) a read within the declared scope (RO read / legal read).
+	actions.push({
+		source: versioned,
+		identity: AUDIT_IDENTITY,
+		action: { op: "read", host },
+	});
+
+	if (versioned.scope === "read_write") {
+		// 2) an APPROVED write (A2 runtime authorisation) — admitted.
+		actions.push({
+			source: versioned,
+			identity: AUDIT_IDENTITY,
+			action: {
+				op: "write",
+				host,
+				approval: {
+					connector: versioned.name,
+					op: "write",
+					granted: true,
+					by: "humain",
+				},
+			},
+		});
+		// 3) an UN-approved write — refused CONNECTOR_RW_NEEDS_APPROVAL.
+		actions.push({
+			source: versioned,
+			identity: AUDIT_IDENTITY,
+			action: { op: "write", host },
+		});
+	} else {
+		// 2') a read_only source attempting a write — refused CONNECTOR_READ_ONLY.
+		actions.push({
+			source: versioned,
+			identity: AUDIT_IDENTITY,
+			action: { op: "write", host },
+		});
+	}
+
+	if (versioned.classification === "ai") {
+		// an ai plane attempting a DATASTORE host — refused AI_DIRECT_DB_ACCESS_FORBIDDEN.
+		actions.push({
+			source: versioned,
+			identity: AUDIT_IDENTITY,
+			action: { op: "read", host: "postgres://truth-store/direct" },
+		});
+	}
+
+	return actions;
+}
+
+/**
+ * ConnectorAuditTimeline is the DP22 per-connector AUDIT surface (below the line): it folds the
+ * connector's enforced actions into a tamper-evident GV03 Merkle ledger (the pure twin
+ * lib/connector-audit) and renders, per entry, WHO / WHAT / scope / target / egress / result,
+ * chained by HASH. A global integrity readout shows verify().ok ; a « vérifier l'intégrité »
+ * button re-runs verify ; a « démo : altérer une entrée passée » button alters a past entry IN A
+ * LOCAL COPY (never the source ledger) so verify goes red with its TamperKind ; a « réinitialiser »
+ * button restores the intact ledger.
+ *
+ * DETERMINISM-FIRST (§6/§8): the ledger, every entry hash, the tip root and the verify verdict are
+ * COMPUTED by the pure twin (verdict-for-verdict with the Go connectoraudit), never a UI opinion.
+ * THE WALL (§2): the ledger is below-the-line AUDIT telemetry — it writes NO truth; the tamper
+ * demonstration mutates a local React-state copy, never a truth-store. Themed on ADR 0010 tokens;
+ * strings via next-intl (ADR 0011, FR first).
+ */
+function ConnectorAuditTimeline({ source }: { source: ConnectorSource }) {
+	const t = useTranslations("connectors");
+
+	// the intact ledger of this connector's enforced actions — COMPUTED once from the fixtures.
+	const intactLedger = useMemo(
+		() => buildLedger(auditActionsFor(source)),
+		[source],
+	);
+
+	// the rendered ledger: the intact chain, or a locally-tampered COPY for the demonstration.
+	const [tampered, setTampered] = useState(false);
+	const ledger: LedgerEntry[] = tampered
+		? tamperEntryHash(intactLedger, intactLedger.length > 1 ? 1 : 0)
+		: intactLedger;
+
+	// the integrity verdict — COMPUTED by the pure twin (the chain decides, never an LLM).
+	const result = verifyLedger(ledger);
+	const tip = ledgerRoot(ledger);
+
+	if (intactLedger.length === 0) {
+		return (
+			<p data-testid="audit-empty" className="text-xs text-muted-foreground">
+				{t("auditEmpty")}
+			</p>
+		);
+	}
+
+	return (
+		<div className="mt-4 space-y-3">
+			{/* the global integrity readout + the controls */}
+			<div
+				data-testid="ledger-verify"
+				data-connector={source.name}
+				data-ok={result.ok ? "true" : "false"}
+				className={`flex flex-wrap items-center gap-3 rounded-lg border p-3 ${
+					result.ok
+						? "border-primary/40 bg-primary/10"
+						: "border-destructive/40 bg-destructive/10"
+				}`}
+			>
+				<span
+					className={`inline-flex items-center gap-2 text-xs font-medium ${
+						result.ok ? "text-primary" : "text-destructive"
+					}`}
+				>
+					<span aria-hidden>{result.ok ? "✓" : "✗"}</span>
+					{result.ok ? t("auditVerifyOk") : t("auditVerifyTampered")}
+				</span>
+
+				{!result.ok && (
+					<span className="inline-flex items-center gap-1.5 text-[0.7rem] text-destructive">
+						<span className="text-destructive/80">
+							{t("auditTamperKindLabel")}:
+						</span>
+						<code
+							data-testid="tamper-kind"
+							data-tamper={result.tamper}
+							className="rounded bg-destructive/15 px-1.5 py-0.5 font-mono font-bold text-destructive"
+						>
+							{result.tamper}
+						</code>
+						<span className="text-destructive/80">
+							{t("auditTamperAt")} {result.atIndex}
+						</span>
+					</span>
+				)}
+
+				<div className="ml-auto flex flex-wrap gap-2">
+					{/* « vérifier l'intégrité » — re-runs verify (idempotent; the readout already shows it) */}
+					<button
+						type="button"
+						data-testid="audit-verify-button"
+						data-connector={source.name}
+						onClick={() => setTampered(false)}
+						className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+					>
+						{t("auditVerifyButton")}
+					</button>
+					{/* « démo : altérer une entrée passée » — local copy only, never the source ledger */}
+					<button
+						type="button"
+						data-testid="audit-tamper-button"
+						data-connector={source.name}
+						disabled={tampered}
+						onClick={() => setTampered(true)}
+						className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20 disabled:cursor-not-allowed disabled:opacity-50"
+					>
+						{t("auditTamperButton")}
+					</button>
+					{tampered && (
+						<button
+							type="button"
+							data-testid="audit-reset-button"
+							data-connector={source.name}
+							onClick={() => setTampered(false)}
+							className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+						>
+							{t("auditResetButton")}
+						</button>
+					)}
+				</div>
+			</div>
+
+			{/* the tip root — the content-address of the WHOLE ordered ledger */}
+			<div className="flex flex-wrap items-center gap-2 text-[0.7rem] text-muted-foreground">
+				<span className="font-medium">{t("auditTipRoot")}:</span>
+				<code
+					data-testid="ledger-tip-root"
+					data-connector={source.name}
+					className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-foreground"
+				>
+					{tip}
+				</code>
+			</div>
+
+			{/* the per-entry timeline — qui / quoi / scope / cible / egress / résultat, chained by hash */}
+			<ol
+				data-testid="audit-timeline"
+				data-connector={source.name}
+				className="space-y-2"
+			>
+				{ledger.map((e) => (
+					<li
+						key={`${e.index}-${e.entry_hash}`}
+						data-testid="audit-entry"
+						data-connector={e.bom.connector}
+						data-scope={e.bom.scope}
+						data-result={e.bom.permitted ? "permitted" : "refused"}
+						data-op={e.bom.op}
+						className="rounded-lg border border-border bg-background p-3 text-xs"
+					>
+						<div className="flex flex-wrap items-center gap-2">
+							<span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted font-mono text-[0.65rem] text-muted-foreground">
+								{e.index}
+							</span>
+							<span className="text-muted-foreground">
+								{t("auditColIdentity")}:
+							</span>
+							<span className="font-mono font-medium text-foreground">
+								{e.bom.identity}
+							</span>
+							<span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 font-mono text-[0.65rem] text-foreground">
+								{e.bom.op}
+							</span>
+							<span
+								className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[0.65rem] font-medium uppercase ${
+									e.bom.scope === "read_write"
+										? "border-primary/40 text-primary"
+										: "border-border text-muted-foreground"
+								}`}
+							>
+								{e.bom.scope === "read_write"
+									? t("auditScopeRW")
+									: t("auditScopeRO")}
+							</span>
+							<span className="text-muted-foreground">→ {e.bom.target}</span>
+							{e.bom.permitted ? (
+								<span
+									data-testid="audit-result-permitted"
+									className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-primary-foreground"
+								>
+									{t("auditPermitted")}
+								</span>
+							) : (
+								<span
+									data-testid="audit-result-refused"
+									data-code={e.bom.block_reason_code}
+									className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-destructive px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-destructive-foreground"
+								>
+									{t("auditRefused")}
+									<code className="font-mono normal-case">
+										{e.bom.block_reason_code}
+									</code>
+								</span>
+							)}
+						</div>
+						<dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-[0.7rem] sm:grid-cols-2">
+							<div className="flex gap-2">
+								<dt className="text-muted-foreground">{t("auditColHost")}:</dt>
+								<dd className="break-all font-mono text-foreground">
+									{e.bom.host || "—"}
+								</dd>
+							</div>
+							<div className="flex gap-2">
+								<dt className="text-muted-foreground">
+									{t("auditEntryHash")}:
+								</dt>
+								<dd className="break-all font-mono text-muted-foreground">
+									{e.entry_hash}
+								</dd>
+							</div>
+							<div className="flex gap-2 sm:col-span-2">
+								<dt className="text-muted-foreground">{t("auditRoot")}:</dt>
+								<dd className="break-all font-mono text-muted-foreground">
+									{e.root}
+								</dd>
+							</div>
+						</dl>
+					</li>
+				))}
+			</ol>
+		</div>
+	);
+}
 
 /**
  * RWReadOnlyDemo shows the scope axis the other way round: a read_only connector attempting a
@@ -389,6 +700,14 @@ export function ConnectorsPanel({
 										</dd>
 									</div>
 								</dl>
+
+								{/* DP22 — the per-connector tamper-evident audit timeline + Verify status */}
+								<div className="mt-4 border-t border-border pt-3">
+									<h3 className="text-xs font-semibold tracking-tight text-foreground">
+										{t("auditTimelineHeading")}
+									</h3>
+									<ConnectorAuditTimeline source={c} />
+								</div>
 							</li>
 						);
 					})}
@@ -397,6 +716,19 @@ export function ConnectorsPanel({
 
 			{/* the DP21 RUNTIME enforcement — RW approval inbox (A2) + RO write refusal */}
 			<RWEnforcementInbox rwConnectors={rwConnectors} />
+
+			{/* the DP22 audit explainer — what the per-connector tamper-evident ledger proves */}
+			<section
+				data-testid="audit-explainer"
+				className="space-y-2 rounded-xl border border-border bg-card p-5"
+			>
+				<h2 className="text-sm font-semibold tracking-tight text-foreground">
+					{t("auditHeading")}
+				</h2>
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					{t("auditBody")}
+				</p>
+			</section>
 
 			{/* the load-bearing invariant — AI-never-direct-to-DB, made visible at the SOURCE */}
 			<section

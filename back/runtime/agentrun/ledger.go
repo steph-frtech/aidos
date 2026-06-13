@@ -77,10 +77,15 @@ type LedgerEntry struct {
 	Root      string      `json:"root"`       // content-address of (prior_root ‖ entry_hash) — the new chain root
 }
 
-// entryHash content-addresses (index ‖ bom): the per-row integrity address. Pure, total.
-func entryHash(index int, bom DecisionBOM) (string, error) {
-	body := map[string]any{"index": index, "bom": bom}
-	raw, err := json.Marshal(body)
+// ContentHash content-addresses ANY canonical body via the S01/S02 scheme
+// (records.Canonicalize + records.Hash, REUSED not forked) — the one pure-total hash the GV03
+// chain is built on. It is EXPORTED so a SECOND audit plane (the DP22 connector-action ledger,
+// back/runtime/connectorenforce/connectoraudit) chains its own load-bearing body through the
+// SAME Merkle math instead of FORKING it (anti-duplication, CLAUDE.md §3/§6). No clock, no rng,
+// no I/O; same body ⇒ same hash. The body is whatever per-row integrity payload the plane folds
+// (here {index ‖ bom}); ContentHash never inspects it, it only canonicalises + hashes.
+func ContentHash(v any) (string, error) {
+	raw, err := json.Marshal(v)
 	if err != nil {
 		return "", err
 	}
@@ -91,20 +96,25 @@ func entryHash(index int, bom DecisionBOM) (string, error) {
 	return records.Hash(canon), nil
 }
 
-// chainRoot content-addresses (prior_root ‖ entry_hash): the Merkle fold of the prefix. Pure,
-// total. Folding the prior root into every new root is what makes a DELETION or REORDERING
-// detectable — the root is a function of the whole ordered history, not just the latest row.
+// entryHash content-addresses (index ‖ bom): the per-row integrity address. Pure, total. It is
+// the AgentRun plane's use of the shared ContentHash primitive — byte-identical to the pre-GV03
+// shape (the AgentRun ledger roots are unchanged by the extraction).
+func entryHash(index int, bom DecisionBOM) (string, error) {
+	return ContentHash(map[string]any{"index": index, "bom": bom})
+}
+
+// ChainRoot content-addresses (prior_root ‖ entry_hash): the Merkle FOLD of the prefix — the one
+// operation that makes a DELETION or REORDERING detectable (the root is a function of the WHOLE
+// ordered history, not just the latest row). EXPORTED so the DP22 connector-action ledger folds
+// its prefix through the SAME math (no parallel hash). Pure, total — no clock, no rng, no I/O.
+func ChainRoot(priorRoot, entryHash string) (string, error) {
+	return ContentHash(map[string]any{"prior_root": priorRoot, "entry_hash": entryHash})
+}
+
+// chainRoot is the unexported alias the AgentRun plane calls — preserved so the existing GV03
+// call-sites read unchanged. It delegates to the exported ChainRoot (one implementation).
 func chainRoot(priorRoot, entryHash string) (string, error) {
-	body := map[string]any{"prior_root": priorRoot, "entry_hash": entryHash}
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return "", err
-	}
-	canon, err := records.Canonicalize(raw)
-	if err != nil {
-		return "", err
-	}
-	return records.Hash(canon), nil
+	return ChainRoot(priorRoot, entryHash)
 }
 
 // Append adds a run's Decision-BOM to the ledger as a new chained entry, returning the grown

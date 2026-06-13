@@ -240,3 +240,150 @@ test.describe("DP21 — the /connectors RW approval inbox (runtime enforcement)"
 		);
 	});
 });
+
+/**
+ * DP22 Playwright e2e — the per-connector tamper-evident AUDIT TIMELINE on /connectors: each
+ * enforced connector action (RO read, RW approved/refused, egress refused, ai→datastore refused)
+ * produces ONE verifiable entry of a GV03 Merkle ledger; the integrity readout shows Verify().OK;
+ * a tamper demonstration turns it red with a TamperKind.
+ * mirror record: reflects=DP22-connector-audit, test_kind=e2e, cert_language=gherkin,
+ *               liveness=alive, authority=below (below-the-line audit telemetry, never a truth-write)
+ *
+ * Scenario: a connector's enforced actions produce a verifiable, tamper-evident audit ledger
+ *   Given the Workbench is running and I am on /connectors
+ *   When I look at the slack-notify connector's audit timeline
+ *   Then I see at least one audit entry (qui/quoi/scope/cible/résultat, chained by hash)
+ *   And the ledger integrity is OK (ledger-verify data-ok="true")
+ *   And the timeline includes both a permitted action and a refused action
+ *   When I run the « démo : altérer une entrée passée »
+ *   Then the ledger integrity goes red (ledger-verify data-ok="false") with a TamperKind
+ *   When I reset the ledger
+ *   Then the ledger integrity is OK again
+ *
+ * THE WALL (§2): the ledger is a below-the-line AUDIT artefact, the screen writes no truth; the
+ * tamper demo mutates a local copy only. The verdict is COMPUTED by the pure twin
+ * (lib/connector-audit), verdict-for-verdict with the Go connectoraudit, never a UI opinion.
+ */
+test.describe("DP22 — the /connectors audit timeline (tamper-evident Merkle ledger)", () => {
+	test.beforeEach(async ({ page }) => {
+		await page.goto("/connectors");
+		await expect(page.getByTestId("connectors-list")).toBeVisible({
+			timeout: 10000,
+		});
+	});
+
+	test("the slack-notify connector shows an audit timeline with verifiable entries", async ({
+		page,
+	}) => {
+		const timeline = page.locator(
+			'[data-testid="audit-timeline"][data-connector="slack-notify"]',
+		);
+		await expect(timeline).toBeVisible();
+		const entries = timeline.getByTestId("audit-entry");
+		// the RW connector has at least three audited actions (read, approved write, refused write).
+		expect(await entries.count()).toBeGreaterThanOrEqual(3);
+		// each entry carries its connector / scope / result facets on its attributes.
+		const first = entries.first();
+		await expect(first).toHaveAttribute("data-connector", "slack-notify");
+		await expect(first).toHaveAttribute(
+			"data-scope",
+			/^(read_only|read_write)$/,
+		);
+		await expect(first).toHaveAttribute("data-result", /^(permitted|refused)$/);
+	});
+
+	test("the slack-notify timeline includes both a permitted and a refused entry", async ({
+		page,
+	}) => {
+		const timeline = page.locator(
+			'[data-testid="audit-timeline"][data-connector="slack-notify"]',
+		);
+		await expect(
+			timeline.locator('[data-testid="audit-entry"][data-result="permitted"]'),
+		).not.toHaveCount(0);
+		await expect(
+			timeline.locator('[data-testid="audit-entry"][data-result="refused"]'),
+		).not.toHaveCount(0);
+	});
+
+	test("the slack-notify ledger integrity verifies OK (Verify().OK)", async ({
+		page,
+	}) => {
+		const verify = page.locator(
+			'[data-testid="ledger-verify"][data-connector="slack-notify"]',
+		);
+		await expect(verify).toBeVisible();
+		await expect(verify).toHaveAttribute("data-ok", "true");
+		// no tamper-kind is shown while the chain is intact.
+		await expect(verify.getByTestId("tamper-kind")).toHaveCount(0);
+	});
+
+	test("running an action (approving a RW write) adds a permitted audit entry", async ({
+		page,
+	}) => {
+		// approve the RW write in the DP21 inbox — the audited approved-write entry is present.
+		await page
+			.locator('[data-testid="rw-approve"][data-connector="slack-notify"]')
+			.click();
+		await expect(
+			page.locator(
+				'[data-testid="rw-permitted"][data-connector="slack-notify"]',
+			),
+		).toBeVisible();
+		// the connector's audit timeline records the approved write as a permitted entry.
+		const timeline = page.locator(
+			'[data-testid="audit-timeline"][data-connector="slack-notify"]',
+		);
+		await expect(
+			timeline.locator(
+				'[data-testid="audit-entry"][data-result="permitted"][data-op="write"]',
+			),
+		).not.toHaveCount(0);
+		// and the ledger still verifies OK.
+		await expect(
+			page.locator(
+				'[data-testid="ledger-verify"][data-connector="slack-notify"]',
+			),
+		).toHaveAttribute("data-ok", "true");
+	});
+
+	test("altering a past entry turns the ledger integrity red with a TamperKind", async ({
+		page,
+	}) => {
+		const verify = page.locator(
+			'[data-testid="ledger-verify"][data-connector="slack-notify"]',
+		);
+		await expect(verify).toHaveAttribute("data-ok", "true");
+		// run the tamper demonstration on the slack-notify ledger.
+		await page
+			.locator(
+				'[data-testid="audit-tamper-button"][data-connector="slack-notify"]',
+			)
+			.click();
+		// the integrity goes red and a TamperKind is surfaced.
+		await expect(verify).toHaveAttribute("data-ok", "false");
+		const tamperKind = verify.getByTestId("tamper-kind");
+		await expect(tamperKind).toBeVisible();
+		await expect(tamperKind).toHaveAttribute("data-tamper", "entry_hash");
+	});
+
+	test("resetting the ledger restores integrity OK", async ({ page }) => {
+		const verify = page.locator(
+			'[data-testid="ledger-verify"][data-connector="slack-notify"]',
+		);
+		// tamper first…
+		await page
+			.locator(
+				'[data-testid="audit-tamper-button"][data-connector="slack-notify"]',
+			)
+			.click();
+		await expect(verify).toHaveAttribute("data-ok", "false");
+		// …then verify/reset — the intact chain is restored.
+		await page
+			.locator(
+				'[data-testid="audit-verify-button"][data-connector="slack-notify"]',
+			)
+			.click();
+		await expect(verify).toHaveAttribute("data-ok", "true");
+	});
+});
