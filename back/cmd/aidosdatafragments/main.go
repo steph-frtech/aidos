@@ -18,8 +18,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/steph-frtech/aidos/back/kernel/appauth"
 	"github.com/steph-frtech/aidos/back/kernel/operation"
 	"github.com/steph-frtech/aidos/back/kernel/scope"
+	"github.com/steph-frtech/aidos/back/runtime/appservicefragments"
 	"github.com/steph-frtech/aidos/back/runtime/asyncfragments"
 	"github.com/steph-frtech/aidos/back/runtime/datafragments"
 	"github.com/steph-frtech/aidos/back/runtime/envbindings"
@@ -119,6 +121,159 @@ type observabilityOutput struct {
 	// no capability is a truth-write scope — the screen's deterministic « écrit aucune
 	// vérité » indicator (computed from the oracle, never asserted by prose).
 	ObsNoTruth bool `json:"obs_no_truth"`
+}
+
+// appsvcFragmentOut is the per-fragment JSON the app-service panel renders — the
+// appservicefragments.ServiceFragment plus its content address AND the wall oracle
+// (writes_truth + the below-the-line capabilities), so the screen can SHOW the capital
+// invariant: an optional app-service (git/tickets/auth) writes NO AIDOS truth.
+type appsvcFragmentOut struct {
+	appservicefragments.ServiceFragment
+	Hash         string   `json:"hash"`
+	WritesTruth  bool     `json:"writes_truth"`
+	Capabilities []string `json:"capabilities"`
+}
+
+// authBindingOut is the auth-cabling JSON: how the emitted Better-Auth service cables onto
+// the S80 `app-auth` macro (carrying its ExpansionID, byte-identical via Expand), grafts the
+// S76 UNIQUE owner-scoping expansion (its ExpansionID), and maps the operation→min-role grants
+// onto the EMITTED APP'S runtime AuthorityGraph — NEVER the AIDOS approvers (the wall §2). It
+// carries a verbatim runtime-authz DEMO: a viewer is REFUSED manageRoles, an admin is ALLOWED.
+type authBindingOut struct {
+	appservicefragments.AppAuthBinding
+	WritesTruth bool `json:"writes_truth"`
+	// Demo carries two verbatim CheckAppAccess verdicts proving the runtime gate REFUSES an
+	// insufficient role (viewer × manageRoles → DENY) and ALLOWS a sufficient one (admin → ALLOW).
+	Demo []authDecisionOut `json:"demo"`
+}
+
+// authDecisionOut is one verbatim appauth.Decision the screen renders — the emitted app's
+// runtime authz verdict for a (role, operation) pair (code, never an LLM).
+type authDecisionOut struct {
+	Role      string `json:"role"`
+	Operation string `json:"operation"`
+	Allowed   bool   `json:"allowed"`
+	Required  string `json:"required"`
+}
+
+// appsvcOutput is the full DP18 app-service-substrate emission for one (project, env): the
+// THREE optional app-service fragments (Forgejo git + Plane tickets + Better-Auth core/auth),
+// the auth-cabling binding (S80 × S76), the closed palette key set, and the CAPITAL indicator
+// `auth_app_not_aidos` (the emitted app's auth maps the RUNTIME AuthorityGraph, never the AIDOS
+// approvers). ALL of it writes NO AIDOS truth (the wall §2).
+type appsvcOutput struct {
+	ProjectID   string              `json:"project_id"`
+	Env         string              `json:"env"`
+	AppServices []appsvcFragmentOut `json:"app_services"`
+	Binding     authBindingOut      `json:"binding"`
+	Keys        []string            `json:"keys"`
+	// AuthAppNotAidos is true iff the binding maps the EMITTED-APP runtime scope (never the AIDOS
+	// approvers) AND nothing writes AIDOS truth — the screen's deterministic separation indicator.
+	AuthAppNotAidos bool `json:"auth_app_not_aidos"`
+}
+
+func toAppsvcOut(frags []appservicefragments.ServiceFragment) ([]appsvcFragmentOut, error) {
+	out := make([]appsvcFragmentOut, 0, len(frags))
+	for _, f := range frags {
+		h, err := appservicefragments.HashFragment(f)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, appsvcFragmentOut{
+			ServiceFragment: f,
+			Hash:            h,
+			WritesTruth:     f.WritesTruth(),
+			Capabilities:    f.Capabilities(),
+		})
+	}
+	return out, nil
+}
+
+// emitAppService prints the DP18 app-service-substrate emission (the three fragments + the
+// auth cabling). The auth_app_not_aidos flag is COMPUTED from the binding scope + the wall
+// oracle: the binding maps the EMITTED-APP runtime AuthorityGraph (never the AIDOS approvers)
+// and no fragment / not the binding writes AIDOS truth. The two demo verdicts are verbatim
+// CheckAppAccess decisions (code, never an LLM). Same (project, env) ⇒ byte-identical JSON.
+func emitAppService(project, env string) {
+	frags, err := appservicefragments.SubstrateAppServiceFragments(project, scope.Environment(env))
+	if err != nil {
+		var ref *envbindings.Refusal
+		if errors.As(err, &ref) {
+			fmt.Fprintln(os.Stderr, "aidosdatafragments:", ref.Error())
+			os.Exit(1)
+		}
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", err)
+		os.Exit(1)
+	}
+	appsvcOut, ferr := toAppsvcOut(frags)
+	if ferr != nil {
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", ferr)
+		os.Exit(1)
+	}
+
+	binding, berr := appservicefragments.EmittedAppAuthBinding(project)
+	if berr != nil {
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", berr)
+		os.Exit(1)
+	}
+
+	// The verbatim runtime-authz demo — a viewer is REFUSED manageRoles, an admin is ALLOWED
+	// (the emitted app's AuthorityGraph, decided by code, never an LLM — determinism-first).
+	demo := make([]authDecisionOut, 0, 2)
+	for _, c := range []struct {
+		role appauth.Role
+		op   string
+	}{
+		{appauth.Viewer, "manageRoles"},
+		{appauth.Admin, "manageRoles"},
+	} {
+		d, derr := appservicefragments.CheckAppAccess(c.role, c.op)
+		if derr != nil {
+			fmt.Fprintln(os.Stderr, "aidosdatafragments:", derr)
+			os.Exit(1)
+		}
+		demo = append(demo, authDecisionOut{
+			Role:      string(c.role),
+			Operation: c.op,
+			Allowed:   d.Allowed,
+			Required:  string(d.Required),
+		})
+	}
+
+	// Compute the capital indicator from the binding scope + the wall oracle — never a prose
+	// assertion. The binding must map the EMITTED-APP runtime scope (not the AIDOS approvers)
+	// and nothing — no fragment, not the binding — may write AIDOS truth.
+	authAppNotAidos := binding.AuthorityGraphScope == appservicefragments.AuthorityGraphScopeEmittedApp &&
+		!binding.WritesTruth()
+	for _, f := range appsvcOut {
+		if f.WritesTruth {
+			authAppNotAidos = false
+		}
+		for _, c := range f.Capabilities {
+			if appservicefragments.IsTruthWriteCapability(c) {
+				authAppNotAidos = false
+			}
+		}
+	}
+
+	res := appsvcOutput{
+		ProjectID:   project,
+		Env:         env,
+		AppServices: appsvcOut,
+		Binding: authBindingOut{
+			AppAuthBinding: binding,
+			WritesTruth:    binding.WritesTruth(),
+			Demo:           demo,
+		},
+		Keys:            appservicefragments.Keys(),
+		AuthAppNotAidos: authAppNotAidos,
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(res); err != nil {
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", err)
+		os.Exit(1)
+	}
 }
 
 func toObsOut(frags []observabilityfragments.ServiceFragment) ([]obsFragmentOut, error) {
@@ -352,7 +507,13 @@ func main() {
 	env := flag.String("env", "dev", "the deployment environment (prod|staging|dev|local|future_cloud)")
 	async := flag.Bool("async", false, "emit the DP16 ASYNC-substrate fragments (Windmill + NATS) + the demo dispatch trace instead of the DP15 data fragments")
 	observability := flag.Bool("observability", false, "emit the DP17 OBSERVABILITY-substrate fragments (OTel collector + SigNoz + GlitchTip) + the emitted TS instrumentation instead of the DP15 data fragments")
+	appsvc := flag.Bool("appsvc", false, "emit the DP18 APP-SERVICE-substrate fragments (Forgejo + Plane + Better-Auth) + the auth cabling (S80 × S76) instead of the DP15 data fragments")
 	flag.Parse()
+
+	if *appsvc {
+		emitAppService(*project, *env)
+		return
+	}
 
 	if *observability {
 		emitObservability(*project, *env)

@@ -364,3 +364,102 @@ test.describe("DP17 — the observability-service fragments + the emitted instru
 		}
 	});
 });
+
+/**
+ * DP18 Playwright e2e — the « Services applicatifs (optionnels) » section of the /substrate
+ * route. mirror record: reflects=DP18-appservicefragments, test_kind=e2e,
+ * cert_language=playwright, liveness=live
+ *
+ * Proves the app-service slice renders the THREE optional application-service fragments the Go
+ * emitter (runtime/appservicefragments, via cmd/aidosdatafragments -appsvc) produces —
+ * Forgejo (the self-hosted git of the emitted app, role git, profile git), Plane (the tickets
+ * of the emitted app, role tickets, profile tickets) and Better-Auth (the RUNTIME auth of the
+ * USERS OF THE BUILT APP, role auth, profile core) — each carrying its image / port / volume /
+ * profile, isolated per project; AND the AUTH-CABLING indicator that the emitted app's auth maps
+ * the AuthorityGraph OF THE EMITTED APP'S RUNTIME, NEVER the AIDOS approvers (separation
+ * auth-app ≠ auth-AIDOS); AND the cabling app-auth → Better-Auth via the S76 UNIQUE Expand
+ * (S80 macro, never duplicated).
+ *
+ * THE WALL (CLAUDE.md §2): the screen renders a below-the-line projection — it writes no truth
+ * (no kernel/mirrors/fitness). The emitted app's auth maps the EMITTED APP'S runtime
+ * AuthorityGraph, NEVER the AIDOS approvers. The source is the authoritative Go (the fragment
+ * emission + the auth binding are pure functions); the cabling reuses S80/S76, never re-coined.
+ */
+test.describe("DP18 — the app-service fragments + the auth cabling (additive section)", () => {
+	test.setTimeout(90_000);
+
+	test("the app-service section renders Forgejo (git), Plane (tickets) and Better-Auth (auth)", async ({
+		page,
+	}) => {
+		await page.goto("/substrate");
+
+		const appsvcSection = page.getByTestId("substrate-appsvc");
+		await expect(appsvcSection).toBeVisible();
+
+		// the three app-service fragments are emitted (the dev seed).
+		const services = page.getByTestId("substrate-appsvc-services");
+		await expect
+			.poll(() => services.getByTestId("substrate-service").count(), {
+				timeout: ACTION_TIMEOUT,
+			})
+			.toBe(3);
+
+		// Forgejo — the self-hosted git, role git, profile git.
+		const forgejo = appsvcSection.locator(
+			'[data-testid="substrate-service"][data-key="forgejo"]',
+		);
+		await expect(forgejo).toBeVisible();
+		await expect(forgejo).toHaveAttribute("data-role", "git");
+		await expect(forgejo).toHaveAttribute("data-profile", "git");
+		await expect(forgejo.getByTestId("service-image")).toContainText("forgejo");
+		await expect(forgejo.getByTestId("service-port")).toContainText("3300");
+
+		// Plane — the tickets, role tickets, profile tickets.
+		const plane = appsvcSection.locator(
+			'[data-testid="substrate-service"][data-key="plane"]',
+		);
+		await expect(plane).toBeVisible();
+		await expect(plane).toHaveAttribute("data-role", "tickets");
+		await expect(plane).toHaveAttribute("data-profile", "tickets");
+		await expect(plane.getByTestId("service-image")).toContainText("plane");
+		await expect(plane.getByTestId("service-port")).toContainText("3100");
+
+		// Better-Auth — the RUNTIME auth of the BUILT app's users, role auth, profile core.
+		const betterAuth = appsvcSection.locator(
+			'[data-testid="substrate-service"][data-key="better-auth"]',
+		);
+		await expect(betterAuth).toBeVisible();
+		await expect(betterAuth).toHaveAttribute("data-role", "auth");
+		await expect(betterAuth).toHaveAttribute("data-profile", "core");
+		await expect(betterAuth.getByTestId("service-port")).toContainText("3200");
+	});
+
+	test("the auth-app-not-aidos indicator: the emitted app's auth maps the RUNTIME AuthorityGraph, never the AIDOS approvers", async ({
+		page,
+	}) => {
+		await page.goto("/substrate");
+
+		// the « auth de l'app émise ≠ auth AIDOS » indicator is present and asserts the
+		// AuthorityGraph mapped is the EMITTED APP'S runtime, never the AIDOS approvers.
+		const authIndicator = page.getByTestId("auth-app-not-aidos");
+		await expect(authIndicator).toBeVisible({ timeout: ACTION_TIMEOUT });
+		await expect(authIndicator).toHaveAttribute(
+			"data-authority-scope",
+			"emitted-app-runtime",
+		);
+		await expect(authIndicator).not.toHaveAttribute(
+			"data-authority-scope",
+			"aidos-approvers",
+		);
+
+		// the cabling: Better-Auth cables onto the S80 app-auth macro via the S76 UNIQUE Expand.
+		const cabling = page.getByTestId("appsvc-auth-cabling");
+		await expect(cabling).toBeVisible({ timeout: ACTION_TIMEOUT });
+		await expect(cabling).toContainText("app-auth");
+		// the expansion ids prove the cabling is BYTE-IDENTICAL via Expand (S80 + S76).
+		await expect(page.getByTestId("appsvc-subsystem-expansion")).toBeVisible();
+		await expect(
+			page.getByTestId("appsvc-ownerscoping-expansion"),
+		).toBeVisible();
+	});
+});

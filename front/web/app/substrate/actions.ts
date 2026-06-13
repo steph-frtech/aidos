@@ -189,6 +189,90 @@ interface RawObsOutput {
 }
 
 /**
+ * AppServiceFragmentView is the twin of the Go appservicefragments.ServiceFragment + its
+ * content address AND the wall oracle — the per-service row the DP18 app-service section
+ * renders. `writes_truth` is ALWAYS false (an optional app-service of the BUILT app never
+ * writes AIDOS truth) and `capabilities` is a below-the-line set (git/tickets/auth of the
+ * emitted app), the data behind the « auth de l'app ≠ auth AIDOS » indicator (the wall §2).
+ */
+export interface AppServiceFragmentView extends ServiceFragmentView {
+	writes_truth: boolean;
+	capabilities: string[];
+}
+
+/** AuthGrantView is one operation→min-role row of the emitted app's runtime AuthorityGraph. */
+export interface AuthGrantView {
+	operation: string;
+	min_role: string;
+}
+
+/** AuthDecisionView is one verbatim runtime-authz verdict (role × operation → allowed). */
+export interface AuthDecisionView {
+	role: string;
+	operation: string;
+	allowed: boolean;
+	required: string;
+}
+
+/**
+ * AuthBindingView is the twin of the Go appservicefragments.AppAuthBinding — the auth-cabling
+ * projection that CABLES the emitted Better-Auth service onto the S80 `app-auth` macro
+ * (subsystem_expansion_id, byte-identical via Expand), grafts the S76 UNIQUE owner-scoping
+ * expansion (owner_scoping_expansion_id, never duplicated), and maps the operation→min-role
+ * grants onto the EMITTED APP'S runtime AuthorityGraph (authority_graph_scope =
+ * "emitted-app-runtime", NEVER the AIDOS approvers). `demo` carries two verbatim verdicts
+ * proving the runtime gate REFUSES an insufficient role + ALLOWS a sufficient one. It WRITES
+ * NO AIDOS truth (writes_truth + wrote_kernel always false, the wall §2).
+ */
+export interface AuthBindingView {
+	project_id: string;
+	macro: string;
+	service_key: string;
+	subsystem_expansion_id: string;
+	owner_scoping_expansion_id: string;
+	roles: string[];
+	grants: AuthGrantView[];
+	authority_graph_scope: string;
+	base_url_var: string;
+	secret_var: string;
+	binding_id: string;
+	wrote_kernel: boolean;
+	writes_truth: boolean;
+	demo: AuthDecisionView[];
+}
+
+/**
+ * AppServiceSubstrateView is the full DP18 APP-SERVICE-substrate emission for one
+ * (project, env) — the THREE optional app-service fragments (Forgejo git + Plane tickets +
+ * Better-Auth core/auth), the auth-cabling binding (S80 × S76), the closed palette key set,
+ * and the CAPITAL indicator `auth_app_not_aidos` (the emitted app's auth maps the RUNTIME
+ * AuthorityGraph, never the AIDOS approvers — separation auth-app ≠ auth-AIDOS, the wall §2).
+ * The app-service section renders this single source.
+ */
+export interface AppServiceSubstrateView {
+	ok: boolean;
+	project_id: string;
+	env: Environment;
+	app_services: AppServiceFragmentView[];
+	binding: AuthBindingView | null;
+	keys: string[];
+	/** auth_app_not_aidos is the deterministic indicator: the binding maps the EMITTED-APP
+	 * runtime scope (never the AIDOS approvers) AND nothing writes AIDOS truth (Go oracle). */
+	auth_app_not_aidos: boolean;
+	/** error carries any execution-level failure (the Go cmd refused / crashed). */
+	error?: string;
+}
+
+interface RawAppsvcOutput {
+	project_id: string;
+	env: string;
+	app_services?: AppServiceFragmentView[];
+	binding?: AuthBindingView | null;
+	keys?: string[];
+	auth_app_not_aidos?: boolean;
+}
+
+/**
  * emitFragments — the /substrate gesture (ui-completeness, CLAUDE.md §7): run the
  * AUTHORITATIVE Go emitter (cmd/aidosdatafragments) for the active project and the
  * SELECTED environment, and surface the fragments + the DP06 verdict.
@@ -371,6 +455,71 @@ export async function emitObservabilityFragments(
 			instrumentation: null,
 			keys: [],
 			obs_no_truth: false,
+			error: e instanceof Error ? e.message : String(e),
+		};
+	}
+}
+
+/**
+ * emitAppServiceFragments — the DP18 /substrate APP-SERVICE gesture (ui-completeness,
+ * CLAUDE.md §7): run the AUTHORITATIVE Go emitter (cmd/aidosdatafragments -appsvc, the fourth
+ * twin of the data/async/observability doors — never a forked TS palette) for the active
+ * project + the SELECTED environment, and surface the THREE optional app-service fragments
+ * (Forgejo git + Plane tickets + Better-Auth core/auth), the auth-cabling binding (S80 app-auth
+ * macro cabled via the S76 UNIQUE Expand), and the CAPITAL indicator `auth_app_not_aidos`.
+ *
+ * DETERMINISM-FIRST (§6/§8): the Go is authoritative; the env is VALIDATED against the closed
+ * set before it reaches the process. THE WALL (§2): a below-the-line projection — it WRITES NO
+ * truth (no kernel/mirrors/fitness, no gen/ file); the emitted app's auth maps the EMITTED
+ * APP'S runtime AuthorityGraph, NEVER the AIDOS approvers (auth-app ≠ auth-AIDOS). The cabling
+ * reuses S80/S76 (never duplicated). Same (project, env) ⇒ byte-identical fragments + binding.
+ */
+export async function emitAppServiceFragments(
+	projectId: string | null,
+	env: string,
+): Promise<AppServiceSubstrateView> {
+	const safeEnv: Environment = isKnownEnvironment(env) ? env : "dev";
+	const project = projectId?.trim() ? projectId.trim() : "__demo__";
+
+	try {
+		const go = resolveGo();
+		const { stdout } = await execFileP(
+			go.bin,
+			[
+				"run",
+				"./cmd/aidosdatafragments",
+				"-project",
+				project,
+				"-env",
+				safeEnv,
+				"-appsvc",
+			],
+			{
+				cwd: `${APP_REPO}/back`,
+				timeout: 120_000,
+				maxBuffer: 8 * 1024 * 1024,
+				env: { ...process.env, GOTOOLCHAIN: go.toolchain },
+			},
+		);
+		const raw = JSON.parse(stdout) as RawAppsvcOutput;
+		return {
+			ok: true,
+			project_id: raw.project_id,
+			env: safeEnv,
+			app_services: raw.app_services ?? [],
+			binding: raw.binding ?? null,
+			keys: raw.keys ?? [],
+			auth_app_not_aidos: raw.auth_app_not_aidos ?? false,
+		};
+	} catch (e) {
+		return {
+			ok: false,
+			project_id: project,
+			env: safeEnv,
+			app_services: [],
+			binding: null,
+			keys: [],
+			auth_app_not_aidos: false,
 			error: e instanceof Error ? e.message : String(e),
 		};
 	}

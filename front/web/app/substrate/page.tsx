@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
 import {
+	emitAppServiceFragments,
 	emitAsyncFragments,
 	emitFragments,
 	emitObservabilityFragments,
@@ -42,11 +43,13 @@ export default async function SubstratePage() {
 	// Seed the panel off prod (dev) so the four fragments — including the opt-in
 	// doltgres — are visible on first paint; the selector drives prod from there. The
 	// async twin (Windmill + NATS) is seeded for the same env so both slices are in step.
-	const [initialData, initialAsync, initialObs] = await Promise.all([
-		emitFragments(ctx.activeId, "dev"),
-		emitAsyncFragments(ctx.activeId, "dev"),
-		emitObservabilityFragments(ctx.activeId, "dev"),
-	]);
+	const [initialData, initialAsync, initialObs, initialAppsvc] =
+		await Promise.all([
+			emitFragments(ctx.activeId, "dev"),
+			emitAsyncFragments(ctx.activeId, "dev"),
+			emitObservabilityFragments(ctx.activeId, "dev"),
+			emitAppServiceFragments(ctx.activeId, "dev"),
+		]);
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -89,6 +92,7 @@ export default async function SubstratePage() {
 						initialData={initialData}
 						initialAsync={initialAsync}
 						initialObs={initialObs}
+						initialAppsvc={initialAppsvc}
 					/>
 				</div>
 			</main>
