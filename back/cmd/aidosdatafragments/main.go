@@ -23,6 +23,7 @@ import (
 	"github.com/steph-frtech/aidos/back/runtime/asyncfragments"
 	"github.com/steph-frtech/aidos/back/runtime/datafragments"
 	"github.com/steph-frtech/aidos/back/runtime/envbindings"
+	"github.com/steph-frtech/aidos/back/runtime/observabilityfragments"
 )
 
 // fragmentOut is the per-fragment JSON the panel renders: the ServiceFragment plus
@@ -79,6 +80,137 @@ type demoStep struct {
 	Kind      string `json:"kind"`
 	Target    string `json:"target"`
 	Bus       string `json:"bus"` // the async fragment the effect is dispatched over (nats)
+}
+
+// obsFragmentOut is the per-fragment JSON the observability panel renders — the
+// observabilityfragments.ServiceFragment plus its content address AND the wall oracle
+// (writes_truth + the read-only capabilities), so the screen can SHOW the capital
+// invariant: an exploitation-observability fragment writes NO truth.
+type obsFragmentOut struct {
+	observabilityfragments.ServiceFragment
+	Hash         string   `json:"hash"`
+	WritesTruth  bool     `json:"writes_truth"`
+	Capabilities []string `json:"capabilities"`
+}
+
+// instrumentationOut is the emitted-instrumentation JSON: how the emitted TS app wires
+// @opentelemetry/* → SigNoz and its errors → GlitchTip (a PURE projection of the Kernel,
+// ADR 0040 TS — never Go runtime), plus its content address AND the wall oracle.
+type instrumentationOut struct {
+	observabilityfragments.Instrumentation
+	Hash         string   `json:"hash"`
+	WritesTruth  bool     `json:"writes_truth"`
+	Capabilities []string `json:"capabilities"`
+}
+
+// observabilityOutput is the full DP17 observability-substrate emission for one
+// (project, env): the THREE observability fragments (OTel collector + SigNoz +
+// GlitchTip, all profile observability), the emitted TS instrumentation projection, and
+// the closed palette key set. ALL of it writes NO truth (the wall §2) — the obs_no_truth
+// flag is the screen's capital indicator (exploitation observability ≠ Kernel sensor;
+// the RealityMirror E12 is the only on-ramp).
+type observabilityOutput struct {
+	ProjectID       string             `json:"project_id"`
+	Env             string             `json:"env"`
+	Observability   []obsFragmentOut   `json:"observability"`
+	Instrumentation instrumentationOut `json:"instrumentation"`
+	Keys            []string           `json:"keys"`
+	// ObsNoTruth is true iff NO fragment and NOT the instrumentation writes truth AND
+	// no capability is a truth-write scope — the screen's deterministic « écrit aucune
+	// vérité » indicator (computed from the oracle, never asserted by prose).
+	ObsNoTruth bool `json:"obs_no_truth"`
+}
+
+func toObsOut(frags []observabilityfragments.ServiceFragment) ([]obsFragmentOut, error) {
+	out := make([]obsFragmentOut, 0, len(frags))
+	for _, f := range frags {
+		h, err := observabilityfragments.HashFragment(f)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, obsFragmentOut{
+			ServiceFragment: f,
+			Hash:            h,
+			WritesTruth:     f.WritesTruth(),
+			Capabilities:    f.Capabilities(),
+		})
+	}
+	return out, nil
+}
+
+// emitObservability prints the DP17 observability-substrate emission (the three fragments
+// + the emitted instrumentation). The obs_no_truth flag is COMPUTED from the wall oracle:
+// no fragment writes truth, the instrumentation writes no truth, and no capability is a
+// truth-write scope (IsTruthWriteCapability). Same (project, env) ⇒ byte-identical JSON.
+func emitObservability(project, env string) {
+	frags, err := observabilityfragments.SubstrateObservabilityFragments(project, scope.Environment(env))
+	if err != nil {
+		var ref *envbindings.Refusal
+		if errors.As(err, &ref) {
+			fmt.Fprintln(os.Stderr, "aidosdatafragments:", ref.Error())
+			os.Exit(1)
+		}
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", err)
+		os.Exit(1)
+	}
+	obsOut, ferr := toObsOut(frags)
+	if ferr != nil {
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", ferr)
+		os.Exit(1)
+	}
+	instr, ierr := observabilityfragments.EmittedInstrumentation(project, scope.Environment(env))
+	if ierr != nil {
+		var ref *envbindings.Refusal
+		if errors.As(ierr, &ref) {
+			fmt.Fprintln(os.Stderr, "aidosdatafragments:", ref.Error())
+			os.Exit(1)
+		}
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", ierr)
+		os.Exit(1)
+	}
+	ih, herr := observabilityfragments.HashInstrumentation(instr)
+	if herr != nil {
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", herr)
+		os.Exit(1)
+	}
+
+	// Compute the capital indicator from the wall oracle — never a prose assertion.
+	noTruth := !instr.WritesTruth()
+	for _, c := range instr.Capabilities() {
+		if observabilityfragments.IsTruthWriteCapability(c) {
+			noTruth = false
+		}
+	}
+	for _, f := range obsOut {
+		if f.WritesTruth {
+			noTruth = false
+		}
+		for _, c := range f.Capabilities {
+			if observabilityfragments.IsTruthWriteCapability(c) {
+				noTruth = false
+			}
+		}
+	}
+
+	res := observabilityOutput{
+		ProjectID:     project,
+		Env:           env,
+		Observability: obsOut,
+		Instrumentation: instrumentationOut{
+			Instrumentation: instr,
+			Hash:            ih,
+			WritesTruth:     instr.WritesTruth(),
+			Capabilities:    instr.Capabilities(),
+		},
+		Keys:       observabilityfragments.Keys(),
+		ObsNoTruth: noTruth,
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(res); err != nil {
+		fmt.Fprintln(os.Stderr, "aidosdatafragments:", err)
+		os.Exit(1)
+	}
 }
 
 func toOut(frags []datafragments.ServiceFragment) ([]fragmentOut, error) {
@@ -219,7 +351,13 @@ func main() {
 	project := flag.String("project", "", "the project the fragments are isolated to")
 	env := flag.String("env", "dev", "the deployment environment (prod|staging|dev|local|future_cloud)")
 	async := flag.Bool("async", false, "emit the DP16 ASYNC-substrate fragments (Windmill + NATS) + the demo dispatch trace instead of the DP15 data fragments")
+	observability := flag.Bool("observability", false, "emit the DP17 OBSERVABILITY-substrate fragments (OTel collector + SigNoz + GlitchTip) + the emitted TS instrumentation instead of the DP15 data fragments")
 	flag.Parse()
+
+	if *observability {
+		emitObservability(*project, *env)
+		return
+	}
 
 	if *async {
 		emitAsync(*project, *env)

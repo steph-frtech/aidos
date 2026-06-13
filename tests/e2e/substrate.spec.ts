@@ -235,3 +235,132 @@ test.describe("DP16 — the async-service fragments + the demo job (additive sec
 		await expect(step2).toContainText("sendReminder");
 	});
 });
+
+/**
+ * DP17 Playwright e2e — the « Observabilité d'exploitation » section of the /substrate route.
+ * mirror record: reflects=DP17-observabilityfragments, test_kind=e2e, cert_language=playwright, liveness=live
+ *
+ * Proves the observability slice renders the THREE observability-layer service fragments the
+ * Go emitter (runtime/observabilityfragments, via cmd/aidosdatafragments -observability)
+ * produces — OTel Collector (the OTLP ingest, role observability) + SigNoz (traces/metrics/
+ * logs dashboard, role observability) + GlitchTip (error-tracking, role errortracking) — all
+ * in profile OBSERVABILITY, each carrying image / port / volume / healthcheck / depends_on;
+ * the EMITTED INSTRUMENTATION (how the TS app wires @opentelemetry/* → SigNoz, errors →
+ * GlitchTip, ADR 0040); and the CAPITAL INDICATOR that exploitation observability writes NO
+ * truth.
+ *
+ * THE WALL (CLAUDE.md §2) — THE CAPITAL INVARIANT: an exploitation-observability fragment and
+ * the emitted instrumentation write NO truth (no kernel/mirrors/fitness). Exploitation
+ * observability ≠ Kernel sensor — the RealityMirror (E12) is the only on-ramp. The `obs-no-truth`
+ * indicator surfaces this deterministically (computed by the Go oracle, never re-coined in prose).
+ */
+test.describe("DP17 — the observability-service fragments + the emitted instrumentation (additive section)", () => {
+	test.setTimeout(90_000);
+
+	test("the observability section renders OTel collector, SigNoz and GlitchTip — all profile observability", async ({
+		page,
+	}) => {
+		await page.goto("/substrate");
+
+		const obsSection = page.getByTestId("substrate-obs");
+		await expect(obsSection).toBeVisible();
+
+		// the three observability fragments are emitted (the dev seed).
+		const services = page.getByTestId("substrate-obs-services");
+		await expect
+			.poll(() => services.getByTestId("substrate-service").count(), {
+				timeout: ACTION_TIMEOUT,
+			})
+			.toBe(3);
+
+		// OTel Collector — role observability, profile observability, the OTLP ingest (4317).
+		const otel = obsSection.locator(
+			'[data-testid="substrate-service"][data-key="otel-collector"]',
+		);
+		await expect(otel).toBeVisible();
+		await expect(otel).toHaveAttribute("data-role", "observability");
+		await expect(otel).toHaveAttribute("data-profile", "observability");
+		await expect(otel).toHaveAttribute("data-writes-truth", "false");
+		await expect(otel.getByTestId("service-image")).toContainText(
+			"otel/opentelemetry-collector-contrib",
+		);
+		await expect(otel.getByTestId("service-port")).toContainText("4317");
+
+		// SigNoz — traces/metrics/logs dashboard, role observability, profile observability.
+		const signoz = obsSection.locator(
+			'[data-testid="substrate-service"][data-key="signoz"]',
+		);
+		await expect(signoz).toBeVisible();
+		await expect(signoz).toHaveAttribute("data-role", "observability");
+		await expect(signoz).toHaveAttribute("data-profile", "observability");
+		await expect(signoz.getByTestId("service-image")).toContainText("signoz");
+
+		// GlitchTip — error-tracking, role errortracking, profile observability, depends on
+		// postgres + valkey.
+		const glitchtip = obsSection.locator(
+			'[data-testid="substrate-service"][data-key="glitchtip"]',
+		);
+		await expect(glitchtip).toBeVisible();
+		await expect(glitchtip).toHaveAttribute("data-role", "errortracking");
+		await expect(glitchtip).toHaveAttribute("data-profile", "observability");
+		await expect(glitchtip.getByTestId("service-image")).toContainText(
+			"glitchtip",
+		);
+	});
+
+	test("the emitted instrumentation wires @opentelemetry/* → SigNoz, errors → GlitchTip (ADR 0040 TS)", async ({
+		page,
+	}) => {
+		await page.goto("/substrate");
+
+		const instr = page.getByTestId("obs-instrumentation");
+		await expect(instr).toBeVisible({ timeout: ACTION_TIMEOUT });
+
+		// the TS OTel packages (ADR 0040 — JS/TS SDK, never Go) are listed.
+		const packages = page.getByTestId("obs-instr-packages");
+		await expect(packages).toContainText("@opentelemetry/sdk-node");
+		// the instrumentation is TS — there must be NO Go module in the packages.
+		await expect(packages).not.toContainText(/go\.opentelemetry\.io/i);
+
+		// OTLP export → the otel-collector via an ENV-VAR reference (never a hardcoded URL).
+		await expect(page.getByTestId("obs-instr-otlp")).toContainText(
+			"OTEL_EXPORTER_OTLP_ENDPOINT",
+		);
+		await expect(page.getByTestId("obs-instr-otlp")).toContainText(
+			"otel-collector",
+		);
+
+		// errors → GlitchTip via the DSN env-var reference.
+		await expect(page.getByTestId("obs-instr-errors")).toContainText(
+			"GLITCHTIP_DSN",
+		);
+		await expect(page.getByTestId("obs-instr-errors")).toContainText(
+			"glitchtip",
+		);
+	});
+
+	test("the capital indicator: exploitation observability writes NO truth (the wall §2)", async ({
+		page,
+	}) => {
+		await page.goto("/substrate");
+
+		// the « écrit aucune vérité » indicator is present and asserts the invariant holds.
+		const noTruth = page.getByTestId("obs-no-truth");
+		await expect(noTruth).toBeVisible({ timeout: ACTION_TIMEOUT });
+		await expect(noTruth).toHaveAttribute("data-no-truth", "true");
+		await expect(noTruth).toContainText(/RealityMirror|E12/);
+
+		// EVERY observability fragment carries data-writes-truth="false" (no truth write).
+		const obsServices = page
+			.getByTestId("substrate-obs-services")
+			.getByTestId("substrate-service");
+		const count = await obsServices.count();
+		expect(count).toBe(3);
+		for (let i = 0; i < count; i++) {
+			await expect(obsServices.nth(i)).toHaveAttribute(
+				"data-writes-truth",
+				"false",
+			);
+		}
+	});
+});

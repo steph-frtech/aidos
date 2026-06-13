@@ -126,6 +126,69 @@ interface RawAsyncOutput {
 }
 
 /**
+ * ObsServiceFragmentView is the twin of the Go observabilityfragments.ServiceFragment +
+ * its content address AND the wall oracle — the per-service row the observability section
+ * renders. `writes_truth` is ALWAYS false and `capabilities` is a closed read-only set
+ * (observe:*), the data behind the « écrit aucune vérité » indicator (the wall §2).
+ */
+export interface ObsServiceFragmentView extends ServiceFragmentView {
+	writes_truth: boolean;
+	capabilities: string[];
+}
+
+/**
+ * InstrumentationView is the twin of the Go observabilityfragments.Instrumentation — how
+ * the emitted TS app wires @opentelemetry/* → SigNoz (OTLP endpoint var) and its errors →
+ * GlitchTip (DSN var), ADR 0040 (JS/TS OTel SDK, NEVER Go). A PURE projection of the
+ * Kernel, READ-ONLY on reality (writes_truth always false).
+ */
+export interface InstrumentationView {
+	project_id: string;
+	env: string;
+	packages: string[];
+	otlp_endpoint_var: string;
+	otlp_target: string;
+	dashboard_target: string;
+	error_dsn_var: string;
+	error_target: string;
+	read_only_reality: boolean;
+	hash: string;
+	writes_truth: boolean;
+	capabilities: string[];
+}
+
+/**
+ * ObservabilitySubstrateView is the full DP17 OBSERVABILITY-substrate emission for one
+ * (project, env) — the THREE observability fragments (OTel collector + SigNoz + GlitchTip,
+ * all profile observability), the emitted TS instrumentation projection, the closed
+ * palette key set, and the CAPITAL indicator `obs_no_truth` (the ops-observability writes
+ * NO truth — exploitation observability ≠ Kernel sensor, the RealityMirror E12 is the only
+ * on-ramp). The observability section renders this single source.
+ */
+export interface ObservabilitySubstrateView {
+	ok: boolean;
+	project_id: string;
+	env: Environment;
+	observability: ObsServiceFragmentView[];
+	instrumentation: InstrumentationView | null;
+	keys: string[];
+	/** obs_no_truth is the deterministic indicator: NO fragment / NOT the instrumentation
+	 * writes truth AND no capability is a truth-write scope (computed by the Go oracle). */
+	obs_no_truth: boolean;
+	/** error carries any execution-level failure (the Go cmd refused / crashed). */
+	error?: string;
+}
+
+interface RawObsOutput {
+	project_id: string;
+	env: string;
+	observability?: ObsServiceFragmentView[];
+	instrumentation?: InstrumentationView | null;
+	keys?: string[];
+	obs_no_truth?: boolean;
+}
+
+/**
  * emitFragments — the /substrate gesture (ui-completeness, CLAUDE.md §7): run the
  * AUTHORITATIVE Go emitter (cmd/aidosdatafragments) for the active project and the
  * SELECTED environment, and surface the fragments + the DP06 verdict.
@@ -242,6 +305,72 @@ export async function emitAsyncFragments(
 			async: [],
 			keys: [],
 			demo: [],
+			error: e instanceof Error ? e.message : String(e),
+		};
+	}
+}
+
+/**
+ * emitObservabilityFragments — the DP17 /substrate OBSERVABILITY gesture (ui-completeness,
+ * CLAUDE.md §7): run the AUTHORITATIVE Go emitter (cmd/aidosdatafragments -observability,
+ * the third twin of the data/async doors — never a forked TS palette) for the active
+ * project + the SELECTED environment, and surface the THREE observability fragments (OTel
+ * collector + SigNoz + GlitchTip, all profile observability), the emitted TS instrumentation
+ * (@opentelemetry/* → SigNoz, errors → GlitchTip, ADR 0040), and the CAPITAL indicator
+ * `obs_no_truth`.
+ *
+ * DETERMINISM-FIRST (§6/§8): the Go is authoritative; the env is VALIDATED against the
+ * closed set before it reaches the process. THE WALL (§2): a below-the-line projection —
+ * it WRITES NO truth (no kernel/mirrors/fitness, no gen/ file); exploitation observability
+ * is NOT a Kernel sensor (the RealityMirror E12 is the only on-ramp). Same (project, env) ⇒
+ * byte-identical fragments + instrumentation.
+ */
+export async function emitObservabilityFragments(
+	projectId: string | null,
+	env: string,
+): Promise<ObservabilitySubstrateView> {
+	const safeEnv: Environment = isKnownEnvironment(env) ? env : "dev";
+	const project = projectId?.trim() ? projectId.trim() : "__demo__";
+
+	try {
+		const go = resolveGo();
+		const { stdout } = await execFileP(
+			go.bin,
+			[
+				"run",
+				"./cmd/aidosdatafragments",
+				"-project",
+				project,
+				"-env",
+				safeEnv,
+				"-observability",
+			],
+			{
+				cwd: `${APP_REPO}/back`,
+				timeout: 120_000,
+				maxBuffer: 8 * 1024 * 1024,
+				env: { ...process.env, GOTOOLCHAIN: go.toolchain },
+			},
+		);
+		const raw = JSON.parse(stdout) as RawObsOutput;
+		return {
+			ok: true,
+			project_id: raw.project_id,
+			env: safeEnv,
+			observability: raw.observability ?? [],
+			instrumentation: raw.instrumentation ?? null,
+			keys: raw.keys ?? [],
+			obs_no_truth: raw.obs_no_truth ?? false,
+		};
+	} catch (e) {
+		return {
+			ok: false,
+			project_id: project,
+			env: safeEnv,
+			observability: [],
+			instrumentation: null,
+			keys: [],
+			obs_no_truth: false,
 			error: e instanceof Error ? e.message : String(e),
 		};
 	}

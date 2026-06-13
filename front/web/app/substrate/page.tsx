@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
-import { emitAsyncFragments, emitFragments } from "./actions";
+import {
+	emitAsyncFragments,
+	emitFragments,
+	emitObservabilityFragments,
+} from "./actions";
 import { SubstrateScreen } from "./SubstrateScreen";
 
 export const metadata: Metadata = {
@@ -38,9 +42,10 @@ export default async function SubstratePage() {
 	// Seed the panel off prod (dev) so the four fragments — including the opt-in
 	// doltgres — are visible on first paint; the selector drives prod from there. The
 	// async twin (Windmill + NATS) is seeded for the same env so both slices are in step.
-	const [initialData, initialAsync] = await Promise.all([
+	const [initialData, initialAsync, initialObs] = await Promise.all([
 		emitFragments(ctx.activeId, "dev"),
 		emitAsyncFragments(ctx.activeId, "dev"),
+		emitObservabilityFragments(ctx.activeId, "dev"),
 	]);
 
 	return (
@@ -83,6 +88,7 @@ export default async function SubstratePage() {
 						activeProjectId={ctx.activeId}
 						initialData={initialData}
 						initialAsync={initialAsync}
+						initialObs={initialObs}
 					/>
 				</div>
 			</main>

@@ -2,27 +2,36 @@
 
 import { useState } from "react";
 import { AsyncSubstratePanel } from "./AsyncSubstratePanel";
-import type { AsyncSubstrateView, SubstrateView } from "./actions";
+import type {
+	AsyncSubstrateView,
+	ObservabilitySubstrateView,
+	SubstrateView,
+} from "./actions";
+import { ObservabilitySubstratePanel } from "./ObservabilitySubstratePanel";
 import { SubstratePanel } from "./SubstratePanel";
 
 /**
  * SubstrateScreen is the /substrate cockpit shell: it composes the DP15 DATA-substrate
  * panel (Postgres / Doltgres / Valkey / PgBouncer, with the env selector that owns the
- * gesture) and the DP16 ASYNC-substrate panel (Windmill / NATS + the demo job trigger).
+ * gesture), the DP16 ASYNC-substrate panel (Windmill / NATS + the demo job trigger) and the
+ * DP17 OBSERVABILITY-substrate panel (OTel collector / SigNoz / GlitchTip + the emitted
+ * instrumentation + the « écrit aucune vérité » indicator).
  *
- * It HOISTS the selected env from the data panel's selector so the async twin re-emits
- * for the SAME (project, env) in step — one selector drives both substrate slices. The
- * shell writes nothing (THE WALL §2): both panels are below-the-line projections of the
- * authoritative Go.
+ * It HOISTS the selected env from the data panel's selector so the async + observability
+ * twins re-emit for the SAME (project, env) in step — one selector drives all substrate
+ * slices. The shell writes nothing (THE WALL §2): every panel is a below-the-line projection
+ * of the authoritative Go.
  */
 export function SubstrateScreen({
 	activeProjectId,
 	initialData,
 	initialAsync,
+	initialObs,
 }: {
 	activeProjectId: string | null;
 	initialData: SubstrateView;
 	initialAsync: AsyncSubstrateView;
+	initialObs: ObservabilitySubstrateView;
 }) {
 	const [env, setEnv] = useState<string>(initialData.env);
 
@@ -37,6 +46,11 @@ export function SubstrateScreen({
 				activeProjectId={activeProjectId}
 				env={env}
 				initial={initialAsync}
+			/>
+			<ObservabilitySubstratePanel
+				activeProjectId={activeProjectId}
+				env={env}
+				initial={initialObs}
 			/>
 		</div>
 	);
