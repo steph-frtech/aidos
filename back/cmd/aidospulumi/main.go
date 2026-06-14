@@ -67,6 +67,7 @@ func main() {
 	out := fs.String("out", "", "the export artefact path (X.aidos.json) — the portable genome (only for `export`; defaults to <project>.aidos.json)")
 	artifact := fs.String("artifact", "", "the portable genome to recompile (X.aidos.json) — only for `found`")
 	outRoot := fs.String("out-root", "", "the recompilation root `found` writes gen/<name>/ under (only for `found`; defaults to .found/<project>)")
+	changed := fs.String("changed", "", "INCREMENTAL found: recompile ONLY the families the red wave reddens for this changed node id (an entity/operation/control name, or `master`/`manifest`) — only for `found`")
 	_ = fs.Parse(os.Args[2:])
 
 	switch sub {
@@ -79,7 +80,11 @@ func main() {
 	case "export":
 		runExport(*project, *entities, *out)
 	case "found":
-		runFound(*artifact, *project, *outRoot)
+		if *changed != "" {
+			runFoundIncremental(*artifact, *project, *outRoot, *changed)
+		} else {
+			runFound(*artifact, *project, *outRoot)
+		}
 	default:
 		usage()
 		os.Exit(2)
@@ -95,6 +100,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  emit   : print the emitted Pulumi program (in-memory, no pulumi) as JSON — the front preview source")
 	fmt.Fprintln(os.Stderr, "  export : write the project's ARBRE (the content-addressed genome) to X.aidos.json — the portable source `found` recompiles from")
 	fmt.Fprintln(os.Stderr, "  found  : recompile the WHOLE app from X.aidos.json — schema + Hono server + master view + 3 children + Pulumi program, BYTE-IDENTICAL to a direct emission (the compiler)")
+	fmt.Fprintln(os.Stderr, "           with --changed <nodeID>: INCREMENTAL — recompile ONLY the families the red wave reddens for that changed node (entity/operation/control name, or `master`/`manifest`)")
 }
 
 // runUp materialises the emitted artifacts then drives the pulumi lifecycle, printing the result as

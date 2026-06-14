@@ -122,74 +122,110 @@ func FoundProject(tree ProjectTree, outRoot string) (FoundResult, error) {
 // nothing; each emitter is fed exactly the cut the export gathered, so the bytes equal the direct
 // emission. Split out so the byte-identity is a pure-function property the mirror can assert without
 // touching disk (and so FoundProject's only impurity is the final write).
+//
+// It is the COMPLETE recompilation (all SEVEN families). FoundIncremental (impact.go) recompiles a
+// SUBSET of these same per-family emitters — the families the red wave touched — so the incremental
+// output is byte-identical to the corresponding slice of recompile (the incremental ⊆ complete proof).
 func recompile(tree ProjectTree) ([]FoundFile, error) {
+	return recompileFamilies(tree, AllFamilies())
+}
+
+// recompileFamilies recompiles EXACTLY the requested families (in canonical family order), reusing the
+// existing emitters — the shared heart of both FoundProject (all families) and FoundIncremental (the red
+// subset). A family NOT in `want` is NOT recompiled (no emitter is run for it), so its artefacts never
+// appear in the output: that is the whole point of the red wave (incremental recompilation). The master
+// view is recompiled iff ANY view family (master/web/mobile/desktop) is wanted, because the children
+// derive FROM it — but its master-view.json artefact is emitted only when the `master` family is wanted.
+//
+// PURE: same (tree, want) → byte-identical FoundFiles; no clock, no RNG, no disk. Each emitter is fed the
+// SAME cut recompile feeds it, so a family's recompiled bytes equal recompile's bytes for that family.
+func recompileFamilies(tree ProjectTree, want map[Family]bool) ([]FoundFile, error) {
 	out := make([]FoundFile, 0, 24)
 
-	// (1) The schema — the project's data DDL, from the genome's entity sources.
-	schema, _, err := appdata.EmitProjectData(tree.Name, tree.Entities)
-	if err != nil {
-		return nil, fmt.Errorf("found: recompile schema: %w", err)
+	// (1) schema — the project's data DDL, from the genome's entity sources.
+	if want[FamilySchema] {
+		schema, _, err := appdata.EmitProjectData(tree.Name, tree.Entities)
+		if err != nil {
+			return nil, fmt.Errorf("found: recompile schema: %w", err)
+		}
+		out = append(out, foundFile("schema.sql", schema))
 	}
-	out = append(out, foundFile("schema.sql", schema))
 
-	// (2) The Hono server scaffold — from the ServerSpec rebuilt from the genome (the SAME cut
+	// (2) server — the Hono server scaffold, from the ServerSpec rebuilt from the genome (the SAME cut
 	// projectServerSpec pins: the operations + the served view's entities + the web build dir).
-	scaffold, br := honoemit.EmitServerScaffold(foundServerSpec(tree))
-	if br != nil {
-		return nil, fmt.Errorf("found: recompile server scaffold (%s): %s", br.Code, br.Explanation)
-	}
-	for _, a := range scaffold {
-		out = append(out, foundFile(a.Path, a.Bytes))
-	}
-
-	// (3) The MASTER view — the canonical, platform-agnostic parent node (the children derive from it).
-	master, br := honoemit.EmitMasterView(tree.WebAppSpec)
-	if br != nil {
-		return nil, fmt.Errorf("found: recompile master view (%s): %s", br.Code, br.Explanation)
-	}
-	masterBytes, err := masterViewArtifactBytes(master)
-	if err != nil {
-		return nil, fmt.Errorf("found: address master view: %w", err)
-	}
-	out = append(out, foundFile("master-view.json", masterBytes))
-
-	// (4) The WEB child — the React web idiom, byte-identical to EmitWebApp (anti-overwrite §9).
-	webChild, br := honoemit.EmitWebChild(tree.WebAppSpec)
-	if br != nil {
-		return nil, fmt.Errorf("found: recompile web child (%s): %s", br.Code, br.Explanation)
-	}
-	for _, a := range webChild.Artifacts {
-		out = append(out, foundFile(a.Path, a.Bytes))
+	if want[FamilyServer] {
+		scaffold, br := honoemit.EmitServerScaffold(foundServerSpec(tree))
+		if br != nil {
+			return nil, fmt.Errorf("found: recompile server scaffold (%s): %s", br.Code, br.Explanation)
+		}
+		for _, a := range scaffold {
+			out = append(out, foundFile(a.Path, a.Bytes))
+		}
 	}
 
-	// (5) The MOBILE child — reproduced from the master APPLYING the capitalised adaptations (the
-	// loopback). No matching capitalisation ⇒ the canonical mobile child (byte-identical to EmitMobileChild).
-	mobile, vbr := honoemit.ReproduceWithCapitalised(master, honoemit.ChildMobile, tree.Adaptations)
-	if vbr != nil {
-		return nil, fmt.Errorf("found: recompile mobile child (%s): %s", vbr.Code, vbr.Explanation)
-	}
-	for _, a := range mobile.Artifacts {
-		out = append(out, foundFile(a.Path, a.Bytes))
+	// (3)–(6) the VIEW family — the master node + its three children. The master is the canonical,
+	// platform-agnostic parent (the children derive FROM it), so it must be (re)emitted whenever ANY view
+	// family is wanted; only the `master` family persists the master-view.json artefact.
+	if want[FamilyMaster] || want[FamilyWeb] || want[FamilyMobile] || want[FamilyDesktop] {
+		master, br := honoemit.EmitMasterView(tree.WebAppSpec)
+		if br != nil {
+			return nil, fmt.Errorf("found: recompile master view (%s): %s", br.Code, br.Explanation)
+		}
+
+		// (3) master-view.json — the canonical parent node (emitted only when the master family is red).
+		if want[FamilyMaster] {
+			masterBytes, err := masterViewArtifactBytes(master)
+			if err != nil {
+				return nil, fmt.Errorf("found: address master view: %w", err)
+			}
+			out = append(out, foundFile("master-view.json", masterBytes))
+		}
+
+		// (4) web — the React web idiom, byte-identical to EmitWebApp (anti-overwrite §9).
+		if want[FamilyWeb] {
+			webChild, br := honoemit.EmitWebChild(tree.WebAppSpec)
+			if br != nil {
+				return nil, fmt.Errorf("found: recompile web child (%s): %s", br.Code, br.Explanation)
+			}
+			for _, a := range webChild.Artifacts {
+				out = append(out, foundFile(a.Path, a.Bytes))
+			}
+		}
+
+		// (5) mobile — reproduced from the master APPLYING the capitalised adaptations (the loopback).
+		if want[FamilyMobile] {
+			mobile, vbr := honoemit.ReproduceWithCapitalised(master, honoemit.ChildMobile, tree.Adaptations)
+			if vbr != nil {
+				return nil, fmt.Errorf("found: recompile mobile child (%s): %s", vbr.Code, vbr.Explanation)
+			}
+			for _, a := range mobile.Artifacts {
+				out = append(out, foundFile(a.Path, a.Bytes))
+			}
+		}
+
+		// (6) desktop — reproduced from the master APPLYING the capitalised adaptations.
+		if want[FamilyDesktop] {
+			desktop, vbr := honoemit.ReproduceWithCapitalised(master, honoemit.ChildDesktop, tree.Adaptations)
+			if vbr != nil {
+				return nil, fmt.Errorf("found: recompile desktop child (%s): %s", vbr.Code, vbr.Explanation)
+			}
+			for _, a := range desktop.Artifacts {
+				out = append(out, foundFile(a.Path, a.Bytes))
+			}
+		}
 	}
 
-	// (6) The DESKTOP child — reproduced from the master APPLYING the capitalised adaptations.
-	desktop, vbr := honoemit.ReproduceWithCapitalised(master, honoemit.ChildDesktop, tree.Adaptations)
-	if vbr != nil {
-		return nil, fmt.Errorf("found: recompile desktop child (%s): %s", vbr.Code, vbr.Explanation)
-	}
-	for _, a := range desktop.Artifacts {
-		out = append(out, foundFile(a.Path, a.Bytes))
-	}
-
-	// (7) The Pulumi PROGRAM — the 3-container wired stack, from the genome's manifest. The per-project
-	// server image tag is the SAME the materialiser pins (honoServerImageTag), so the program references
-	// the project's own routes — the recompiled program byte-equals the materialised one.
-	infra, br := honoemit.EmitPulumiStackHono(tree.Name, foundEnv, tree.StackManifest, honoemit.StackHonoOpts{HonoImage: honoServerImageTag(tree.Name)})
-	if br != nil {
-		return nil, fmt.Errorf("found: recompile pulumi stack (%s): %s", br.Code, br.Explanation)
-	}
-	for _, a := range infra {
-		out = append(out, foundFile(a.Path, a.Bytes))
+	// (7) infra — the Pulumi PROGRAM (the 3-container wired stack, from the genome's manifest). The
+	// per-project server image tag is the SAME the materialiser pins (honoServerImageTag), so the program
+	// references the project's own routes — the recompiled program byte-equals the materialised one.
+	if want[FamilyInfra] {
+		infra, br := honoemit.EmitPulumiStackHono(tree.Name, foundEnv, tree.StackManifest, honoemit.StackHonoOpts{HonoImage: honoServerImageTag(tree.Name)})
+		if br != nil {
+			return nil, fmt.Errorf("found: recompile pulumi stack (%s): %s", br.Code, br.Explanation)
+		}
+		for _, a := range infra {
+			out = append(out, foundFile(a.Path, a.Bytes))
+		}
 	}
 
 	return out, nil
