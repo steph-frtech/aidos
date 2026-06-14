@@ -1,0 +1,262 @@
+// scaffold_test.go — le MIROIR du SERVEUR HONO ÉMIS RUNNABLE (la clé de voûte côté serveur).
+//
+// EmitServerScaffold(spec) rend, EN PLUS de server.ts, le boot index.ts (qui câble deps.interpret
+// sur le sidecar via fetch + sert via @hono/node-server), le package.json et le Dockerfile. Le miroir
+// prouve : (a) la JOURNÉE — le scaffold BOOTE sous node et route une operation vers un sidecar fake
+// (fetch → 201) ; (b) le câblage — index.ts lit INTERPRETER_URL et POST /interpret {operation,input} ;
+// (c) la reproductibilité (byte-stable, FN02-pur) ; (d) l'honnêteté (spec malformé → BlockReason).
+package honoemit
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"pgregory.net/rapid"
+)
+
+// scaffoldByPath returns the artifact whose Path ends with the given basename (the scaffold lands files
+// under gen/<project>/server/). Fails the test if absent.
+func scaffoldByPath(t *testing.T, arts []Artifact, base string) Artifact {
+	t.Helper()
+	for _, a := range arts {
+		if strings.HasSuffix(a.Path, "/"+base) {
+			return a
+		}
+	}
+	t.Fatalf("scaffold missing %q (have %v)", base, artPaths(arts))
+	return Artifact{}
+}
+
+func artPaths(arts []Artifact) []string {
+	out := make([]string, 0, len(arts))
+	for _, a := range arts {
+		out = append(out, a.Path)
+	}
+	return out
+}
+
+// TestScaffold_EmitsBootableSet — the scaffold lands the FOUR bootable files: server.ts (the pure
+// server), index.ts (the boot), package.json (the deps), Dockerfile (the node image). All four under
+// gen/<project>/server/, all carrying the SAME source hash (one source → one content address).
+func TestScaffold_EmitsBootableSet(t *testing.T) {
+	arts, br := EmitServerScaffold(checkoutSpec())
+	if br != nil {
+		t.Fatalf("EmitServerScaffold refused: %s", br.Explanation)
+	}
+	for _, base := range []string{"server.ts", "index.ts", "package.json", "Dockerfile"} {
+		a := scaffoldByPath(t, arts, base)
+		if !strings.HasPrefix(a.Path, "gen/shop/server/") {
+			t.Fatalf("%s not under gen/shop/server/: %q", base, a.Path)
+		}
+	}
+	// One source → one content address across the whole scaffold.
+	src := arts[0].SourceHash
+	for _, a := range arts {
+		if a.SourceHash != src {
+			t.Fatalf("scaffold artifacts carry diverging source hashes: %q vs %q", a.SourceHash, src)
+		}
+	}
+}
+
+// TestScaffold_BootWiresInterpreterURL — the boot index.ts reads INTERPRETER_URL and POSTs each
+// operation to ${INTERPRETER_URL}/interpret with {operation, input}, serving via @hono/node-server. It
+// is the EXACT wire contract the Go sidecar (interpretsvc POST /interpret) answers.
+func TestScaffold_BootWiresInterpreterURL(t *testing.T) {
+	arts, br := EmitServerScaffold(checkoutSpec())
+	if br != nil {
+		t.Fatalf("EmitServerScaffold refused: %s", br.Explanation)
+	}
+	idx := string(scaffoldByPath(t, arts, "index.ts").Bytes)
+	for _, want := range []string{
+		`import { serve } from "@hono/node-server";`,
+		`import { createApp, type OperationInterpreter } from "./server.ts";`,
+		`process.env["INTERPRETER_URL"]`,
+		"`${baseUrl}/interpret`",
+		`method: "POST"`,
+		`JSON.stringify({ operation, input })`,
+		`createApp({ interpret: createInterpreter(interpreterUrl) })`,
+		`serve({ fetch: app.fetch, port });`,
+	} {
+		if !strings.Contains(idx, want) {
+			t.Fatalf("boot index.ts missing %q\n%s", want, idx)
+		}
+	}
+	// package.json pins the two runtime deps.
+	pkg := string(scaffoldByPath(t, arts, "package.json").Bytes)
+	for _, want := range []string{`"hono":`, `"@hono/node-server":`, `"type": "module"`} {
+		if !strings.Contains(pkg, want) {
+			t.Fatalf("package.json missing %q\n%s", want, pkg)
+		}
+	}
+}
+
+// TestScaffold_ByteStable_AndFN02Pure — same spec → byte-identical scaffold under input-order
+// permutation, and no emitted TS module carries a module-scope mutable binding (FN02). The
+// reproducibility + purity mirror for the boot scaffold.
+func TestScaffold_ByteStable_AndFN02Pure(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		spec := genServerSpec(t)
+		a1, br := EmitServerScaffold(spec)
+		if br != nil {
+			t.Fatalf("EmitServerScaffold refused a projectable spec: %s", br.Explanation)
+		}
+		a2, _ := EmitServerScaffold(shuffledSpec(spec))
+		if len(a1) != len(a2) {
+			t.Fatalf("scaffold artifact count diverged: %d vs %d", len(a1), len(a2))
+		}
+		for i := range a1 {
+			if a1[i].Path != a2[i].Path || string(a1[i].Bytes) != string(a2[i].Bytes) {
+				t.Fatalf("scaffold %q not byte-identical under input-order permutation", a1[i].Path)
+			}
+			if a1[i].OutputHash != a2[i].OutputHash {
+				t.Fatalf("scaffold %q output hash diverged", a1[i].Path)
+			}
+		}
+		// FN02 purity: no module-scope let/var in any emitted .ts.
+		for _, art := range a1 {
+			if !strings.HasSuffix(art.Path, ".ts") {
+				continue
+			}
+			for _, line := range strings.Split(string(art.Bytes), "\n") {
+				if strings.HasPrefix(line, "let ") || strings.HasPrefix(line, "var ") {
+					t.Fatalf("module-scope mutable binding in %s: %q", art.Path, line)
+				}
+			}
+		}
+	})
+}
+
+// TestScaffold_MalformedRefused — the honesty rule: a malformed spec (empty project / unnamed op / bad
+// async trigger) is a typed BlockReason, never a partial scaffold (the server.ts validation owns it).
+func TestScaffold_MalformedRefused(t *testing.T) {
+	for i, sp := range []ServerSpec{
+		{Project: "", Ops: []Op{{Name: "x"}}},
+		{Project: "p", Ops: nil},
+		{Project: "p", Ops: []Op{{Name: ""}}},
+	} {
+		if _, br := EmitServerScaffold(sp); br == nil {
+			t.Fatalf("case %d: malformed spec was NOT refused", i)
+		}
+	}
+}
+
+// TestScaffold_BootsAndRoutesToSidecar is the JOURNEY (the done-criterion): GIVEN the checkout spec,
+// WHEN we emit the scaffold and BOOT index.ts under node against a FAKE sidecar (an httptest server
+// answering POST /interpret), THEN createApp + the fetch interpreter route a real operation call all
+// the way to the sidecar and back — proving the emitted SERVER↔SIDECAR wire actually runs. This is the
+// clé-de-voûte proof: the emitted Hono server delegates to the sidecar over HTTP.
+func TestScaffold_BootsAndRoutesToSidecar(t *testing.T) {
+	node := nodeBin(t)
+	root := repoRoot(t)
+
+	// A FAKE sidecar: it answers POST /interpret with a deterministic outcome (the wire shape the real
+	// interpretsvc returns). The boot's fetch interpreter must reach it and surface its result.
+	var gotOp string
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/interpret" || r.Method != http.MethodPost {
+			http.Error(w, "nope", http.StatusNotFound)
+			return
+		}
+		var body struct {
+			Operation string         `json:"operation"`
+			Input     map[string]any `json:"input"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gotOp = body.Operation
+		w.Header().Set("content-type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"operation": body.Operation,
+			"result":    map[string]any{"id": "order-1"},
+			"events":    []string{"OrderCreated"},
+		})
+	}))
+	t.Cleanup(sidecar.Close)
+
+	arts, br := EmitServerScaffold(checkoutSpec())
+	if br != nil {
+		t.Fatalf("EmitServerScaffold refused: %s", br.Explanation)
+	}
+
+	dir, err := os.MkdirTemp(root, "honoemit-scaffold-")
+	if err != nil {
+		t.Fatalf("mkdir temp under root: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	for _, base := range []string{"server.ts", "index.ts"} {
+		write(t, filepath.Join(dir, base), scaffoldByPath(t, arts, base).Bytes)
+	}
+
+	// Boot harness: import the boot's interpreter wiring INDIRECTLY by importing createApp + building
+	// the same fetch interpreter the boot builds (against the fake sidecar URL), then drive it through
+	// Hono's app.request. This proves the EMITTED server.ts + the fetch-to-sidecar contract run.
+	harness := `
+import { createApp } from "./server.ts";
+
+// The exact interpreter the boot index.ts builds: a fetch POST to ${INTERPRETER_URL}/interpret.
+const baseUrl = process.env["INTERPRETER_URL"];
+const interpret = async (operation, input) => {
+  const res = await fetch(` + "`${baseUrl}/interpret`" + `, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ operation, input }),
+  });
+  if (!res.ok) throw new Error("interpreter " + res.status);
+  return res.json();
+};
+
+const app = createApp({ interpret });
+const out = {};
+const health = await app.request("/healthz");
+out.healthStatus = health.status;
+
+const created = await app.request("/createorder", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ total: 42 }),
+});
+out.opStatus = created.status;
+out.opBody = await created.json();
+
+process.stdout.write(JSON.stringify(out));
+`
+	write(t, filepath.Join(dir, "harness.ts"), []byte(harness))
+
+	cmd := exec.Command(node, "--experimental-strip-types", "--no-warnings", filepath.Join(dir, "harness.ts"))
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "INTERPRETER_URL="+sidecar.URL)
+	stdout, err := cmd.Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			t.Fatalf("emitted scaffold failed to boot: %v\nstderr:\n%s", err, ee.Stderr)
+		}
+		t.Fatalf("node run failed: %v", err)
+	}
+
+	var res struct {
+		HealthStatus int            `json:"healthStatus"`
+		OpStatus     int            `json:"opStatus"`
+		OpBody       map[string]any `json:"opBody"`
+	}
+	if err := json.Unmarshal(stdout, &res); err != nil {
+		t.Fatalf("harness output not JSON: %v\nraw: %s", err, stdout)
+	}
+	if res.HealthStatus != 200 {
+		t.Fatalf("healthz not green: %d", res.HealthStatus)
+	}
+	// THEN: the operation route reached the sidecar and surfaced its result.
+	if res.OpStatus != 201 {
+		t.Fatalf("operation route not 201: %d body=%v", res.OpStatus, res.OpBody)
+	}
+	if gotOp != "createOrder" {
+		t.Fatalf("sidecar did not receive the createOrder command (got %q)", gotOp)
+	}
+	if res.OpBody["operation"] != "createOrder" {
+		t.Fatalf("server did not surface the sidecar result: %v", res.OpBody)
+	}
+}

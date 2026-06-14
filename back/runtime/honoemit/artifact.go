@@ -3,6 +3,7 @@ package honoemit
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"github.com/steph-frtech/aidos/back/kernel/records"
 )
@@ -35,6 +36,12 @@ func artifact(path, target string, out []byte, sourceHash string) Artifact {
 		OutputHash: records.Hash(out),
 		Protected:  true,
 	}
+}
+
+// sortArtifacts orders an artifact slice by Path (the FIXED, path-sorted order so the slice is
+// itself byte-stable). Reused by every multi-artifact emitter so the order never drifts.
+func sortArtifacts(arts []Artifact) {
+	sort.SliceStable(arts, func(i, j int) bool { return arts[i].Path < arts[j].Path })
 }
 
 // jsStr renders a Go string as a TS/JS double-quoted literal, JSON-escaped — deterministic,

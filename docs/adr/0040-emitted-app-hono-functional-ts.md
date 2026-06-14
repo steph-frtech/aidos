@@ -64,3 +64,57 @@ La **seule décision structurelle forcée** (au-delà d'un changement de templat
 - **OQ-0040-front** : framework front exact de l'app émise (Hono JSX/SSR vs Hono comme API + client `hc` séparé) — tranché en **S93**. Thème/i18n inchangés.
 - **OQ-0040-driver** : choix du client Postgres TS (postgres.js / Drizzle / Kysely) et re-mesure des caveats Doltgres beta contre lui — tranché par le spike **S88** (slot `replaceable`, ADR au step).
 - **OQ-0040-linear** : l'issue `EL00 · …` (projet AIDOS `aidos-2a9085453be8`, label `adr`) à créer/déplacer en `Done` au prochain run authentifié (CLAUDE.md §11, best-effort, ne bloque pas le step).
+
+## Addendum — 2026-06-14 : la STACK MULTI-PLATEFORME de l'app émise — UNE spec → N plateformes (Hono+React+Expo+Electron) + le SIDECAR INTERPRÉTEUR Go, prouvé runnable
+
+> **Statut : ACCEPTÉ — gravé par l'utilisateur (2026-06-14).** Cet addendum **n'efface rien** (anti-overwrite §9) ; il **confirme** la frontière constructrice ≠ construite (Décision 1) et la Décision 7 (l'interpréteur reste Go gouvernable, appelé par callback), et **grave** ce que la décision impliquait sans le nommer : l'app émise n'est pas *une* application — c'est **une seule spec qui se projette vers N plateformes**, chacune une cible déterministe ; et la clé de voûte runtime de toutes ces plateformes est **le même sidecar interpréteur Go**.
+
+**Décision utilisatrice (2026-06-14) — « une spec → N plateformes ».** Depuis la SOURCE déclarée au-dessus du mur (entités · opérations · invariants · vues · contrôles — content-adressée, append-only), AIDOS émet l'app utilisateur sur **plusieurs surfaces à la fois**, chacune une **projection déterministe byte-stable** de la même vérité. La plateforme est une **dimension de l'émission**, jamais une seconde source à maintenir (la même règle que la cible de déploiement, ADR 0043/DP33). *Une source → N plateformes.*
+
+### La stack multi-plateforme gravée (la matrice cible)
+
+| Plan | Cible | Choix gravé | Statut |
+|---|---|---|---|
+| **Backend (serveur émis)** | router HTTP, operations→routes | **Hono / TypeScript** pur-fonctionnel (handler valide/route/projette, « functional core, imperative shell ») | mandatory |
+| **Backend (exécution op→DB)** | exécuter les opérations sur la base | **SIDECAR INTERPRÉTEUR GO** — un service qui **réutilise `operation.Interpret` VERBATIM**, écrit le schéma de l'app émise (jamais une vérité) | mandatory |
+| **Web** | app web | **React** (Hono + React — SSR/JSX ou API Hono + client `hc` typé, tranché S93) | mandatory |
+| **Mobile** | app mobile native | **Expo / React Native** (« expo go ») — partage le client typé `hc` et les types `TargetTSTypes` | mandatory |
+| **Desktop** | « l'app en dur » | **Electron** — empaquète le même front React + le serveur Hono + le sidecar | mandatory |
+
+Le fil rouge : **un seul modèle de types partagé** (`TargetTSTypes`) et **un seul client de données typé** (`hc` de Hono) irriguent Web (React), Mobile (Expo/React Native) **et** Desktop (Electron) — pas de double-typage, pas de re-déclaration par plateforme. Le **DDL Postgres** (`TargetPgDDL`) et le **datastore** (ADR 0006, dialecte Postgres, Doltgres opt-in, Atlas) sont **neutres à la plateforme** et inchangés.
+
+### Le sidecar interpréteur Go — la clé de voûte runtime (Décision 7 réalisée)
+
+L'Operation-DSL ne s'exécute **qu'en Go**, **une seule fois**, **gouvernablement** : le **sidecar interpréteur** est ce service. Il **réutilise `operation.Interpret` VERBATIM** — **aucune règle d'interprétation n'est réimplémentée**, et il n'est **jamais** ré-émis en TS (pas de duplication d'une logique gouvernée, une seule source d'interprétation autoritaire — determinism-first, §8). Les handlers **Hono/TS** de toutes les plateformes l'appellent à l'exécution via un **contrat HTTP** :
+
+- **`POST /interpret`** `{operation, input, auth?}` → `{result, events}` — le port émis `OperationInterpreter = (operation, input) => Promise<unknown>` s'y branche directement ; erreurs honnêtes (`404` op inconnue, `403` deny policy, `422` règle métier, `400`/`405`).
+- **`GET /healthz`** → `{status:"ok", operations:[…]}`.
+
+**Le pont State↔DB vit ENTIÈREMENT dans les seams** (`operation.Deps` : Validator/Authorizer/Reader/Mutator). `operation.Interpret` reste **pur** et passe ses effets **par** ces seams — c'est le contrat (`operation/deps.go`), par **design**, pas un gap : le job du sidecar est exactement de **fournir** ces seams. Le sidecar offre deux implémentations : **`MemDeps`** (seams en mémoire — le chemin logique-pure du miroir) et **`DBDeps`** (le pont **pgx** réel sur le **schéma émis** : read=`SELECT`, create=`INSERT … RETURNING *` avec id **content-adressé** via `records.Hash`, clear=`DELETE`). **Mur §2 : le sidecar n'écrit QUE les tables de l'app émise** — jamais `kernel`/`mirrors`/`fitness`.
+
+**Prouvé runnable aujourd'hui (pas supposé).** `back/runtime/interpretsvc/` (logique pure importable + seams mémoire + pont pgx + serveur HTTP) et `back/cmd/aidosinterpreter/` (le service `main`, `PORT` 8080, `DATABASE_URL` absent → mode démo seedé / présent → `DBDeps`) — **13 miroirs, tous verts** : 4 fonctionnels (`createOrder` crée un `Order` depuis le cart, vide le cart, émet `[OrderCreated, CartCleared]` ; DENY / op-inconnue / cart-absent = échecs typés sans `Order`), 1 property rapid (même input+state → même effet), 6 contrats de fil `httptest`, 2 d'intégration **Testcontainers + Postgres réel** (read/insert/delete réels, skip gracieux sans Docker). Binaire booté, `curl /interpret` a renvoyé un `Order` réel.
+
+### Le shop server Go était une DIVERGENCE de spec (corrigée vers Hono)
+
+La slice §S46 avait livré un serveur de boutique **en Go** (`http.HandlerFunc` émis délégant à `operation.Interpret` in-process) : c'était une **divergence** de la spec d'émission — l'app émise hérite par défaut de la stack de la **constructrice** (le piège que cette ADR a tranché, Décision 1). La cible canonique est **Hono/TS** ; le Go in-process est remplacé par le couple **serveur Hono émis + callback vers le sidecar Go** (Décision 7). Le serveur Go subsiste comme **preuve d'exécution** de l'interpréteur (la parité de comportement que le sidecar préserve), **pas** comme cible de déploiement.
+
+### Le déploiement réel passe par Pulumi (ADR 0043 amendé)
+
+Le **déploiement** de l'app émise multi-plateforme — bundle **Hono/TS** (front React + routing back) **+ le sidecar interpréteur Go** comme seule dépendance Go (partagée, gouvernée, versionnée avec le Kernel) — est provisionné par **Pulumi** (ADR 0043, addendum 2026-06-13) : un **stack par projet×env** via `@pulumi/docker` (réel, prouvé par `demoshop-dev` live, routé Traefik + Let's Encrypt), portable vers `future_cloud` par simple changement de stack/provider (DP33). L'app **mobile** (Expo) et **desktop** (Electron) s'empaquètent par leurs toolchains natives (EAS / electron-builder) au-dessus du **même** serveur Hono + sidecar.
+
+### Déterminisme / mur (inchangés, §2/§6/§8)
+
+- **Émetteurs purs byte-stables :** chaque cible de plateforme est une **projection déterministe** de la source (même Kernel → mêmes octets, par cible) ; aucun LLM dans l'émission.
+- **Le sidecar n'écrit AUCUNE vérité :** il **réutilise** `operation.Interpret` (la source d'interprétation, jamais dupliquée) et n'écrit que le schéma de l'app émise (below-the-line) ; SQL byte-stable (colonnes triées), id content-adressé.
+- **Une source, N plateformes :** la plateforme est une **dimension** de la projection, jamais une seconde déclaration ; le mur, le mirror-first et les neuf `phases` du contrat de step restent intacts (garde ajoutée, jamais retirée).
+
+### OpenQuestions de l'addendum (documentées, non truquées — le sidecar est runnable aujourd'hui)
+
+- **OQ-SIDECAR-clear-where** *(le « marche » réel)* : `operation.evalMutate` ne forwarde au seam `Mutator` que le `Data` du step — la **cible** du verbe `clear` vit dans le `Where` (`{id:$.cart.id}`) que l'interpréteur **ne transmet pas** encore. Le seam dérive la cible **honnêtement** du State (slot `$.<entity>` lié par le read), jamais une règle réimplémentée ; un `Where` non dérivable est **refusé** (jamais de table wipe). Le vrai correctif (thread `m.Where` au Mutator) est un **changement Kernel**, hors de cette surface.
+- **OQ-SIDECAR-validate / -policy / -expr / -registry** : `Validator` = check minimal ; `Authorizer` = verdict configurable (vrai = évaluateur Policy ∀) ; `sum()` pour `total` non câblé (même OQ que la slice §S46) ; la `Registry` (coupe d'opérations) ancre `createOrder`, le loader `kernel.operation` étant le tooth suivant (`NewRegistry` prend toute coupe). Tous **forward-deps documentés**, ne bloquent pas.
+
+### Sur l'implémentation (la preuve)
+
+- `back/runtime/interpretsvc/{interpretsvc.go, memdeps.go, dbdeps.go, http.go, README.md}` — logique pure + seams mémoire + pont pgx réel + serveur HTTP.
+- `back/cmd/aidosinterpreter/{main.go, Dockerfile}` — le service `main` (distroless multi-stage).
+- **Gates :** `go build ./...` OK (module entier, voisins `operation`/`honoemit`/`checkout` sans régression) ; `go test ./runtime/interpretsvc/` **vert** (13 tests) ; `-race` clean ; gofmt/vet propres ; aucun binaire ELF parasite.
