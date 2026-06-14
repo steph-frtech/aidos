@@ -49,7 +49,9 @@ export function InstanceClient({
 }: {
 	initialConfig: InstanceConfig;
 }) {
-	const { strings: t } = useV3Session();
+	// projectId = le slug du PROJET COURANT : la stack par environnement est résolue POUR LUI
+	// (test → test-dev.sagedesk.fr), jamais le placeholder « app ». Le couple projet/env a SON adresse.
+	const { strings: t, projectId } = useV3Session();
 	// La config POSÉE (les tuiles la lisent) vs le BROUILLON du formulaire.
 	const [config, setConfig] = useState<InstanceConfig>(initialConfig);
 	const [draft, setDraft] = useState<Record<string, string>>({
@@ -175,7 +177,7 @@ export function InstanceClient({
 				</ul>
 			</section>
 
-			{/* ── les CONTENEURS docker connus (l'éditeur live, la boutique démo) ── */}
+			{/* ── les CONTENEURS docker connus de l'INSTANCE (tous projets confondus, réalité docker) ── */}
 			<section
 				data-testid="v3-inst-docker"
 				className="space-y-2 rounded-xl border border-border bg-card p-4"
@@ -250,7 +252,7 @@ export function InstanceClient({
 				{/* · la table résolue : libellé amical, URL (%env% substitué), niveau déclaré */}
 				<table className="w-full border-collapse text-left">
 					<tbody>
-						{envStackOf(activeEnv, config).map((row) => (
+						{envStackOf(activeEnv, config, projectId ?? "app").map((row) => (
 							<tr
 								key={row.key}
 								data-testid="v3-inst-stack-row"

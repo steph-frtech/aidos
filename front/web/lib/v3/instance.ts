@@ -55,12 +55,11 @@ export const INSTANCE_TOOLS: readonly InstanceTool[] = [
 		defaultUrl: "https://aidos.mintlify.app",
 		probe: true,
 	},
-	{
-		key: "shop",
-		labelKey: "instShop",
-		defaultUrl: "https://alphashop.sagedesk.fr",
-		probe: true,
-	},
+	// NOTE (ADR 0071 / « la boutique c'est UN des projets, pas le projet ») : AUCUN projet
+	// déployé (alphashop, shopapp…) n'est un OUTIL d'instance. Les outils ci-dessus sont
+	// instance-level (atelier, base, monitoring, routage, éditeur, docs) ; les projets déployés
+	// se voient dans « Les conteneurs » (réalité docker, tous projets) et leur stack par
+	// environnement est résolue pour le PROJET COURANT (envStackOf avec son slug), jamais « app ».
 ] as const;
 
 export type InstanceConfig = Readonly<Record<string, string>>;
