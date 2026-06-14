@@ -117,7 +117,7 @@ export function EvidenceBascule({
 							data-testid="no-loss"
 							className={
 								state.noLoss
-									? "rounded-lg bg-blue-500/10 px-3 py-1.5 text-sm font-semibold text-blue-600 dark:text-blue-400"
+									? "rounded-lg bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary"
 									: "rounded-lg bg-destructive/10 px-3 py-1.5 text-sm font-semibold text-destructive"
 							}
 						>

@@ -116,7 +116,7 @@ function statusBadge(status: Placement["status"], t: (k: string) => string) {
 	if (status === "realized")
 		return {
 			label: t("statusRealized"),
-			cls: "bg-blue-600/15 text-blue-700 dark:text-blue-300",
+			cls: "bg-primary/15 text-primary",
 		};
 	return {
 		label: t("statusProposed"),
@@ -167,7 +167,7 @@ export function CockpitPanel() {
 								data-mode={view.mode}
 								className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
 									view.mode === "llm"
-										? "bg-blue-600/15 text-blue-700 dark:text-blue-300"
+										? "bg-primary/15 text-primary"
 										: "bg-amber-500/15 text-amber-700 dark:text-amber-300"
 								}`}
 							>

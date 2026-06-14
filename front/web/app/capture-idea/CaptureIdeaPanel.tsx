@@ -179,7 +179,7 @@ export function CaptureIdeaPanel({ snapshot }: { snapshot: InboxSnapshot }) {
 								className="space-y-2 rounded-xl border border-border bg-card p-4"
 							>
 								<div className="flex flex-wrap items-center gap-2">
-									<span className="inline-flex items-center rounded-full bg-zinc-500/10 px-2 py-0.5 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+									<span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
 										{t(`statusName.${idea.status}`)}
 									</span>
 									<span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">

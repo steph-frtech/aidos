@@ -35,7 +35,7 @@ import {
 /** La pastille d'état — émeraude (en ligne) / rouge (injoignable) / neutre (non sondé). */
 const DOT: Record<ProbeStatus, string> = {
 	up: "bg-emerald-500",
-	down: "bg-red-500",
+	down: "bg-destructive",
 	unknown: "bg-muted-foreground/40",
 };
 

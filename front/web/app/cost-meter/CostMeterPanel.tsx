@@ -39,8 +39,7 @@ function verdictLabel(
 function verdictBadgeClass(v: Verdict): string {
 	if (v === "within_budget")
 		return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
-	if (v === "over_budget_justified")
-		return "bg-blue-500/15 text-blue-600 dark:text-blue-400";
+	if (v === "over_budget_justified") return "bg-primary/15 text-primary";
 	return "bg-amber-500/15 text-amber-600 dark:text-amber-400";
 }
 

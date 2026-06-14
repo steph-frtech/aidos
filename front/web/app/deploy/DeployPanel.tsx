@@ -406,7 +406,7 @@ function CockpitSection({
 									type="button"
 									data-testid="cockpit-go-domain"
 									onClick={() => onGoToTab("domain")}
-									className="text-xs text-blue-600 underline"
+									className="text-xs text-primary underline"
 								>
 									{t("cockpitLinkDomainLabel")}
 								</button>
@@ -428,7 +428,7 @@ function CockpitSection({
 											<a
 												href={d.url}
 												data-testid="cockpit-domain-url"
-												className="font-mono text-xs text-blue-600 underline"
+												className="font-mono text-xs text-primary underline"
 											>
 												{d.url}
 											</a>
@@ -548,7 +548,7 @@ function CockpitDeployPhase({
 					href={state.plan.url}
 					data-testid="cockpit-phase-url"
 					data-phase={phaseHash}
-					className="font-mono text-[11px] text-blue-600 underline"
+					className="font-mono text-[11px] text-primary underline"
 				>
 					{state.plan.url}
 				</a>
@@ -659,7 +659,7 @@ function CockpitEnvironments({
 									href={current.liveUrl}
 									data-testid="cockpit-live-url"
 									data-env={current.env}
-									className="font-mono text-xs text-blue-600 underline"
+									className="font-mono text-xs text-primary underline"
 								>
 									{current.liveUrl}
 								</a>
@@ -887,7 +887,7 @@ function DeploySection({
 							<a
 								href={state.plan.url}
 								data-testid="deploy-url"
-								className="font-mono text-xs text-blue-600 underline"
+								className="font-mono text-xs text-primary underline"
 							>
 								{state.plan.url}
 							</a>
@@ -1251,7 +1251,7 @@ function PreviewSection({
 							<a
 								href={state.plan.url}
 								data-testid="preview-url"
-								className="font-mono text-xs text-blue-600 underline"
+								className="font-mono text-xs text-primary underline"
 							>
 								{state.plan.url}
 							</a>
@@ -1499,7 +1499,7 @@ function EnvSection({ activeProjectId }: { activeProjectId: string | null }) {
 					<a
 						href={liveUrl("preview", devPhase)}
 						data-testid="dev-deploy-url"
-						className="font-mono text-xs text-blue-600 underline"
+						className="font-mono text-xs text-primary underline"
 					>
 						{liveUrl("preview", devPhase)}
 					</a>
@@ -1636,7 +1636,7 @@ function EnvSection({ activeProjectId }: { activeProjectId: string | null }) {
 						<a
 							href={state.promotion.liveUrl}
 							data-testid="promoted-url"
-							className="font-mono text-xs text-blue-600 underline"
+							className="font-mono text-xs text-primary underline"
 						>
 							{state.promotion.liveUrl}
 						</a>
@@ -1871,7 +1871,7 @@ function DomainSection({
 							<a
 								href={state.binding.url}
 								data-testid="domain-https-url"
-								className="font-mono text-xs text-blue-600 underline"
+								className="font-mono text-xs text-primary underline"
 							>
 								{state.binding.url}
 							</a>
@@ -2296,7 +2296,7 @@ function PulumiSection({
 								<a
 									href={state.url}
 									data-testid="pulumi-url"
-									className="font-mono text-xs text-blue-600 underline"
+									className="font-mono text-xs text-primary underline"
 								>
 									{state.url}
 								</a>

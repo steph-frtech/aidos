@@ -217,7 +217,7 @@ function ObsServiceCard({
 				{/* the profile badge — all `observability` */}
 				<span
 					data-testid="service-profile"
-					className="inline-flex items-center rounded-full bg-blue-500/15 px-2 py-0.5 text-[0.65rem] font-medium text-blue-600 dark:text-blue-400"
+					className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] font-medium text-primary"
 				>
 					{t("profileObservability")}
 				</span>

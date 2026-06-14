@@ -148,7 +148,7 @@ export function EndpointsFitnessPanel({
 						className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
 							view.state === "green"
 								? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/30 dark:text-emerald-400"
-								: "bg-red-500/10 text-red-700 border border-red-500/30 dark:text-red-400"
+								: "bg-destructive/10 text-destructive border border-destructive/30"
 						}`}
 					>
 						{view.state === "green" ? t("stateGreen") : t("stateRed")}
@@ -158,7 +158,7 @@ export function EndpointsFitnessPanel({
 				{view.injected ? (
 					<p
 						data-testid="injected-badge"
-						className="mt-3 inline-flex items-center rounded-full bg-red-500/10 px-2.5 py-0.5 font-mono text-xs text-red-700 dark:text-red-400"
+						className="mt-3 inline-flex items-center rounded-full bg-destructive/10 px-2.5 py-0.5 font-mono text-xs text-destructive"
 					>
 						{t("injectedBadge")}
 					</p>
@@ -201,7 +201,7 @@ export function EndpointsFitnessPanel({
 							<li
 								key={`${f.file}:${f.line}:${f.literal}`}
 								data-testid="finding"
-								className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 font-mono text-xs text-red-700 dark:text-red-400"
+								className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 font-mono text-xs text-destructive"
 							>
 								{f.file}:{f.line} — {f.literal} — {f.reason}
 							</li>
@@ -212,9 +212,9 @@ export function EndpointsFitnessPanel({
 				{view.state === "red" ? (
 					<div
 						data-testid="sensor-block"
-						className="mt-4 rounded-lg border border-red-500/30 bg-red-500/5 p-3"
+						className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3"
 					>
-						<p className="font-mono text-xs font-semibold text-red-700 dark:text-red-400">
+						<p className="font-mono text-xs font-semibold text-destructive">
 							{RULE}
 						</p>
 						<p className="mt-1 text-xs leading-relaxed text-muted-foreground">

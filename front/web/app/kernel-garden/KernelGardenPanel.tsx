@@ -153,7 +153,7 @@ export function KernelGardenPanel() {
 													<span className="text-xs text-muted-foreground">
 														{t("proposes")}:
 													</span>
-													<code className="rounded bg-muted px-1.5 py-0.5 text-xs text-blue-600 dark:text-blue-400">
+													<code className="rounded bg-muted px-1.5 py-0.5 text-xs text-primary">
 														{sug.proposedAction}
 													</code>
 													<form action={acceptSubmit} className="ml-auto">
@@ -203,7 +203,7 @@ export function KernelGardenPanel() {
 						<div className="flex flex-wrap items-center gap-2">
 							<span
 								data-testid="opens-idea-badge"
-								className="inline-flex items-center rounded-full bg-blue-500/15 px-2.5 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400"
+								className="inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium text-primary"
 							>
 								{t("opensIdea")}
 							</span>

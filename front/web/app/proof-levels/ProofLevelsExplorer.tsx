@@ -66,7 +66,7 @@ export function ProofLevelsExplorer({
 					<span
 						className={
 							above
-								? "ml-auto rounded-full bg-blue-500/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400"
+								? "ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-primary"
 								: "ml-auto rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground"
 						}
 					>

@@ -138,7 +138,7 @@ export function DomainBindPanel({
 							<a
 								href={state.plan.url}
 								data-testid="bind-url"
-								className="font-mono text-xs text-blue-600 underline"
+								className="font-mono text-xs text-primary underline"
 							>
 								{state.plan.url}
 							</a>

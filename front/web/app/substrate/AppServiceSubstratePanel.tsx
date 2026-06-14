@@ -292,7 +292,7 @@ function AppServiceCard({
 					className={`inline-flex items-center rounded-full px-2 py-0.5 text-[0.65rem] font-medium ${
 						f.service.profile === "core"
 							? "bg-primary/10 text-primary"
-							: "bg-blue-500/15 text-blue-600 dark:text-blue-400"
+							: "bg-primary/15 text-primary"
 					}`}
 				>
 					{f.service.profile === "core"
@@ -303,7 +303,7 @@ function AppServiceCard({
 				{f.service.profile !== "core" ? (
 					<span
 						data-testid="badge-optional"
-						className="inline-flex items-center rounded-full bg-blue-500/15 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400"
+						className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-primary"
 					>
 						{t("appsvcOptional")}
 					</span>
@@ -365,7 +365,7 @@ function AppServiceCard({
 			</dl>
 
 			{isAuth ? (
-				<p className="text-[0.7rem] leading-relaxed text-blue-600 dark:text-blue-400">
+				<p className="text-[0.7rem] leading-relaxed text-primary">
 					{t("appsvcAuthNote")}
 				</p>
 			) : null}

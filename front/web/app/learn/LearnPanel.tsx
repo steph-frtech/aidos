@@ -174,7 +174,7 @@ export function LearnPanel({
 							data-testid="bump-moved"
 							className={`inline-flex items-center rounded-full px-2.5 py-0.5 font-mono text-xs ${
 								outcome.bump.moved
-									? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+									? "bg-primary/10 text-primary"
 									: "bg-muted text-muted-foreground"
 							}`}
 						>
@@ -206,7 +206,7 @@ export function LearnPanel({
 										<span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 font-mono text-xs text-primary">
 											{i + 1}
 										</span>
-										<span className="inline-flex items-center rounded-full bg-zinc-500/10 px-2 py-0.5 font-mono text-xs text-muted-foreground">
+										<span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
 											{item.layer}
 										</span>
 										<span className="font-mono text-foreground">

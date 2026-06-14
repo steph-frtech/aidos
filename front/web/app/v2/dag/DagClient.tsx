@@ -47,7 +47,7 @@ type DagNodeData = {
 };
 
 const STRATUM_RING: Record<Stratum, string> = {
-	above: "border-blue-500/50 bg-blue-500/5",
+	above: "border-primary/50 bg-primary/5",
 	below: "border-violet-500/50 bg-violet-500/5",
 };
 
@@ -181,7 +181,7 @@ export function DagClient({ t }: { t: Strings }) {
 			<div className="flex flex-wrap gap-3 text-xs">
 				<span
 					data-testid="v2-dag-band-above"
-					className="rounded-md border border-blue-500/40 bg-blue-500/5 px-2 py-1 text-foreground"
+					className="rounded-md border border-primary/40 bg-primary/5 px-2 py-1 text-foreground"
 				>
 					{t.bandAbove}
 				</span>

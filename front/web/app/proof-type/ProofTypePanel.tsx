@@ -60,7 +60,7 @@ function ELevelChip({ e, added }: { e: ELevelView; added?: boolean }) {
 			data-added={added ? "true" : "false"}
 			className={
 				added
-					? "inline-flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 px-2.5 py-1 font-mono text-xs text-blue-700 dark:text-blue-300"
+					? "inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-xs text-primary"
 					: "inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted px-2.5 py-1 font-mono text-xs text-foreground"
 			}
 		>
@@ -149,7 +149,7 @@ export function ProofTypePanel({
 									<span className="font-semibold text-primary">{f}</span>
 									<span className="text-muted-foreground">{FACET_NAME[f]}</span>
 									{ADDED_HINT[f] && (
-										<span className="rounded bg-blue-500/10 px-1 font-mono text-[0.6rem] text-blue-600 dark:text-blue-400">
+										<span className="rounded bg-primary/10 px-1 font-mono text-[0.6rem] text-primary">
 											+{ADDED_HINT[f]}
 										</span>
 									)}
@@ -170,7 +170,7 @@ export function ProofTypePanel({
 						<span className="font-medium text-foreground">
 							{t("formalLabel")}
 						</span>
-						<span className="rounded bg-blue-500/10 px-1 font-mono text-[0.6rem] text-blue-600 dark:text-blue-400">
+						<span className="rounded bg-primary/10 px-1 font-mono text-[0.6rem] text-primary">
 							+E7
 						</span>
 					</label>

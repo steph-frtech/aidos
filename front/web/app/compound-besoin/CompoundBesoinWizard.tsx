@@ -491,7 +491,7 @@ export function CompoundBesoinWizard({ labels }: { labels: WizardLabels }) {
 											{v.openQuestions.length > 0 ? (
 												<div
 													data-testid={`wizard-oq-${rs.level}`}
-													className="rounded-lg border border-blue-500/40 bg-blue-500/10 p-3 text-xs text-blue-700 dark:text-blue-300"
+													className="rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs text-primary"
 												>
 													<p className="font-semibold">
 														{labels.openQuestionsHeading}
@@ -515,7 +515,7 @@ export function CompoundBesoinWizard({ labels }: { labels: WizardLabels }) {
 			{/* The cross-app reuse history (EL18) — OpenQuestion when normalisation not live */}
 			<div
 				data-testid="wizard-reuse"
-				className="rounded-xl border border-blue-500/40 bg-blue-500/5 p-4 text-xs text-blue-700 dark:text-blue-300"
+				className="rounded-xl border border-primary/40 bg-primary/5 p-4 text-xs text-primary"
 			>
 				<p className="font-semibold">{labels.reuseHeading}</p>
 				<p className="mt-1">{labels.reuseOpenQuestion}</p>
@@ -563,7 +563,7 @@ export function CompoundBesoinWizard({ labels }: { labels: WizardLabels }) {
 					className={
 						goalsVerdict.ok
 							? "rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm text-primary"
-							: "rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-400"
+							: "rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
 					}
 				>
 					{goalsVerdict.ok ? (
