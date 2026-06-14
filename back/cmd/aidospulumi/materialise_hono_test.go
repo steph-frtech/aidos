@@ -7,6 +7,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -35,12 +36,23 @@ func TestMaterialiseHono_WiresThreeContainers(t *testing.T) {
 		`name: "shop-dev-db"`,
 		"INTERPRETER_URL=http://shop-dev-interpreter:8080",
 		"DATABASE_URL=postgres://app:shop@shop-dev-db:5432/shop?sslmode=disable",
-		"aidos-hono:latest",
+		// The server runs the PER-PROJECT image (built from the emitted scaffold), not the generic one.
+		"shop-hono:latest",
 		"aidos-interpreter:latest",
 		"pg_isready",
 	} {
 		if !contains(string(idx), want) {
 			t.Fatalf("index.ts missing %q:\n%s", want, string(idx))
+		}
+	}
+	// The generic placeholder must NOT appear — the per-project image replaced it (gap #3 closed).
+	if contains(string(idx), "aidos-hono:latest") {
+		t.Fatalf("the generic aidos-hono:latest leaked into the program; expected shop-hono:latest:\n%s", string(idx))
+	}
+	// The per-project server scaffold landed under server/ (server.ts/index.ts/package.json/Dockerfile).
+	for _, base := range []string{"server.ts", "index.ts", "package.json", "Dockerfile"} {
+		if _, err := os.Stat(filepath.Join(mat.ServerDir, base)); err != nil {
+			t.Fatalf("server scaffold missing %s: %v", base, err)
 		}
 	}
 	// No --entities → no schema mount, no schema.sql file on disk.
@@ -124,6 +136,90 @@ func TestMaterialiseHono_Idempotent(t *testing.T) {
 		if h2, ok := b.Files[name]; !ok || h1 != h2 {
 			t.Fatalf("file %s hash drifted between runs (%q vs %q)", name, h1, h2)
 		}
+	}
+}
+
+// TestMaterialiseHono_EmitsPerProjectServerScaffold — the per-project Hono server scaffold lands under
+// server/ (server.ts carries this project's routes, the Dockerfile boots it), and it is byte-stable
+// across runs. This is the deterministic half of gap #3 (the docker build is the gated half).
+func TestMaterialiseHono_EmitsPerProjectServerScaffold(t *testing.T) {
+	root := t.TempDir()
+	mat, err := MaterialiseHono(root, "shop", "dev", "", "")
+	if err != nil {
+		t.Fatalf("MaterialiseHono: %v", err)
+	}
+	// server.ts carries the createOrder route (the project's operation cut) and the interpreter port.
+	serverTS, err := os.ReadFile(filepath.Join(mat.ServerDir, "server.ts"))
+	if err != nil {
+		t.Fatalf("read server/server.ts: %v", err)
+	}
+	for _, want := range []string{`app.post("/createorder"`, "OperationInterpreter", "deps.interpret"} {
+		if !contains(string(serverTS), want) {
+			t.Fatalf("server.ts missing %q:\n%s", want, string(serverTS))
+		}
+	}
+	// The boot index.ts forwards auth to the sidecar (gap #2 closed end to end).
+	indexTS, _ := os.ReadFile(filepath.Join(mat.ServerDir, "index.ts"))
+	if !contains(string(indexTS), "auth: auth ?? {}") {
+		t.Fatalf("boot index.ts does not forward auth to the sidecar:\n%s", string(indexTS))
+	}
+	// Byte-stable: the scaffold file hashes match across a second materialisation.
+	again, err := MaterialiseHono(t.TempDir(), "shop", "dev", "", "")
+	if err != nil {
+		t.Fatalf("MaterialiseHono #2: %v", err)
+	}
+	for name, h := range mat.Files {
+		if name[:7] != "server/" {
+			continue
+		}
+		if h2, ok := again.Files[name]; !ok || h2 != h {
+			t.Fatalf("scaffold file %s hash drifted (%q vs %q)", name, h, h2)
+		}
+	}
+}
+
+// TestBuildHonoServerImage_RefusesEmptyDir — the gated docker gesture refuses an empty scaffold dir
+// (the honesty rule: never `docker build` an absent context). The actual build is docker-gated and
+// not exercised in the unit mirror.
+func TestBuildHonoServerImage_RefusesEmptyDir(t *testing.T) {
+	if _, err := BuildHonoServerImage("shop", ""); err == nil {
+		t.Fatalf("BuildHonoServerImage with no scaffold dir was NOT refused")
+	}
+}
+
+// TestModuleRoot_FindsGoMod — moduleRoot walks up from the test's CWD (cmd/aidospulumi/) to the module
+// root (back/, the dir holding go.mod). It is the docker build context for the interpreter image. Pure,
+// docker-free — it only stats go.mod.
+func TestModuleRoot_FindsGoMod(t *testing.T) {
+	root, err := moduleRoot()
+	if err != nil {
+		t.Fatalf("moduleRoot: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "go.mod")); err != nil {
+		t.Fatalf("moduleRoot %q does not hold go.mod: %v", root, err)
+	}
+	// The interpreter Dockerfile must live under that root (the ensure-gesture builds -f against it).
+	if _, err := os.Stat(filepath.Join(root, "cmd", "aidosinterpreter", "Dockerfile")); err != nil {
+		t.Fatalf("interpreter Dockerfile not under module root %q: %v", root, err)
+	}
+}
+
+// TestEnsureInterpreterImage_Idempotent — when the interpreter image already exists locally, the gated
+// ensure-gesture returns the tag WITHOUT building (idempotent skip). Docker-gated: skipped when docker
+// is absent so the rest of the unit mirror stays docker-free. The actual cold build is the gated effect.
+func TestEnsureInterpreterImage_Idempotent(t *testing.T) {
+	if _, err := exec.LookPath("docker"); err != nil {
+		t.Skip("docker not on PATH — the interpreter ensure-gesture is docker-gated")
+	}
+	if !dockerImageExists(interpreterImageTag) {
+		t.Skipf("%s not pre-built — the cold-build half is the gated effect (not exercised here)", interpreterImageTag)
+	}
+	tag, err := EnsureInterpreterImage()
+	if err != nil {
+		t.Fatalf("EnsureInterpreterImage (warm): %v", err)
+	}
+	if tag != interpreterImageTag {
+		t.Fatalf("ensure tag = %q, want %q", tag, interpreterImageTag)
 	}
 }
 

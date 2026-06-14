@@ -22,8 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
+	"github.com/steph-frtech/aidos/back/kernel/operation"
 	"github.com/steph-frtech/aidos/back/runtime/appdata"
 	"github.com/steph-frtech/aidos/back/runtime/honoemit"
 )
@@ -38,6 +40,9 @@ func honoDefaultManifest(project string) honoemit.StackManifest {
 	return honoemit.StackManifest{
 		App: project,
 		Services: []honoemit.Service{
+			// Placeholder images — EmitPulumiStackHono REWRITES them by role (opts.HonoImage /
+			// InterpreterImage). MaterialiseHono sets opts.HonoImage to the per-project tag
+			// (<project>-hono:latest) so the server runs THIS project's routes, not the generic image.
 			{Name: "server", Role: honoemit.RoleServer, Image: "aidos-hono:latest", InternalPort: 3000},
 			{Name: "interpreter", Role: honoemit.RoleInterpreter, Image: "aidos-interpreter:latest", InternalPort: 8080},
 			{Name: "db", Role: honoemit.RoleDatastore, Image: "postgres:16-alpine", InternalPort: 5432},
@@ -45,6 +50,68 @@ func honoDefaultManifest(project string) honoemit.StackManifest {
 		Volumes: []honoemit.Volume{{Name: "pgdata", Path: "/var/lib/postgresql/data"}},
 		Network: honoemit.Network{Name: "traefik_default", External: true},
 	}
+}
+
+// honoServerImageTag is the deterministic per-project server image tag (<project>-hono:latest) the
+// scaffold builds into and the manifest references. One source of truth shared by the manifest and
+// the build gesture so they never drift.
+func honoServerImageTag(project string) string { return project + "-hono:latest" }
+
+// interpreterImageTag is the shared sidecar interpreter image tag. The manifest references it and the
+// ensure-image gesture builds it (from cmd/aidosinterpreter/Dockerfile). One source of truth.
+const interpreterImageTag = "aidos-interpreter:latest"
+
+// moduleRoot walks up from the current working directory to the Go module root (the dir holding go.mod).
+// It is the docker build CONTEXT for the interpreter image (its Dockerfile copies the whole module). It
+// is deterministic (no absolute path baked) and bounded (≤ 8 levels). A miss is an actionable error.
+func moduleRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("moduleRoot: getwd: %w", err)
+	}
+	for i := 0; i < 8; i++ {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", errors.New("moduleRoot: go.mod not found walking up from CWD — run aidospulumi from inside the back/ module")
+}
+
+// dockerImageExists reports whether a docker image tag is present locally (`docker image inspect`). It is
+// the GATED probe the ensure-gesture uses to stay idempotent — a warm image skips the build. A docker
+// error (daemon down / not installed) returns false so the caller attempts the build and surfaces the
+// real cause there, never a silent skip.
+func dockerImageExists(tag string) bool {
+	cmd := exec.Command("docker", "image", "inspect", tag)
+	return cmd.Run() == nil
+}
+
+// EnsureInterpreterImage is the GATED docker gesture that guarantees the sidecar interpreter image
+// (aidos-interpreter:latest) exists before `pulumi up` references it: if absent it runs
+// `docker build -f cmd/aidosinterpreter/Dockerfile -t aidos-interpreter:latest <moduleRoot>` (the build
+// context is the Go module root, what the interpreter Dockerfile copies). It JUDGES nothing — it builds
+// exactly the committed Dockerfile. Idempotent: a warm image skips the build. Invoked by the executor
+// (PulumiUpHono), never by the pure materialiser, so the unit mirror stays docker-free.
+func EnsureInterpreterImage() (string, error) {
+	if dockerImageExists(interpreterImageTag) {
+		return interpreterImageTag, nil // already built — idempotent skip.
+	}
+	root, err := moduleRoot()
+	if err != nil {
+		return "", err
+	}
+	dockerfile := filepath.Join("cmd", "aidosinterpreter", "Dockerfile")
+	cmd := exec.Command("docker", "build", "-f", dockerfile, "-t", interpreterImageTag, ".")
+	cmd.Dir = root // build context = the module root (the Dockerfile copies the whole module).
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("docker build %s (-f %s): %w\n%s", interpreterImageTag, dockerfile, err, out)
+	}
+	return interpreterImageTag, nil
 }
 
 // MaterialiseHono renders the clean Hono-path stack for (project, env): with entitiesPath set it first
@@ -66,7 +133,10 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath string) (Materia
 		return Materialised{}, fmt.Errorf("create %s: %w", dir, err)
 	}
 
-	opts := honoemit.StackHonoOpts{}
+	// The server runs the PER-PROJECT image (<project>-hono:latest), built from the emitted scaffold
+	// below. EmitPulumiStackHono rewrites the role=server image to this, so the wired Pulumi program
+	// references the project's own routes — never the generic aidos-hono:latest placeholder.
+	opts := honoemit.StackHonoOpts{HonoImage: honoServerImageTag(project)}
 
 	// (a) Optional project DATA: emit the schema (+ seed) into the stack dir — what postgres mounts.
 	if entitiesPath != "" {
@@ -95,13 +165,28 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath string) (Materia
 		}
 	}
 
+	// (a2) Emit the PER-PROJECT Hono SERVER SCAFFOLD into <dir>/server/ (server.ts/index.ts/
+	// package.json/Dockerfile). This is the project's OWN routes (one POST per operation → the
+	// sidecar), the bootable image the `server` container runs — NOT the generic aidos-hono:latest
+	// placeholder. Emission is PURE + deterministic (EmitServerScaffold); building the image from it
+	// is the gated docker gesture (BuildHonoServerImage, run by the executor, never here). A malformed
+	// cut is a typed refusal — never a partial scaffold.
+	serverDir := filepath.Join(dir, "server")
+	if err := os.MkdirAll(serverDir, 0o755); err != nil {
+		return Materialised{}, fmt.Errorf("create %s: %w", serverDir, err)
+	}
+	scaffold, br := honoemit.EmitServerScaffold(projectServerSpec(project))
+	if br != nil {
+		return Materialised{}, fmt.Errorf("emitter refused the Hono server scaffold (%s): %s", br.Code, br.Explanation)
+	}
+
 	// (b) Emit the WIRED Pulumi program (3 containers) and land the three files byte-identically.
 	arts, br := honoemit.EmitPulumiStackHono(project, env, honoDefaultManifest(project), opts)
 	if br != nil {
 		return Materialised{}, fmt.Errorf("emitter refused the clean Hono stack (%s): %s", br.Code, br.Explanation)
 	}
 
-	files := make(map[string]string, len(arts))
+	files := make(map[string]string, len(arts)+len(scaffold))
 	url := ""
 	for _, a := range arts {
 		name := filepath.Base(a.Path)
@@ -114,14 +199,56 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath string) (Materia
 		}
 	}
 
+	// Land the per-project server scaffold under <dir>/server/ (byte-stable). The files key them as
+	// "server/<base>" so the result inventory is unambiguous and the idempotence mirror covers them.
+	for _, a := range scaffold {
+		name := filepath.Base(a.Path)
+		if err := os.WriteFile(filepath.Join(serverDir, name), a.Bytes, 0o644); err != nil {
+			return Materialised{}, fmt.Errorf("write server/%s: %w", name, err)
+		}
+		files["server/"+name] = a.OutputHash
+	}
+
 	return Materialised{
-		Project: project,
-		Env:     env,
-		Stack:   stack,
-		Dir:     dir,
-		URL:     url,
-		Files:   files,
+		Project:   project,
+		Env:       env,
+		Stack:     stack,
+		Dir:       dir,
+		ServerDir: serverDir,
+		URL:       url,
+		Files:     files,
 	}, nil
+}
+
+// projectServerSpec builds the Hono ServerSpec from the project's operation cut — the SAME cut the
+// sidecar registers (today the createOrder anchor; when the kernel.operation projection lands, the
+// executor reads the project's operations from the truth-store). It is a below-the-line projection
+// INPUT, never a truth write; the emitter renders exactly the ops it pins (one POST route per op).
+func projectServerSpec(project string) honoemit.ServerSpec {
+	ops := []operation.Operation{operation.CreateOrder()}
+	view := make([]honoemit.Op, 0, len(ops))
+	for _, op := range ops {
+		view = append(view, honoemit.Op{Name: op.Name})
+	}
+	return honoemit.ServerSpec{Project: project, Ops: view}
+}
+
+// BuildHonoServerImage is the GATED docker gesture (the side-effecting half of "build the per-project
+// Hono image"): it runs `docker build -t <project>-hono:latest <serverDir>` over the emitted scaffold
+// so the `server` container runs the PROJECT'S OWN routes, not the generic aidos-hono:latest. It
+// JUDGES nothing — it builds exactly the deterministic scaffold MaterialiseHono landed. It is invoked
+// by the executor (PulumiUpHono), never by the pure materialiser, so the unit mirror stays docker-free.
+// The image tag is deterministic (<project>-hono:latest); the build is the gated effect.
+func BuildHonoServerImage(project, serverDir string) (string, error) {
+	if serverDir == "" {
+		return "", errors.New("BuildHonoServerImage: no scaffold dir (run MaterialiseHono first)")
+	}
+	tag := honoServerImageTag(project)
+	cmd := exec.Command("docker", "build", "-t", tag, serverDir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("docker build %s: %w\n%s", tag, err, out)
+	}
+	return tag, nil
 }
 
 // honoContainers returns the container names the clean Hono stack runs (the wired three), for the
@@ -135,6 +262,20 @@ func honoContainers(stack string) []string {
 // It JUDGES nothing — it executes the pure program EmitPulumiStackHono produced. It reuses the same
 // gated pulumi helpers as PulumiUp (no fork); only the reported container set differs (3, not 2).
 func PulumiUpHono(mat Materialised) (UpResult, error) {
+	// Build the PER-PROJECT Hono server image from the emitted scaffold FIRST, so the wired Pulumi
+	// program (which references <project>-hono:latest) finds it. The gated docker gesture; the image
+	// carries this project's routes (gap closed: the server is no longer the generic placeholder).
+	if mat.ServerDir != "" {
+		if _, err := BuildHonoServerImage(mat.Project, mat.ServerDir); err != nil {
+			return UpResult{}, err
+		}
+	}
+	// Guarantee the sidecar interpreter image exists too (build from cmd/aidosinterpreter/Dockerfile if
+	// absent) — the wired program references aidos-interpreter:latest, so `pulumi up` would otherwise fail
+	// to pull it on a cold box. The gated docker gesture; idempotent (a warm image skips the build).
+	if _, err := EnsureInterpreterImage(); err != nil {
+		return UpResult{}, err
+	}
 	if err := npmInstallIfNeeded(mat.Dir); err != nil {
 		return UpResult{}, err
 	}

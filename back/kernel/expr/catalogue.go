@@ -4,9 +4,12 @@ package expr
 // else Parse rejects it — there is no free-code escape. The catalogue carries the
 // §24.5-named functions (lowercase, concat, now, uuid, randomToken) plus exactly
 // the comparison / logical / length operators the visible_when / enabled_when
-// examples need (>, &&, !, .length). NOTHING is added beyond what KRD names or an
-// example requires (the honesty rule: never invent a function). Extending the
-// catalogue is a contract change → ChangeSet + SemanticDiff, never an edit here.
+// examples need (>, &&, !, .length) and the aggregate `sum` the §93 createOrder
+// anchor pins verbatim (`total: sum($.cart.items, "price")`). NOTHING is added
+// beyond what KRD names or an anchor/example requires (the honesty rule: never
+// invent a function). Extending the catalogue is a contract change → ChangeSet +
+// SemanticDiff; `sum` is added together with the createOrder anchor that requires
+// it (the Tome §93 declares it word for word — it is named, not invented).
 //
 // arity == -1 means variadic (concat). Each entry pins the function's arity so
 // Parse rejects a mis-arity call before Eval is ever reached.
@@ -29,6 +32,9 @@ var catalogue = []catalogueEntry{
 	{"&&", 2},     // $.form.valid && !$.submitting
 	{"!", 1},      // !$.submitting
 	{"length", 1}, // .length — the length of an array/string ($.cart.items.length)
+	// Aggregate the §93 createOrder anchor pins (total: sum($.cart.items, "price")):
+	// sum(collection, field) folds a numeric field over a collection of objects.
+	{"sum", 2}, // sum($.cart.items, "price") — Σ over the items' price field
 }
 
 var catalogueByName = func() map[string]catalogueEntry {

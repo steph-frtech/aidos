@@ -54,22 +54,14 @@ func (m *mockDeps) Mutate(entity string, op string, data map[string]any, state *
 	switch op {
 	case "create":
 		// The Order create mutate: returns the created order + emits OrderCreated.
-		// total is computed by the mutate (sum of item prices), mirroring the §96
-		// projection where repo.order.create computes the row — Expr `sum` is mocked
-		// at this seam (S10). The interpreter resolved $.cart.items into data["items"].
-		total := 0.0
-		if items, ok := data["items"].([]any); ok {
-			for _, it := range items {
-				if row, ok := it.(map[string]any); ok {
-					if p, ok := row["price"].(float64); ok {
-						total += p
-					}
-				}
-			}
-		}
+		// total arrives ALREADY COMPUTED in the data — the interpreter evaluated the
+		// anchor's `total: sum($.cart.items,"price")` Expr through expr.Eval before the
+		// Mutator ran (the §96 projection's repo.order.create persists the same row).
+		// The mock re-folds NOTHING: it forwards the Σ the Expr engine produced, proving
+		// the seam no longer owns the sum (the wall / determinism-first §6/§8).
 		return map[string]any{
 			"status": data["status"], // the literal "pending" from the AST
-			"total":  total,
+			"total":  data["total"],  // the Expr-evaluated sum (10 + 5 = 15)
 		}, []string{"OrderCreated"}, nil
 	case "clear":
 		// The Cart clear mutate: emits CartCleared, no result slot.

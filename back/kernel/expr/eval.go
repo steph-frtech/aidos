@@ -198,6 +198,43 @@ func resolveRef(path string, root any) (any, error) {
 	return cur, nil
 }
 
+// asCollection normalizes a sum's first arg into a []any of elements. A ref to
+// $.cart.items resolves to the raw State value ([]any); an array composer yields
+// []Value (unwrapped here). Any other type is a typed mismatch (sum needs a
+// collection). This is the only place sum tolerates the two list encodings — the
+// element typing stays strict (each must be an object, checked in evalCall).
+func asCollection(v any) ([]any, error) {
+	switch t := v.(type) {
+	case []any:
+		return t, nil
+	case []Value:
+		out := make([]any, len(t))
+		for i, e := range t {
+			out[i] = e.v
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("%w: sum expects a collection, got %T", ErrTypeMismatch, v)
+	}
+}
+
+// toNumber coerces a JSON-decoded numeric value to float64. A JSON number decodes
+// as float64; an int (from a Go-built State) is accepted too. A non-number is a
+// failed coercion (reported, never silently 0). It NEVER parses a string — a
+// "10" stays non-numeric (a sum over text is a malformed cart, surfaced honestly).
+func toNumber(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	default:
+		return 0, false
+	}
+}
+
 func evalCall(n CallNode, env Env) (Value, error) {
 	// Nullary impure functions resolve through injected providers (determinism).
 	switch n.Fn {
@@ -272,6 +309,39 @@ func evalCall(n CallNode, env Env) (Value, error) {
 			return Value{}, fmt.Errorf("%w: ! expects boolean", ErrTypeMismatch)
 		}
 		return Value{v: !b}, nil
+
+	case "sum":
+		// sum(collection, field): fold a numeric field over a collection of objects.
+		// The §93 createOrder anchor's `total: sum($.cart.items, "price")`. arg[0] is
+		// the collection (a $.cart.items ref → []any/[]Value), arg[1] the field name
+		// (a literal "price"). Each element must be an object carrying a numeric field;
+		// a missing/non-numeric field is a typed mismatch (never a silent 0 that masks
+		// a malformed cart). An empty collection sums to 0 (the neutral element).
+		field, ok := args[1].AsString()
+		if !ok {
+			return Value{}, fmt.Errorf("%w: sum field must be a string", ErrTypeMismatch)
+		}
+		items, err := asCollection(args[0].v)
+		if err != nil {
+			return Value{}, err
+		}
+		total := 0.0
+		for i, it := range items {
+			obj, ok := it.(map[string]any)
+			if !ok {
+				return Value{}, fmt.Errorf("%w: sum item %d is not an object", ErrTypeMismatch, i)
+			}
+			fv, ok := obj[field]
+			if !ok {
+				return Value{}, fmt.Errorf("%w: sum item %d has no %q field", ErrTypeMismatch, i, field)
+			}
+			n, ok := toNumber(fv)
+			if !ok {
+				return Value{}, fmt.Errorf("%w: sum item %d field %q is not a number (%T)", ErrTypeMismatch, i, field, fv)
+			}
+			total += n
+		}
+		return Value{v: total}, nil
 	}
 	// Parse already rejected non-catalogue names; a name here without a case is a
 	// catalogue/impl drift — surface it as a typed error, never a panic.

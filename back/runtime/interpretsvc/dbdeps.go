@@ -33,10 +33,11 @@ import (
 // THE MARCHE DE PLUS (honesty, §8). The Validator and Authorizer here are the SAME minimal honest
 // seams as MemDeps (a present-input check; a fixed/contextless authorize): a real Validator over
 // the entity-schema contract and a real Authorizer over the Policy ∀ evaluator are LATER teeth
-// (OpenQuestion OQ-SIDECAR-policy / OQ-SIDECAR-validate). The Expr `sum($.cart.items,"price")` for
-// a computed `total` is likewise not yet wired (OQ-SIDECAR-expr): the emitted Order stores the
-// items the cart pins; `total` stays whatever the AST resolves (today: unset — pricing is the same
-// OpenQuestion the §46 slice already recorded). The DB pont itself is real and runnable.
+// (OpenQuestion OQ-SIDECAR-policy / OQ-SIDECAR-validate). The Expr `sum($.cart.items,"price")` for a
+// computed `total` IS now wired (OQ-SIDECAR-expr CLOSED): the operation interpreter evaluates the
+// anchor's `total` Expr through the REUSED kernel Expr engine (expr.Eval) BEFORE this Mutator runs,
+// so the resolved data already carries the numeric Σ — the insert persists it verbatim, the seam
+// re-folds nothing (determinism-first §6/§8). The DB pont itself is real and runnable.
 //
 // THE WALL (§2). DBDeps writes ONLY the emitted app tables (the app's own data), never a truth
 // schema. It opens its transaction on the app DSN (DATABASE_URL), a role with no GRANT on

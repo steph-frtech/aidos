@@ -176,7 +176,11 @@ type Materialised struct {
 	Env     string `json:"env"`
 	Stack   string `json:"stack"`
 	Dir     string `json:"dir"`
-	URL     string `json:"url"`
+	// ServerDir is the per-project Hono server scaffold dir (<dir>/server) the executor builds the
+	// project image from (BuildHonoServerImage). Empty for the non-Hono paths. A below-the-line
+	// projection output, never a truth.
+	ServerDir string `json:"serverDir,omitempty"`
+	URL       string `json:"url"`
 	// Files maps the materialised filename → its content hash (the byte-stable proof).
 	Files map[string]string `json:"files"`
 }

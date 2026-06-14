@@ -3,6 +3,8 @@ package operation
 import (
 	"fmt"
 	"strings"
+
+	"github.com/steph-frtech/aidos/back/kernel/expr"
 )
 
 // State is the $-rooted data bag threaded through an operation's steps: $.input
@@ -91,16 +93,45 @@ func (s *State) Resolve(path string) (any, error) {
 	return cur, nil
 }
 
-// resolveValue resolves one data/where value: a $-rooted selector string resolves
-// against the state; any other value (literal, or a value the caller already
-// resolved) is returned as-is. A selector that fails to resolve yields its error so
-// a step can surface it (totality is the evaluator's choice, not the resolver's).
+// resolveValue resolves one data/where value to the concrete value the Mutator/Reader
+// seam receives. Three cases, in order:
+//
+//   - an Expr AST (expr.Expr) — e.g. the §93 anchor's `total: sum($.cart.items,
+//     "price")` — is EVALUATED through the REUSED kernel Expr interpreter
+//     (expr.Eval) against the current State (the wall / determinism-first §6/§8: the
+//     sum is computed by the existing Expr engine, never an ad-hoc fold in a seam).
+//     The evaluated Value is unwrapped to its raw Go value so the row stays a plain
+//     map of scalars/lists the Mutator can encode.
+//   - a $-rooted selector string ($.auth.user.id, $.cart.items) resolves against the
+//     State, exactly as before.
+//   - any other value (a literal "pending", a number) is returned verbatim.
+//
+// A selector or an Expr that fails to resolve yields its error so the step can
+// surface it (totality is the evaluator's choice, not the resolver's).
 func (s *State) resolveValue(v any) (any, error) {
+	if e, ok := v.(expr.Expr); ok {
+		val, err := expr.Eval(e, s.exprEnv())
+		if err != nil {
+			return nil, err
+		}
+		return val.Raw(), nil
+	}
 	str, ok := v.(string)
 	if ok && strings.HasPrefix(str, "$") {
 		return s.Resolve(str)
 	}
 	return v, nil
+}
+
+// exprEnv adapts the operation State into an Expr Env: the $-rooted State root
+// becomes the Expr's "$" root, so an Expr ref ($.cart.items) resolves against the
+// SAME data the operation selectors do (one $-rooted data tree across the DSLs,
+// ADR 0007). Providers are fixed/empty — a Data Expr is pure (sum over resolved
+// items); the impure functions (now/uuid/randomToken) are not used in a mutate row,
+// and if one ever were it would resolve to the empty fixed value, never a real
+// clock/RNG (determinism-first §6).
+func (s *State) exprEnv() expr.Env {
+	return expr.NewEnv(map[string]any{"$": s.root}, expr.FixedProviders("", "", ""))
 }
 
 // resolveMap resolves every value of a data/where map (selectors → state values,

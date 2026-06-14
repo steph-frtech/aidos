@@ -1,5 +1,7 @@
 package operation
 
+import "github.com/steph-frtech/aidos/back/kernel/expr"
+
 // CreateOrder is the KRD §93 anchor operation, VERBATIM — the agent invents no
 // step, event, total formula or status beyond what the Tome pins:
 //
@@ -26,11 +28,14 @@ package operation
 // authoritative row is written to kernel.operation by the aidos CLI through an
 // approved ChangeSet, never from here (the wall, CLAUDE.md §2).
 //
-// MOCKED SEAMS (S10). validate/authorize/read/mutate reach the world only through
-// injected deps; the Expr `sum($.cart.items, "price")` is mocked at the Mutator
-// seam (the Order create mutate computes the total from the resolved items, exactly
-// as the §96 emitted handler's repo.order.create does). The real Policy ∀
-// evaluation feeding authorize and the real Expr `sum` are later teeth.
+// SEAMS (S10 → wired). validate/authorize/read/mutate reach the world only through
+// injected deps. The Expr `sum($.cart.items, "price")` is now LIVE: the anchor's
+// mutate Data pins `total` as the real Expr AST sum($.cart.items,"price"), and the
+// interpreter EVALUATES it through the REUSED kernel Expr engine (expr.Eval) before
+// the Mutator ever runs — the seam receives an already-computed numeric `total`, so
+// MemDeps and DBDeps persist the same value with no ad-hoc fold of their own (the
+// wall / determinism-first §6/§8: the sum is the Expr interpreter's, never a seam's).
+// The real Policy ∀ evaluation feeding authorize remains a later tooth (OQ-SIDECAR-policy).
 func CreateOrder() Operation {
 	return Operation{
 		Name:  "createOrder",
@@ -50,9 +55,10 @@ func CreateOrder() Operation {
 					"userId": "$.auth.user.id",
 					"items":  "$.cart.items",
 					"status": "pending",
-					// total = sum($.cart.items, "price") — computed by the mutate seam
-					// (Expr mocked this step); the interpreter resolves $.cart.items
-					// into the data, the Mutator sums the prices.
+					// total = sum($.cart.items, "price"), the §93 anchor verbatim — a real
+					// Expr AST the interpreter evaluates via expr.Eval against the State
+					// (the read bound $.cart.items). The Mutator receives the computed Σ.
+					"total": expr.Call("sum", expr.Ref("$.cart.items"), expr.Lit("price")),
 				},
 				As: "$.order",
 			},

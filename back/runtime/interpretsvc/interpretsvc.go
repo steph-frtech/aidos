@@ -21,10 +21,11 @@
 // applies a create/clear to a table) — Interpret itself never touches Postgres. That is by
 // design (the seam contract, operation/deps.go), not a gap: the sidecar's job is exactly to
 // SUPPLY those seams over the emitted schema, never to reach inside Interpret. The remaining
-// depth (a real Validator over the entity schema, a real Authorizer over the Policy ∀ evaluator,
-// Expr `sum` for a computed `total`) is documented as OpenQuestions, not faked (see README +
-// the report). The sidecar is runnable today over the createOrder anchor with a minimal,
-// honest DB pont.
+// depth (a real Validator over the entity schema, a real Authorizer over the Policy ∀ evaluator)
+// is documented as OpenQuestions, not faked (see README + the report). Expr `sum` for a computed
+// `total` IS now wired (OQ-SIDECAR-expr CLOSED): the interpreter evaluates the anchor's `total`
+// Expr through the REUSED kernel Expr engine before the Mutator runs, so createOrder persists a
+// real Σ over the cart's item prices. The sidecar is runnable today over the createOrder anchor.
 //
 // THE WALL (CLAUDE.md §2). The sidecar EXECUTES operations — a runtime effect BELOW the line.
 // It writes NO Kernel truth: it never touches kernel/mirrors/fitness; the Operation it runs is

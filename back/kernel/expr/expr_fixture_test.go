@@ -26,12 +26,14 @@ type fixtureCase struct {
 	// Parse-rejection cases never reach Eval).
 	env string
 	// events (one of):
-	wantValue    any    // the expected resolved Value (when parseErr == false)
-	wantBool     bool   // convenience for boolean results
-	isBool       bool   // use wantBool instead of wantValue
-	wantString   string // convenience for string results
-	isString     bool   // use wantString
-	parseRejects bool   // Parse must reject this AST (unknown function / kind)
+	wantValue    any     // the expected resolved Value (when parseErr == false)
+	wantBool     bool    // convenience for boolean results
+	isBool       bool    // use wantBool instead of wantValue
+	wantString   string  // convenience for string results
+	isString     bool    // use wantString
+	wantNumber   float64 // convenience for numeric results
+	isNumber     bool    // use wantNumber
+	parseRejects bool    // Parse must reject this AST (unknown function / kind)
 }
 
 func TestExprFixtures(t *testing.T) {
@@ -63,6 +65,22 @@ func TestExprFixtures(t *testing.T) {
 			env:      `{"$":{"form":{"valid":true},"submitting":false}}`,
 			isBool:   true,
 			wantBool: true,
+		},
+		{
+			// The §93 anchor's total: sum($.cart.items, "price") = 10 + 5 = 15.
+			name:       "sum folds a numeric field over a collection (createOrder total)",
+			ast:        `{"kind":"call","fn":"sum","args":[{"kind":"ref","path":"$.cart.items"},{"kind":"lit","value":"price"}]}`,
+			env:        `{"$":{"cart":{"items":[{"price":10},{"price":5}]}}}`,
+			isNumber:   true,
+			wantNumber: 15,
+		},
+		{
+			// sum over an empty collection is the neutral element 0 (an empty cart).
+			name:       "sum over an empty collection is 0",
+			ast:        `{"kind":"call","fn":"sum","args":[{"kind":"ref","path":"$.cart.items"},{"kind":"lit","value":"price"}]}`,
+			env:        `{"$":{"cart":{"items":[]}}}`,
+			isNumber:   true,
+			wantNumber: 0,
 		},
 		{
 			name:         "unknown function is rejected, not evaluated",
@@ -110,6 +128,14 @@ func TestExprFixtures(t *testing.T) {
 				}
 				if got != tc.wantString {
 					t.Fatalf("got %q, want %q", got, tc.wantString)
+				}
+			case tc.isNumber:
+				got, ok := v.AsNumber()
+				if !ok {
+					t.Fatalf("result is not a number: %#v", v)
+				}
+				if got != tc.wantNumber {
+					t.Fatalf("got %v, want %v", got, tc.wantNumber)
 				}
 			default:
 				t.Fatalf("fixture %q declares no expected event", tc.name)

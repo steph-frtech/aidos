@@ -226,20 +226,34 @@ func EmitServer(s ServerSpec) (Artifact, *blockreason.BlockReason) {
 	b.WriteString(header("//", sourceHash))
 	b.WriteString("// S87 emitted app server (Hono/functional TS, ADR 0040). main+router+middleware+health+\n")
 	b.WriteString("// one handler per SYNC operation; async ops are wired in worker.ts.\n\n")
-	b.WriteString("import { Hono } from \"hono\";\n\n")
+	b.WriteString("import { Hono } from \"hono\";\n")
+	b.WriteString("import type { Context } from \"hono\";\n\n")
 
 	// The operation interpreter callback port (ADR 0040 Déc.7): the handler hands the
 	// command to the Go sidecar interpreter; it re-implements no rule. A PORT, not a global.
-	b.WriteString("export type OperationInterpreter = (operation: string, input: unknown) => Promise<unknown>;\n")
-	b.WriteString("export type Deps = { interpret: OperationInterpreter };\n\n")
+	// It carries the caller AUTH ($.auth) alongside the input ($.input) so an authorize verb
+	// and an auth-bearing mutate (createOrder's userId: $.auth.user.id, total: sum(...)) resolve
+	// against the real caller — never an empty $.auth. auth is optional (defaults to {}).
+	b.WriteString("export type OperationInterpreter = (operation: string, input: unknown, auth?: unknown) => Promise<unknown>;\n")
+	// The AUTH deriver port: a PURE function request-context → caller identity ($.auth). server.ts owns
+	// no authentication SCHEME — it only calls the injected deriver and sets the result on the context
+	// (FIRST, before the routes, so every handler's c.get("auth") resolves). The BOOT (index.ts) injects
+	// the concrete deriver (the X-Aidos-User header reader); a missing deriver defaults to {} (no scheme
+	// invented here). Optional so the pure server stays bootable in tests without an auth source.
+	b.WriteString("export type AuthDeriver = (c: Context) => unknown;\n")
+	b.WriteString("export type Deps = { interpret: OperationInterpreter; auth?: AuthDeriver };\n\n")
 
 	// createApp is a PURE FACTORY: deps in → a configured Hono app out. No module-scope
 	// mutable binding (FN02). Every handler closes over the injected `deps`.
 	b.WriteString("export function createApp(deps: Deps): Hono {\n")
 	b.WriteString("\tconst app = new Hono();\n")
-	// Middleware: a request-id header + a content-type guard (deterministic, no I/O).
+	// FIRST middleware (runs BEFORE every route — Hono dispatches in registration order): the request-id/
+	// app header AND the caller-identity binding. It calls the injected auth deriver and sets the result on
+	// the context (c.set("auth", …)) so each route reads it via c.get("auth"). Installed here, not in the
+	// boot, because a middleware registered AFTER the routes would not wrap them (Hono registration order).
 	b.WriteString("\tapp.use(\"*\", async (c, next) => {\n")
 	b.WriteString("\t\tc.header(\"x-app\", " + jsStr(s.Project) + ");\n")
+	b.WriteString("\t\tc.set(\"auth\", deps.auth ? deps.auth(c) : {});\n")
 	b.WriteString("\t\tawait next();\n")
 	b.WriteString("\t});\n")
 	// The health check — GET /healthz → 200 { status: \"ok\" }.
@@ -249,7 +263,12 @@ func EmitServer(s ServerSpec) (Artifact, *blockreason.BlockReason) {
 		route := routeOf(op.Name)
 		fmt.Fprintf(&b, "\tapp.post(%s, async (c) => {\n", jsStr(route))
 		b.WriteString("\t\tconst input = await c.req.json().catch(() => ({}));\n")
-		fmt.Fprintf(&b, "\t\tconst result = await deps.interpret(%s, input);\n", jsStr(op.Name))
+		// The caller AUTH ($.auth): the conventional Hono context value an upstream auth
+		// middleware sets (c.get(\"auth\")), defaulting to {} when none is set. It is forwarded
+		// to the sidecar so $.auth resolves (createOrder's userId/total). The route invents no
+		// authentication scheme — it only forwards the caller the platform already authenticated.
+		b.WriteString("\t\tconst auth = c.get(\"auth\") ?? {};\n")
+		fmt.Fprintf(&b, "\t\tconst result = await deps.interpret(%s, input, auth);\n", jsStr(op.Name))
 		b.WriteString("\t\treturn c.json(result, 201);\n")
 		b.WriteString("\t});\n")
 	}

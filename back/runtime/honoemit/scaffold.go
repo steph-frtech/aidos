@@ -45,6 +45,17 @@ const (
 // (<stack>-interpreter) by name — overridable per environment. Declared, never guessed.
 const interpreterURLEnv = "INTERPRETER_URL"
 
+// The caller-identity request header the boot reads to build $.auth. A trusted upstream (the gateway /
+// Traefik forward-auth) sets X-Aidos-User to the authenticated user id; the boot maps it into the
+// conventional shape {user:{id:<header>}} the operations resolve ($.auth.user.id). When the header is
+// absent the boot uses the DETERMINISTIC dev identity (devUserID) — never a clock, never an RNG, so the
+// emitted boot stays a pure function of the request. The route invents no authentication scheme; it only
+// forwards the identity an upstream already established (or the dev default in a bare deployment).
+const (
+	authHeader = "x-aidos-user"
+	devUserID  = "dev"
+)
+
 // EmitServerScaffold renders the BOOTABLE Hono server scaffold for the project, IN ADDITION to the
 // pure server.ts (EmitServer): server.ts (reused verbatim), the boot index.ts (wires deps.interpret
 // on the sidecar via fetch + serves via @hono/node-server), package.json (hono + @hono/node-server),
@@ -85,7 +96,23 @@ func emitBootIndex(s ServerSpec, sourceHash string) []byte {
 	b.WriteString("// S87 emitted app server BOOT (Hono/functional TS, ADR 0040). Wires deps.interpret onto the\n")
 	b.WriteString("// Go sidecar interpreter (POST ${INTERPRETER_URL}/interpret) and serves via @hono/node-server.\n\n")
 	b.WriteString("import { serve } from \"@hono/node-server\";\n")
+	b.WriteString("import type { Context } from \"hono\";\n")
 	b.WriteString("import { createApp, type OperationInterpreter } from \"./server.ts\";\n\n")
+
+	// authFromRequest — the PURE deriver of the caller identity from the request, INJECTED into createApp
+	// (deps.auth) so it runs in server.ts's first middleware (before every route, where c.get("auth")
+	// resolves). It reads the trusted X-Aidos-User header (set by the upstream gateway / Traefik forward-
+	// auth) and maps it into the conventional {user:{id}} shape the operations resolve ($.auth.user.id).
+	// Absent header → the DETERMINISTIC dev identity (no clock, no RNG): the boot is a pure function of the
+	// request, and a bare deployment (no gateway) still resolves $.auth without a 500. It invents no auth
+	// scheme — it only forwards an already-established identity (or the dev default).
+	b.WriteString("// authFromRequest derives the caller identity ($.auth) from the request: it reads the trusted\n")
+	b.WriteString("// X-Aidos-User header an upstream gateway sets and shapes it into { user: { id } }. Absent →\n")
+	b.WriteString("// the deterministic dev identity (no clock, no RNG). It is injected into createApp (deps.auth).\n")
+	b.WriteString("function authFromRequest(c: Context): { user: { id: string } } {\n")
+	b.WriteString("\tconst id = c.req.header(" + jsStr(authHeader) + ") ?? " + jsStr(devUserID) + ";\n")
+	b.WriteString("\treturn { user: { id } };\n")
+	b.WriteString("}\n\n")
 
 	// createInterpreter — a PURE FACTORY of the OperationInterpreter port. It closes over the sidecar
 	// base URL; every call POSTs {operation, input} to /interpret and returns the sidecar's result.
@@ -93,11 +120,11 @@ func emitBootIndex(s ServerSpec, sourceHash string) []byte {
 	b.WriteString("// contract (POST /interpret → { operation, result, events }). It re-implements no rule —\n")
 	b.WriteString("// the sidecar (interpretsvc) runs operation.Interpret; this only forwards the command.\n")
 	b.WriteString("function createInterpreter(baseUrl: string): OperationInterpreter {\n")
-	b.WriteString("\treturn async (operation: string, input: unknown): Promise<unknown> => {\n")
+	b.WriteString("\treturn async (operation: string, input: unknown, auth?: unknown): Promise<unknown> => {\n")
 	b.WriteString("\t\tconst res = await fetch(`${baseUrl}/interpret`, {\n")
 	b.WriteString("\t\t\tmethod: \"POST\",\n")
 	b.WriteString("\t\t\theaders: { \"content-type\": \"application/json\" },\n")
-	b.WriteString("\t\t\tbody: JSON.stringify({ operation, input }),\n")
+	b.WriteString("\t\t\tbody: JSON.stringify({ operation, input, auth: auth ?? {} }),\n")
 	b.WriteString("\t\t});\n")
 	b.WriteString("\t\tif (!res.ok) {\n")
 	b.WriteString("\t\t\tconst detail = await res.text();\n")
@@ -113,10 +140,13 @@ func emitBootIndex(s ServerSpec, sourceHash string) []byte {
 	b.WriteString("const interpreterUrl = process.env[" + jsStr(interpreterURLEnv) + "] ?? \"http://localhost:8080\";\n")
 	b.WriteString("const port = Number(process.env.PORT ?? \"3000\");\n\n")
 
-	// Build the app with the wired deps and serve it. createApp + createInterpreter are pure factories;
-	// serve is the side-effecting boot (the gated gesture), exactly like the sidecar's ListenAndServe.
-	b.WriteString("// Boot: build the app with the wired interpreter and serve it (the side-effecting entrypoint).\n")
-	b.WriteString("const app = createApp({ interpret: createInterpreter(interpreterUrl) });\n")
+	// Build the app with the wired interpreter AND the injected auth deriver (the request-header → $.auth
+	// reader), then serve it. createApp + createInterpreter + authFromRequest are pure factories/derivers;
+	// serve is the side-effecting boot (the gated gesture), exactly like the sidecar's ListenAndServe. The
+	// deriver is injected into createApp so it runs in the FIRST middleware (before every route) — a
+	// middleware installed here, after the routes, would not wrap them (Hono registration order).
+	b.WriteString("// Boot: build the app (wired interpreter + the request-header auth deriver) and serve it.\n")
+	b.WriteString("const app = createApp({ interpret: createInterpreter(interpreterUrl), auth: authFromRequest });\n")
 	b.WriteString("serve({ fetch: app.fetch, port });\n")
 	b.WriteString("console.log(`" + s.Project + " server listening on :${port} (interpreter ${interpreterUrl})`);\n")
 

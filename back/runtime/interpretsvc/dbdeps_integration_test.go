@@ -46,6 +46,10 @@ func appEntities() []generators.EntitySource {
 			{Name: "id", Type: "text"},
 			{Name: "userId", Type: "text"},
 			{Name: "items", Type: "text"},
+			// total is the §93 computed column — sum($.cart.items,"price"). The emitted
+			// schema declares it numeric so the create mutate's evaluated Σ lands; without
+			// it the INSERT fails (the pont proves the value is really computed + written).
+			{Name: "total", Type: "numeric"},
 			{Name: "status", Type: "text"},
 		}},
 	}
@@ -132,8 +136,9 @@ func TestIntegration_DBPont_CreateOrder(t *testing.T) {
 		t.Fatalf("expected 1 order row, got %d", orderCount)
 	}
 	var userID, status, items string
-	if err := pool.QueryRow(ctx, `SELECT "userId","status","items" FROM "order" LIMIT 1`).
-		Scan(&userID, &status, &items); err != nil {
+	var total float64
+	if err := pool.QueryRow(ctx, `SELECT "userId","status","items","total" FROM "order" LIMIT 1`).
+		Scan(&userID, &status, &items, &total); err != nil {
 		t.Fatalf("read order: %v", err)
 	}
 	if userID != "u-1" {
@@ -145,6 +150,12 @@ func TestIntegration_DBPont_CreateOrder(t *testing.T) {
 	// The items column carries the cart's two items (JSON-encoded by the mutate pont).
 	if items == "" || items == "null" {
 		t.Errorf("expected the order to carry the cart items, got %q", items)
+	}
+	// The total column carries the COMPUTED sum: 10 + 5 = 15 (the §93 anchor's
+	// total: sum($.cart.items,"price"), evaluated by the Expr engine, persisted by the
+	// pont — never null, never re-folded ad-hoc). This is the OQ-SIDECAR-expr gap closed.
+	if total != 15 {
+		t.Errorf("expected the computed total 15 (= sum of item prices), got %v", total)
 	}
 
 	// The cart was cleared (the second mutate's DELETE).

@@ -65,8 +65,8 @@ func TestScaffold_EmitsBootableSet(t *testing.T) {
 }
 
 // TestScaffold_BootWiresInterpreterURL — the boot index.ts reads INTERPRETER_URL and POSTs each
-// operation to ${INTERPRETER_URL}/interpret with {operation, input}, serving via @hono/node-server. It
-// is the EXACT wire contract the Go sidecar (interpretsvc POST /interpret) answers.
+// operation to ${INTERPRETER_URL}/interpret with {operation, input, auth}, serving via @hono/node-server.
+// It is the EXACT wire contract the Go sidecar (interpretsvc POST /interpret) answers.
 func TestScaffold_BootWiresInterpreterURL(t *testing.T) {
 	arts, br := EmitServerScaffold(checkoutSpec())
 	if br != nil {
@@ -75,12 +75,18 @@ func TestScaffold_BootWiresInterpreterURL(t *testing.T) {
 	idx := string(scaffoldByPath(t, arts, "index.ts").Bytes)
 	for _, want := range []string{
 		`import { serve } from "@hono/node-server";`,
+		`import type { Context } from "hono";`,
 		`import { createApp, type OperationInterpreter } from "./server.ts";`,
 		`process.env["INTERPRETER_URL"]`,
 		"`${baseUrl}/interpret`",
 		`method: "POST"`,
-		`JSON.stringify({ operation, input })`,
-		`createApp({ interpret: createInterpreter(interpreterUrl) })`,
+		`JSON.stringify({ operation, input, auth: auth ?? {} })`,
+		// The boot derives $.auth from the trusted X-Aidos-User header, defaulting to the deterministic
+		// dev identity — and injects the deriver into createApp (so it runs before every route).
+		`function authFromRequest(c: Context): { user: { id: string } } {`,
+		`const id = c.req.header("x-aidos-user") ?? "dev";`,
+		`return { user: { id } };`,
+		`createApp({ interpret: createInterpreter(interpreterUrl), auth: authFromRequest })`,
 		`serve({ fetch: app.fetch, port });`,
 	} {
 		if !strings.Contains(idx, want) {
@@ -156,8 +162,11 @@ func TestScaffold_BootsAndRoutesToSidecar(t *testing.T) {
 	root := repoRoot(t)
 
 	// A FAKE sidecar: it answers POST /interpret with a deterministic outcome (the wire shape the real
-	// interpretsvc returns). The boot's fetch interpreter must reach it and surface its result.
+	// interpretsvc returns). The boot's fetch interpreter must reach it and surface its result. It records
+	// the auth of EACH call (the header-carrying one + the anonymous one) so the journey proves both the
+	// forwarded identity and the deterministic dev default reach $.auth.user.id.
 	var gotOp string
+	var gotAuthIDs []string
 	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/interpret" || r.Method != http.MethodPost {
 			http.Error(w, "nope", http.StatusNotFound)
@@ -166,9 +175,15 @@ func TestScaffold_BootsAndRoutesToSidecar(t *testing.T) {
 		var body struct {
 			Operation string         `json:"operation"`
 			Input     map[string]any `json:"input"`
+			Auth      struct {
+				User struct {
+					ID string `json:"id"`
+				} `json:"user"`
+			} `json:"auth"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		gotOp = body.Operation
+		gotAuthIDs = append(gotAuthIDs, body.Auth.User.ID)
 		w.Header().Set("content-type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"operation": body.Operation,
@@ -193,35 +208,50 @@ func TestScaffold_BootsAndRoutesToSidecar(t *testing.T) {
 	}
 
 	// Boot harness: import the boot's interpreter wiring INDIRECTLY by importing createApp + building
-	// the same fetch interpreter the boot builds (against the fake sidecar URL), then drive it through
-	// Hono's app.request. This proves the EMITTED server.ts + the fetch-to-sidecar contract run.
+	// the same fetch interpreter AND the same header auth deriver the boot builds, then drive it through
+	// Hono's app.request. This proves the EMITTED server.ts + the fetch-to-sidecar contract run, AND that
+	// the X-Aidos-User header flows all the way to $.auth.user.id (with a deterministic dev default).
 	harness := `
 import { createApp } from "./server.ts";
 
-// The exact interpreter the boot index.ts builds: a fetch POST to ${INTERPRETER_URL}/interpret.
+// The exact interpreter the boot index.ts builds: a fetch POST to ${INTERPRETER_URL}/interpret,
+// now forwarding the caller AUTH alongside the input (the boot's 3-arg OperationInterpreter).
 const baseUrl = process.env["INTERPRETER_URL"];
-const interpret = async (operation, input) => {
+const interpret = async (operation, input, auth) => {
   const res = await fetch(` + "`${baseUrl}/interpret`" + `, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ operation, input }),
+    body: JSON.stringify({ operation, input, auth: auth ?? {} }),
   });
   if (!res.ok) throw new Error("interpreter " + res.status);
   return res.json();
 };
 
-const app = createApp({ interpret });
+// The exact auth deriver the boot index.ts injects into createApp: the X-Aidos-User header → {user:{id}},
+// defaulting to the deterministic dev identity. Injected so it runs in server.ts's first middleware.
+const authFromRequest = (c) => ({ user: { id: c.req.header("x-aidos-user") ?? "dev" } });
+
+const app = createApp({ interpret, auth: authFromRequest });
 const out = {};
 const health = await app.request("/healthz");
 out.healthStatus = health.status;
 
+// (1) A request CARRYING the identity header: $.auth.user.id must reach the sidecar as that id.
 const created = await app.request("/createorder", {
   method: "POST",
-  headers: { "content-type": "application/json" },
+  headers: { "content-type": "application/json", "x-aidos-user": "alice" },
   body: JSON.stringify({ total: 42 }),
 });
 out.opStatus = created.status;
 out.opBody = await created.json();
+
+// (2) A request WITHOUT the header: the deterministic dev identity must reach the sidecar.
+const anon = await app.request("/createorder", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ total: 7 }),
+});
+out.anonStatus = anon.status;
 
 process.stdout.write(JSON.stringify(out));
 `
@@ -242,6 +272,7 @@ process.stdout.write(JSON.stringify(out));
 		HealthStatus int            `json:"healthStatus"`
 		OpStatus     int            `json:"opStatus"`
 		OpBody       map[string]any `json:"opBody"`
+		AnonStatus   int            `json:"anonStatus"`
 	}
 	if err := json.Unmarshal(stdout, &res); err != nil {
 		t.Fatalf("harness output not JSON: %v\nraw: %s", err, stdout)
@@ -249,14 +280,29 @@ process.stdout.write(JSON.stringify(out));
 	if res.HealthStatus != 200 {
 		t.Fatalf("healthz not green: %d", res.HealthStatus)
 	}
-	// THEN: the operation route reached the sidecar and surfaced its result.
+	// THEN: both operation routes reached the sidecar and surfaced its result.
 	if res.OpStatus != 201 {
 		t.Fatalf("operation route not 201: %d body=%v", res.OpStatus, res.OpBody)
+	}
+	if res.AnonStatus != 201 {
+		t.Fatalf("anonymous operation route not 201: %d", res.AnonStatus)
 	}
 	if gotOp != "createOrder" {
 		t.Fatalf("sidecar did not receive the createOrder command (got %q)", gotOp)
 	}
 	if res.OpBody["operation"] != "createOrder" {
 		t.Fatalf("server did not surface the sidecar result: %v", res.OpBody)
+	}
+	// The wire forwards $.auth.user.id all the way: the FIRST call carried X-Aidos-User: alice (so the
+	// sidecar saw "alice"); the SECOND carried no header (so the boot's deterministic dev default "dev"
+	// reached it). This proves the request-header → $.auth.user.id chain (createOrder's userId resolves).
+	if len(gotAuthIDs) != 2 {
+		t.Fatalf("sidecar saw %d calls, want 2 (header + anonymous): %v", len(gotAuthIDs), gotAuthIDs)
+	}
+	if gotAuthIDs[0] != "alice" {
+		t.Fatalf("sidecar did not receive the header identity: $.auth.user.id = %q, want \"alice\"", gotAuthIDs[0])
+	}
+	if gotAuthIDs[1] != "dev" {
+		t.Fatalf("sidecar did not receive the deterministic dev default: $.auth.user.id = %q, want \"dev\"", gotAuthIDs[1])
 	}
 }

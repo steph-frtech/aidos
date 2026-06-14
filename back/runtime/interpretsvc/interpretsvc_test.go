@@ -2,6 +2,7 @@ package interpretsvc
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/steph-frtech/aidos/back/kernel/operation"
@@ -76,6 +77,11 @@ func TestSidecarRunsCreateOrderAndCreatesAnOrder(t *testing.T) {
 	if order["userId"] != "u-1" {
 		t.Errorf("expected userId u-1, got %v", order["userId"])
 	}
+	// The order carries the COMPUTED total (sum($.cart.items,"price") = 10 + 5 = 15),
+	// evaluated by the Expr engine and forwarded by the seam — never null, never mocked.
+	if total, ok := order["total"].(float64); !ok || total != 15 {
+		t.Errorf("expected computed total 15, got %v (%T)", order["total"], order["total"])
+	}
 
 	// The ordered events match the §93 anchor: [OrderCreated, CartCleared].
 	wantEvents := []string{"OrderCreated", "CartCleared"}
@@ -103,6 +109,59 @@ func TestSidecarRunsCreateOrderAndCreatesAnOrder(t *testing.T) {
 	if out.Result["status"] != "pending" {
 		t.Errorf("expected result.status pending, got %v", out.Result["status"])
 	}
+}
+
+// THE total MIRROR (OQ-SIDECAR-expr closed). createOrder must persist a COMPUTED total — the
+// §93 anchor's `total: sum($.cart.items,"price")` evaluated by the REUSED kernel Expr engine, not a
+// seam's ad-hoc fold. The seeded cart's two items price 10 + 5, so the created Order carries
+// total == 15 (numeric), in the store AND in the returned result. A second identical run yields the
+// SAME total (deterministic) — the Expr sum is pure. This is the proof the total is calculated, not
+// mocked, and that the seam forwards the Expr value verbatim.
+func TestSidecarCreateOrderComputesTotalFromCartPrices(t *testing.T) {
+	reg := newCreateOrderReg(t)
+
+	run := func() map[string]any {
+		store := seededCartStore()
+		out, err := Interpret(reg, "createOrder", orderInput(), orderAuth(), NewMemDeps(store))
+		if err != nil {
+			t.Fatalf("Interpret(createOrder): %v", err)
+		}
+		orders := store.Rows("Order")
+		if len(orders) != 1 {
+			t.Fatalf("expected exactly 1 Order, got %d", len(orders))
+		}
+		// The stored row and the returned result must agree on the computed total.
+		if !floatEq(orders[0]["total"], out.Result["total"]) {
+			t.Fatalf("stored total %v != result total %v", orders[0]["total"], out.Result["total"])
+		}
+		return orders[0]
+	}
+
+	order := run()
+	total, ok := order["total"].(float64)
+	if !ok {
+		t.Fatalf("Order.total is not a number: %T (%v)", order["total"], order["total"])
+	}
+	if total != 15 {
+		t.Fatalf("expected the computed total 15 (= 10 + 5, sum of item prices), got %v", total)
+	}
+
+	// Determinism: a second identical run computes the same total (the Expr sum is pure).
+	again := run()
+	if !floatEq(again["total"], 15.0) {
+		t.Fatalf("total not reproducible: second run got %v, want 15", again["total"])
+	}
+}
+
+// floatEq compares two values as float64 with a fmt fallback (the result/store may carry the same
+// numeric under different concrete encodings); it is the test's tolerant numeric equality.
+func floatEq(a, b any) bool {
+	af, aok := a.(float64)
+	bf, bok := b.(float64)
+	if aok && bok {
+		return af == bf
+	}
+	return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
 }
 
 // A denied authorize short-circuits the pipeline: NO Order is created (the §93 "any DENY blocks"
