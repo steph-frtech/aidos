@@ -5641,7 +5641,19 @@
 		"pulumiStatusEmitted": "programme émis (lecture seule, aucun pulumi)",
 		"pulumiContainersHeading": "Conteneurs du stack (<projet>-<env>-app, <projet>-<env>-db)",
 		"pulumiProgramHeading": "Programme Pulumi émis (index.ts — sortie PURE de l'émetteur)",
-		"pulumiProgramNote": "Le programme que l'exécuteur lance verbatim : RemoteImage par image, réseau externe attaché (jamais créé), volume du datastore, healthcheck pg_isready, DATABASE_URL pointant <stack>-db, labels Traefik complets (priority=1000, tls.certresolver=le, Host(<stack>.sagedesk.fr)). Source : l'émetteur via `aidospulumi emit` (read-only)."
+		"pulumiProgramNote": "Le programme que l'exécuteur lance verbatim : RemoteImage par image, réseau externe attaché (jamais créé), volume du datastore, healthcheck pg_isready, DATABASE_URL pointant <stack>-db, labels Traefik complets (priority=1000, tls.certresolver=le, Host(<stack>.sagedesk.fr)). Source : l'émetteur via `aidospulumi emit` (read-only).",
+		"targetHeading": "Cible de déploiement (DP33)",
+		"targetIntro": "PORTABILITÉ FUTURE-CLOUD : le MÊME StackManifest se projette vers self-hosted (@pulumi/docker) OU future-cloud (cloud managé) SANS réécrire la déclaration. « Une source → N projections ». Basculer la cible recalcule la projection depuis la MÊME source ; la SOURCE reste invariante, seuls les bytes émis changent. En future-cloud, les services managés se résolvent en managed_url (DP07).",
+		"targetSelfHostedLabel": "Self-hosted (@pulumi/docker)",
+		"targetFutureCloudLabel": "Future-cloud (managé)",
+		"targetProviderLabel": "Provider",
+		"sourceHashLabel": "Hash source (invariant)",
+		"sourceInvariantOk": "Source INCHANGÉE entre les cibles : un seul sourceHash partagé par les deux projections — la déclaration n'est jamais réécrite (portabilité par projection).",
+		"sourceInvariantFail": "Divergence de source détectée — les cibles ne partagent pas le même sourceHash (la projection a muté la source).",
+		"managedHeading": "Services managés → managed_url (DP07)",
+		"targetProgramHeading": "Programme émis (recalculé depuis la même source)",
+		"outputHashLabel": "Hash sortie",
+		"targetResultHeading": "Projection de la cible"
 	},
 	"domainBind": {
 		"eyebrow": "S97 · Domaines custom & TLS",

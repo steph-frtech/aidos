@@ -208,3 +208,42 @@ export interface PulumiView {
 }
 
 export const PULUMI_INITIAL: PulumiView = { ok: false };
+
+/**
+ * View model for the DP33 « Cible de déploiement » selector (clôture EPIC G + la piste DP) —
+ * PORTABILITÉ FUTURE-CLOUD. Le MÊME StackManifest se projette vers self_hosted (@pulumi/docker)
+ * OU future_cloud (cloud managé) SANS réécrire la déclaration : « une source → N projections ».
+ *
+ * Basculer la cible recalcule la PROJECTION depuis la MÊME source (le twin pur
+ * lib/pulumi-target.emitPulumiStackTarget, le twin de Go honoemit.EmitPulumiStackTarget). La SOURCE
+ * (le StackManifest, son sourceHash) est INVARIANTE entre les cibles ; seuls les BYTES émis diffèrent.
+ * En future_cloud, les services MANAGÉS (datastore/bus/cache/pooler/workflow) se résolvent en
+ * managed_url (DP07 — ${<NAME>_MANAGED_URL}), jamais un docker.Container.
+ *
+ * THE WALL (CLAUDE.md §2) : la projection est below-the-line — recalculer une cible n'écrit AUCUNE
+ * vérité ; le StackManifest source reste au-dessus de la ligne (DP02). DÉTERMINISME-FIRST : la
+ * projection est une fonction PURE de (source, cible), jamais un LLM.
+ */
+export interface TargetView {
+	ok: boolean;
+	/** the deployment target the projection was recalculated for (self_hosted | future_cloud). */
+	target?: "self_hosted" | "future_cloud";
+	/** the @pulumi/<provider> the projection imports ("@pulumi/docker" | "@pulumi/cloud"). */
+	provider?: "@pulumi/docker" | "@pulumi/cloud";
+	/** the recalculated Pulumi/TS program (index.ts) — the PURE projection of the SAME source. */
+	program?: string;
+	/** the content address of the SOURCE manifest — INVARIANT across targets (the capital property). */
+	sourceHash?: string;
+	/** the content address of the OUTPUT program bytes — DIFFERS between targets. */
+	outputHash?: string;
+	/** whether the source content address is unchanged across targets (the source-invariant badge). */
+	sourceInvariant?: boolean;
+	/** the managed-service resolutions surfaced (future_cloud only): service → ${<NAME>_MANAGED_URL}. */
+	managed?: { service: string; role: string; mode: string; url: string }[];
+	/** the refusal code when the target is refused (UNKNOWN_TARGET / OUT_OF_SCOPE). */
+	blockCode?: string;
+	/** the BlockReason explanation when refused. */
+	blockExplanation?: string;
+}
+
+export const TARGET_INITIAL: TargetView = { ok: false };

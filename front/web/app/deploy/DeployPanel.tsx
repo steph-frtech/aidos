@@ -12,6 +12,7 @@ import {
 	envAction,
 	previewAction,
 	pulumiAction,
+	targetAction,
 } from "./actions";
 import {
 	COCKPIT_INITIAL,
@@ -26,7 +27,15 @@ import {
 	type PreviewView,
 	PULUMI_INITIAL,
 	type PulumiView,
+	TARGET_INITIAL,
+	type TargetView,
 } from "./view";
+
+/** The DP33 closed deployment-target set the « Cible de déploiement » selector toggles between. */
+const DEPLOY_TARGETS = [
+	{ target: "self_hosted", testid: "self-hosted" },
+	{ target: "future_cloud", testid: "future_cloud" },
+] as const;
 
 /** The DP06 closed environment set the domain-cabling selector offers (prod/staging/dev/
  * future_cloud terminate TLS; local does NOT — cabling a custom HTTPS domain into local is refused). */
@@ -1965,6 +1974,200 @@ function PulumiButton({
 }
 
 /**
+ * DeployTargetSection — the DP33 « Cible de déploiement » selector (clôture EPIC G + la piste DP) :
+ * PORTABILITÉ FUTURE-CLOUD. Le MÊME StackManifest se projette vers self-hosted (@pulumi/docker) OU
+ * future-cloud (cloud managé) SANS réécrire la déclaration : « une source → N projections ».
+ *
+ * Action-capable (ui-completeness, CLAUDE.md §7) : un toggle self-hosted / future-cloud recalcule
+ * la PROJECTION depuis la MÊME source (target-program montre le programme émis recalculé). Un
+ * indicateur prouve que la SOURCE (le StackManifest, son sourceHash) est INCHANGÉE entre les cibles
+ * (source-invariant data-ok=true). En future-cloud, les services managés affichent leur managed_url
+ * (managed-service data-url=${<NAME>_MANAGED_URL}, DP07).
+ *
+ * Source = le twin PUR de l'émetteur cible (lib/pulumi-target.emitPulumiStackTarget, le twin de Go
+ * honoemit.EmitPulumiStackTarget) — il calque le twin Pulumi existant. THE WALL (§2/§6/§8) :
+ * recalculer une projection n'écrit AUCUNE vérité (below-the-line) ; la projection est une fonction
+ * PURE, déterministe, byte-stable, jamais un LLM. Thème ADR 0010, bilingue ADR 0011.
+ */
+function DeployTargetSection({
+	activeProjectId,
+}: {
+	activeProjectId: string | null;
+}) {
+	const t = useTranslations("deploy");
+	const [state, action] = useActionState<TargetView, FormData>(
+		targetAction,
+		TARGET_INITIAL,
+	);
+	const project = activeProjectId ?? "shop";
+	// The active target the operator toggled; toggling re-runs the PURE projection from the SAME source.
+	const [target, setTarget] = useState<"self_hosted" | "future_cloud">(
+		"self_hosted",
+	);
+	const [loaded, setLoaded] = useState(false);
+
+	// Recalculate the projection whenever the target changes (and on first mount). The source is
+	// NEVER re-declared — only the target dimension moves; the PURE twin re-projects the same manifest.
+	useEffect(() => {
+		if (!loaded) setLoaded(true);
+		const fd = new FormData();
+		fd.set("project", project);
+		fd.set("target", target);
+		action(fd);
+	}, [target, project, action, loaded]);
+
+	return (
+		<section
+			data-testid="deploy-target"
+			data-target={target}
+			className="space-y-4 rounded-xl border border-border p-5"
+		>
+			<div className="space-y-1">
+				<h2 className="text-sm font-semibold text-foreground">
+					{t("targetHeading")}
+				</h2>
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					{t("targetIntro")}
+				</p>
+			</div>
+
+			{/* The closed target toggle — self-hosted (@pulumi/docker) vs future_cloud (managed). */}
+			<div
+				className="flex flex-wrap gap-2 rounded-lg border border-border bg-muted/40 p-1"
+				role="tablist"
+			>
+				{DEPLOY_TARGETS.map((dt) => (
+					<button
+						key={dt.target}
+						type="button"
+						role="tab"
+						data-testid="target-toggle"
+						data-target={dt.testid}
+						aria-selected={target === dt.target}
+						onClick={() => setTarget(dt.target)}
+						className={
+							target === dt.target
+								? "flex-1 rounded-md bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm"
+								: "flex-1 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+						}
+					>
+						{dt.target === "self_hosted"
+							? t("targetSelfHostedLabel")
+							: t("targetFutureCloudLabel")}
+					</button>
+				))}
+			</div>
+
+			{state.blockExplanation && !state.ok && (
+				<div
+					data-testid="target-block-reason"
+					data-code={state.blockCode}
+					className="space-y-1 rounded-lg border border-destructive/40 bg-destructive/5 p-4"
+				>
+					<p className="text-sm font-semibold text-destructive">
+						{t("blockedHeading")} · {state.blockCode}
+					</p>
+					<p className="text-sm leading-relaxed text-muted-foreground">
+						{state.blockExplanation}
+					</p>
+				</div>
+			)}
+
+			{state.ok && (
+				<div className="space-y-4" data-testid="target-result">
+					{/* The SOURCE-INVARIANT indicator — the same source content address across targets. */}
+					<div className="grid gap-2 text-xs sm:grid-cols-2">
+						<div>
+							<p className="text-muted-foreground">
+								{t("targetProviderLabel")}
+							</p>
+							<p
+								data-testid="target-provider"
+								className="font-mono text-foreground"
+							>
+								{state.provider}
+							</p>
+						</div>
+						<div>
+							<p className="text-muted-foreground">{t("sourceHashLabel")}</p>
+							<p
+								data-testid="target-source-hash"
+								className="truncate font-mono text-foreground"
+							>
+								{state.sourceHash}
+							</p>
+						</div>
+					</div>
+					<p
+						data-testid="source-invariant"
+						data-ok={state.sourceInvariant ? "true" : "false"}
+						data-source-hash={state.sourceHash}
+						className={
+							state.sourceInvariant
+								? "rounded-lg border border-emerald-500/40 bg-emerald-50/40 p-3 text-xs text-emerald-700"
+								: "rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive"
+						}
+					>
+						{state.sourceInvariant
+							? t("sourceInvariantOk")
+							: t("sourceInvariantFail")}
+					</p>
+
+					{/* The MANAGED services (future_cloud only) → managed_url (DP07). */}
+					{(state.managed?.length ?? 0) > 0 && (
+						<div className="space-y-2 rounded-lg border border-border p-4">
+							<p className="text-xs font-medium text-foreground">
+								{t("managedHeading")}
+							</p>
+							<ul className="space-y-1" data-testid="managed-services">
+								{(state.managed ?? []).map((mr) => (
+									<li
+										key={mr.service}
+										data-testid="managed-service"
+										data-service={mr.service}
+										data-role={mr.role}
+										data-mode={mr.mode}
+										data-url={mr.url}
+										className="flex flex-col gap-0.5 rounded-lg bg-muted p-2 font-mono text-xs sm:flex-row sm:items-center sm:gap-2"
+									>
+										<span className="text-foreground">{mr.service}</span>
+										<span className="text-muted-foreground">
+											{mr.role} · {mr.mode} · {mr.url}
+										</span>
+									</li>
+								))}
+							</ul>
+						</div>
+					)}
+
+					{/* The recalculated PROJECTION — the emitted program, re-projected from the SAME source. */}
+					<div className="space-y-2 rounded-lg border border-border p-4">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<p className="text-xs font-medium text-foreground">
+								{t("targetProgramHeading")}
+							</p>
+							<span
+								data-testid="target-output-hash"
+								className="font-mono text-xs text-muted-foreground"
+							>
+								{t("outputHashLabel")}: {state.outputHash?.slice(0, 16)}
+							</span>
+						</div>
+						<pre
+							data-testid="target-program"
+							data-target={state.target}
+							className="max-h-80 overflow-auto rounded-lg border border-border bg-muted/40 p-4 font-mono text-xs leading-relaxed text-foreground"
+						>
+							{state.program}
+						</pre>
+					</div>
+				</div>
+			)}
+		</section>
+	);
+}
+
+/**
  * PulumiSection — the « Déployer ce projet (Pulumi) » tab (intention utilisatrice 2026-06-13 :
  * « du Pulumi qui fait les docker par projet »). It makes the /deploy route REALLY deploy a
  * per-project×env Pulumi stack (one stack per project×env, deployed FOR REAL by @pulumi/docker).
@@ -1995,6 +2198,9 @@ function PulumiSection({
 
 	return (
 		<div className="space-y-6" data-testid="pulumi-section">
+			{/* DP33 — « Cible de déploiement » : la MÊME source, deux projections (self-hosted / future-cloud). */}
+			<DeployTargetSection activeProjectId={activeProjectId} />
+
 			<form
 				action={action}
 				className="space-y-5 rounded-xl border border-border p-5"

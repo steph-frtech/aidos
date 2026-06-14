@@ -931,3 +931,121 @@ test.describe("Pulumi — the real per-project×env deployment tab", () => {
 		).toBeVisible();
 	});
 });
+
+/**
+ * DP33 — PORTABILITÉ FUTURE-CLOUD (clôture EPIC G + la piste DP). The « Cible de déploiement »
+ * selector projects the SAME StackManifest to self-hosted (@pulumi/docker) OR future_cloud (managed
+ * cloud) WITHOUT rewriting the declaration: « une source → N projections ».
+ *
+ * Proves (from the screen): toggling self-hosted → future_cloud recalculates the projection from
+ * the SAME source; the SOURCE (sourceHash) is INVARIANT across targets (source-invariant data-ok);
+ * a managed service shows its managed_url. Anti-flake: the assertions anchor on the STATE CHANGE
+ * (the program's data-target flips, the source hash stays identical).
+ */
+test.describe("DP33 — future-cloud portability (one source → N projections)", () => {
+	test("the Pulumi tab exposes the « Cible de déploiement » selector (self-hosted default)", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("pulumi-tab").click();
+		const target = page.getByTestId("deploy-target");
+		await expect(target).toBeVisible();
+		// the toggle carries both closed targets.
+		await expect(
+			page.locator('[data-testid="target-toggle"][data-target="self-hosted"]'),
+		).toBeVisible();
+		await expect(
+			page.locator('[data-testid="target-toggle"][data-target="future_cloud"]'),
+		).toBeVisible();
+		// self-hosted is the default projection — @pulumi/docker.
+		await expect(
+			page.locator('[data-testid="target-program"][data-target="self_hosted"]'),
+		).toBeVisible();
+		const selfProgram = await page.getByTestId("target-program").innerText();
+		expect(selfProgram).toContain("@pulumi/docker");
+		// the source is invariant from the first projection.
+		await expect(page.getByTestId("source-invariant")).toHaveAttribute(
+			"data-ok",
+			"true",
+		);
+	});
+
+	test("toggling self-hosted → future_cloud recalculates the projection from the SAME source", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("pulumi-tab").click();
+
+		// the self-hosted projection + its INVARIANT source hash.
+		await expect(
+			page.locator('[data-testid="target-program"][data-target="self_hosted"]'),
+		).toBeVisible();
+		const selfHash = await page
+			.getByTestId("source-invariant")
+			.getAttribute("data-source-hash");
+		const selfProgram = await page.getByTestId("target-program").innerText();
+		expect(selfProgram).toContain("@pulumi/docker");
+
+		// BASCULER vers future_cloud — the projection RECALCULATES from the SAME source.
+		await page
+			.locator('[data-testid="target-toggle"][data-target="future_cloud"]')
+			.click();
+		// anti-flake: anchor on the state change (the program's data-target flips to future_cloud).
+		await expect(
+			page.locator(
+				'[data-testid="target-program"][data-target="future_cloud"]',
+			),
+		).toBeVisible();
+
+		const cloudProgram = await page.getByTestId("target-program").innerText();
+		// the cloud projection is a DIFFERENT program: @pulumi/cloud, no docker.Container.
+		expect(cloudProgram).toContain("@pulumi/cloud");
+		expect(cloudProgram).not.toContain("@pulumi/docker");
+		expect(cloudProgram).not.toContain("docker.Container");
+
+		// the SOURCE is INVARIANT across targets — the same source content address, source-invariant ok.
+		await expect(page.getByTestId("source-invariant")).toHaveAttribute(
+			"data-ok",
+			"true",
+		);
+		const cloudHash = await page
+			.getByTestId("source-invariant")
+			.getAttribute("data-source-hash");
+		expect(cloudHash).toBe(selfHash);
+	});
+
+	test("a managed service in future_cloud shows its managed_url (DP07)", async ({
+		page,
+	}) => {
+		await page.goto("/deploy");
+		await page.getByTestId("pulumi-tab").click();
+		await expect(page.getByTestId("deploy-target")).toBeVisible();
+
+		// switch to future_cloud — the managed services resolve to managed_url.
+		await page
+			.locator('[data-testid="target-toggle"][data-target="future_cloud"]')
+			.click();
+		await expect(
+			page.locator(
+				'[data-testid="target-program"][data-target="future_cloud"]',
+			),
+		).toBeVisible();
+
+		// the datastore (Postgres) is MANAGED → ${POSTGRES_MANAGED_URL}.
+		const managedPostgres = page.locator(
+			'[data-testid="managed-service"][data-service="postgres"]',
+		);
+		await expect(managedPostgres).toBeVisible();
+		await expect(managedPostgres).toHaveAttribute("data-mode", "managed_url");
+		await expect(managedPostgres).toHaveAttribute(
+			"data-url",
+			"${POSTGRES_MANAGED_URL}",
+		);
+		// the bus is MANAGED too → ${EVENTS_MANAGED_URL}.
+		await expect(
+			page.locator(
+				'[data-testid="managed-service"][data-service="events"][data-url="${EVENTS_MANAGED_URL}"]',
+			),
+		).toBeVisible();
+	});
+});

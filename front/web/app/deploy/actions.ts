@@ -39,6 +39,7 @@ import {
 	recordHumanValidation,
 	rollback,
 } from "@/lib/env-rollback";
+import type { StackManifest as TargetManifest } from "@/lib/hono-emitter";
 import {
 	buildPreviewWithBootstrap,
 	isBlocked as isPreviewBlocked,
@@ -46,6 +47,11 @@ import {
 	servedMatchesEmitted,
 	teardownOf,
 } from "@/lib/preview-bootstrap";
+import {
+	emitPulumiStackTarget,
+	isTargetProjection,
+	type Target,
+} from "@/lib/pulumi-target";
 import type {
 	CockpitView,
 	DeployView,
@@ -53,6 +59,7 @@ import type {
 	EnvView,
 	PreviewView,
 	PulumiView,
+	TargetView,
 } from "./view";
 
 /**
@@ -895,4 +902,96 @@ export async function pulumiAction(
 			blockExplanation: String(e).slice(0, 400),
 		};
 	}
+}
+
+/**
+ * targetManifest — the representative StackManifest source the « Cible de déploiement » selector
+ * projects to each target. It is ONE source, content-addressed: a server (the app) + the Go
+ * interpreter sidecar (APP services) + Postgres (datastore) + a bus + a cache (MANAGED services).
+ * The SAME object is passed to BOTH projections — the source is never re-declared per target.
+ */
+function targetManifest(project: string): TargetManifest {
+	return {
+		app: project,
+		services: [
+			{
+				name: "server",
+				role: "server",
+				image: `${project}:latest`,
+				internalPort: 3000,
+			},
+			{
+				name: "interpreter",
+				role: "interpreter",
+				image: "aidos-interpreter:latest",
+				internalPort: 8080,
+			},
+			{
+				name: "postgres",
+				role: "datastore",
+				image: "postgres:16",
+				internalPort: 5432,
+			},
+			{ name: "events", role: "bus", image: "nats:2", internalPort: 4222 },
+			{
+				name: "valkey",
+				role: "cache",
+				image: "valkey/valkey:8",
+				internalPort: 6379,
+			},
+		],
+		network: { name: "traefik_default", external: true },
+	};
+}
+
+/**
+ * targetAction — the DP33 « Cible de déploiement » Server Action (clôture EPIC G). Basculer la cible
+ * (self_hosted | future_cloud) recalcule la PROJECTION depuis la MÊME source StackManifest via le
+ * twin PUR lib/pulumi-target.emitPulumiStackTarget (le twin de Go honoemit.EmitPulumiStackTarget).
+ *
+ * « Une source → N projections » : la SOURCE (le sourceHash du manifest) est INVARIANTE entre les
+ * cibles — seuls les BYTES émis diffèrent. En future_cloud, les services managés se résolvent en
+ * managed_url (DP07). PORTABILITÉ PAR PROJECTION, JAMAIS PAR RÉÉCRITURE.
+ *
+ * THE WALL (CLAUDE.md §2/§6/§8) : recalculer une projection n'écrit AUCUNE vérité (below-the-line) ;
+ * la projection est une fonction PURE (déterministe, byte-stable), jamais un LLM ; le StackManifest
+ * source reste au-dessus de la ligne (DP02). Pour sceller la source-invariance, l'action émet AUSSI
+ * la cible-jumelle et compare les deux sourceHash (le badge source-invariant).
+ */
+export async function targetAction(
+	_prev: TargetView,
+	formData: FormData,
+): Promise<TargetView> {
+	const project = String(formData.get("project") ?? "").trim() || "shop";
+	const requested = String(formData.get("target") ?? "self_hosted").trim();
+
+	const source = targetManifest(project);
+	const proj = await emitPulumiStackTarget(source, requested);
+	if (!isTargetProjection(proj)) {
+		return {
+			ok: false,
+			blockCode: proj.code,
+			blockExplanation: proj.explanation,
+		};
+	}
+
+	// The source-invariant check: project the OTHER target from the SAME source and compare the two
+	// source content addresses. The bytes differ; the source address is identical — that IS the
+	// source-invariance, computed by CODE (never declared).
+	const other: Target =
+		requested === "future_cloud" ? "self_hosted" : "future_cloud";
+	const twin = await emitPulumiStackTarget(source, other);
+	const sourceInvariant =
+		isTargetProjection(twin) && twin.sourceHash === proj.sourceHash;
+
+	return {
+		ok: true,
+		target: proj.target,
+		provider: proj.provider,
+		program: proj.program,
+		sourceHash: proj.sourceHash,
+		outputHash: proj.outputHash,
+		sourceInvariant,
+		managed: proj.managed,
+	};
 }
