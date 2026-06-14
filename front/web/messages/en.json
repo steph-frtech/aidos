@@ -181,7 +181,8 @@
 		"connectorsSpike": "Connector governance spike (DP19)",
 		"connectors": "Declared connectors (DP20)",
 		"substrate": "Data services",
-		"bootstrap": "Deterministic one-shot bootstrap (DP12)"
+		"bootstrap": "Deterministic one-shot bootstrap (DP12)",
+		"appOps": "App operations (backups DP31)"
 	},
 	"home": {
 		"eyebrow": "AI development operating system",
@@ -8013,5 +8014,36 @@
 		"sequenceHashLabel": "sequence hash (byte-stable replay)",
 		"viaMcpLive": "emitted via the S58 gateway MCP tool (DP13) — the gateway answered live.",
 		"viaMcpTwin": "emitted via the MCP tool (DP13) — gateway unreachable, the pure TS twin re-derived the SAME sequence (byte-identical to the authoritative Go)."
+	},
+	"appOps": {
+		"eyebrow": "DP31 · DP track · EPIC G",
+		"title": "App operations",
+		"subtitle": "Deterministic backups",
+		"intro": "The DETERMINISTIC BACKUP strategy for the emitted app: its named bind volumes (${APP_DATA_PATH}) AND its datastore (Postgres dump / non-prod Doltgres snapshot). Scheduled on an INJECTED clock (twin-side, never time.Now), append-only, scoped to project_id. DISTINCT from the phase rollback (DP28): the backup protects the DATA, the rollback re-emits the CODE.",
+		"tutorialHeading": "How it works",
+		"tutorialBody": "Click « Schedule a backup »: the pure twin of RealizeBackup (injected clock) fires the scheduled job at its echeance and mints a content-addressed RESTORABLE artefact, scoped to the project, that enters the append-only ledger. « Restore » round-trips the data WITHOUT LOSS — the restored state EQUALS the backed-up state. The backup carries NO secret in the clear (S91 ScanEmission, green indicator) and stays isolated per project (DP15: a backup of A is inaccessible from B). The wall: below-the-line, no truth-write; a restoration is a recorded decision (§9).",
+		"backupsHeading": "Backups",
+		"backupsIntro": "Schedule, list and restore the app's deterministic backups — bind volumes + datastore. Injected clock twin-side; append-only; scoped to project_id.",
+		"noSecretOk": "No secret in the clear",
+		"noSecretFail": "Secret in the clear detected",
+		"projectIsolated": "Per-project isolation: {project} · token {token}…",
+		"scheduleBackup": "Schedule a backup",
+		"scheduling": "Scheduling…",
+		"restoreBackup": "Restore",
+		"clockNote": "The scheduler is code on an injected clock — never time.Now, never an LLM (determinism-first).",
+		"artifactHeading": "Backup artefact",
+		"restorable": "Restorable",
+		"contentAddress": "Content address",
+		"project": "Project",
+		"storageKey": "Storage key",
+		"volumes": "Volumes",
+		"datastore": "Datastore",
+		"eventNote": "« Backup taken » notification dispatched → {target} (stable idempotency key: a replay never doubles the event).",
+		"roundTripOk": "Round-trip WITHOUT LOSS: the restored state EQUALS the backed-up state.",
+		"roundTripFail": "Round-trip FAILED: the restored state differs from the backed-up state.",
+		"ledgerHeading": "Backup ledger (append-only)",
+		"ledgerEmpty": "No backup yet — schedule one.",
+		"clean": "Clean",
+		"leak": "Leak"
 	}
 }

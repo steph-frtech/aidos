@@ -181,7 +181,8 @@
 		"connectorsSpike": "Spike gouvernance connecteurs (DP19)",
 		"connectors": "Connecteurs déclarés (DP20)",
 		"substrate": "Services de données",
-		"bootstrap": "Bootstrap one-shot déterministe (DP12)"
+		"bootstrap": "Bootstrap one-shot déterministe (DP12)",
+		"appOps": "Opérations de l'app (backups DP31)"
 	},
 	"home": {
 		"eyebrow": "Système d'exploitation de développement IA",
@@ -8013,5 +8014,36 @@
 		"sequenceHashLabel": "empreinte de la séquence (replay byte-stable)",
 		"viaMcpLive": "émis via l'outil MCP de la passerelle S58 (DP13) — la passerelle a répondu en direct.",
 		"viaMcpTwin": "émis via l'outil MCP (DP13) — passerelle injoignable, le jumeau TS pur a re-dérivé la MÊME séquence (byte-identique au Go autoritaire)."
+	},
+	"appOps": {
+		"eyebrow": "DP31 · Piste DP · EPIC G",
+		"title": "Opérations de l'app",
+		"subtitle": "Sauvegardes déterministes",
+		"intro": "La stratégie de BACKUP DÉTERMINISTE de l'app émise : ses volumes nommés bind (${APP_DATA_PATH}) ET son datastore (dump Postgres / snapshot Doltgres non-prod). Planifiée sur une horloge INJECTÉE (côté twin, jamais time.Now), append-only, scopée project_id. DISTINCT du rollback-par-phase (DP28) : le backup protège la DONNÉE, le rollback ré-émet le CODE.",
+		"tutorialHeading": "Comment ça marche",
+		"tutorialBody": "Cliquez « Planifier un backup » : le twin pur de RealizeBackup (horloge injectée) tire le job planifié à l'échéance et frappe un artefact RESTAURABLE content-addressed, scopé au projet, qui entre dans le journal append-only. « Restaurer » round-trip la donnée SANS PERTE — l'état restauré ÉGALE l'état sauvegardé. Le backup ne porte AUCUN secret en clair (S91 ScanEmission, indicateur vert) et reste isolé par projet (DP15 : un backup de A est inaccessible depuis B). Le mur : below-the-line, aucune écriture-vérité ; une restauration est une décision enregistrée (§9).",
+		"backupsHeading": "Sauvegardes",
+		"backupsIntro": "Planifier, lister et restaurer les backups déterministes de l'app — volumes bind + datastore. Horloge injectée côté twin ; append-only ; scopé project_id.",
+		"noSecretOk": "Aucun secret en clair",
+		"noSecretFail": "Secret en clair détecté",
+		"projectIsolated": "Isolation par projet : {project} · token {token}…",
+		"scheduleBackup": "Planifier un backup",
+		"scheduling": "Planification…",
+		"restoreBackup": "Restaurer",
+		"clockNote": "Le scheduler est du code sur une horloge injectée — jamais time.Now, jamais un LLM (déterminisme-first).",
+		"artifactHeading": "Artefact de backup",
+		"restorable": "Restaurable",
+		"contentAddress": "Content-address",
+		"project": "Projet",
+		"storageKey": "Clé de stockage",
+		"volumes": "Volumes",
+		"datastore": "Datastore",
+		"eventNote": "Notification « backup pris » dispatchée → {target} (clé d'idempotence stable : un rejeu ne double jamais l'événement).",
+		"roundTripOk": "Round-trip SANS PERTE : l'état restauré ÉGALE l'état sauvegardé.",
+		"roundTripFail": "Round-trip ÉCHOUÉ : l'état restauré diffère de l'état sauvegardé.",
+		"ledgerHeading": "Journal des backups (append-only)",
+		"ledgerEmpty": "Aucun backup pour l'instant — planifiez-en un.",
+		"clean": "Propre",
+		"leak": "Fuite"
 	}
 }
