@@ -1,4 +1,4 @@
-# ADR 0064 — Le modèle d'exécution redevient Opus 4.8, et devient PARAMÉTRABLE
+# ADR 0070 — Le modèle d'exécution redevient Opus 4.8, et devient PARAMÉTRABLE
 
 - **Statut :** accepté (décision humaine, 2026-06-13 : « Repasse tout en opus 4.8 partout, rends-le paramétrable, car fable-5 est désactivé »)
 - **Date :** 2026-06-13

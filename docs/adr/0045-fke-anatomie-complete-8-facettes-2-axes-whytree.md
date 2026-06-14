@@ -33,3 +33,13 @@ Après la fusion FKE→Tome (ADR 0044), un grill itératif (« et d'autre ? · u
 ## Liens
 
 `KRD.md` LIVRE XXX (FKE-1.3/1.4/3/35.1/38) · ADR 0044 · `docs/plan/ROADMAP-fke.md` · le grill du 2026-06-07 (provenance) · ISO 25010 (croisement externe des facettes).
+
+## Addendum — 2026-06-14
+
+Les six décisions de cet ADR sont **BÂTIES** (build FKE vert, git `8727034`) — la prose « post-S117 / build en cours / atterrissage par la piste FK » est **dépassée** par l'implémentation. Preuves vertes :
+
+- **Décision #3 (8 facettes canoniques)** — `back/kernel/facets/facets.go` grave les **8 constantes** de l'ensemble clos : `FacetFunctional` **F**, `FacetInvariants` **I**, `FacetSecurity` **S**, `FacetBudgets` **B**, `FacetReliability` **R**, `FacetEvolvability` **V**, `FacetMaintainability` **M**, `FacetExperience` **X** (verbatim « SOFT, §13.6 — informs, never blocks »). `FacetSet` est une fonction pure (no DB/clock/rng/I/O/LLM ; même `FacetSet` ⇒ même verdict). Miroirs fixture + property + round-trip de migration présents.
+- **Décision #6 (WhyTree / `caused_by` / `/why`)** — `back/kernel/causedby` (le lien arrière, inverse d'`impacts`) + `back/kernel/whytree` (l'arbre fishbone déterministe-sur-graphe), chacun avec ses miroirs fixture + property.
+- **Décision #7 (cockpit AI Lab)** + **conscience-agrégateur** — la route `front/web/app/ai-lab` (trialogue) et `front/web/app/conscience` (l'agrégateur déterministe `back/runtime/conscience/conscience.go`) existent et sont vertes.
+
+L'anatomie 1-pour-1, les 2 axes, le determinism-first (juge structurel, conscience-agrégateur, WhyTree déterministe + cause vérifiée, X soft) et l'additivité §9 restent valides tels quels. Aucune réécriture du corps — seul l'**état d'atterrissage** des six décisions est acté.

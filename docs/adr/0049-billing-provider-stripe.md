@@ -1,6 +1,6 @@
 # ADR 0049 — Provider de facturation Stripe + webhooks entrants en operations async + contrat Pact (slot replaceable)
 
-- **Statut :** proposed (accepté au vert de S114)
+- **Statut :** accepté (S114 vert, build S53→S117 git 8727034)
 - **Date :** 2026-06-09
 - **Contexte KRD :** ROADMAP app-builder, EPIC 14 (SaaS multi-tenant), étape **S114**. Tool-search par étape (CLAUDE.md §6). Dépend de S73 (operations async/outbox), S111 (HarnessCostBudget/ValueCase câblés aux compteurs réels), S52 (AgentRun enregistrés), S61 (identité compte), S53 (project_id).
 - **Amende par référence :** complète ADR 0003 (frozen-stack — aucun slot « provider de facturation ») ; s'appuie sur ADR 0009 (tout op backend = outil MCP), ADR 0010/0011 (Workbench thémé + bilingue), et le mandat determinism-first (§6/§8). Distingue la couche économique **customer-facing** (cette ADR) du **HarnessCostBudget kernel** (S51/S111, advisory build-time).

@@ -27,3 +27,7 @@ L'utilisateur a formalisé **Fractal Kernel Engineering (FKE)** — la disciplin
 ## Liens
 
 `KRD.md` LIVRE XXX · `docs/plan/ROADMAP-fke.md` · ADR 0040 (construite TS) · ADR 0043 (IaC Pulumi) · la conversation de grill du 2026-06-07 (provenance).
+
+## Addendum — 2026-06-14
+
+La piste FKE est **BÂTIE & VERTE** (build `FK01→FK16`, git `8727034`). La décision #8 (« atterrissage = piste `FK01-FK10` lancée APRÈS S117 ; aujourd'hui documentaire seulement + conception du plan ») est **dépassée** : les deltas code ont atterri. Preuves dans le truth-store vert — `back/runtime/conscience` (l'agrégateur déterministe de la décision #3, `conscience.go` + miroirs fixture/property), `back/kernel/facets` (l'anatomie des facettes, `facets.go`), `back/kernel/causedby` et `back/kernel/whytree` (la causalité arrière, ADR 0045 décision #6). L'anatomie symétrique, la conscience-agrégateur, les 7 niveaux de vérité et le kernel effondrable ne sont plus « documentaires seulement » : ils sont implémentés et conformes. Les autres décisions (FKE fondu au Tome, doc-miroirs structurels, A0-A8) restent valides telles quelles. Aucune réécriture du corps — seul l'**état d'atterrissage** de la décision #8 est mis à jour.

@@ -1,6 +1,6 @@
 # ADR 0046 — Type blob/fichier + provider de stockage objet par projet (slot replaceable)
 
-- **Statut :** proposed (accepté au vert de S72)
+- **Statut :** accepté (S72 vert, build S53→S117 git 8727034)
 - **Date :** 2026-06-08
 - **Contexte KRD :** ROADMAP app-builder, EPIC 6 (modéliser son domaine), étape **S72**. Tool-search par étape (CLAUDE.md §6). Gate de l'émission multi-entités E9 (S74/S87/S90/S93).
 - **Amende par référence :** complète ADR 0003 (frozen-stack — aucun slot « stockage objet ») ; s'appuie sur ADR 0040 (app émise = Hono/TS fonctionnel — le handler blob est émis en TS) + ADR 0006 (datastore dialecte Postgres, inchangé) + ADR 0009 (tout op backend = outil MCP) ; prolonge l'honnêteté de l'ensemble clos de S35 (scalaires) et S71 (relations).

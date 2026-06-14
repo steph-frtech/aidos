@@ -85,3 +85,24 @@ Zone `/spike` uniquement : aucune écriture `kernel`/`mirrors`/`fitness`, aucune
 - Jumeau TS + matrice gravée : `front/web/lib/connector-governance.ts` (`MEASURED_MATRIX`, `Matrix{rows, ledgerRoot, ledgerOK, ledgerLength, verdict}`).
 - Miroir T0 vitest : `front/web/lib/connector-governance.test.ts` (**11 PASS**).
 - **Gates :** `go build ./...` GREEN ; `go test ./runtime/spike/dp19connectorgov/... ./runtime/agentimpl/... ./runtime/agentrun/...` GREEN ; `gofmt -l` clean ; `go vet` clean ; `vitest` GREEN (11) ; `biome check` clean (TABS).
+
+## Addendum — 2026-06-14
+
+Ce verdict de spike (DP19, zone `/spike`, ratchet OFF) affirmait **« AUCUN nouveau
+BlockReason canonique »** : les codes de refus étaient des **constantes jetables**, jamais
+promues hors d'idée → miroir → /goal. Cette prose est **dépassée** : la couche connecteurs
+a effectivement franchi cette porte légale à **DP20/DP21** (EPIC E), et les trois gardes
+runtime load-bearing **ont été PROMUS dans l'enum canonique** `blockreason.Code` —
+l'enforcer runtime vit à `back/runtime/connectorenforce` (DP21), son jumeau de déclaration
+kernel à DP20 :
+
+- `CodeConnectorRWNeedsApproval` (`CONNECTOR_RW_NEEDS_APPROVAL`) — `blockreason.go:511` — l'amendement **A2** (HITL runtime, **pas** `authority.Decide`) gravé en canonique.
+- `CodeEgressNotAllowed` (`EGRESS_NOT_ALLOWED`) — `blockreason.go:524` — l'axe confinement (`agentimpl.EgressAllowed`) resserré par le scope du connecteur.
+- `CodeAIDirectDBAccessForbidden` (`AI_DIRECT_DB_ACCESS_FORBIDDEN`) — `blockreason.go:538` — l'amendement **A3** (l'IA jamais en direct sur la DB), set-membership fail-closed.
+
+Chacun est ADDED via une **extension additive de l'enum** (`change_type: refine`, jamais un
+removal), par la porte **idée → miroir → /goal → ChangeSet**, exactement comme l'exigeait
+la décision de cet ADR. Le spike a tenu sa promesse (rien promu DANS le spike) ; la promotion
+a eu lieu APRÈS, à la gravure EPIC E. Le no-go reproductible, la réutilisation des 5
+enforcers + ledger Merkle, et « aucun nouveau mur » restent vrais. Seul le **statut des codes
+de refus** est mis à jour (de jetable `/spike` à canonique gravé). Aucune réécriture du corps.

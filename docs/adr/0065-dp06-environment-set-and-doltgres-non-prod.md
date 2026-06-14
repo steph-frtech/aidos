@@ -67,3 +67,18 @@ première (l'environnement comme dimension de scope complète) :
   vector/embedding (pgvector absent de Doltgres) reste réglé par sidecar Postgres ;
   la palette managée précise arrive à l'EPIC G — `future_cloud` est déclaré dès
   maintenant pour la portabilité, ses bindings sont `managed_url`-only.
+
+## Addendum — 2026-06-14
+
+La décision #2 décrivait `DOLTGRES_NOT_ALLOWED_IN_PROD` (et son pendant `UNKNOWN_PROFILE`)
+comme **« package-local, motif DP02 `UNKNOWN_SERVICE_ROLE`, pas un nouveau membre de
+l'enum gelé `blockreason` »**. Cette prose est **dépassée** : à **DP11**, `CodeUnknownProfile`
+(`UNKNOWN_PROFILE`) et `CodeDoltgresNotAllowedInProd` (`DOLTGRES_NOT_ALLOWED_IN_PROD`) ont
+été **PROMUS dans l'enum canonique gelé** `blockreason.Code` — `back/runtime/blockreason/blockreason.go:450`
+et `:463` — via la **porte légale** (idée → miroir → /goal → **ChangeSet + SemanticDiff**,
+classé `refine` / extension additive, jamais un removal). Ils ne sont plus des constantes
+package-local de l'émetteur profilé : ce sont des membres de la vérité au-dessus de la
+ligne, surfacés par `aidos explain` et le Workbench. La règle de fond est inchangée (prod
+impose Postgres ; Doltgres hors-prod uniquement ; refus fail-closed) — seul le **statut
+d'enregistrement du code de refus** est mis à jour (de package-local à canonique). Aucune
+réécriture du corps de la décision.

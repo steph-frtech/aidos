@@ -1,6 +1,6 @@
 # ADR 0043 — Langage Infrastructure-as-Code de l'app émise : Pulumi (TypeScript fonctionnel), adapté KRD
 
-- **Statut :** proposed (tranché par le spike DP01/DP10 ; accepté à leur verdict go)
+- **Statut :** accepté (au verdict GO des spikes DP01 ADR 0064 + DP10 ADR 0067, 2026-06-13 ; preuve live demoshop-dev)
 - **Date :** 2026-06-07
 - **Contexte KRD :** piste DP (`ROADMAP-provisioning-deploy.md`), épics A/B/C/D/G. Tool-search par étape (CLAUDE.md §6).
 - **Amende par référence :** ADR 0003 (frozen-stack — aucun slot « substrat de déploiement de l'app émise ») ; complète ADR 0040 (app émise = Hono/TS fonctionnel) + ADR 0036 (mandat fonctionnel FN02) + ADR 0006 (datastore).

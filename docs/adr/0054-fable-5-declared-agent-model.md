@@ -1,6 +1,6 @@
 # ADR 0054 — Le modèle déclaré de la couche-agent du produit passe à Claude Fable 5
 
-- **Statut :** accepté (approbation humaine explicite, 2026-06-12 : « Oui on passe tout en Fable 5 ultracode »)
+- **Statut :** Superseded by ADR 0070 (modele-parametrable-opus), 2026-06-13
 - **Date :** 2026-06-12
 - **Contexte KRD :** S52 (agent layer) · BA01-BA03 (knobs gouvernés) · GV (gouvernance) · CLAUDE.md §8 (« un override est une décision enregistrée »)
 
