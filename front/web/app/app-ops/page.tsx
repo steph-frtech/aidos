@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
 import { AppOpsScreen } from "./AppOpsScreen";
-import { seedBackups } from "./actions";
+import { seedBackups, seedSecrets } from "./actions";
 
 export const metadata: Metadata = {
 	title: "Opérations de l'app — Sauvegardes déterministes — AIDOS Workbench",
@@ -36,6 +36,7 @@ export default async function AppOpsPage() {
 	const ctx = await activeProjectContext();
 	const t = await getTranslations("appOps");
 	const initialBackups = await seedBackups(ctx.activeId);
+	const initialSecrets = await seedSecrets(ctx.activeId);
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -76,6 +77,7 @@ export default async function AppOpsPage() {
 					<AppOpsScreen
 						activeProjectId={ctx.activeId}
 						initialBackups={initialBackups}
+						initialSecrets={initialSecrets}
 					/>
 				</div>
 			</main>

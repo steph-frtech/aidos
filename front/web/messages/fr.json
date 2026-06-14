@@ -8044,6 +8044,22 @@
 		"ledgerHeading": "Journal des backups (append-only)",
 		"ledgerEmpty": "Aucun backup pour l'instant — planifiez-en un.",
 		"clean": "Propre",
-		"leak": "Fuite"
+		"leak": "Fuite",
+		"secretsHeading": "Secrets (par projet)",
+		"secretsIntro": "DP32 : le SECRET STORE PAR PROJET (S91) branché sur le provisioning — credentials DB, clés API, secrets OAuth, certificats, chiffrés au repos et scopés project_id. Le boot résout les RÉFÉRENCES du .env.example (DP04) en valeurs concrètes, dans l'ordre gravé références → store → overrides. La valeur n'est JAMAIS affichée à l'écran ni écrite dans le source émis.",
+		"valueHidden": "La valeur n'est jamais affichée",
+		"secretProjectIsolated": "Isolation par projet : {project} (un secret de A est invisible sous B)",
+		"refsOnlyOk": ".env.example = références seules (zéro valeur)",
+		"refsOnlyFail": "Une valeur de secret a fuité dans l'émission",
+		"mergeOrderLabel": "Ordre de merge au boot (gravé) :",
+		"secretNameLabel": "Nom de la référence (jamais une valeur)",
+		"secretAdd": "Ajouter une référence",
+		"secretAdding": "Ajout…",
+		"secretValueNote": "On dépose une RÉFÉRENCE, jamais une valeur — la valeur est chiffrée et scopée project_id dans le store (S91), injectée au boot par variable d'environnement. Le .env.example émis ne porte que ${VAR}.",
+		"secretListHeading": "Références de secret (append-only)",
+		"secretListEmpty": "Aucune référence pour l'instant — ajoutez-en une.",
+		"secretReference": "Référence",
+		"secretRotate": "Faire tourner",
+		"secretRotatedBadge": "Roté (ancienne valeur invalidée)"
 	}
 }

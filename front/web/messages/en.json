@@ -8044,6 +8044,22 @@
 		"ledgerHeading": "Backup ledger (append-only)",
 		"ledgerEmpty": "No backup yet — schedule one.",
 		"clean": "Clean",
-		"leak": "Leak"
+		"leak": "Leak",
+		"secretsHeading": "Secrets (per project)",
+		"secretsIntro": "DP32: the PER-PROJECT SECRET STORE (S91) branched onto the provisioning — DB credentials, API keys, OAuth secrets, certificates, encrypted at rest and scoped to project_id. At boot, it resolves the .env.example REFERENCES (DP04) into concrete values, in the engraved order references → store → overrides. The value is NEVER shown on screen nor written into the emitted source.",
+		"valueHidden": "The value is never displayed",
+		"secretProjectIsolated": "Per-project isolation: {project} (a secret of A is invisible under B)",
+		"refsOnlyOk": ".env.example = references only (zero value)",
+		"refsOnlyFail": "A secret value leaked into the emission",
+		"mergeOrderLabel": "Boot merge order (engraved):",
+		"secretNameLabel": "Reference name (never a value)",
+		"secretAdd": "Add a reference",
+		"secretAdding": "Adding…",
+		"secretValueNote": "You drop a REFERENCE, never a value — the value is encrypted and scoped to project_id in the store (S91), injected at boot as an env var. The emitted .env.example carries only ${VAR}.",
+		"secretListHeading": "Secret references (append-only)",
+		"secretListEmpty": "No reference yet — add one.",
+		"secretReference": "Reference",
+		"secretRotate": "Rotate",
+		"secretRotatedBadge": "Rotated (old value invalidated)"
 	}
 }

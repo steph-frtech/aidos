@@ -101,3 +101,113 @@ test.describe("DP31 — les sauvegardes déterministes (route additive /app-ops)
 		await expect(done).toHaveAttribute("data-roundtrip", "true");
 	});
 });
+
+/**
+ * DP32 Playwright e2e — the « Secrets (par projet) » section of /app-ops (piste DP, EPIC G).
+ * mirror record: reflects=DP32-secrets, test_kind=e2e, cert_language=playwright, liveness=live
+ *
+ * Proves the /app-ops route renders the DP32 SECRET-STORE section (branche S91 sur le
+ * provisioning) and that the gesture EXECUTES from the screen (ui-completeness §7):
+ *
+ *  (1) AJOUTER une RÉFÉRENCE de secret ⇒ une ligne apparaît portant la RÉFÉRENCE `${VAR}`
+ *      (data-testid="secret-reference"), JAMAIS la valeur en clair ;
+ *  (2) FAIRE TOURNER ⇒ data-testid="secret-rotated" : l'ancienne valeur est invalidée ;
+ *  (3) l'indicateur « la valeur n'est jamais affichée » est présent (data-shown="false") ;
+ *  (4) l'isolation PAR PROJET est affichée + « .env.example = références seules » est vert.
+ *
+ * THE SOURCE est le TWIN PUR de MergeBootEnv/RotateSecret/ScanEmission (lib/secret-boot),
+ * ordre de merge GRAVÉ — jamais un LLM. THE WALL (§2) : below-the-line ; les secrets vivent
+ * dans le store chiffré scopé project_id, JAMAIS le truth-store/git/source émis ; le panneau
+ * ne rend QUE la référence `${VAR}` et le fingerprint, jamais la valeur.
+ *
+ * Anti-flake : chaque attente s'ancre sur un CHANGEMENT D'ÉTAT (un testid/attr qui apparaît
+ * après l'action), jamais sur un délai. Le twin est synchrone et déterministe.
+ */
+test.describe("DP32 — le secret store par projet (section additive /app-ops)", () => {
+	test.setTimeout(60_000);
+
+	test("la section secrets rend les indicateurs value-hidden, isolation projet et refs-only", async ({
+		page,
+	}) => {
+		await page.goto("/app-ops");
+
+		// la section « Secrets (par projet) » est présente.
+		const secrets = page.getByTestId("app-ops-secrets");
+		await expect(secrets).toBeVisible();
+
+		// l'indicateur « la valeur n'est jamais affichée » (data-shown=false).
+		const hidden = page.getByTestId("secret-value-hidden");
+		await expect(hidden).toBeVisible();
+		await expect(hidden).toHaveAttribute("data-shown", "false");
+
+		// l'isolation par projet est présente (scope project_id).
+		await expect(page.getByTestId("secret-project-isolated")).toBeVisible();
+
+		// « .env.example = références seules » est vert (S91 ScanEmission, zéro valeur).
+		const refsOnly = page.getByTestId("envexample-refs-only");
+		await expect(refsOnly).toBeVisible();
+		await expect(refsOnly).toHaveAttribute("data-ok", "true");
+
+		// l'ordre de merge gravé est affiché (références → store → overrides).
+		await expect(page.getByTestId("secret-merge-order")).toBeVisible();
+	});
+
+	test("ajouter une référence ⇒ voir la RÉFÉRENCE dollar-brace (jamais la valeur) dans la liste", async ({
+		page,
+	}) => {
+		await page.goto("/app-ops");
+
+		const list = page.getByTestId("secret-list");
+		await expect(list).toBeVisible();
+		const before = await list.getByTestId("secret-row").count();
+
+		// le geste : AJOUTER une référence (nom seulement — jamais un champ valeur).
+		await page.getByTestId("secret-name-input").fill("APP_SECRET_DATABASE_URL");
+		await page.getByTestId("secret-add").click();
+
+		// la liste a grandi d'exactement une ligne, portant le nom + le projet.
+		await expect
+			.poll(() => list.getByTestId("secret-row").count())
+			.toBe(before + 1);
+		const row = list.getByTestId("secret-row").first();
+		await expect(row).toHaveAttribute("data-name", "APP_SECRET_DATABASE_URL");
+		await expect(row).toHaveAttribute("data-project", /.+/);
+
+		// la RÉFÉRENCE dollar-brace est affichée — JAMAIS une valeur en clair.
+		const ref = row.getByTestId("secret-reference");
+		await expect(ref).toBeVisible();
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: the emitted reference text is a literal dollar-brace string, not a template interpolation.
+		await expect(ref).toHaveText("${APP_SECRET_DATABASE_URL}");
+	});
+
+	test("faire tourner ⇒ l'ancienne valeur est invalidée (badge roté)", async ({
+		page,
+	}) => {
+		await page.goto("/app-ops");
+
+		// ajouter d'abord une référence à faire tourner.
+		await page
+			.getByTestId("secret-name-input")
+			.fill("APP_SECRET_OAUTH_CLIENT_SECRET");
+		await page.getByTestId("secret-add").click();
+		const row = page
+			.getByTestId("secret-list")
+			.getByTestId("secret-row")
+			.first();
+		await expect(row).toHaveAttribute(
+			"data-name",
+			"APP_SECRET_OAUTH_CLIENT_SECRET",
+		);
+
+		// le geste : FAIRE TOURNER.
+		await row.getByTestId("secret-rotate").click();
+
+		// le badge « roté » apparaît (l'ancienne valeur est invalidée) — ancre sur l'état.
+		const rotated = page.getByTestId("secret-rotated").first();
+		await expect(rotated).toBeVisible();
+		await expect(rotated).toHaveAttribute(
+			"data-name",
+			"APP_SECRET_OAUTH_CLIENT_SECRET",
+		);
+	});
+});

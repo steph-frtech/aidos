@@ -1,7 +1,8 @@
 "use client";
 
 import { AppOpsBackupsPanel } from "./AppOpsBackupsPanel";
-import type { AppOpsBackupsView } from "./view";
+import { SecretsPanel } from "./SecretsPanel";
+import type { AppOpsBackupsView, AppOpsSecretsView } from "./view";
 
 /**
  * AppOpsScreen is the /app-ops cockpit shell (DP31, piste DP). It composes the DP31
@@ -18,15 +19,21 @@ import type { AppOpsBackupsView } from "./view";
 export function AppOpsScreen({
 	activeProjectId,
 	initialBackups,
+	initialSecrets,
 }: {
 	activeProjectId: string | null;
 	initialBackups: AppOpsBackupsView;
+	initialSecrets: AppOpsSecretsView;
 }) {
 	return (
 		<div className="space-y-12">
 			<AppOpsBackupsPanel
 				activeProjectId={activeProjectId}
 				initial={initialBackups}
+			/>
+			<SecretsPanel
+				activeProjectId={activeProjectId}
+				initial={initialSecrets}
 			/>
 		</div>
 	);

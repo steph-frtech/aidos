@@ -12,7 +12,21 @@ import {
 	restoreBackup,
 	stateEqual,
 } from "@/lib/backup";
-import type { AppOpsBackupsView, BackupRow } from "./view";
+import {
+	bootMergeOrder,
+	demoEnvExample,
+	envExampleIsReferencesOnly,
+	referenceFor,
+	rotateSecret,
+	storeFingerprint,
+} from "@/lib/secret-boot";
+import { SecretStore } from "@/lib/secret-store";
+import type {
+	AppOpsBackupsView,
+	AppOpsSecretsView,
+	BackupRow,
+	SecretRow,
+} from "./view";
 
 /**
  * Server Actions for the /app-ops « Sauvegardes » panel (DP31, piste DP, EPIC G).
@@ -178,5 +192,173 @@ export async function restoreBackupAction(
 		lastEvents: [],
 		lastNoSecret: artifactIsClean(artifact),
 		lastRestore: { roundTrip, decision: out.decision },
+	};
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────
+// DP32 — « Secrets (par projet) » server actions.
+//
+// THE SOURCE is the PURE twin lib/secret-boot (the twin of the Go MergeBootEnv /
+// RotateSecret / ScanBootEmission). THE WALL (§2): a secret is operational material, never a
+// truth — the actions NEVER return a value in the clear (only the EMITTED reference `${VAR}`
+// and the content-address fingerprint). The store is rebuilt deterministically per action
+// from the prior rows (server actions are stateless) — the demo VALUE is derived server-side
+// from (project, name) and NEVER crosses the wire to the panel.
+//
+// The .env.example carried by the emission is references-only (the DP04 contract); the
+// refsOnly indicator REUSES the shared S91 scan over the demo emission. Determinism: the
+// merge order is the engraved BOOT_MERGE_ORDER; the scan is code, never an LLM.
+// ─────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * demoSecretValue derives a deterministic, project-scoped demo VALUE for a secret name — it
+ * stays SERVER-SIDE (the store seals it); it is NEVER returned to the panel. Same
+ * (project, name, salt) ⇒ same value (so a rotation with a new salt changes the value).
+ */
+function demoSecretValue(project: string, name: string, salt: string): string {
+	// a stable, high-entropy-ish value (≥12 chars) the S91 scan would flag if it ever leaked.
+	return `v${salt}${project}${name}`
+		.replace(/[^A-Za-z0-9]/g, "")
+		.slice(0, 24)
+		.padEnd(12, "0");
+}
+
+/**
+ * rebuildStore reconstructs the project-scoped SecretStore from the prior rows — server
+ * actions are stateless, so the store is re-derived deterministically each call (the value
+ * is re-sealed from the row's salt, never carried on the wire). REUSES the S91 SecretStore.
+ */
+function rebuildStore(projectId: string, rows: SecretRow[]): SecretStore {
+	const store = new SecretStore();
+	for (const r of rows) {
+		// the salt is encoded in the fingerprint-bearing row via its seq + rotated flag; we
+		// re-seal a deterministic value so the store carries the SAME present-set the rows show.
+		store.set(
+			projectId,
+			r.name,
+			demoSecretValue(projectId, r.name, r.rotated ? "rot" : "set"),
+		);
+	}
+	return store;
+}
+
+/** Build the project-scoped seed view (no secret reference added yet). */
+export async function seedSecrets(
+	activeProjectId: string | null,
+): Promise<AppOpsSecretsView> {
+	const projectId =
+		(activeProjectId ?? "demo-project").trim() || "demo-project";
+	return {
+		ok: true,
+		projectId,
+		rows: [],
+		mergeOrder: bootMergeOrder(),
+		// the emitted .env.example is references-only by construction (DP04) — the S91 scan
+		// is green even checked against the project's actual values.
+		refsOnly: envExampleIsReferencesOnly(demoEnvExample(), []),
+	};
+}
+
+/**
+ * addSecretReferenceAction ADDS a secret REFERENCE (name + project scope) to the store and
+ * the append-only list. It NEVER takes nor returns a value in the clear — the value is sealed
+ * server-side (demoSecretValue) and the row carries only the EMITTED reference `${VAR}` + the
+ * store fingerprint. It is the « Ajouter une référence » gesture (ui-completeness §7).
+ */
+export async function addSecretReferenceAction(
+	activeProjectId: string | null,
+	name: string,
+	priorRows: SecretRow[],
+): Promise<AppOpsSecretsView> {
+	const projectId =
+		(activeProjectId ?? "demo-project").trim() || "demo-project";
+	const key = (name ?? "").trim();
+	if (!key) {
+		return {
+			ok: false,
+			projectId,
+			rows: priorRows,
+			mergeOrder: bootMergeOrder(),
+			refsOnly: envExampleIsReferencesOnly(demoEnvExample(), []),
+			error: {
+				code: "EMPTY_SECRET_NAME",
+				message:
+					"le nom de la référence de secret est requis (jamais une valeur en clair)",
+			},
+		};
+	}
+
+	const store = rebuildStore(projectId, priorRows);
+	// seal a deterministic demo value server-side (NEVER returned to the panel).
+	store.set(projectId, key, demoSecretValue(projectId, key, "set"));
+	const fingerprint = storeFingerprint(store, projectId);
+
+	const nextSeq =
+		priorRows.reduce((max, r) => (r.seq > max ? r.seq : max), 0) + 1;
+	const row: SecretRow = {
+		seq: nextSeq,
+		name: key,
+		projectId,
+		reference: referenceFor(key),
+		fingerprint,
+		rotated: false,
+	};
+	return {
+		ok: true,
+		projectId,
+		// append-only: prepend the new row (most-recent first); never mutate a prior row (§9).
+		rows: [row, ...priorRows],
+		mergeOrder: bootMergeOrder(),
+		refsOnly: envExampleIsReferencesOnly(demoEnvExample(), []),
+	};
+}
+
+/**
+ * rotateSecretReferenceAction ROTATES a secret (S91 Rotate) — the old value is INVALIDATED
+ * and the row carries a NEW fingerprint (proving the value moved WITHOUT exposing it). It is
+ * the « Faire tourner » gesture (ui-completeness §7). Rotating an ABSENT secret is refused.
+ * A rotation is a RECORDED decision (append-only §9), never a silent in-place rewrite.
+ */
+export async function rotateSecretReferenceAction(
+	activeProjectId: string | null,
+	name: string,
+	priorRows: SecretRow[],
+): Promise<AppOpsSecretsView> {
+	const projectId =
+		(activeProjectId ?? "demo-project").trim() || "demo-project";
+	const key = (name ?? "").trim();
+
+	const store = rebuildStore(projectId, priorRows);
+	// rotate to a NEW deterministic demo value (the "rot" salt ⇒ a different value).
+	const res = rotateSecret(
+		store,
+		projectId,
+		key,
+		demoSecretValue(projectId, key, "rot"),
+	);
+	if (!res.ok) {
+		return {
+			ok: false,
+			projectId,
+			rows: priorRows,
+			mergeOrder: bootMergeOrder(),
+			refsOnly: envExampleIsReferencesOnly(demoEnvExample(), []),
+			error: { code: res.code, message: res.message },
+		};
+	}
+
+	// the row's fingerprint moves to the NEW one (the old value is gone) and the row is marked
+	// rotated; the prior rows for OTHER keys are untouched (append-only §9).
+	const rows = priorRows.map((r) =>
+		r.name === key && r.projectId === projectId
+			? { ...r, fingerprint: res.decision.newFingerprint, rotated: true }
+			: r,
+	);
+	return {
+		ok: true,
+		projectId,
+		rows,
+		mergeOrder: bootMergeOrder(),
+		refsOnly: envExampleIsReferencesOnly(demoEnvExample(), []),
 	};
 }

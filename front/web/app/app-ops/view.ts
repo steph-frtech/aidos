@@ -65,3 +65,52 @@ export const APP_OPS_BACKUPS_INITIAL: AppOpsBackupsView = {
 	lastEvents: [],
 	lastNoSecret: true,
 };
+
+/**
+ * View model for the /app-ops « Secrets (par projet) » section (DP32, piste DP, EPIC G).
+ *
+ * Every field is a deterministic VALUE produced by the pure twin lib/secret-boot (the twin
+ * of the Go MergeBootEnv / RotateSecret / ScanBootEmission). THE WALL (§2): a secret is
+ * operational material, NEVER a truth — the panel renders only REFERENCES (`${VAR}`), NEVER
+ * a value in the clear. There is no value-egress surface to the UI.
+ */
+
+/** One secret-reference row of the project's secret store (a reference, never a value). */
+export interface SecretRow {
+	/** a stable monotonic sequence number, assigned at append time — the React key. */
+	seq: number;
+	/** the secret key (the env-var the emitted .env.example references). */
+	name: string;
+	/** the owning project (scope project_id — the isolation key). */
+	projectId: string;
+	/** the EMITTED reference shape (`${VAR}`) — NEVER a value. */
+	reference: string;
+	/** the per-project store fingerprint after the last set/rotate (proves change, not value). */
+	fingerprint: string;
+	/** whether this reference was just rotated (the old value invalidated). */
+	rotated: boolean;
+}
+
+/** The full /app-ops secrets view for one project. */
+export interface AppOpsSecretsView {
+	ok: boolean;
+	/** the active project the secrets are scoped to (the isolation scope). */
+	projectId: string;
+	/** the append-only list of secret references (most-recent first). */
+	rows: SecretRow[];
+	/** the engraved boot merge order rendered legibly (references → store → overrides). */
+	mergeOrder: string[];
+	/** whether the emitted .env.example carries ONLY references (zero value, ∀ property). */
+	refsOnly: boolean;
+	/** a typed refusal surfaced verbatim (rotate-absent / missing-at-boot / …). */
+	error?: { code: string; message: string };
+}
+
+/** The empty seed before any project context (the secrets panel re-seeds on mount). */
+export const APP_OPS_SECRETS_INITIAL: AppOpsSecretsView = {
+	ok: false,
+	projectId: "",
+	rows: [],
+	mergeOrder: [],
+	refsOnly: true,
+};
