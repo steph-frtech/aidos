@@ -23,6 +23,7 @@ import type { InstanceConfig } from "@/lib/v3/instance";
 import type { ProjectRecord } from "@/lib/v3/project";
 import { replayTo, type SessionTurn, turnsOf } from "@/lib/v3/session";
 import { chatTurnAction } from "./actions";
+import { deployProjectStackAction } from "./environnements/deploy-actions";
 import {
 	createProjectAction,
 	emitWorkspaceAction,
@@ -335,6 +336,13 @@ export function V3SessionProvider({
 			const record = await createProjectAction(name);
 			if (record === null) return;
 			await setActiveProjectAction(record.id);
+			// #1 (ADR 0040/0043) : « chaque projet est des docker à déployer au moment où on le
+			// crée » — on MONTE sa stack tout de suite (server · base · interpréteur) et le bandeau
+			// ProvisioningBanner ATTEND qu'elle monte. Le drapeau survit au remount (sessionStorage).
+			if (typeof window !== "undefined") {
+				window.sessionStorage.setItem(`aidos-provisioning:${record.id}`, "1");
+			}
+			void deployProjectStackAction(record.id, []);
 			router.refresh();
 		},
 		[persistNow, router],

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { deployRealAction } from "@/app/v2/builder/actions";
+import { deployProjectStackAction } from "./deploy-actions";
 import {
 	type AppProjection,
 	type BuilderState,
@@ -184,7 +184,14 @@ export function EnvsClient() {
 	const runRealDeploy = async () => {
 		setRealBusy(true);
 		try {
-			setRealResult(await deployRealAction());
+			// LE VRAI déploiement PAR PROJET : monte la stack docker dédiée du projet courant
+			// (server + interpreter + db) derrière <slug>-dev.sagedesk.fr, depuis SES entités.
+			setRealResult(
+				await deployProjectStackAction(
+					projectId ?? "app",
+					emitApp(state).entities.map((e) => e.name),
+				),
+			);
 		} catch {
 			setRealResult({ ok: false, url: null, detail: "action indisponible" });
 		} finally {

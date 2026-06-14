@@ -8,6 +8,7 @@ import { assembleGraph, extractFromSource } from "@/lib/v2/code-extract";
 import { ladderOf } from "@/lib/v3/instance";
 import { loadInstanceConfigAction } from "./instance/actions";
 import { Palette } from "./Palette";
+import { ProvisioningBanner } from "./ProvisioningBanner";
 import {
 	createProjectAction,
 	listProjectsAction,
@@ -164,6 +165,8 @@ const KEYS = [
 	"envRealBusy",
 	"envRealUrl",
 	"envRealFailed",
+	"provisioningBuilding",
+	"provisioningUp",
 	"envDeltaTitle",
 	"envDeltaEmpty",
 	"envDeltaWave",
@@ -491,7 +494,10 @@ export default async function V3Layout({ children }: { children: ReactNode }) {
 				<aside className="shrink-0 border-b border-border bg-card/40 p-3 sm:sticky sm:top-0 sm:h-screen sm:w-60 sm:border-b-0 sm:border-r">
 					<V3Nav />
 				</aside>
-				<main className="min-w-0 flex-1 px-4 py-6 sm:px-8">{children}</main>
+				<main className="min-w-0 flex-1 px-4 py-6 sm:px-8">
+						<ProvisioningBanner />
+						{children}
+					</main>
 			</div>
 			{/* LA PALETTE ⌘K — montée DANS la provider (elle lit state.screens). */}
 			<Palette />

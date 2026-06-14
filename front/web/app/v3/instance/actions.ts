@@ -107,10 +107,18 @@ export async function probeInstanceAction(): Promise<ProbeResult[]> {
 const run = promisify(execFile);
 
 /**
- * LISTE les conteneurs docker CONNUS (`docker ps --format json` = une ligne JSON
- * par conteneur, clés `Names`/`Status`) — fail-closed : docker absent ou bruit → [].
+ * LISTE les conteneurs docker DU PROJET COURANT (`docker ps --format json` = une ligne
+ * JSON par conteneur, clés `Names`/`Status`) — fail-closed : docker absent ou bruit → [].
+ * Avec un projectSlug, ne renvoie QUE les conteneurs `<slug>-…` (la stack de CE projet,
+ * tous environnements : <slug>-dev-*, <slug>-staging-*…) — « ne voir que les conteneurs
+ * associés au projet ». Sans slug (compat), retombe sur le jeu connu de l'instance.
  */
-export async function dockerPsAction(): Promise<DockerContainer[]> {
+export async function dockerPsAction(
+	projectSlug?: string,
+): Promise<DockerContainer[]> {
+	const slug = (projectSlug ?? "").trim();
+	const matches = (name: string): boolean =>
+		slug !== "" ? name.startsWith(`${slug}-`) : KNOWN_CONTAINERS.test(name);
 	try {
 		const { stdout } = await run("docker", ["ps", "--format", "json"], {
 			timeout: 5000,
@@ -123,7 +131,7 @@ export async function dockerPsAction(): Promise<DockerContainer[]> {
 					const o = JSON.parse(l) as Record<string, unknown>;
 					const name = typeof o.Names === "string" ? o.Names : "";
 					const status = typeof o.Status === "string" ? o.Status : "";
-					return KNOWN_CONTAINERS.test(name) ? [{ name, status }] : [];
+					return matches(name) ? [{ name, status }] : [];
 				} catch {
 					return [];
 				}

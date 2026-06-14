@@ -73,13 +73,14 @@ export function InstanceClient({
 		void probeInstanceAction()
 			.then((r) => alive && setProbes(r))
 			.catch(() => {});
-		void dockerPsAction()
+		// Les conteneurs DE CE PROJET (filtre par slug) — « ne voir que les conteneurs associés au projet ».
+		void dockerPsAction(projectId ?? undefined)
 			.then((r) => alive && setDocker(r))
 			.catch(() => {});
 		return () => {
 			alive = false;
 		};
-	}, []);
+	}, [projectId]);
 
 	/** ENREGISTRE puis RAFRAÎCHIT : la config relue (canonique) + une nouvelle sonde. */
 	const save = async (e: FormEvent<HTMLFormElement>) => {
