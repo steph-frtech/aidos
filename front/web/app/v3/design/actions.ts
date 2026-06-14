@@ -104,7 +104,9 @@ export async function designChatTurnAction(
 				"--max-turns",
 				"1",
 			],
-			{ cwd: "/tmp", timeout: 90_000, maxBuffer: 8 * 1024 * 1024 },
+			// 150s : opus-4-8 (ADR 0070) prend ~70-120s/tour ; headroom sous charge (le LLM PROPOSE, le
+			// déterministe dispose — panne → null, repli sur le re-jugement déterministe pur).
+			{ cwd: "/tmp", timeout: 150_000, maxBuffer: 8 * 1024 * 1024 },
 		);
 		const outer = JSON.parse(stdout);
 		const text = typeof outer?.result === "string" ? outer.result : "";

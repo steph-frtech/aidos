@@ -60,7 +60,7 @@ export async function reformulateAction(
 				"--max-turns",
 				"1",
 			],
-			{ cwd: "/tmp", timeout: 60_000, maxBuffer: 8 * 1024 * 1024 },
+			{ cwd: "/tmp", timeout: 150_000, maxBuffer: 8 * 1024 * 1024 },
 		);
 		const outer = JSON.parse(stdout);
 		const text = typeof outer?.result === "string" ? outer.result : "";

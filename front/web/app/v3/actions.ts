@@ -76,7 +76,9 @@ export async function chatTurnAction(
 				"--max-turns",
 				"1",
 			],
-			{ cwd: "/tmp", timeout: 90_000, maxBuffer: 8 * 1024 * 1024 },
+			// 150s : opus-4-8 (ADR 0070, le modèle déclaré) prend ~70-120s/tour ; un timeout trop court
+			// le coupait sous charge → null → « l'IA ne marche plus ». Panne réelle → null (repli déterministe).
+			{ cwd: "/tmp", timeout: 150_000, maxBuffer: 8 * 1024 * 1024 },
 		);
 		const outer = JSON.parse(stdout);
 		const text = typeof outer?.result === "string" ? outer.result : "";

@@ -91,7 +91,7 @@ async function callClaude(message: string): Promise<{
 				"--max-turns",
 				"1",
 			],
-			{ cwd: "/tmp", timeout: 90_000, maxBuffer: 8 * 1024 * 1024 },
+			{ cwd: "/tmp", timeout: 150_000, maxBuffer: 8 * 1024 * 1024 },
 		);
 		const outer = JSON.parse(stdout);
 		const text = typeof outer?.result === "string" ? outer.result : "";
@@ -209,7 +209,7 @@ async function enrichNextPair(
 				"--max-turns",
 				"1",
 			],
-			{ cwd: "/tmp", timeout: 90_000, maxBuffer: 8 * 1024 * 1024 },
+			{ cwd: "/tmp", timeout: 150_000, maxBuffer: 8 * 1024 * 1024 },
 		);
 		const outer = JSON.parse(stdout);
 		const text = typeof outer?.result === "string" ? outer.result : "";
