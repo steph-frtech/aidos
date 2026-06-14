@@ -60,11 +60,14 @@ func main() {
 	project := fs.String("project", "", "the project name (the per-project namespace)")
 	env := fs.String("env", "", "the environment (dev|staging|prod)")
 	root := fs.String("root", defaultRoot(), "the repo root that holds .deploy-pulumi/")
+	entities := fs.String("entities", "", "path to a JSON []EntitySource file — deploys the project's OWN data (opt-in; omit for the gold default)")
+	seed := fs.String("seed", "", "optional path to a seed.sql mounted as 02-seed.sql (only with --entities)")
+	appName := fs.String("app-name", "", "the human APP_NAME baked into the deployed app (only with --entities; defaults to the project)")
 	_ = fs.Parse(os.Args[2:])
 
 	switch sub {
 	case "up":
-		runUp(*root, *project, *env)
+		runUp(*root, *project, *env, *entities, *seed, *appName)
 	case "down":
 		runDown(*root, *project, *env)
 	case "emit":
@@ -76,16 +79,26 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: aidospulumi <up|down|emit> --project <p> --env <e> [--root <repo>]")
+	fmt.Fprintln(os.Stderr, "usage: aidospulumi <up|down|emit> --project <p> --env <e> [--root <repo>] [--entities <f.json> [--seed <f.sql>] [--app-name <name>]]")
 	fmt.Fprintln(os.Stderr, "  up   : materialise the emitted Pulumi stack + pulumi up --yes (prints {url, containers} JSON)")
+	fmt.Fprintln(os.Stderr, "         with --entities: deploy the project's OWN data (schema+entities[+seed] emitted, mounted by Pulumi)")
 	fmt.Fprintln(os.Stderr, "  down : pulumi destroy --yes")
 	fmt.Fprintln(os.Stderr, "  emit : print the emitted Pulumi program (in-memory, no pulumi) as JSON — the front preview source")
 }
 
-// runUp materialises the emitted artifacts then drives the pulumi lifecycle, printing the
-// result as JSON. Any error is actionable on stderr; the process exits non-zero.
-func runUp(root, project, env string) {
-	mat, err := Materialise(root, project, env)
+// runUp materialises the emitted artifacts then drives the pulumi lifecycle, printing the result as
+// JSON. With --entities it deploys the project's OWN data (schema.sql + entities.json [+ seed.sql]
+// emitted by aidosappemit, mounted by the Pulumi program) — the per-project deploy; without it, the
+// gold-default topology (byte-identical to the existing executor). Any error is actionable on stderr.
+func runUp(root, project, env, entities, seed, appName string) {
+	var mat Materialised
+	var err error
+	if entities != "" {
+		// Per-project DATA deploy: emit the project's data + the data-aware Pulumi program AVANT pulumi up.
+		mat, err = MaterialiseApp(root, project, env, entities, seed, appName)
+	} else {
+		mat, err = Materialise(root, project, env)
+	}
 	if err != nil {
 		fail(err)
 	}
