@@ -136,4 +136,64 @@ test.describe("WB2-22 /v2/deploy — specs → app web → prod (URL live, bouto
 		await expect(page).toHaveURL(/\/v2\/deploy$/);
 		await expect(page.getByTestId("v2-deploy-view")).toBeVisible();
 	});
+
+	// ── Item 2 (2026-06-14) — le BOUTON PRIMAIRE lance un VRAI déploiement PULUMI par projet ──
+	//
+	// Le bouton « Déployer (Pulumi réel) » câble la server action deployStackPulumi(project, entities) →
+	// `aidospulumi up --project X --env dev --entities <fichier>` : la full-stack réelle de X montée par
+	// Pulumi à X-dev.sagedesk.fr. CES tests assertent le CÂBLAGE + l'affichage de la cible live attendue —
+	// ils NE lancent JAMAIS un vrai `pulumi up` (anti-flake : on ancre sur un CHANGEMENT D'ÉTAT
+	// déterministe — la présence/le gating du bouton et la cible affichée — exactement comme le bouton de
+	// déploiement réel du builder n'est jamais cliqué).
+
+	test("le bouton Pulumi est GATÉ : anonyme → désarmé (fail-closed, le mur)", async ({
+		page,
+	}) => {
+		await page.goto("/v2/deploy");
+
+		// Par défaut anonyme : le bouton Pulumi est présent mais DÉSARMÉ (la garde ADR 0052, fail-closed).
+		const pulumiBtn = page.getByTestId("v2-deploy-pulumi-btn");
+		await expect(pulumiBtn).toBeVisible();
+		await expect(pulumiBtn).toBeDisabled();
+
+		// Même en CHOISISSANT une entité, anonyme reste désarmé (auth d'abord).
+		await page.getByTestId("v2-deploy-sample-order").click();
+		await expect(pulumiBtn).toBeDisabled();
+	});
+
+	test("le bouton Pulumi s'ARME + affiche la cible live X-dev.sagedesk.fr (le câblage par projet)", async ({
+		page,
+	}) => {
+		await page.goto("/v2/deploy");
+
+		// S'AUTHENTIFIER (fermer la garde) + CHOISIR Order → le projet = order.
+		await page.getByTestId("v2-deploy-auth-toggle").click();
+		await page.getByTestId("v2-deploy-sample-order").click();
+
+		// LE BOUTON PRIMAIRE est armé (la garde passe) et porte le nom du projet (data-project=order).
+		const pulumiBtn = page.getByTestId("v2-deploy-pulumi-btn");
+		await expect(pulumiBtn).toBeEnabled();
+		await expect(pulumiBtn).toHaveAttribute("data-project", "order");
+
+		// La CIBLE LIVE attendue (Traefik) : order-dev.sagedesk.fr — dérivée du projet, jamais devinée.
+		const target = page.getByTestId("v2-deploy-pulumi-target");
+		await expect(target).toBeVisible();
+		await expect(target).toHaveAttribute("data-host", "order-dev.sagedesk.fr");
+		await expect(target).toContainText("order-dev.sagedesk.fr");
+
+		// Le panneau Pulumi explique le pipeline réel (aidospulumi up — Pulumi reste le moteur).
+		await expect(page.getByTestId("v2-deploy-pulumi")).toContainText(
+			"aidospulumi up",
+		);
+
+		// Order amputé du discount → le projet/cible suivent la source (toujours order ici : même nom).
+		await page.getByTestId("v2-deploy-sample-order-changed").click();
+		await expect(page.getByTestId("v2-deploy-pulumi-target")).toHaveAttribute(
+			"data-host",
+			"order-dev.sagedesk.fr",
+		);
+		// Le run réel n'est PAS lancé : aucun résultat affiché (on ancre sur l'état, pas sur un exec).
+		await expect(page.getByTestId("v2-deploy-pulumi-url")).toHaveCount(0);
+		await expect(page.getByTestId("v2-deploy-pulumi-status")).toHaveCount(0);
+	});
 });

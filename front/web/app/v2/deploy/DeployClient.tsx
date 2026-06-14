@@ -8,28 +8,38 @@ import {
 	type DeployPlan,
 	deployGate,
 	type EntityCase,
+	entityToSource,
 	isBlockedPlan,
+	projectOf,
 	type ReDeployReport,
 	reDeployStable,
 } from "@/lib/v2/deploy";
+import { deployStackPulumi, type PulumiDeployResult } from "./actions";
 
 /**
- * WB2-22 — l'AFFICHAGE + le DÉPLOIEMENT de l'app émise (le planificateur déterministe GATÉ), client-only.
- * On choisit une source → on DÉPLOIE (gaté : auth + rate-limit) → on voit l'URL live (Traefik), le plan de
- * conteneurisation, l'aperçu live ; on RE-PLANIFIE pour prouver la reproductibilité.
+ * WB2-22 + item 2 (2026-06-14) — l'AFFICHAGE + le DÉPLOIEMENT de l'app émise, client-only.
+ *
+ * DEUX CHEMINS DE DÉPLOIEMENT, ADR 0043 amendé (Pulumi = exécution réelle par projet ; compose =
+ * projection dérivable jamais exécutée) :
+ *   - LE BOUTON PRIMAIRE « Déployer » (v2-deploy-pulumi-btn) lance un VRAI déploiement PULUMI PAR
+ *     PROJET via la server action deployStackPulumi(project, entitiesJSON) → `aidospulumi up --project
+ *     X --env dev --entities <fichier>` : la full-stack réelle de X (ses PROPRES entités, la projection
+ *     pure entityToSource) montée par Pulumi à `X-dev.sagedesk.fr`. On voit l'URL live
+ *     (v2-deploy-pulumi-url), les conteneurs (v2-deploy-pulumi-container), le statut.
+ *   - LE PLANIFICATEUR DÉTERMINISTE GATÉ (compose, conservé — anti-overwrite §9) : on DÉPLOIE
+ *     (v2-deploy-deploy, gaté auth + rate-limit) → l'URL planifiée, le plan de conteneurisation,
+ *     l'aperçu live ; on RE-PLANIFIE pour prouver la reproductibilité.
  *
  * ACTION-CAPABLE (CLAUDE.md §6, ui-completeness) : l'écran NE FAIT PAS qu'afficher —
  *   - on BASCULE l'authentification (la garde sécurité d'ADR 0052) ;
- *   - on CHOISIT une entité puis on DÉPLOIE (v2-deploy-deploy) ;
+ *   - on CHOISIT une entité puis on DÉPLOIE — Pulumi (réel) ou la projection compose (planifiée) ;
  *   - garde refusée (anonyme / quota) → le BlockReason actionnable, AUCUN plan (fail-closed) ;
- *   - garde OK → l'URL live, les services conteneurisés, l'aperçu de l'app servie ;
  *   - on RE-PLANIFIE (v2-deploy-redeploy) → la preuve reproductible (même planId/URL à chaque tour) ;
  *   - on RÉINITIALISE (v2-deploy-reset).
- * Tout délégué au twin pur lib/v2/deploy.ts (buildDeployPlan / reDeployStable / deployGate — réutilise WB2-21).
  *
- * LE MUR (§2) : déployer est une action SOUS LA LIGNE (émettre + planifier le conteneur) ; l'écran n'écrit
- * AUCUNE vérité. L'app émise et son plan sont des PROJECTIONS. Modifier une source PROPOSE → /goal (le bouton
- * de proposition déclare data-proposes).
+ * LE MUR (§2) : déployer est une action SOUS LA LIGNE (émettre + monter le conteneur) ; l'écran n'écrit
+ * AUCUNE vérité. Les entités de X viennent de la projection PURE entityToSource ; l'app émise et son
+ * plan sont des PROJECTIONS. Modifier une source PROPOSE → /goal (le bouton de proposition data-proposes).
  */
 
 type Strings = Record<string, string>;
@@ -49,6 +59,11 @@ export function DeployClient({
 	const [deployed, setDeployed] = useState(false);
 	// vrai dès qu'on a lancé la re-planification (la preuve reproductible).
 	const [reDeployed, setReDeployed] = useState(false);
+	// Le DÉPLOIEMENT RÉEL PULUMI (item 2) : son occupation et son résultat (URL live / conteneurs / panne).
+	const [pulumiBusy, setPulumiBusy] = useState(false);
+	const [pulumiResult, setPulumiResult] = useState<PulumiDeployResult | null>(
+		null,
+	);
 
 	const selected = useMemo(
 		() => cases.find((c) => c.id === selectedId) ?? null,
@@ -87,6 +102,49 @@ export function DeployClient({
 		if (gate.allowed) setDeploysInWindow((n) => n + 1);
 	}
 
+	// Le projet courant + ses entités (la projection PURE) — le contrat de l'exécuteur Pulumi item 2.
+	const project = selected ? projectOf(selected.entity) : "";
+	const liveHost = project ? `${project}-dev.sagedesk.fr` : "";
+
+	/**
+	 * Le DÉPLOIEMENT RÉEL PULUMI (item 2) — le BOUTON PRIMAIRE. Gaté par la même garde sécurité d'ADR
+	 * 0052 (auth + rate-limit) ; on n'exécute QUE si la garde passe (fail-closed). On projette les
+	 * entités de X (entityToSource, pure) en JSON puis on lance deployStackPulumi → `aidospulumi up`.
+	 * Le mur (§2) : un geste side-effectant gaté, aucune écriture-vérité.
+	 */
+	async function onDeployPulumi() {
+		if (!selected || !gate.allowed) return;
+		setPulumiBusy(true);
+		setPulumiResult(null);
+		try {
+			const entitiesJSON = JSON.stringify(
+				[entityToSource(selected.entity)],
+				null,
+				2,
+			);
+			setPulumiResult(await deployStackPulumi(project, entitiesJSON));
+			// Un déploiement réel autorisé consomme aussi une unité de quota (le rate-limit avance).
+			setDeploysInWindow((n) => n + 1);
+		} catch {
+			setPulumiResult({
+				status: "error",
+				url: null,
+				containers: [],
+				stack: `${project}-dev`,
+				detail: "action indisponible",
+			});
+		} finally {
+			setPulumiBusy(false);
+		}
+	}
+
+	/** À chaque changement de sélection/auth, on remet à zéro l'état Pulumi (plus de résultat périmé). */
+	function resetTransient() {
+		setDeployed(false);
+		setReDeployed(false);
+		setPulumiResult(null);
+	}
+
 	return (
 		<div data-testid="v2-deploy-view" className="space-y-6">
 			{/* LA GARDE SÉCURITÉ (ADR 0052) — le toggle auth + le rate-limit */}
@@ -102,8 +160,7 @@ export function DeployClient({
 						data-authenticated={authenticated ? "true" : "false"}
 						onClick={() => {
 							setAuthenticated((a) => !a);
-							setDeployed(false);
-							setReDeployed(false);
+							resetTransient();
 						}}
 						className={[
 							"inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
@@ -142,8 +199,7 @@ export function DeployClient({
 							data-testid={`v2-deploy-sample-${c.id}`}
 							onClick={() => {
 								setSelectedId(c.id);
-								setDeployed(false);
-								setReDeployed(false);
+								resetTransient();
 							}}
 							className={[
 								"rounded-lg border px-4 py-2 text-left text-sm transition-colors",
@@ -157,12 +213,25 @@ export function DeployClient({
 					))}
 				</div>
 				<div className="flex flex-wrap gap-2 pt-1">
+					{/* LE BOUTON PRIMAIRE — le VRAI déploiement PULUMI par projet (item 2, ADR 0043 amendé). */}
+					<button
+						type="button"
+						data-testid="v2-deploy-pulumi-btn"
+						data-project={project}
+						onClick={onDeployPulumi}
+						disabled={selected === null || !gate.allowed || pulumiBusy}
+						title={selected === null ? undefined : t.pulumiBtnHint}
+						className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+					>
+						{pulumiBusy ? t.pulumiBusy : t.pulumiBtn}
+					</button>
+					{/* LE PLANIFICATEUR DÉTERMINISTE (compose, conservé — projection dérivable, jamais exécutée). */}
 					<button
 						type="button"
 						data-testid="v2-deploy-deploy"
 						onClick={onDeploy}
 						disabled={selected === null}
-						className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+						className="inline-flex items-center rounded-md border border-primary bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
 					>
 						{t.deployBtn}
 					</button>
@@ -180,14 +249,99 @@ export function DeployClient({
 						data-testid="v2-deploy-reset"
 						onClick={() => {
 							setSelectedId(null);
-							setDeployed(false);
-							setReDeployed(false);
+							resetTransient();
 						}}
 						disabled={selected === null}
 						className="inline-flex items-center rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
 					>
 						{t.resetBtn}
 					</button>
+				</div>
+
+				{/* ── LE DÉPLOIEMENT RÉEL PULUMI (item 2) : l'URL live, les conteneurs, le statut ── */}
+				<div
+					data-testid="v2-deploy-pulumi"
+					className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3"
+				>
+					<h4 className="text-xs font-semibold text-foreground">
+						{t.pulumiHeading}
+					</h4>
+					<p className="text-[11px] leading-relaxed text-muted-foreground">
+						{t.pulumiHint}
+					</p>
+					{selected !== null && (
+						<p className="text-[11px] text-muted-foreground">
+							{t.pulumiTargetLabel} :{" "}
+							<span
+								data-testid="v2-deploy-pulumi-target"
+								data-host={liveHost}
+								className="font-mono text-foreground"
+							>
+								{liveHost}
+							</span>
+						</p>
+					)}
+					{pulumiResult !== null &&
+						(pulumiResult.status === "up" ? (
+							<div className="space-y-2">
+								<div className="flex flex-wrap items-center gap-2">
+									<span
+										data-testid="v2-deploy-pulumi-status"
+										data-status="up"
+										className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600"
+									>
+										🟢 {t.pulumiUp}
+									</span>
+									<span className="font-mono text-[10px] text-muted-foreground">
+										{pulumiResult.stack}
+									</span>
+								</div>
+								{pulumiResult.url !== null && (
+									<a
+										href={pulumiResult.url}
+										data-testid="v2-deploy-pulumi-url"
+										target="_blank"
+										rel="noreferrer"
+										className="inline-flex items-center gap-2 rounded-md border border-primary bg-card px-3 py-1.5 font-mono text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+									>
+										{pulumiResult.url} ↗
+									</a>
+								)}
+								{pulumiResult.containers.length > 0 && (
+									<ul
+										data-testid="v2-deploy-pulumi-containers"
+										className="flex flex-wrap gap-1.5"
+									>
+										{pulumiResult.containers.map((c) => (
+											<li
+												key={c.name}
+												data-testid="v2-deploy-pulumi-container"
+												data-name={c.name}
+												className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-mono text-[11px] text-foreground"
+											>
+												{c.name}
+											</li>
+										))}
+									</ul>
+								)}
+							</div>
+						) : (
+							<div className="space-y-1">
+								<span
+									data-testid="v2-deploy-pulumi-status"
+									data-status="error"
+									className="inline-flex rounded-full border border-destructive/40 bg-destructive/5 px-2 py-0.5 text-[11px] font-medium text-destructive"
+								>
+									🔴 {t.pulumiError}
+								</span>
+								<p
+									data-testid="v2-deploy-pulumi-detail"
+									className="text-[11px] leading-relaxed text-muted-foreground"
+								>
+									{pulumiResult.detail}
+								</p>
+							</div>
+						))}
 				</div>
 			</div>
 

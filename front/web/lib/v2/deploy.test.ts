@@ -25,12 +25,15 @@ import {
 	BASE_DOMAIN,
 	buildDeployPlan,
 	CONTAINER_SERVICES,
+	DEFAULT_DEPLOY_ENV,
 	DEFAULT_RATE_LIMIT,
 	deployGate,
 	ENTITY_CASES,
 	type Entity,
+	entityToSource,
 	type GateVerdict,
 	isBlockedPlan,
+	projectOf,
 	reDeployStable,
 	subdomainOf,
 } from "./deploy";
@@ -299,5 +302,53 @@ describe("WB2-22 lib/v2/deploy — le déploiement de l'app émise (twin pur, AD
 			expect(full.appHash).not.toBe(cut.appHash);
 			expect(full.planId).not.toBe(cut.planId);
 		}
+	});
+
+	// ── Item 2 (2026-06-14) — la PROJECTION PURE entité → EntitySource (le contrat `aidospulumi --entities`) ──
+
+	// (17) entityToSource est DÉTERMINISTE & TOTALE : même entité → même JSON, à chaque tour (le miroir de
+	// reproductibilité du déterminisme-first §6/§8 — la base du fichier --entities du déploiement réel).
+	it("entityToSource est reproductible : même entité → même []EntitySource (déterminisme-first)", () => {
+		fc.assert(
+			fc.property(arbEntity(), (e) => {
+				const a = JSON.stringify(entityToSource(e));
+				for (let i = 0; i < 8; i++) {
+					expect(JSON.stringify(entityToSource(e))).toBe(a);
+				}
+			}),
+		);
+	});
+
+	// (18) entityToSource PRÉSERVE l'ordre source des attributs et MAPPE chaque type sur le jeu Go fermé
+	// {text, numeric, int, bool, timestamptz} (jamais un type deviné), avec l'id content-adressé S35.
+	it("entityToSource préserve l'ordre + mappe les types sur le contrat Go (jamais deviné)", () => {
+		const GO_TYPES = new Set(["text", "numeric", "int", "bool", "timestamptz"]);
+		const src = entityToSource(ENTITY_ORDER);
+		expect(src.name).toBe(ENTITY_ORDER.name);
+		expect(src.id.length).toBeGreaterThan(0);
+		// l'ordre source des champs = l'ordre des attributs de la source (l'ordre est sémantique).
+		expect(src.fields.map((f) => f.name)).toEqual(
+			ENTITY_ORDER.attributes.map((a) => a.name),
+		);
+		for (const f of src.fields) expect(GO_TYPES.has(f.type)).toBe(true);
+	});
+
+	// (19) Order amputé du discount → un fichier --entities DISTINCT (les entités de X suivent la source).
+	it("Order amputé du discount → un []EntitySource distinct (la full-stack suit la source)", () => {
+		const full = JSON.stringify(entityToSource(ENTITY_ORDER));
+		const cut = JSON.stringify(entityToSource(ENTITY_ORDER_CHANGED));
+		expect(full).not.toBe(cut);
+	});
+
+	// (20) projectOf dérive le namespace par projet du même slug que le sous-domaine (un seul juge) ; l'env
+	// par défaut du bouton « Déployer » est dev (la porte humaine DP28 reste en amont du staging).
+	it("projectOf = subdomainOf (un seul juge) et l'env par défaut est dev", () => {
+		fc.assert(
+			fc.property(arbEntity(), (e) => {
+				expect(projectOf(e)).toBe(subdomainOf(e.name));
+			}),
+		);
+		expect(projectOf(ENTITY_ORDER)).toBe("order");
+		expect(DEFAULT_DEPLOY_ENV).toBe("dev");
 	});
 });

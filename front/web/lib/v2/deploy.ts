@@ -43,6 +43,7 @@ import {
 	emitView,
 	entityId,
 	isBlockedView,
+	type ScalarType,
 } from "./emetteurs";
 
 // On RÉ-EXPORTE le registre clos + les types réutilisés pour que l'écran V2 importe tout depuis un seul
@@ -309,3 +310,65 @@ export function reDeployStable(
 export function isBlockedPlan(x: DeployPlan | BlockReason): x is BlockReason {
 	return (x as BlockReason).code !== undefined;
 }
+
+// ── La PROJECTION PURE entité → EntitySource (le contrat que `aidospulumi --entities` consomme) ──
+//
+// Item 2 (utilisatrice, 2026-06-14) : le bouton « Déployer » de /v2 lance un VRAI déploiement PULUMI
+// par projet — `aidospulumi up --project X --entities <fichier>`. L'exécuteur Go décode un JSON
+// `[]EntitySource` (`{id, name, fields:[{name, type}]}`, le type Go ∈ {text, numeric, int, bool,
+// timestamptz}). Ce module rend CE fichier depuis l'AST d'entité du projet courant — une PROJECTION
+// PURE & TOTALE & DÉTERMINISTE (mêmes attributs → mêmes octets), jamais un LLM (§8). Le mur (§2) reste
+// intact : l'entité est une vérité LUE ; le fichier d'entités est une projection régénérable.
+
+/** Le mapping CLOS du scalaire d'écran (S35) vers le type de champ Go que l'émetteur de données accepte. */
+const ENTITY_SOURCE_TYPE: Record<ScalarType, string> = {
+	string: "text",
+	int: "int",
+	decimal: "numeric",
+	bool: "bool",
+	timestamptz: "timestamptz",
+};
+
+/** Un champ EntitySource (le contrat Go) : son nom (ordre source préservé) + son type Go. */
+export interface EntitySourceField {
+	readonly name: string;
+	readonly type: string;
+}
+
+/** Une entité EntitySource (le contrat Go `--entities`) : un id stable, son nom, ses champs ordonnés. */
+export interface EntitySourceJSON {
+	readonly id: string;
+	readonly name: string;
+	readonly fields: readonly EntitySourceField[];
+}
+
+/**
+ * entityToSource — la PROJECTION PURE d'un AST d'entité (S35) vers la forme `EntitySource` que
+ * `aidospulumi up --entities` consomme. DÉTERMINISTE & TOTALE : l'ordre source des attributs est
+ * préservé (l'ordre est sémantique, comme le DDL/Go), le type est mappé par la table CLOSE
+ * ENTITY_SOURCE_TYPE (jamais deviné), l'id reprend l'empreinte content-adressée de l'entité (S35).
+ * Aucun LLM, aucune horloge. Le mur (§2) : une projection régénérable, jamais une écriture de vérité.
+ */
+export function entityToSource(entity: Entity): EntitySourceJSON {
+	return {
+		id: entityId(entity),
+		name: entity.name,
+		fields: entity.attributes.map((a) => ({
+			name: a.name,
+			type: ENTITY_SOURCE_TYPE[a.type],
+		})),
+	};
+}
+
+/**
+ * Le nom de PROJET dérivé d'une entité — le namespace par projet du déploiement Pulumi (un stack par
+ * projet×env). DÉTERMINISTE & TOTAL : minuscules, [a-z0-9-] gardés, le reste collapse en « - », sans
+ * tiret de bord ; vide → « app ». Le MÊME schéma de slug que `subdomainOf` (un seul juge, ADR 0007),
+ * de sorte que le projet `order` se déploie à `order-dev.sagedesk.fr` (le sous-domaine suit le projet).
+ */
+export function projectOf(entity: Entity): string {
+	return subdomainOf(entity.name);
+}
+
+/** L'environnement par défaut du bouton « Déployer » : `dev` (la porte humaine DP28 reste en amont du staging). */
+export const DEFAULT_DEPLOY_ENV = "dev" as const;
