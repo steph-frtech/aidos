@@ -19,6 +19,7 @@ package honoemit
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"pgregory.net/rapid"
@@ -42,7 +43,10 @@ func genMasterFromSpec(t *rapid.T) (MasterView, WebAppSpec) {
 
 // genCatalogueToken draws an arbitrary VALID (property, token) pair from the CLOSED ADR-0010 catalogue.
 func genCatalogueToken(t *rapid.T) StyleToken {
-	props := []string{"bg", "text", "border", "radius", "pad", "gap", "align"}
+	props := []string{
+		"bg", "text", "border", "radius", "pad", "gap", "align",
+		"size", "weight", "shadow", "density", "width", "cols",
+	}
 	p := props[rapid.IntRange(0, len(props)-1).Draw(t, "prop")]
 	toks := styleTokens[p]
 	keys := make([]string, 0, len(toks))
@@ -366,6 +370,93 @@ func TestProp_CapitaliseScreenDesign_WallPinned(t *testing.T) {
 		val2, _ := CapitaliseScreenDesign(d, AdaptationValidation{Validated: true, By: "alice"})
 		if val2.Requirement.ID != val.Requirement.ID {
 			t.Fatalf("CapitaliseScreenDesign not idempotent: %q != %q", val2.Requirement.ID, val.Requirement.ID)
+		}
+	})
+}
+
+// ─── TRANCHE 3 : LE CATALOGUE ÉTENDU (typo / élévation / densité / largeur / colonnes) ──────────
+
+// (h) — the EXTENDED catalogue (T3) is CLOSED and renders deterministically. Each new property accepts
+// ONLY its declared tokens (a hex / arbitrary utility / a foreign property's token → refused), and the
+// rendered class is the deterministic property→prefix (+ the closed alias) — never a free-form utility.
+func TestProp_ExtendedCatalogue_ClosedAndRenders(t *testing.T) {
+	// Every NEW property × token the style-panel exposes, with its EXPECTED ADR-0010 class (the
+	// deterministic render — a golden the front twin mirrors verdict-for-verdict).
+	cases := []struct {
+		prop, tok, class string
+	}{
+		{"size", "xs", "text-xs"}, {"size", "sm", "text-sm"}, {"size", "base", "text-base"},
+		{"size", "lg", "text-lg"}, {"size", "xl", "text-xl"},
+		{"weight", "normal", "font-normal"}, {"weight", "medium", "font-medium"},
+		{"weight", "semibold", "font-semibold"}, {"weight", "bold", "font-bold"},
+		{"shadow", "none", "shadow-none"}, {"shadow", "sm", "shadow-sm"},
+		{"shadow", "md", "shadow-md"}, {"shadow", "lg", "shadow-lg"},
+		{"density", "compact", "aidos-density-compact"}, {"density", "cosy", "aidos-density-cosy"},
+		{"density", "spacieux", "aidos-density-spacieux"},
+		{"width", "full", "w-full"}, {"width", "auto", "w-auto"}, {"width", "fit", "w-fit"},
+		{"width", "half", "w-1/2"}, // the alias: "half" → w-1/2 (no "/" in the catalogue token)
+		{"cols", "1", "grid-cols-1"}, {"cols", "2", "grid-cols-2"}, {"cols", "3", "grid-cols-3"},
+		{"cols", "4", "grid-cols-4"},
+	}
+	for _, c := range cases {
+		tok := StyleToken{Property: c.prop, Token: c.tok}
+		if !IsKnownStyleToken(tok) {
+			t.Fatalf("the extended catalogue must contain %+v (a declared T3 token)", tok)
+		}
+		if got := tok.className(); got != c.class {
+			t.Fatalf("className(%+v) = %q, want %q (deterministic property→class)", tok, got, c.class)
+		}
+	}
+
+	// Fail-closed on the extended axes: a hex, an arbitrary utility, a foreign token are all refused.
+	bad := []StyleToken{
+		{Property: "size", Token: "13px"},      // an arbitrary size, not the closed ramp
+		{Property: "weight", Token: "900"},     // a numeric weight, not the closed ramp
+		{Property: "shadow", Token: "2xl"},     // a shadow outside the closed scale
+		{Property: "density", Token: "ultra"},  // a density outside the closed presets
+		{Property: "width", Token: "1/3"},      // an arbitrary width fraction
+		{Property: "cols", Token: "12"},        // a column count outside the closed subset
+		{Property: "size", Token: "#aabbcc"},   // a hex (always forbidden)
+		{Property: "weight", Token: "primary"}, // a colour token on a non-colour property
+	}
+	for _, b := range bad {
+		if IsKnownStyleToken(b) {
+			t.Fatalf("the extended catalogue must REFUSE %+v (fail-closed breached)", b)
+		}
+	}
+}
+
+// (i) — a multi-token design over the EXTENDED catalogue is accepted, content-addressed and renders
+// every token's class (the style-panel composes a multi-token ScreenDesign; the emitter reproduces it).
+func TestProp_ExtendedCatalogue_MultiTokenDesign(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		m, _ := genMasterFromSpec(t)
+		coords := masterCoords(m)
+		if len(coords) == 0 {
+			return
+		}
+		coord := coords[rapid.IntRange(0, len(coords)-1).Draw(t, "coord")]
+
+		// A stack of NEW-catalogue tokens (typography + elevation + density) on one coordinate.
+		styles := []StyleToken{
+			{Property: "size", Token: "lg"},
+			{Property: "weight", Token: "semibold"},
+			{Property: "shadow", Token: "md"},
+			{Property: "density", Token: "cosy"},
+		}
+		d, br := EmitScreenDesign(m, ChildWeb, []ScreenOverride{{Coord: coord, Styles: styles}})
+		if br != nil {
+			t.Fatalf("EmitScreenDesign refused an extended-catalogue multi-token design: %s", br.Explanation)
+		}
+		if d.ID == "" {
+			t.Fatalf("the multi-token design must be content-addressed")
+		}
+		// The render helper folds every token's class (sorted canonically) — none dropped, none invented.
+		suffix := screenClassSuffix(d.Overrides, coord)
+		for _, s := range styles {
+			if !strings.Contains(suffix, s.className()) {
+				t.Fatalf("screenClassSuffix dropped %+v (class %q) from %q", s, s.className(), suffix)
+			}
 		}
 	})
 }

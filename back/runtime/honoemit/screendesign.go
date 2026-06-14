@@ -105,14 +105,30 @@ type StyleToken struct {
 // styleProperties is the CLOSED property catalogue (ADR 0010). A property outside it is refused
 // fail-closed. Each property maps to its closed token set AND to the Tailwind class prefix the
 // emitter renders (the deterministic property→class mapping — never a free-form utility).
+//
+// T3 (ADR 0071) EXTENDS the catalogue with the typography/elevation/density/layout axes a complete
+// style-panel needs — all still TOKENS (never a hex, never an arbitrary utility):
+//   - size    → text-<xs|sm|base|lg|xl>   (font-size — the Tailwind text-size scale)
+//   - weight  → font-<normal|medium|semibold|bold>
+//   - shadow  → shadow[-<sm|md|lg>] | shadow-none (elevation)
+//   - density → aidos-density-<compact|cosy|spacieux>  (a DECLARED design-system class, a closed
+//     set of pad/gap presets — never a raw utility; see ADR 0010 density presets)
+//   - width   → w-<full|auto|fit|half>     (the closed width subset)
+//   - cols    → grid-cols-<1|2|3|4>        (the closed column subset)
 var styleProperties = map[string]string{
-	"bg":     "bg-",      // background colour token → bg-<token>
-	"text":   "text-",    // text colour token → text-<token>
-	"border": "border-",  // border colour token → border-<token>
-	"radius": "rounded-", // corner radius token → rounded-<token>
-	"pad":    "p-",       // padding token → p-<token>
-	"gap":    "gap-",     // gap token → gap-<token>
-	"align":  "text-",    // text alignment token → text-<token> (left/center/right)
+	"bg":      "bg-",            // background colour token → bg-<token>
+	"text":    "text-",          // text colour token → text-<token>
+	"border":  "border-",        // border colour token → border-<token>
+	"radius":  "rounded-",       // corner radius token → rounded-<token>
+	"pad":     "p-",             // padding token → p-<token>
+	"gap":     "gap-",           // gap token → gap-<token>
+	"align":   "text-",          // text alignment token → text-<token> (left/center/right)
+	"size":    "text-",          // font-size token → text-<token> (xs/sm/base/lg/xl)
+	"weight":  "font-",          // font-weight token → font-<token> (normal/medium/semibold/bold)
+	"shadow":  "shadow-",        // elevation token → shadow-<token> (none/sm/md/lg)
+	"density": "aidos-density-", // density preset → aidos-density-<token> (compact/cosy/spacieux)
+	"width":   "w-",             // width token → w-<token> (full/auto/fit/half)
+	"cols":    "grid-cols-",     // columns token → grid-cols-<token> (1/2/3/4)
 }
 
 // styleTokens is the CLOSED token catalogue per property (ADR 0010 — zinc + blue-600, radius 0.5rem).
@@ -131,6 +147,29 @@ var styleTokens = map[string]map[string]bool{
 	"gap": setOf("0", "1", "2", "3", "4", "5", "6", "8"),
 	// Alignment tokens (text alignment — the only align tokens the closed catalogue exposes).
 	"align": setOf("left", "center", "right"),
+	// Font-size tokens (the Tailwind text-size scale — the closed typographic ramp; base == default).
+	"size": setOf("xs", "sm", "base", "lg", "xl"),
+	// Font-weight tokens (the closed weight ramp the design system exposes).
+	"weight": setOf("normal", "medium", "semibold", "bold"),
+	// Elevation tokens (the shadcn shadow scale; "none" == shadow-none, no shadow).
+	"shadow": setOf("none", "sm", "md", "lg"),
+	// Density presets (a DECLARED design-system class — a closed set of pad/gap presets, never a raw
+	// utility; "compact" tightens, "spacieux" loosens). It can NEVER hide a field (it only re-spaces
+	// — the §177 OpenQuestion frontier: a density token is pure styling, never a structural removal).
+	"density": setOf("compact", "cosy", "spacieux"),
+	// Width tokens (the closed width subset — full/auto/fit/half, never an arbitrary w-[…]).
+	"width": setOf("full", "auto", "fit", "half"),
+	// Columns tokens (the closed grid-column subset — 1..4, never an arbitrary grid-cols-[…]).
+	"cols": setOf("1", "2", "3", "4"),
+}
+
+// styleTokenAlias maps a (property, token) whose Tailwind class is NOT the literal prefix+token to its
+// rendered class SUFFIX (the part after the prefix). The closed catalogue stays the human-facing token
+// vocabulary; the alias is the deterministic render translation (e.g. width "half" → w-1/2 — the token
+// avoids the "/" the canonical adapt-phrase parser forbids, ADR 0071 §3). PURE: a token absent from the
+// alias renders as prefix+token verbatim. The alias is itself a CLOSED table (never a free-form class).
+var styleTokenAlias = map[string]string{
+	"width=half": "1/2", // w-1/2 — "half" is the catalogue token (no "/" in the adapt phrase)
 }
 
 func setOf(items ...string) map[string]bool {
@@ -159,6 +198,9 @@ func (t StyleToken) className() string {
 	prefix, ok := styleProperties[t.Property]
 	if !ok {
 		return ""
+	}
+	if suffix, aliased := styleTokenAlias[t.Property+"="+t.Token]; aliased {
+		return prefix + suffix
 	}
 	return prefix + t.Token
 }

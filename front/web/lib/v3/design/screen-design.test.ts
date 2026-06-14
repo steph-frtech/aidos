@@ -22,13 +22,19 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { parseFromIframe } from "./bridge-protocol";
 import {
+	classifyDrag,
 	classifyGesture,
+	classOf,
 	composeScreenDesign,
+	DRAG_MODES,
+	type DragGesture,
 	type GestureInput,
 	isKnownStyleToken,
 	type MasterDescriptor,
+	routeDrag,
 	type ScreenCoord,
 	type ScreenOverride,
+	STYLE_TOKEN_ALIAS,
 	STYLE_TOKENS,
 	sha256Hex,
 } from "./screen-design";
@@ -318,5 +324,157 @@ describe("(g) l'embed front == le const Go byte-pour-byte (le twin aidos-bridge)
 			"utf8",
 		);
 		expect(front).toBe(back);
+	});
+});
+
+// ─── TRANCHE 3 : LE CATALOGUE ÉTENDU (typo / élévation / densité / largeur / colonnes) ──────────
+
+describe("(h) le catalogue ÉTENDU T3 — verdict-pour-verdict avec Go (mêmes tokens, mêmes classes)", () => {
+	// Chaque NOUVELLE property × token + sa classe ADR-0010 ATTENDUE (la valeur DORÉE du `go test`
+	// TestProp_ExtendedCatalogue_ClosedAndRenders — le rendu byte-égal Go classOf == className).
+	const golden: ReadonlyArray<[string, string, string]> = [
+		["size", "xs", "text-xs"],
+		["size", "sm", "text-sm"],
+		["size", "base", "text-base"],
+		["size", "lg", "text-lg"],
+		["size", "xl", "text-xl"],
+		["weight", "normal", "font-normal"],
+		["weight", "medium", "font-medium"],
+		["weight", "semibold", "font-semibold"],
+		["weight", "bold", "font-bold"],
+		["shadow", "none", "shadow-none"],
+		["shadow", "sm", "shadow-sm"],
+		["shadow", "md", "shadow-md"],
+		["shadow", "lg", "shadow-lg"],
+		["density", "compact", "aidos-density-compact"],
+		["density", "cosy", "aidos-density-cosy"],
+		["density", "spacieux", "aidos-density-spacieux"],
+		["width", "full", "w-full"],
+		["width", "auto", "w-auto"],
+		["width", "fit", "w-fit"],
+		["width", "half", "w-1/2"], // l'alias : "half" → w-1/2 (le token évite le « / »)
+		["cols", "1", "grid-cols-1"],
+		["cols", "2", "grid-cols-2"],
+		["cols", "3", "grid-cols-3"],
+		["cols", "4", "grid-cols-4"],
+	];
+
+	it("∀ token T3 du catalogue → accepté ∧ classOf == la classe Go (déterministe)", () => {
+		for (const [property, token, cls] of golden) {
+			expect(isKnownStyleToken({ property, token })).toBe(true);
+			expect(classOf({ property, token })).toBe(cls);
+		}
+	});
+
+	it("l'alias width=half → w-1/2 est la seule traduction (sinon prefix+token verbatim)", () => {
+		expect(STYLE_TOKEN_ALIAS["width=half"]).toBe("1/2");
+		// un token sans alias rend prefix+token littéral
+		expect(classOf({ property: "width", token: "full" })).toBe("w-full");
+	});
+
+	it("fail-closed sur les axes T3 : hex / arbitraire / token étranger → refusé", () => {
+		for (const bad of [
+			{ property: "size", token: "13px" },
+			{ property: "weight", token: "900" },
+			{ property: "shadow", token: "2xl" },
+			{ property: "density", token: "ultra" },
+			{ property: "width", token: "1/3" },
+			{ property: "cols", token: "12" },
+			{ property: "size", token: "#aabbcc" },
+			{ property: "weight", token: "primary" },
+		]) {
+			expect(isKnownStyleToken(bad)).toBe(false);
+		}
+	});
+
+	it("la VALEUR DORÉE A : (web · section produit {size=lg, weight=semibold, shadow=md, density=cosy}) → l'ID Go", () => {
+		const r = composeScreenDesign(MASTER, "web", [
+			{
+				coord: { kind: "section", entity: "produit" },
+				styles: [
+					{ property: "size", token: "lg" },
+					{ property: "weight", token: "semibold" },
+					{ property: "shadow", token: "md" },
+					{ property: "density", token: "cosy" },
+				],
+			},
+		]);
+		expect(r.ok).toBe(true);
+		if (!r.ok) return;
+		// DESIGN_A_ID capturé du probe Go pour exactement ces (target, parent, overrides) T3.
+		expect(r.design.id).toBe(
+			"bafe17e8fd67dc0dd0e97c265499888747d0c70c07a12329862f25acef0c3a8b",
+		);
+	});
+
+	it("la VALEUR DORÉE B : (mobile · field prix {width=half, cols=2}) → l'ID Go", () => {
+		const r = composeScreenDesign(MASTER, "mobile", [
+			{
+				coord: { kind: "field", entity: "produit", field: "prix" },
+				styles: [
+					{ property: "width", token: "half" },
+					{ property: "cols", token: "2" },
+				],
+			},
+		]);
+		expect(r.ok).toBe(true);
+		if (!r.ok) return;
+		expect(r.design.id).toBe(
+			"5f50bb7da2074e85af70783361308eb75e3582554a3f66ee5560cf5ce40bd3a3",
+		);
+	});
+});
+
+describe("(i) LE DRAG-DROP T3 — la frontière nudge-visuel (styling) vs réordre (structural)", () => {
+	const COORD: ScreenCoord = { kind: "section", entity: "produit" };
+
+	it("un nudge VISUEL (densité/alignement) → styling (below-the-line, ScreenDesign)", () => {
+		const g: DragGesture = {
+			coord: COORD,
+			mode: "visual-nudge",
+			styles: [{ property: "density", token: "compact" }],
+		};
+		expect(classifyDrag(g)).toBe("styling");
+		// le routage prend la voie « adapte … » (jamais l'idée)
+		expect(routeDrag(g).startsWith("adapte")).toBe(true);
+	});
+
+	it("un RÉORDRE de champs → structural (idée→/goal, le mur §2)", () => {
+		const g: DragGesture = {
+			coord: { kind: "field", entity: "produit", field: "prix" },
+			mode: "reorder",
+		};
+		expect(classifyDrag(g)).toBe("structural");
+		// le routage prend la PORTE de l'idée (jamais « adapte … » — pas de smuggling)
+		expect(routeDrag(g).startsWith("capture l'idée :")).toBe(true);
+		expect(routeDrag(g)).toContain("réordonner les champs de");
+	});
+
+	it("∀ drag (mode × coord × tokens) : la nature est du jeu clos ∧ un réordre n'est JAMAIS styling", () => {
+		fc.assert(
+			fc.property(
+				fc.constantFrom(...DRAG_MODES),
+				fc.constantFrom("section", "field", "action"),
+				fc.string(),
+				(mode, ckind, entity) => {
+					const g: DragGesture = {
+						mode,
+						coord: { kind: ckind, entity } as ScreenCoord,
+						styles: [{ property: "density", token: "cosy" }],
+					};
+					const nature = classifyDrag(g);
+					expect(["styling", "structural"]).toContain(nature);
+					// un réordre est TOUJOURS structural (la frontière exacte = ClassifyGesture)
+					if (mode === "reorder") expect(nature).toBe("structural");
+					else expect(nature).toBe("styling");
+				},
+			),
+		);
+	});
+
+	it("un nudge visuel VIDE (aucun token) ne propose RIEN (chaîne vide — la lentille n'émet rien)", () => {
+		expect(routeDrag({ coord: COORD, mode: "visual-nudge", styles: [] })).toBe(
+			"",
+		);
 	});
 });

@@ -892,6 +892,97 @@ test.describe("V3 — le Studio de design (ADR 0071, Onlook INVERSÉ), Tranche 1
 		await expect(applied.first()).toContainText("below-the-line");
 	});
 
+	test("LE PANNEAU LAYERS (Tranche 2) : l'arbre fractal master → enfants → sections + composants", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `design-layers-${testInfo.testId}`);
+
+		// Une coordonnée à designer : capture + promotion → l'app émet une section.
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(2);
+
+		await navTo(page, "/v3/design");
+		await expect(page.getByTestId("v3-design")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		// L'ARBRE LAYERS (ADR 0055) est rendu : la racine MAÎTRE + les 3 ENFANTS plateforme
+		// (web/mobile/desktop, des nœuds organisationnels) — la hiérarchie fractale VISIBLE.
+		const tree = page.getByTestId("v3-design-tree");
+		await expect(tree).toBeVisible();
+		await expect(
+			tree.locator(
+				'[data-testid="v3-design-layer-node"][data-source-kind="master"]',
+			),
+		).toHaveCount(1);
+		await expect(
+			tree.locator(
+				'[data-testid="v3-design-layer-node"][data-source-kind="child"]',
+			),
+		).toHaveCount(3);
+
+		// LES SECTIONS (les entités émises, S35) portent leur COMPOSANT — la détection de
+		// composants AIDOS : une entité EST un « composant liste » (la source kernel, pas une
+		// heuristique). Au moins une section sous les enfants, badgée « composant liste ».
+		const sections = tree.locator(
+			'[data-testid="v3-design-layer-node"][data-source-kind="entity"]',
+		);
+		expect(await sections.count()).toBeGreaterThanOrEqual(1);
+		const firstComponent = page
+			.locator('[data-testid="v3-design-component"][data-component="entity"]')
+			.first();
+		await expect(firstComponent).toBeVisible();
+		await expect(firstComponent).toContainText("composant");
+
+		// CLIQUER un nœud-section SÉLECTIONNE (send(select) à l'iframe) — la coordonnée
+		// sélectionnée apparaît dans le panneau apparence.
+		const layer = page.getByTestId("v3-design-layer").first();
+		const coordRef = (await layer.getAttribute("data-coord")) ?? "";
+		await layer.click();
+		await expect(page.getByTestId("v3-design-selected")).toContainText(
+			coordRef,
+		);
+	});
+
+	test("LE MUR STRUCTUREL (Tranche 2) : « + champ » sur une section → une idée hasMirror=false", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `design-struct-${testInfo.testId}`);
+
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await navTo(page, "/v3/design");
+		await expect(page.getByTestId("v3-design")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		// Le geste STRUCTUREL par nœud : « + champ » sur une section. classifyGesture==Structural
+		// → routeStructuralGesture → send(« capture l'idée : … ») → idée→/goal. JAMAIS un
+		// ScreenDesign, JAMAIS une adaptation below-the-line.
+		const addField = page.getByTestId("v3-design-struct-add-field").first();
+		await expect(addField).toBeVisible();
+		await addField.click();
+
+		// Retour au lab : le dernier tour est une CAPTURE D'IDÉE (carte amicale « idée
+		// ajoutée »), PAS une adaptation — le geste structurel a pris la porte du mur.
+		await navTo(page, "/v3/lab");
+		await expect(page.getByTestId("v3-msg-assistant").last()).toContainText(
+			"Votre idée a été ajoutée",
+		);
+
+		// SPÉCIFICATIONS : la spec créée est une IDÉE (statut « idée », hasMirror=false) —
+		// jamais un ScreenDesign capitalisé below-the-line (le mur §2, structurel→idée).
+		await navTo(page, "/v3/specs");
+		await expect(page.getByTestId("v3-specs-grid")).toBeVisible({
+			timeout: 20_000,
+		});
+		const idees = page.locator(
+			'[data-testid="v3-specs-row"][data-status="idee"]',
+		);
+		expect(await idees.count()).toBeGreaterThanOrEqual(1);
+	});
+
 	test("LE MUR : un geste STRUCTUREL → une idée hasMirror=false (PAS un ScreenDesign)", async ({
 		page,
 	}, testInfo) => {
@@ -958,5 +1049,115 @@ test.describe("V3 — le Studio de design (ADR 0071, Onlook INVERSÉ), Tranche 1
 			timeout: 20_000,
 		});
 		await expect(page.getByTestId("v3-design-not-deployed")).toHaveCount(0);
+	});
+
+	test("LE STYLE-PANEL COMPLET (Tranche 3) : un token typo/ombre du catalogue ÉTENDU → un ScreenDesign multi-tokens", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `design-t3-style-${testInfo.testId}`);
+
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(2);
+
+		await navTo(page, "/v3/design");
+		await expect(page.getByTestId("v3-design")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		// LE STYLE-PANEL est GROUPÉ par axe (couleur/typo/espacement/forme/disposition) — les
+		// nouveaux groupes T3 (typo/forme/disposition) sont rendus dans le <select> de property.
+		await page.getByTestId("v3-design-layer").first().click();
+		await expect(
+			page.locator('[data-testid="v3-design-property-group"]').first(),
+		).toBeAttached();
+
+		// On empile DEUX tokens du catalogue ÉTENDU : une taille de police (size=lg) PUIS une
+		// ombre (shadow=md) — deux axes T3, le même ScreenDesign multi-tokens (Overrides[].Styles).
+		await page.getByTestId("v3-design-property").selectOption("size");
+		await page.getByTestId("v3-design-token").selectOption("lg");
+		await page.getByTestId("v3-design-add-token").click();
+		await expect(page.getByTestId("v3-design-draft")).toBeVisible();
+
+		await page.getByTestId("v3-design-property").selectOption("shadow");
+		await page.getByTestId("v3-design-token").selectOption("md");
+		await page.getByTestId("v3-design-add-token").click();
+
+		// DEUX puces de token (size=lg ∧ shadow=md) — le ScreenDesign DRAFT multi-tokens du twin.
+		const draftTokens = page.getByTestId("v3-design-draft-token");
+		await expect(draftTokens).toHaveCount(2);
+		await expect(draftTokens.filter({ hasText: "size=lg" })).toBeVisible();
+		await expect(draftTokens.filter({ hasText: "shadow=md" })).toBeVisible();
+		// LE TWIN a content-adressé le DRAFT multi-tokens (l'ID hex).
+		await expect(page.getByTestId("v3-design-draft-id")).toBeVisible();
+
+		// CAPTURE : send(« adapte <coord> : size=lg shadow=md ») → un événement `ecran_adapte`
+		// below-the-line (aucune vérité écrite) — le journal du studio le montre.
+		await page.getByTestId("v3-design-capture").click();
+		const applied = page.getByTestId("v3-design-applied-row");
+		await expect(applied.first()).toBeVisible({ timeout: 20_000 });
+		await expect(applied.first()).toContainText("below-the-line");
+	});
+
+	test("LES JETONS DE MARQUE (Tranche 3) : la palette DÉCLARÉE est visible (read-only, jamais un hex)", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `design-t3-assets-${testInfo.testId}`);
+
+		await navTo(page, "/v3/design");
+		await expect(page.getByTestId("v3-design")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		// LE PANNEAU ASSETS (ADR 0071 §4) : les tokens « que vous pouvez utiliser », dérivés du
+		// catalogue FERMÉ — jamais une couleur inventée. Au moins une couleur déclarée (bg=card).
+		const assets = page.getByTestId("v3-design-assets");
+		await expect(assets).toBeVisible();
+		await expect(
+			assets.locator(
+				'[data-testid="v3-design-asset-token"][data-property="bg"][data-token="card"]',
+			),
+		).toBeVisible();
+		// AUCUN hex : chaque jeton est un token sémantique (jamais un « # »).
+		const tokens = assets.getByTestId("v3-design-asset-token");
+		expect(await tokens.count()).toBeGreaterThanOrEqual(3);
+		for (const text of await tokens.allInnerTexts()) {
+			expect(text).not.toContain("#");
+		}
+	});
+
+	test("LE DRAG-DROP / NUDGE VISUEL (Tranche 3) : un token de DENSITÉ → un ScreenDesign (styling), pas une idée", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `design-t3-nudge-${testInfo.testId}`);
+
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(2);
+
+		await navTo(page, "/v3/design");
+		await expect(page.getByTestId("v3-design")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		// UN NUDGE PUREMENT VISUEL : la densité (un axe T3 — re-espacer, jamais retirer un champ).
+		// classifyDrag(visual-nudge) == styling → ScreenDesign (below-the-line). Le style-panel le
+		// porte (groupe Espacement → density), et le twin compose un ScreenDesign content-adressé.
+		await page.getByTestId("v3-design-layer").first().click();
+		await page.getByTestId("v3-design-property").selectOption("density");
+		await page.getByTestId("v3-design-token").selectOption("compact");
+		await page.getByTestId("v3-design-add-token").click();
+		await expect(page.getByTestId("v3-design-draft")).toBeVisible();
+		await expect(page.getByTestId("v3-design-draft-token")).toContainText(
+			"density=compact",
+		);
+		await expect(page.getByTestId("v3-design-draft-id")).toBeVisible();
+
+		// CAPTURE : un nudge visuel reste BELOW-THE-LINE (un ScreenDesign, jamais une idée).
+		await page.getByTestId("v3-design-capture").click();
+		const applied = page.getByTestId("v3-design-applied-row");
+		await expect(applied.first()).toBeVisible({ timeout: 20_000 });
+		await expect(applied.first()).toContainText("below-the-line");
+		await expect(applied.first()).toContainText("density=compact");
 	});
 });

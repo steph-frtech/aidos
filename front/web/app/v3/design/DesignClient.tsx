@@ -4,14 +4,25 @@ import { useMemo, useState } from "react";
 import { emitApp } from "@/lib/v2/builder";
 import type { FromIframe, ToIframe } from "@/lib/v3/design/bridge-protocol";
 import {
+	componentKindKey,
+	deriveLayersTree,
+	flattenLayers,
+	type LayerNode,
+} from "@/lib/v3/design/layers-tree";
+import {
 	canonicalAdaptPhrase,
 	composeScreenDesign,
 	coordRef,
+	type DragGesture,
 	type MasterDescriptor,
 	PROPERTY_PREFIX,
+	routeDrag,
+	routeStructuralGesture,
 	type ScreenCoord,
 	type ScreenDesign,
 	STYLE_TOKENS,
+	type StructuralGesture,
+	type StructuralKind,
 	type StyleToken,
 } from "@/lib/v3/design/screen-design";
 import { envStackOf } from "@/lib/v3/instance";
@@ -38,6 +49,39 @@ import { DesignIframe } from "./DesignIframe";
 
 /** Les properties du catalogue FERMÉ, dans l'ordre déclaré (le jeu clos ADR 0010). */
 const PROPERTIES = Object.keys(PROPERTY_PREFIX);
+
+/**
+ * Les GROUPES de propriétés du style-panel complet (ADR 0071 T3) — chaque property du catalogue
+ * FERMÉ rangée par axe (couleur / typo / espacement / forme+ombre / disposition). DÉCLARÉ, jamais
+ * deviné : un groupe = des properties du catalogue, chacune un <select> de ses tokens fermés.
+ */
+const PROPERTY_GROUPS: ReadonlyArray<{
+	readonly key: string; // la clé i18n du titre de groupe
+	readonly properties: readonly string[];
+}> = [
+	{ key: "designGroupColour", properties: ["bg", "text", "border"] },
+	{ key: "designGroupTypography", properties: ["size", "weight", "align"] },
+	{ key: "designGroupSpacing", properties: ["pad", "gap", "density"] },
+	{ key: "designGroupShape", properties: ["radius", "shadow"] },
+	{ key: "designGroupLayout", properties: ["width", "cols"] },
+];
+
+/** La clé i18n du NOM affichable d'une property (DÉCLARÉE — jamais le code interne brut). */
+const PROPERTY_LABEL_KEY: Readonly<Record<string, string>> = {
+	bg: "designPropBg",
+	text: "designPropText",
+	border: "designPropBorder",
+	radius: "designPropRadius",
+	pad: "designPropPad",
+	gap: "designPropGap",
+	align: "designPropAlign",
+	size: "designPropSize",
+	weight: "designPropWeight",
+	shadow: "designPropShadow",
+	density: "designPropDensity",
+	width: "designPropWidth",
+	cols: "designPropCols",
+};
 
 export function DesignClient() {
 	const { state, send, instanceConfig, projectId, strings } = useV3Session();
@@ -82,6 +126,22 @@ export function DesignClient() {
 		const hash = bridgeMasterHash !== "" ? bridgeMasterHash : app.version;
 		return { hash, coords };
 	}, [app, bridgeCoords, bridgeMasterHash]);
+
+	// L'ARBRE LAYERS (ADR 0055 fractale) — DÉRIVÉ PUREMENT : la MAÎTRE → les 3 enfants
+	// (web/mobile/desktop) → les SECTIONS (entités S35) → les CHAMPS / les ACTIONS (S11),
+	// enrichis par les coords du bridge (les éléments réellement présents dans l'iframe live).
+	// La source-kind de chaque nœud EST sa source kernel — la « détection de composants ».
+	const layersRoot = useMemo(
+		() => deriveLayersTree(app, bridgeCoords),
+		[app, bridgeCoords],
+	);
+	// L'arbre à plat (parcours préfixe, indenté par depth) — déterministe, jamais stocké.
+	const layers = useMemo(() => flattenLayers(layersRoot), [layersRoot]);
+	// L'app a-t-elle au moins une section ? (sinon le panneau montre l'état vide amical).
+	const hasSections = useMemo(
+		() => layers.some((n) => n.coord !== null),
+		[layers],
+	);
 
 	// LA SÉLECTION + L'EMPILEMENT de tokens en cours d'édition (l'apparence proposée, optimiste).
 	const [selected, setSelected] = useState<ScreenCoord | null>(null);
@@ -154,10 +214,59 @@ export function DesignClient() {
 		setDraftDesign(null);
 	};
 
-	/** LE GESTE STRUCTUREL : send(« capture l'idée : … ») → idée→/goal (jamais un write direct). */
+	/**
+	 * LE MUR STRUCTUREL (Tranche 2) : un geste STRUCTUREL (ajout/retrait/réordre d'un champ/
+	 * section/action) classifyGesture==Structural → routeStructuralGesture → send(« capture
+	 * l'idée : <besoin verbatim> ») → composeIdea (hasMirror=false). JAMAIS un ScreenDesign,
+	 * JAMAIS une écriture directe. Le twin re-juge ; le code juge, jamais le LLM (le mur §2).
+	 */
+	const routeStructural = (kind: StructuralKind, coord: ScreenCoord) => {
+		const g: StructuralGesture = { kind, coord };
+		void send(routeStructuralGesture(g));
+	};
+
+	/** Le geste structurel depuis le panneau « Apparence » (sur la coordonnée sélectionnée). */
 	const requestStructural = () => {
-		const ref = selected !== null ? coordRef(selected) : "l'écran";
-		void send(`capture l'idée : changer la structure de ${ref}`);
+		const coord = selected ?? { kind: "section" as const, entity: "app" };
+		// Depuis le panneau apparence, le geste par défaut est un ajout de champ à la coordonnée.
+		const kind: StructuralKind =
+			coord.kind === "section" ? "add-field" : "remove-field";
+		routeStructural(kind, coord);
+	};
+
+	/**
+	 * LE DRAG-DROP (Tranche 3) : la FRONTIÈRE est routeDrag (= classifyDrag, déléguant à
+	 * classifyGesture). On distingue par les coordonnées :
+	 *   - un drag d'un CHAMP sur un AUTRE champ de la MÊME section = un RÉORDRE → "reorder"
+	 *     → routeDrag → « capture l'idée : réordonner les champs de … » (idée→/goal, le mur §2) ;
+	 *   - sinon (un petit décalage cosmétique) c'est un nudge visuel → "visual-nudge" → styling.
+	 * Le code re-juge toujours (jamais le LLM) ; un réordre ne fuit JAMAIS comme du styling.
+	 */
+	const [dragField, setDragField] = useState<ScreenCoord | null>(null);
+
+	/** Émet le geste de drag via send(routeDrag(g)) — vide → rien (la lentille n'émet rien). */
+	const fireDrag = (g: DragGesture) => {
+		const phrase = routeDrag(g);
+		if (phrase !== "") void send(phrase);
+	};
+
+	/** Un DROP d'un champ sur un autre champ de la même section = un RÉORDRE (→ structural). */
+	const onDropField = (target: ScreenCoord) => {
+		if (dragField === null) {
+			setDragField(null);
+			return;
+		}
+		// Réordonner ne change que l'ordre — la voie structurelle (idée→/goal). La coordonnée portée
+		// est celle déplacée (le besoin « réordonner les champs de <entité.champ> »).
+		if (
+			dragField.kind === "field" &&
+			target.kind === "field" &&
+			dragField.entity === target.entity &&
+			coordRef(dragField) !== coordRef(target)
+		) {
+			fireDrag({ coord: dragField, mode: "reorder" });
+		}
+		setDragField(null);
 	};
 
 	/** LE DÉPLOIEMENT en dev : send(« déploie l'application en dev ») — l'app live devient designable. */
@@ -184,6 +293,45 @@ export function DesignClient() {
 	// LES ÉVÉNEMENTS d'adaptation déjà émis dans la session (le journal below-the-line, rejoué).
 	const adaptations = state.log.filter((e) => e.kind === "ecran_adapte");
 
+	/** Le NOM AFFICHABLE du composant (la source-kind) d'un nœud — i18n, jamais devinée. */
+	const componentLabel = (n: LayerNode): string | null => {
+		const key = componentKindKey(n.sourceKind);
+		return key !== null ? (t[key] ?? key) : null;
+	};
+
+	/** Le NOM AFFICHABLE d'une property (i18n, le jeu clos ADR 0010) — jamais le code brut. */
+	const propLabel = (p: string): string => t[PROPERTY_LABEL_KEY[p] ?? ""] ?? p;
+
+	/**
+	 * LES JETONS DE MARQUE (ASSETS, ADR 0071 §4) — une VUE READ-ONLY de la palette DÉCLARÉE
+	 * (ADR 0010, zinc + blue-600) : les tokens « que vous pouvez utiliser », JAMAIS un hex inventé.
+	 * C'est la source des choix du style-panel — dérivée du catalogue FERMÉ (STYLE_TOKENS), pas écrite.
+	 */
+	const ASSETS: ReadonlyArray<{
+		readonly key: string;
+		readonly property: string;
+		readonly tokens: readonly string[];
+	}> = [
+		{ key: "designAssetsColours", property: "bg", tokens: STYLE_TOKENS.bg },
+		{
+			key: "designAssetsRadius",
+			property: "radius",
+			tokens: STYLE_TOKENS.radius,
+		},
+		{
+			key: "designAssetsTypography",
+			property: "size",
+			tokens: STYLE_TOKENS.size,
+		},
+	];
+
+	/** Un nœud SÉLECTIONNÉ ? (coordonnée adressable identique à la sélection). */
+	const isSelected = (n: LayerNode): boolean =>
+		n.coord !== null &&
+		selected !== null &&
+		coordRef(selected) === coordRef(n.coord) &&
+		selected.kind === n.coord.kind;
+
 	return (
 		<div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
 			{/* ── COLONNE GAUCHE : les éléments + l'apparence ── */}
@@ -199,41 +347,197 @@ export function DesignClient() {
 					<p className="text-xs leading-relaxed text-muted-foreground">
 						{t.designLayersHint}
 					</p>
-					{master.coords.length === 0 ? (
-						<p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+					<p className="text-[11px] leading-relaxed text-muted-foreground italic">
+						{t.designDragHint}
+					</p>
+					{!hasSections ? (
+						<p
+							data-testid="v3-design-layers-empty"
+							className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground"
+						>
 							{t.designLayersEmpty}
 						</p>
 					) : (
-						<ul className="space-y-1">
-							{master.coords.map((c) => {
-								const key = coordRef(c) + c.kind;
-								const isSel =
-									selected !== null &&
-									coordRef(selected) === coordRef(c) &&
-									selected.kind === c.kind;
+						/* L'ARBRE FRACTAL à plat (ADR 0055) : maître → enfants → sections → champs/actions.
+						   Chaque nœud porte sa source-kind (le COMPOSANT dont il relève) ; les nœuds
+						   adressables (section/champ/action) sélectionnent ; les gestes STRUCTURELS
+						   (+ champ / + action / retirer / réordonner) routent vers le mur (idée→/goal). */
+						<ul data-testid="v3-design-tree" className="space-y-0.5">
+							{layers.map((n) => {
+								const comp = componentLabel(n);
+								const addressable = n.coord !== null;
+								const sel = isSelected(n);
 								return (
-									<li key={key}>
-										<button
-											type="button"
-											data-testid="v3-design-layer"
-											data-coord={coordRef(c)}
-											data-kind={c.kind}
-											aria-current={isSel ? "true" : undefined}
-											onClick={() => selectCoord(c)}
-											className={[
-												"flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors",
-												isSel
-													? "border-primary bg-primary/10 font-semibold text-primary"
-													: "border-border bg-background text-foreground hover:border-primary/40 hover:bg-primary/5",
-											].join(" ")}
-										>
-											<span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-												{c.kind}
-											</span>
-											<span className="min-w-0 flex-1 truncate">
-												{coordRef(c)}
-											</span>
-										</button>
+									<li
+										key={n.id}
+										data-testid="v3-design-layer-node"
+										data-source-kind={n.sourceKind}
+										data-depth={n.depth}
+										style={{ paddingLeft: `${n.depth * 0.75}rem` }}
+									>
+										<div className="flex items-center gap-1">
+											{/* le nœud lui-même : adressable → bouton de sélection ; sinon libellé organisationnel */}
+											{addressable ? (
+												<button
+													type="button"
+													data-testid="v3-design-layer"
+													data-coord={coordRef(n.coord as ScreenCoord)}
+													data-kind={(n.coord as ScreenCoord).kind}
+													data-source-kind={n.sourceKind}
+													aria-current={sel ? "true" : undefined}
+													onClick={() => selectCoord(n.coord as ScreenCoord)}
+													/* LE DRAG-DROP (T3) : un champ est réordonnable. Glisser un champ sur un autre
+													   de la MÊME section = un RÉORDRE → routeDrag → idée→/goal (le mur §2). */
+													draggable={n.sourceKind === "field"}
+													onDragStart={() => {
+														if (n.sourceKind === "field")
+															setDragField(n.coord as ScreenCoord);
+													}}
+													onDragOver={(e) => {
+														if (n.sourceKind === "field") e.preventDefault();
+													}}
+													onDrop={(e) => {
+														if (n.sourceKind === "field") {
+															e.preventDefault();
+															onDropField(n.coord as ScreenCoord);
+														}
+													}}
+													className={[
+														"flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1 text-left text-xs transition-colors",
+														sel
+															? "border-primary bg-primary/10 font-semibold text-primary"
+															: "border-border bg-background text-foreground hover:border-primary/40 hover:bg-primary/5",
+													].join(" ")}
+												>
+													{/* LA POIGNÉE de réordre (T3) — sur les champs uniquement (la frontière du drag). */}
+													{n.sourceKind === "field" && (
+														<span
+															data-testid="v3-design-drag-handle"
+															aria-hidden="true"
+															title={t.designDragHandle}
+															className="shrink-0 cursor-grab select-none font-mono text-[10px] text-muted-foreground"
+														>
+															⠿
+														</span>
+													)}
+													<span className="min-w-0 flex-1 truncate">
+														{n.label}
+													</span>
+													{/* LE COMPOSANT (la source-kind) — la détection de composants AIDOS */}
+													{comp !== null && (
+														<span
+															data-testid="v3-design-component"
+															data-component={n.sourceKind}
+															className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+														>
+															{comp}
+														</span>
+													)}
+												</button>
+											) : (
+												<span
+													data-testid="v3-design-layer-org"
+													className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground"
+												>
+													<span className="min-w-0 flex-1 truncate font-mono">
+														{n.sourceKind === "master"
+															? n.label
+															: (t[
+																	`designChild${n.label.charAt(0).toUpperCase()}${n.label.slice(1)}`
+																] ?? n.label)}
+													</span>
+												</span>
+											)}
+
+											{/* LES GESTES STRUCTURELS par nœud (le mur §2 — toujours vers idée→/goal) */}
+											{n.sourceKind === "entity" && n.coord !== null && (
+												<>
+													<button
+														type="button"
+														data-testid="v3-design-struct-add-field"
+														data-coord={coordRef(n.coord)}
+														title={t.designStructuralWall}
+														onClick={() =>
+															routeStructural(
+																"add-field",
+																n.coord as ScreenCoord,
+															)
+														}
+														className="shrink-0 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+													>
+														{t.designAddField}
+													</button>
+													<button
+														type="button"
+														data-testid="v3-design-struct-add-action"
+														data-coord={coordRef(n.coord)}
+														title={t.designStructuralWall}
+														onClick={() =>
+															routeStructural(
+																"add-action",
+																n.coord as ScreenCoord,
+															)
+														}
+														className="shrink-0 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+													>
+														{t.designAddAction}
+													</button>
+												</>
+											)}
+											{n.sourceKind === "field" && n.coord !== null && (
+												<>
+													{/* LE RÉORDRE (T3) — un drag-drop équivalent, déterministe : un réordre change
+													    la structure → routeDrag(mode:"reorder") → idée→/goal (le mur §2). */}
+													<button
+														type="button"
+														data-testid="v3-design-struct-reorder"
+														data-coord={coordRef(n.coord)}
+														title={t.designReorderWall}
+														onClick={() =>
+															fireDrag({
+																coord: n.coord as ScreenCoord,
+																mode: "reorder",
+															})
+														}
+														className="shrink-0 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+													>
+														{t.designReorder}
+													</button>
+													<button
+														type="button"
+														data-testid="v3-design-struct-remove"
+														data-coord={coordRef(n.coord)}
+														title={t.designStructuralWall}
+														onClick={() =>
+															routeStructural(
+																"remove-field",
+																n.coord as ScreenCoord,
+															)
+														}
+														className="shrink-0 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"
+													>
+														{t.designRemove}
+													</button>
+												</>
+											)}
+											{n.sourceKind === "control" && n.coord !== null && (
+												<button
+													type="button"
+													data-testid="v3-design-struct-remove"
+													data-coord={coordRef(n.coord)}
+													title={t.designStructuralWall}
+													onClick={() =>
+														routeStructural(
+															"remove-action",
+															n.coord as ScreenCoord,
+														)
+													}
+													className="shrink-0 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"
+												>
+													{t.designRemove}
+												</button>
+											)}
+										</div>
 									</li>
 								);
 							})}
@@ -274,7 +578,8 @@ export function DesignClient() {
 								</span>
 							</p>
 
-							{/* la property + le token (deux <select> du jeu clos) */}
+							{/* LE STYLE-PANEL COMPLET (ADR 0071 T3) : la property (groupée par axe) + le token.
+							    Chaque property est un <select> de ses tokens FERMÉS (aucune saisie libre). */}
 							<div className="grid grid-cols-2 gap-2">
 								<label className="space-y-1 text-[11px] font-medium text-muted-foreground">
 									{t.designTokenProperty}
@@ -287,10 +592,19 @@ export function DesignClient() {
 										}}
 										className="w-full rounded border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
 									>
-										{PROPERTIES.map((p) => (
-											<option key={p} value={p}>
-												{p}
-											</option>
+										{/* Toutes les properties, RANGÉES par groupe (couleur/typo/espacement/forme/disposition). */}
+										{PROPERTY_GROUPS.map((grp) => (
+											<optgroup
+												key={grp.key}
+												label={t[grp.key] ?? grp.key}
+												data-testid="v3-design-property-group"
+											>
+												{grp.properties.map((p) => (
+													<option key={p} value={p}>
+														{propLabel(p)}
+													</option>
+												))}
+											</optgroup>
 										))}
 									</select>
 								</label>
@@ -395,6 +709,41 @@ export function DesignClient() {
 							</div>
 						</div>
 					)}
+				</section>
+
+				{/* · LES JETONS DE MARQUE (ASSETS, ADR 0071 §4) — la palette DÉCLARÉE, read-only */}
+				<section
+					data-testid="v3-design-assets"
+					className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+				>
+					<div className="space-y-1">
+						<h2 className="text-sm font-semibold text-foreground">
+							{t.designAssetsHeading}
+						</h2>
+						<p className="text-xs leading-relaxed text-muted-foreground">
+							{t.designAssetsHint}
+						</p>
+					</div>
+					{ASSETS.map((group) => (
+						<div key={group.key} className="space-y-1.5">
+							<h3 className="text-[11px] font-medium text-muted-foreground">
+								{t[group.key] ?? group.key}
+							</h3>
+							<div className="flex flex-wrap gap-1.5">
+								{group.tokens.map((tk) => (
+									<span
+										key={`${group.property}-${tk}`}
+										data-testid="v3-design-asset-token"
+										data-property={group.property}
+										data-token={tk}
+										className="rounded-full border border-border bg-background px-2 py-0.5 font-mono text-[10px] text-foreground"
+									>
+										{tk}
+									</span>
+								))}
+							</div>
+						</div>
+					))}
 				</section>
 
 				<p className="px-1 text-[11px] leading-relaxed text-muted-foreground italic">
