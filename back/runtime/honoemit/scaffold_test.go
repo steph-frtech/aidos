@@ -174,14 +174,24 @@ func TestScaffold_ServesReactView(t *testing.T) {
 	if apiIdx < 0 || staticIdx < 0 || apiIdx > staticIdx {
 		t.Fatalf("the static SPA fallback must be mounted AFTER the API routes (api@%d, static@%d)", apiIdx, staticIdx)
 	}
-	// The read route the list views fetch: GET /entities/<entity>, one per pinned entity name.
+	// The read route the list views fetch: GET /entities/<entity>, one per pinned entity name. It must
+	// DELEGATE to the injected lister (deps.list) — no longer the old hard-coded c.json([], 200) stub.
 	if !strings.Contains(server, `app.get("/entities/order"`) {
 		t.Fatalf("server.ts (web) missing the read route GET /entities/order\n%s", server)
 	}
-	// The boot imports serveStatic (so the bundled middleware resolves) when WebDir is set.
+	if !strings.Contains(server, `deps.list ? await deps.list("order")`) {
+		t.Fatalf("server.ts (web) GET /entities/order must delegate to deps.list, not return a stub\n%s", server)
+	}
+	// The boot imports serveStatic (so the bundled middleware resolves) when WebDir is set, AND wires the
+	// EntityLister onto the sidecar's read verb (createLister → list:) so the route's delegation resolves.
 	idx := string(scaffoldByPath(t, arts, "index.ts").Bytes)
 	if !strings.Contains(idx, `serve-static`) {
 		t.Fatalf("boot index.ts must reference serve-static when the spec serves the view\n%s", idx)
+	}
+	for _, want := range []string{"function createLister(", "/list?entity=", "list: createLister(interpreterUrl)"} {
+		if !strings.Contains(idx, want) {
+			t.Fatalf("boot index.ts must wire the entity lister (%q)\n%s", want, idx)
+		}
 	}
 	// package.json keeps @hono/node-server (serveStatic ships with it — no new dep).
 	pkg := string(scaffoldByPath(t, arts, "package.json").Bytes)
@@ -386,19 +396,34 @@ process.stdout.write(JSON.stringify(out));
 // TestScaffold_ServesViewAndReadRoute is the WEB journey (the done-criterion of this step): GIVEN the
 // web server spec (WebDir + an entity), WHEN we emit the scaffold, drop a fake built dist/index.html and
 // BOOT server.ts under node against a fake sidecar, THEN GET / serves the React index (the SPA shell),
-// GET /entities/order returns a JSON array (the list view's read route, empty until the sidecar read
-// verb lands), and POST /createorder still reaches the sidecar (the API wins over the static fallback).
+// GET /entities/order DELEGATES to the sidecar's list verb and returns the REAL rows (no longer the old
+// empty []), and POST /createorder still reaches the sidecar (the API wins over the static fallback).
+// The harness builds the SAME EntityLister the emitted boot (createLister) builds — a fetch to
+// GET /list?entity=<e> that unwraps { rows } — so the mirror proves the wired delegation, not a stub.
 func TestScaffold_ServesViewAndReadRoute(t *testing.T) {
 	node := nodeBin(t)
 	root := repoRoot(t)
 
 	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/interpret" || r.Method != http.MethodPost {
+		switch {
+		case r.URL.Path == "/interpret" && r.Method == http.MethodPost:
+			w.Header().Set("content-type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"operation": "createOrder", "result": map[string]any{"id": "order-1"}, "events": []string{}})
+		case r.URL.Path == "/list" && r.Method == http.MethodGet:
+			// The sidecar's read verb: every row of the requested entity, in { rows: [...] }. The
+			// emitted GET /entities/<e> route must surface these — proving the delegation is real.
+			if r.URL.Query().Get("entity") != "order" {
+				http.Error(w, "unknown entity", http.StatusNotFound)
+				return
+			}
+			w.Header().Set("content-type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"rows": []map[string]any{
+				{"id": "order-1", "status": "pending"},
+				{"id": "order-2", "status": "shipped"},
+			}})
+		default:
 			http.Error(w, "nope", http.StatusNotFound)
-			return
 		}
-		w.Header().Set("content-type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"operation": "createOrder", "result": map[string]any{"id": "order-1"}, "events": []string{}})
 	}))
 	t.Cleanup(sidecar.Close)
 
@@ -420,8 +445,10 @@ func TestScaffold_ServesViewAndReadRoute(t *testing.T) {
 	}
 	write(t, filepath.Join(dir, "web", "dist", "index.html"), []byte(`<!doctype html><html><body><div id="root">AIDOS-VIEW</div></body></html>`+"\n"))
 
-	// Boot harness: build the same interpreter + auth deriver the boot builds, create the app, and drive
-	// it through Hono's app.request — proving the EMITTED server.ts serves the view AND the API.
+	// Boot harness: build the same interpreter + LISTER + auth deriver the boot builds, create the app,
+	// and drive it through Hono's app.request — proving the EMITTED server.ts serves the view AND the API,
+	// and that GET /entities/order DELEGATES to the sidecar's list verb (the same createLister the boot
+	// wires: fetch GET /list?entity=<e> → unwrap { rows }).
 	harness := `
 import { createApp } from "./server.ts";
 const baseUrl = process.env["INTERPRETER_URL"];
@@ -430,7 +457,13 @@ const interpret = async (operation, input, auth) => {
   if (!res.ok) throw new Error("interpreter " + res.status);
   return res.json();
 };
-const app = createApp({ interpret, auth: (c) => ({ user: { id: "dev" } }) });
+const list = async (entity) => {
+  const res = await fetch(` + "`${baseUrl}/list?entity=${encodeURIComponent(entity)}`" + `);
+  if (!res.ok) throw new Error("lister " + res.status);
+  const body = await res.json();
+  return body.rows ?? [];
+};
+const app = createApp({ interpret, list, auth: (c) => ({ user: { id: "dev" } }) });
 const out = {};
 const idxRes = await app.request("/");
 out.indexStatus = idxRes.status;
@@ -456,11 +489,11 @@ process.stdout.write(JSON.stringify(out));
 	}
 
 	var res struct {
-		IndexStatus int    `json:"indexStatus"`
-		IndexBody   string `json:"indexBody"`
-		EntStatus   int    `json:"entStatus"`
-		EntBody     []any  `json:"entBody"`
-		OpStatus    int    `json:"opStatus"`
+		IndexStatus int              `json:"indexStatus"`
+		IndexBody   string           `json:"indexBody"`
+		EntStatus   int              `json:"entStatus"`
+		EntBody     []map[string]any `json:"entBody"`
+		OpStatus    int              `json:"opStatus"`
 	}
 	if err := json.Unmarshal(stdout, &res); err != nil {
 		t.Fatalf("harness output not JSON: %v\nraw: %s", err, stdout)
@@ -469,10 +502,16 @@ process.stdout.write(JSON.stringify(out));
 	if res.IndexStatus != 200 || !strings.Contains(res.IndexBody, "AIDOS-VIEW") {
 		t.Fatalf("GET / did not serve the React index: status=%d body=%q", res.IndexStatus, res.IndexBody)
 	}
-	// GET /entities/order returns a JSON array (the read route the list view fetches; empty until the
-	// sidecar read verb lands — an honest empty list, never a 404).
-	if res.EntStatus != 200 || res.EntBody == nil {
-		t.Fatalf("GET /entities/order did not return a JSON array: status=%d body=%v", res.EntStatus, res.EntBody)
+	// GET /entities/order DELEGATES to the sidecar's list verb and surfaces the REAL rows (no longer the
+	// old empty []): the two rows the fake sidecar served, in order. This is the read verb closing the loop.
+	if res.EntStatus != 200 {
+		t.Fatalf("GET /entities/order did not return 200: status=%d", res.EntStatus)
+	}
+	if len(res.EntBody) != 2 {
+		t.Fatalf("GET /entities/order must surface the sidecar's 2 rows, got %d (%v)", len(res.EntBody), res.EntBody)
+	}
+	if res.EntBody[0]["id"] != "order-1" || res.EntBody[1]["id"] != "order-2" {
+		t.Fatalf("GET /entities/order rows out of order/wrong: %v", res.EntBody)
 	}
 	// POST /createorder still reaches the sidecar (the API route wins over the static fallback).
 	if res.OpStatus != 201 {

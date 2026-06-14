@@ -2,6 +2,8 @@ package interpretsvc
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/steph-frtech/aidos/back/kernel/operation"
 )
@@ -137,6 +139,45 @@ func (d *MemDeps) Mutate(entity, op string, data map[string]any, state *operatio
 	default:
 		return nil, nil, fmt.Errorf("interpretsvc: mutate %q: unknown op %q", entity, op)
 	}
+}
+
+// List returns EVERY row of the entity's table in a DETERMINISTIC order — sorted by the `id`
+// column when the rows carry one (the pk for the app's entities, the same key DBDeps orders by),
+// else by the rows' canonical JSON (a stable total order over any shape). It is the in-memory twin
+// of DBDeps.List: a SCOPED, READ-ONLY scan of the app's OWN table, no operation, no event, no
+// effect (§8 honesty; the wall §2 — it reads only the seeded store, writes nothing). An entity the
+// store has never seen is ErrUnknownEntity (fail-closed), never a silent empty list — exactly as the
+// pgx twin refuses a table that does not exist. Each returned row is cloned (no aliasing the store).
+func (d *MemDeps) List(entity string) ([]map[string]any, error) {
+	src, known := d.Store.rows[entity]
+	if !known {
+		return nil, fmt.Errorf("%w: %q", ErrUnknownEntity, entity)
+	}
+	out := make([]map[string]any, len(src))
+	for i, r := range src {
+		out[i] = cloneRow(r)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return listKey(out[i]) < listKey(out[j]) })
+	return out, nil
+}
+
+// listKey is the deterministic sort key for a row in List: the `id` value when present (the pk the
+// app's entities carry), else the row's canonical JSON. It never panics on a missing/odd value —
+// it stringifies, so every shape sorts in a stable total order (determinism-first §6/§8).
+func listKey(row map[string]any) string {
+	if id, ok := row["id"]; ok {
+		return fmt.Sprintf("%v", id)
+	}
+	keys := make([]string, 0, len(row))
+	for k := range row {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	for _, k := range keys {
+		fmt.Fprintf(&b, "%s=%v;", k, row[k])
+	}
+	return b.String()
 }
 
 // eventName derives the §93 event name for an entity mutate: Order+create → "OrderCreated",

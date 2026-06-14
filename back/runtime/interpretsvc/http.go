@@ -14,13 +14,21 @@ import (
 //	GET  /healthz            → 200 { "status": "ok", "operations": [ …names… ] }
 //	POST /interpret          → body { "operation": "<name>", "input": { … }, "auth": { … } }
 //	                           200 { "operation", "result": { … }, "events": [ … ] }
+//	GET  /list?entity=<e>     → 200 { "rows": [ { … }, … ] }
 //
 // The emitted honoemit server can call /interpret directly (its `interpret(op, input)` port → a
 // POST /interpret with {operation, input}). The auth field is optional ($.auth; defaults to {}).
 //
+// GET /list is the READ-ONLY list door (the LIST verb): it returns EVERY row of an entity's emitted
+// table in a stable order, so the served view's GET /entities/<e> fetch resolves to the real rows. It
+// is DISTINCT from /interpret — a read, not a command — so it never enters operation.Interpret; it
+// delegates to the injected Deps when it also implements Lister (the pgx DBDeps / the in-memory MemDeps).
+//
 // ERROR SHAPE (honest, never a panic, never a partial silent success):
 //   - unknown operation              → 404 { "error": … }
+//   - unknown entity (GET /list)     → 404 { "error": … }
 //   - authorize DENY                 → 403 { "error": … }
+//   - missing ?entity / list unsupported → 400 / 422 { "error": … }
 //   - any other interpreter/seam err → 422 { "error": … }
 //   - malformed body / wrong method  → 400 / 405 { "error": … }
 //
@@ -61,6 +69,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleHealthz(w, r)
 	case "/interpret":
 		s.handleInterpret(w, r)
+	case "/list":
+		s.handleList(w, r)
 	default:
 		writeJSON(w, http.StatusNotFound, errorBody{Error: "interpretsvc: no such endpoint: " + r.URL.Path})
 	}
@@ -110,13 +120,51 @@ func (s *Server) handleInterpret(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+// listBody is the GET /list response envelope: the entity's rows in a stable order. rows is always
+// a JSON array (never null) — an empty table is { "rows": [] }, distinct from a 404 unknown entity.
+type listBody struct {
+	Rows []map[string]any `json:"rows"`
+}
+
+// handleList answers GET /list?entity=<e>: it reads EVERY row of the entity's emitted table through
+// the injected Lister seam and returns { rows: [...] }. It is the READ-ONLY door the served view's
+// GET /entities/<e> fetch resolves against — a read, never an operation, so it does not touch
+// operation.Interpret. A missing ?entity is 400; a Deps that is not a Lister is 422 (the feature is
+// unwired, honest); an unknown entity is 404 (fail-closed via ErrUnknownEntity); any other seam error
+// is 422. It writes no truth and runs no effect (the wall §2).
+func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, errorBody{Error: "interpretsvc: /list is GET-only"})
+		return
+	}
+	entity := r.URL.Query().Get("entity")
+	if entity == "" {
+		writeJSON(w, http.StatusBadRequest, errorBody{Error: "interpretsvc: /list pins no entity (?entity=<name>)"})
+		return
+	}
+	lister, ok := s.deps.(Lister)
+	if !ok {
+		writeJSON(w, http.StatusUnprocessableEntity, errorBody{Error: "interpretsvc: this deps does not support the list verb"})
+		return
+	}
+	rows, err := lister.List(entity)
+	if err != nil {
+		writeJSON(w, statusForError(err), errorBody{Error: err.Error()})
+		return
+	}
+	if rows == nil {
+		rows = []map[string]any{} // never serialise null — an empty table is [], not null.
+	}
+	writeJSON(w, http.StatusOK, listBody{Rows: rows})
+}
+
 // statusForError maps an interpreter/seam error to an HTTP status — honest, typed, never a 500 for
-// a known refusal: an unknown op is 404, a DENY is 403, any other operation/seam failure is 422
-// (the command was well-formed but could not complete). A truly unexpected error would still be
+// a known refusal: an unknown op/entity is 404, a DENY is 403, any other operation/seam failure is
+// 422 (the command was well-formed but could not complete). A truly unexpected error would still be
 // 422 (the sidecar never crashes the process on a bad request).
 func statusForError(err error) int {
 	switch {
-	case errors.Is(err, ErrUnknownOperation):
+	case errors.Is(err, ErrUnknownOperation), errors.Is(err, ErrUnknownEntity):
 		return http.StatusNotFound
 	case errors.Is(err, operation.ErrAuthorizationDenied):
 		return http.StatusForbidden

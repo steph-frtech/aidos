@@ -98,7 +98,13 @@ func emitBootIndex(s ServerSpec, sourceHash string) []byte {
 	b.WriteString("// Go sidecar interpreter (POST ${INTERPRETER_URL}/interpret) and serves via @hono/node-server.\n\n")
 	b.WriteString("import { serve } from \"@hono/node-server\";\n")
 	b.WriteString("import type { Context } from \"hono\";\n")
-	b.WriteString("import { createApp, type OperationInterpreter } from \"./server.ts\";\n")
+	// The EntityLister type is imported only when the server serves a view (it has entity read routes);
+	// a pure API server stays import-clean (the no-fork guarantee — same bytes it always emitted).
+	if len(s.Entities) > 0 {
+		b.WriteString("import { createApp, type OperationInterpreter, type EntityLister } from \"./server.ts\";\n")
+	} else {
+		b.WriteString("import { createApp, type OperationInterpreter } from \"./server.ts\";\n")
+	}
 	// When the server SERVES the view, server.ts mounts the static React build via @hono/node-server's
 	// serve-static (resolved relative to the process CWD, i.e. /app/web/dist in the image). The boot
 	// notes the dependency so the served-view wiring is visible at the entrypoint (no extra import — the
@@ -144,19 +150,46 @@ func emitBootIndex(s ServerSpec, sourceHash string) []byte {
 	b.WriteString("\t};\n")
 	b.WriteString("}\n\n")
 
+	// createLister — a PURE FACTORY of the EntityLister port over the sidecar's READ-ONLY list verb
+	// (GET ${baseUrl}/list?entity=<e> → { rows: [...] }). The served view's GET /entities/<e> route
+	// delegates to it; it re-implements no query — the Go sidecar (interpretsvc.List) runs the scoped
+	// SELECT, this only forwards the entity name and unwraps the rows envelope. Emitted ONLY when the
+	// server serves a view (it has entity read routes) — a pure API server stays clean (no-fork).
+	if len(s.Entities) > 0 {
+		b.WriteString("// createLister builds the EntityLister port over the Go sidecar's read verb\n")
+		b.WriteString("// (GET /list?entity=<e> → { rows: [...] }). It re-implements no query — the sidecar\n")
+		b.WriteString("// (interpretsvc.List) runs the scoped SELECT; this forwards the entity + unwraps the rows.\n")
+		b.WriteString("function createLister(baseUrl: string): EntityLister {\n")
+		b.WriteString("\treturn async (entity: string): Promise<unknown[]> => {\n")
+		b.WriteString("\t\tconst res = await fetch(`${baseUrl}/list?entity=${encodeURIComponent(entity)}`);\n")
+		b.WriteString("\t\tif (!res.ok) {\n")
+		b.WriteString("\t\t\tconst detail = await res.text();\n")
+		b.WriteString("\t\t\tthrow new Error(`lister ${res.status}: ${detail}`);\n")
+		b.WriteString("\t\t}\n")
+		b.WriteString("\t\tconst body = (await res.json()) as { rows?: unknown[] };\n")
+		b.WriteString("\t\treturn body.rows ?? [];\n")
+		b.WriteString("\t};\n")
+		b.WriteString("}\n\n")
+	}
+
 	// The boot constants — the sidecar URL (env, with a localhost dev default) + the listen port.
 	b.WriteString("// The sidecar base URL (the Pulumi stack points it at http://<stack>-interpreter:PORT) and the\n")
 	b.WriteString("// listen port. Both are env-driven with deterministic dev defaults (no clock, no RNG).\n")
 	b.WriteString("const interpreterUrl = process.env[" + jsStr(interpreterURLEnv) + "] ?? \"http://localhost:8080\";\n")
 	b.WriteString("const port = Number(process.env.PORT ?? \"3000\");\n\n")
 
-	// Build the app with the wired interpreter AND the injected auth deriver (the request-header → $.auth
-	// reader), then serve it. createApp + createInterpreter + authFromRequest are pure factories/derivers;
-	// serve is the side-effecting boot (the gated gesture), exactly like the sidecar's ListenAndServe. The
-	// deriver is injected into createApp so it runs in the FIRST middleware (before every route) — a
-	// middleware installed here, after the routes, would not wrap them (Hono registration order).
-	b.WriteString("// Boot: build the app (wired interpreter + the request-header auth deriver) and serve it.\n")
-	b.WriteString("const app = createApp({ interpret: createInterpreter(interpreterUrl), auth: authFromRequest });\n")
+	// Build the app with the wired interpreter, the entity LISTER (the read verb → GET /list?entity)
+	// AND the injected auth deriver (the request-header → $.auth reader), then serve it. createApp +
+	// createInterpreter + createLister + authFromRequest are pure factories/derivers; serve is the
+	// side-effecting boot (the gated gesture), exactly like the sidecar's ListenAndServe. The deriver is
+	// injected into createApp so it runs in the FIRST middleware (before every route) — a middleware
+	// installed here, after the routes, would not wrap them (Hono registration order).
+	b.WriteString("// Boot: build the app (wired interpreter + entity lister + the request-header auth deriver) and serve it.\n")
+	if len(s.Entities) > 0 {
+		b.WriteString("const app = createApp({ interpret: createInterpreter(interpreterUrl), list: createLister(interpreterUrl), auth: authFromRequest });\n")
+	} else {
+		b.WriteString("const app = createApp({ interpret: createInterpreter(interpreterUrl), auth: authFromRequest });\n")
+	}
 	b.WriteString("serve({ fetch: app.fetch, port });\n")
 	b.WriteString("console.log(`" + s.Project + " server listening on :${port} (interpreter ${interpreterUrl})`);\n")
 

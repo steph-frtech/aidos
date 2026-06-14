@@ -51,6 +51,29 @@ import (
 // the sidecar invents no operation the Kernel cut does not carry.
 var ErrUnknownOperation = errors.New("interpretsvc: unknown operation")
 
+// ErrUnknownEntity is returned when the LIST verb is asked for an entity whose emitted table does
+// not exist. Like ErrUnknownOperation it is a typed FAILURE (a 404-shaped honest refusal), never a
+// silent empty list — the sidecar reads only the app's OWN tables and never invents one. The HTTP
+// layer maps it to 404; the served view distinguishes "empty table" (200 + []) from "no such entity".
+var ErrUnknownEntity = errors.New("interpretsvc: unknown entity")
+
+// Lister is the sidecar's READ-ONLY list seam: every row of an entity's emitted table, in a stable
+// order, columns decoded like a Read (the JSON-bearing text columns folded back). It is a DISTINCT
+// door from operation.Deps — a list is a read, not a command, so it does NOT enter operation.Interpret
+// and threads through no Validator/Authorizer/Mutator (CLAUDE.md §8 honesty). Both the pgx-backed
+// DBDeps (production) and the in-memory MemDeps (the mirror) implement it; the HTTP layer type-asserts
+// its injected Deps to a Lister to serve GET /list. An unknown entity is ErrUnknownEntity (fail-closed).
+type Lister interface {
+	List(entity string) ([]map[string]any, error)
+}
+
+// Both seam implementations satisfy Lister (a compile-time guard so the read door never drifts away
+// from the production pgx seam or its in-memory mirror twin — the HTTP layer relies on the assertion).
+var (
+	_ Lister = (*DBDeps)(nil)
+	_ Lister = (*MemDeps)(nil)
+)
+
 // Registry is the project's Kernel cut as the sidecar sees it: a name → Operation map (read-only).
 // In production it is loaded from the project's kernel.operation rows (the same ASTs honoemit
 // wired into routes); in the mirror it is seeded with the createOrder anchor. The sidecar only

@@ -258,13 +258,19 @@ func EmitServer(s ServerSpec) (Artifact, *blockreason.BlockReason) {
 	// and an auth-bearing mutate (createOrder's userId: $.auth.user.id, total: sum(...)) resolve
 	// against the real caller — never an empty $.auth. auth is optional (defaults to {}).
 	b.WriteString("export type OperationInterpreter = (operation: string, input: unknown, auth?: unknown) => Promise<unknown>;\n")
+	// The entity LIST port (the read side, S87 read verb): a PURE function entity name → its rows.
+	// The served view's list fetch (GET /entities/<e>) delegates to it; like OperationInterpreter it
+	// is a PORT the boot wires onto the Go sidecar (GET ${INTERPRETER_URL}/list?entity=<e>), never a
+	// global, never a re-implemented query. Optional so the pure API server still boots in a test
+	// without a list source — a missing lister yields an honest empty array (never a 404).
+	b.WriteString("export type EntityLister = (entity: string) => Promise<unknown[]>;\n")
 	// The AUTH deriver port: a PURE function request-context → caller identity ($.auth). server.ts owns
 	// no authentication SCHEME — it only calls the injected deriver and sets the result on the context
 	// (FIRST, before the routes, so every handler's c.get("auth") resolves). The BOOT (index.ts) injects
 	// the concrete deriver (the X-Aidos-User header reader); a missing deriver defaults to {} (no scheme
 	// invented here). Optional so the pure server stays bootable in tests without an auth source.
 	b.WriteString("export type AuthDeriver = (c: Context) => unknown;\n")
-	b.WriteString("export type Deps = { interpret: OperationInterpreter; auth?: AuthDeriver };\n\n")
+	b.WriteString("export type Deps = { interpret: OperationInterpreter; list?: EntityLister; auth?: AuthDeriver };\n\n")
 
 	// createApp is a PURE FACTORY: deps in → a configured Hono app out. No module-scope
 	// mutable binding (FN02). Every handler closes over the injected `deps`.
@@ -296,13 +302,17 @@ func EmitServer(s ServerSpec) (Artifact, *blockreason.BlockReason) {
 		b.WriteString("\t});\n")
 	}
 	// One READ route per entity the served view lists (GET /entities/<entity>, canonical order). The
-	// list views fetch their rows here. The sidecar wire contract (POST /interpret) carries no read
-	// verb yet (a forward dependency — a sidecar query/list verb), so the route returns an honest
-	// EMPTY array: the list view renders its header + the "—" empty state, never a 404. When the
-	// sidecar gains a read verb this route delegates to it (the bytes change, the shape does not).
+	// list views fetch their rows here. The route DELEGATES to the injected EntityLister port (the Go
+	// sidecar's GET /list?entity=<e> verb, wired in index.ts) — it re-implements no query (the wall §2,
+	// determinism-first §6/§8). When no lister is wired (the pure API server in a test) it falls back to
+	// an honest EMPTY array, never a 404: the list view renders its header + the "—" empty state.
 	for _, name := range sortedNames(s.Entities) {
-		route := "/entities/" + strings.ToLower(name)
-		fmt.Fprintf(&b, "\tapp.get(%s, (c) => c.json([], 200)); // read route (sidecar read verb pending)\n", jsStr(route))
+		entity := strings.ToLower(name)
+		route := "/entities/" + entity
+		fmt.Fprintf(&b, "\tapp.get(%s, async (c) => {\n", jsStr(route))
+		fmt.Fprintf(&b, "\t\tconst rows = deps.list ? await deps.list(%s) : [];\n", jsStr(entity))
+		b.WriteString("\t\treturn c.json(rows, 200);\n")
+		b.WriteString("\t}); // read route → sidecar list verb (GET /list?entity)\n")
 	}
 	// The VIEW the app SERVES (WebDir set): the built React dist/ as static files + an SPA catch-all
 	// to index.html. Mounted LAST so the API routes above (healthz, POST /<op>, GET /entities/<e>) win;

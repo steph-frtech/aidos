@@ -20,6 +20,7 @@ package interpretsvc
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -165,6 +166,54 @@ func TestIntegration_DBPont_CreateOrder(t *testing.T) {
 	}
 	if cartCount != 0 {
 		t.Errorf("expected the cart to be cleared, %d row(s) remain", cartCount)
+	}
+}
+
+// THE LIST PONT integration mirror: the READ-ONLY list verb over the REAL emitted schema. It seeds
+// two Order rows (out of id order), runs DBDeps.List THROUGH pgx, and asserts the State↔DB read:
+//   - List returns BOTH rows (2 seeded → 2 returned), in the DETERMINISTIC pk order (order-1 before
+//     order-2), with the JSON `items` text column decoded back to a list (the rowToMap pont);
+//   - an unknown entity is REFUSED (ErrUnknownEntity) against the real catalog — fail-closed, never
+//     a "relation does not exist" leak nor a silent empty list.
+//
+// THE WALL (§2): List reads only the emitted app table, writes nothing, runs no effect.
+func TestIntegration_DBPont_List(t *testing.T) {
+	pool := startAppDB(t)
+	ctx := context.Background()
+
+	// Seed two Order rows, inserted out of id order so the deterministic ORDER BY is proven.
+	for _, row := range []struct{ id, items, total, status string }{
+		{"order-2", `[{"product":"gadget","price":5}]`, "5", "shipped"},
+		{"order-1", `[{"product":"widget","price":10}]`, "10", "pending"},
+	} {
+		if _, err := pool.Exec(ctx,
+			`INSERT INTO "order" ("id","userId","items","total","status") VALUES ($1,$2,$3,$4,$5)`,
+			row.id, "u-1", row.items, row.total, row.status); err != nil {
+			t.Fatalf("seed order %s: %v", row.id, err)
+		}
+	}
+
+	deps := NewDBDepsFromPool(pool)
+
+	rows, err := deps.List("Order")
+	if err != nil {
+		t.Fatalf("List(Order) over the real DB: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 order rows, got %d (%v)", len(rows), rows)
+	}
+	// Deterministic pk order: order-1 before order-2 (NOT insertion order).
+	if rows[0]["id"] != "order-1" || rows[1]["id"] != "order-2" {
+		t.Fatalf("expected rows ordered by pk [order-1, order-2], got [%v, %v]", rows[0]["id"], rows[1]["id"])
+	}
+	// The items text column decoded back to a list (the rowToMap pont, like Read).
+	if _, ok := rows[0]["items"].([]any); !ok {
+		t.Errorf("expected order-1 items decoded to a list, got %T (%v)", rows[0]["items"], rows[0]["items"])
+	}
+
+	// An unknown entity is refused against the real catalog — fail-closed.
+	if _, err := deps.List("Nope"); !errors.Is(err, ErrUnknownEntity) {
+		t.Fatalf("expected ErrUnknownEntity for an unknown table, got %v", err)
 	}
 }
 

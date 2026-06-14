@@ -3,6 +3,7 @@ package interpretsvc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -117,6 +118,106 @@ func (d *DBDeps) Read(entity string, where map[string]any, state *operation.Stat
 		return nil, fmt.Errorf("interpretsvc: read %q: %w", entity, err)
 	}
 	return row, nil
+}
+
+// List runs SELECT * FROM <table> ORDER BY <deterministic key> over the entity's emitted table and
+// returns EVERY row as a column→value map (the JSON-bearing text columns decoded, like Read). It is
+// a SCOPED, READ-ONLY query — no WHERE, no LIMIT, every row of the app's OWN table — that the served
+// view's list fetches (GET /entities/<e>) resolve against. It is NOT an operation: the verb does not
+// enter operation.Interpret (a read, not a command), so it threads through no Validator/Authorizer/
+// Mutator seam — a distinct, honest read door (CLAUDE.md §8 honesty).
+//
+// THE WALL (§2). List reads ONLY the emitted app table (the app's own data) — never a truth schema;
+// it writes nothing, emits no event, runs no effect (anti-overwrite §9: a pure read). DETERMINISM
+// (§6/§8): the rows come back in a stable order — ORDER BY the primary key when the table has one,
+// else by the FIRST column in the schema's declared order — and each row's columns are sorted (the
+// rowToMap pont decodes JSON columns identically to Read), so the same table → the same JSON every
+// run. An unknown entity (a table that does not exist) is a typed "not found" (ErrUnknownEntity),
+// never a silent empty list — the read fails closed.
+func (d *DBDeps) List(entity string) ([]map[string]any, error) {
+	table := tableName(entity)
+	exists, err := d.tableExists(table)
+	if err != nil {
+		return nil, fmt.Errorf("interpretsvc: list %q: %w", entity, err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("%w: %q", ErrUnknownEntity, entity)
+	}
+	order, err := d.orderColumn(table)
+	if err != nil {
+		return nil, fmt.Errorf("interpretsvc: list %q: %w", entity, err)
+	}
+	sql := fmt.Sprintf("SELECT * FROM %s ORDER BY %s", quoteIdent(table), quoteIdent(order))
+
+	rows, err := d.pool.Query(context.Background(), sql)
+	if err != nil {
+		return nil, fmt.Errorf("interpretsvc: list %q: %w", entity, err)
+	}
+	defer rows.Close()
+
+	out := []map[string]any{}
+	for rows.Next() {
+		row, err := rowToMap(rows)
+		if err != nil {
+			return nil, fmt.Errorf("interpretsvc: list %q: %w", entity, err)
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("interpretsvc: list %q: %w", entity, err)
+	}
+	return out, nil
+}
+
+// tableExists asks the catalog whether the emitted table is present in the current schema — the
+// fail-closed guard so List refuses an unknown entity (a typed not-found) rather than letting a
+// "relation does not exist" SQL error leak. It is a pure metadata read (to_regclass), never a write.
+func (d *DBDeps) tableExists(table string) (bool, error) {
+	var reg *string
+	if err := d.pool.QueryRow(context.Background(),
+		"SELECT to_regclass($1)::text", table).Scan(&reg); err != nil {
+		return false, err
+	}
+	return reg != nil, nil
+}
+
+// orderColumn returns the table's DETERMINISTIC sort column: the primary-key column if the table
+// declares one, else the FIRST column in the schema's declared ordinal order. Both queries hit the
+// information_schema/catalog (a metadata read, never the data), so List's ORDER BY is stable without
+// the caller guessing the pk — the same table always sorts the same way. The emitted `id` column is
+// the pk for the app's entities (gen-db), so this resolves to `id` for Cart/Order; a table with no
+// pk falls back to its first column (still deterministic, never an unordered scan).
+func (d *DBDeps) orderColumn(table string) (string, error) {
+	ctx := context.Background()
+	var col string
+	// Primary-key column (if any), via the catalog. A composite pk returns its first column by
+	// attribute order; the typical emitted entity has a single-column pk (`id`).
+	err := d.pool.QueryRow(ctx, `
+		SELECT a.attname
+		FROM pg_index i
+		JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+		WHERE i.indrelid = to_regclass($1) AND i.indisprimary
+		ORDER BY a.attnum
+		LIMIT 1`, table).Scan(&col)
+	if err == nil && col != "" {
+		return col, nil
+	}
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+	// No primary key — fall back to the first column in the schema's declared ordinal order.
+	if err := d.pool.QueryRow(ctx, `
+		SELECT column_name
+		FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = $1
+		ORDER BY ordinal_position
+		LIMIT 1`, table).Scan(&col); err != nil {
+		return "", err
+	}
+	if col == "" {
+		return "", fmt.Errorf("table %q has no columns", table)
+	}
+	return col, nil
 }
 
 // Mutate runs an INSERT (create) or DELETE (clear) over the entity's emitted table, returning the
