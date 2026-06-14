@@ -84,12 +84,20 @@ type ControlAction struct {
 
 // WebAppSpec is the web-view emitter's input — the slice of the requirements tree the view is
 // DERIVED from: the project namespace + the ENTITIES it lists (S35) + the control→action pairs
-// it triggers (S11). The emitter authors no entity/control/action (the wall, SELECT-only); it
-// reads the cut and renders exactly what it pins.
+// it triggers (S11) + the declared INVARIANTS that gate it (∀, KRD §8). The emitter authors no
+// entity/control/action/invariant (the wall, SELECT-only); it reads the cut and renders exactly
+// what it pins. The master view (EmitMasterView) reads the SAME spec — the children all derive
+// from this one cut, so the spec is the single source the whole family projects from.
 type WebAppSpec struct {
 	Project  string
 	Entities []entities.Entity
 	Buttons  []ControlAction
+	// Invariants are the DECLARED ∀ that gate the view (KRD §8). They flow into the MASTER view
+	// (EmitMasterView) — the canonical, platform-agnostic node every child constrains itself by.
+	// They do NOT change the WEB child's bytes (EmitWebApp stays byte-identical, anti-overwrite
+	// §9): the web child's form was already frozen on shopapp; invariants live in the master, not
+	// in the emitted web React. Optional — empty when the source pins none (never invented).
+	Invariants []string
 }
 
 // EmitWebApp renders the React web view for the project, byte-stable under gen/<project>/web/:
