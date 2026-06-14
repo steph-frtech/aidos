@@ -64,6 +64,9 @@ func main() {
 	seed := fs.String("seed", "", "optional path to a seed.sql mounted as 02-seed.sql (only with --entities)")
 	appName := fs.String("app-name", "", "the human APP_NAME baked into the deployed app (only with --entities; defaults to the project)")
 	hono := fs.Bool("hono", false, "deploy the CLEAN Hono/TS path: emitted Hono server + Go interpreter sidecar + postgres (3 wired containers, ADR 0040)")
+	out := fs.String("out", "", "the export artefact path (X.aidos.json) — the portable genome (only for `export`; defaults to <project>.aidos.json)")
+	artifact := fs.String("artifact", "", "the portable genome to recompile (X.aidos.json) — only for `found`")
+	outRoot := fs.String("out-root", "", "the recompilation root `found` writes gen/<name>/ under (only for `found`; defaults to .found/<project>)")
 	_ = fs.Parse(os.Args[2:])
 
 	switch sub {
@@ -73,6 +76,10 @@ func main() {
 		runDown(*root, *project, *env)
 	case "emit":
 		runEmit(*project, *env)
+	case "export":
+		runExport(*project, *entities, *out)
+	case "found":
+		runFound(*artifact, *project, *outRoot)
 	default:
 		usage()
 		os.Exit(2)
@@ -80,12 +87,14 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: aidospulumi <up|down|emit> --project <p> --env <e> [--root <repo>] [--hono] [--entities <f.json> [--seed <f.sql>] [--app-name <name>]]")
-	fmt.Fprintln(os.Stderr, "  up   : materialise the emitted Pulumi stack + pulumi up --yes (prints {url, containers} JSON)")
-	fmt.Fprintln(os.Stderr, "         with --hono: the CLEAN Hono/TS path — emitted Hono server + Go interpreter sidecar + postgres (3 wired containers)")
-	fmt.Fprintln(os.Stderr, "         with --entities: deploy the project's OWN data (schema+entities[+seed] emitted, mounted by Pulumi)")
-	fmt.Fprintln(os.Stderr, "  down : pulumi destroy --yes")
-	fmt.Fprintln(os.Stderr, "  emit : print the emitted Pulumi program (in-memory, no pulumi) as JSON — the front preview source")
+	fmt.Fprintln(os.Stderr, "usage: aidospulumi <up|down|emit|export|found> --project <p> [--env <e>] [--root <repo>] [--hono] [--entities <f.json> [--seed <f.sql>] [--app-name <name>]] [--out <X.aidos.json>] [--artifact <X.aidos.json> [--out-root <dir>]]")
+	fmt.Fprintln(os.Stderr, "  up     : materialise the emitted Pulumi stack + pulumi up --yes (prints {url, containers} JSON)")
+	fmt.Fprintln(os.Stderr, "           with --hono: the CLEAN Hono/TS path — emitted Hono server + Go interpreter sidecar + postgres (3 wired containers)")
+	fmt.Fprintln(os.Stderr, "           with --entities: deploy the project's OWN data (schema+entities[+seed] emitted, mounted by Pulumi)")
+	fmt.Fprintln(os.Stderr, "  down   : pulumi destroy --yes")
+	fmt.Fprintln(os.Stderr, "  emit   : print the emitted Pulumi program (in-memory, no pulumi) as JSON — the front preview source")
+	fmt.Fprintln(os.Stderr, "  export : write the project's ARBRE (the content-addressed genome) to X.aidos.json — the portable source `found` recompiles from")
+	fmt.Fprintln(os.Stderr, "  found  : recompile the WHOLE app from X.aidos.json — schema + Hono server + master view + 3 children + Pulumi program, BYTE-IDENTICAL to a direct emission (the compiler)")
 }
 
 // runUp materialises the emitted artifacts then drives the pulumi lifecycle, printing the result as
