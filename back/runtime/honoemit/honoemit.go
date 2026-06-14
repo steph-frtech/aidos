@@ -245,6 +245,13 @@ func EmitServer(s ServerSpec) (Artifact, *blockreason.BlockReason) {
 	b.WriteString("// WebDir it ALSO serves the React view (the static dist/) on GET / + an SPA fallback.\n\n")
 	b.WriteString("import { Hono } from \"hono\";\n")
 	b.WriteString("import type { Context } from \"hono\";\n")
+	// cors ships INSIDE the hono package (no new dep) — emitted UNCONDITIONALLY because the app is
+	// MULTI-PLATFORM (ADR 0040): the web child shares the API origin, but the mobile (Expo) and desktop
+	// (Electron) children run on SEPARATE origins, so the API must answer their cross-origin fetch/POST.
+	// Auth is the x-aidos-user HEADER (never an ambient cookie), so the default allow-all origin policy
+	// carries no credential-leak risk (CORS is not the auth boundary; the header is). Tightening the
+	// allowed origins per deployment is a documented OpenQuestion, not a rule emitted here.
+	b.WriteString("import { cors } from \"hono/cors\";\n")
 	// serveStatic ships with @hono/node-server (no new dep) — imported ONLY when the server serves the
 	// view (WebDir set), so a pure API server stays import-clean (the no-fork guarantee).
 	if s.WebDir != "" {
@@ -276,6 +283,10 @@ func EmitServer(s ServerSpec) (Artifact, *blockreason.BlockReason) {
 	// mutable binding (FN02). Every handler closes over the injected `deps`.
 	b.WriteString("export function createApp(deps: Deps): Hono {\n")
 	b.WriteString("\tconst app = new Hono();\n")
+	// CORS — registered FIRST so the preflight OPTIONS of a cross-origin child (mobile/desktop) is
+	// answered before any route runs. Default policy (allow-all origin) — see the import note. A pure
+	// deterministic projection, no business rule, no module-scope state (FN02).
+	b.WriteString("\tapp.use(\"*\", cors());\n")
 	// FIRST middleware (runs BEFORE every route — Hono dispatches in registration order): the request-id/
 	// app header AND the caller-identity binding. It calls the injected auth deriver and sets the result on
 	// the context (c.set("auth", …)) so each route reads it via c.get("auth"). Installed here, not in the

@@ -54,8 +54,10 @@ func mobileSourceHash(m MasterView, adapt MobileAdaptation) (string, error) {
 }
 
 // emitExpoAppJSON renders the Expo manifest (app.json): the displayed name (the adaptation override
-// or the project default), the slug, and the platform targets. Valid JSON carrying the source hash
-// as a _source field so it stays content-addressed. Deterministic — no clock, no resolver.
+// or the project default), the slug, the platform targets, and the web bundler. The platforms include
+// "web" and web.bundler == "metro" so `npx expo export -p web` runs the metro bundler (the
+// web-exportable child). Valid JSON carrying the source hash as a _source field so it stays
+// content-addressed. Deterministic — no clock, no resolver.
 func emitExpoAppJSON(m MasterView, adapt MobileAdaptation, sourceHash string) []byte {
 	name := adapt.AppName
 	if name == "" {
@@ -71,17 +73,39 @@ func emitExpoAppJSON(m MasterView, adapt MobileAdaptation, sourceHash string) []
 	b.WriteString("\t\t\"version\": \"1.0.0\",\n")
 	b.WriteString("\t\t\"orientation\": \"portrait\",\n")
 	b.WriteString("\t\t\"userInterfaceStyle\": \"automatic\",\n")
-	b.WriteString("\t\t\"platforms\": [\"ios\", \"android\"],\n")
-	b.WriteString("\t\t\"newArchEnabled\": true\n")
+	b.WriteString("\t\t\"platforms\": [\"ios\", \"android\", \"web\"],\n")
+	b.WriteString("\t\t\"newArchEnabled\": true,\n")
+	b.WriteString("\t\t\"web\": {\n")
+	b.WriteString("\t\t\t\"bundler\": \"metro\"\n")
+	b.WriteString("\t\t}\n")
 	b.WriteString("\t}\n")
 	b.WriteString("}\n")
 	return []byte(b.String())
 }
 
 // emitMobilePackageJSON renders the Expo app's package.json: expo + react + react-native + nativewind
-// (+ the safe-area + screens deps), the Expo entry (expo/AppEntry via "main"), the dev/build scripts.
-// Valid JSON carrying the source hash as a _source field. Pinned, deterministic versions.
+// (+ the safe-area + screens deps) AND the web-export deps (react-native-web bridges RN→DOM, react-dom
+// mounts it, @expo/metro-runtime is the web runtime, react-native-worklets is the plugin the
+// jsxImportSource:nativewind babel pipeline references), the entry ("main": "index.js"), the
+// dev/build scripts. react + react-dom are pinned to 18.3.1 — the version Expo SDK 51 / RN 0.74 expects
+// (DISTINCT from the web child's React 19). Valid JSON carrying the source hash as a _source field.
+// Dependencies are emitted in a fixed alphabetical order so the JSON is byte-stable. Pinned versions.
 func emitMobilePackageJSON(m MasterView, sourceHash string) []byte {
+	// deps in fixed alphabetical key order (byte-stable; no map iteration).
+	deps := [][2]string{
+		{"@expo/metro-runtime", expoMetroRuntimeVer},
+		{"expo", expoVersion},
+		{expoStatusBarPkg, expoStatusBarVer},
+		{"nativewind", nativeWindVersion},
+		{"react", reactMobileVersion},
+		{"react-dom", reactMobileVersion},
+		{"react-native", reactNativeVersion},
+		{"react-native-safe-area-context", rnSafeAreaVersion},
+		{"react-native-screens", rnScreensVersion},
+		{"react-native-web", reactNativeWebVersion},
+		{"react-native-worklets", rnWorkletsVersion},
+	}
+
 	var b strings.Builder
 	b.WriteString("{\n")
 	b.WriteString("\t\"_aidos\": " + jsStr(protectedMarker) + ",\n")
@@ -92,21 +116,80 @@ func emitMobilePackageJSON(m MasterView, sourceHash string) []byte {
 	b.WriteString("\t\"scripts\": {\n")
 	b.WriteString("\t\t\"start\": \"expo start\",\n")
 	b.WriteString("\t\t\"android\": \"expo start --android\",\n")
-	b.WriteString("\t\t\"ios\": \"expo start --ios\"\n")
+	b.WriteString("\t\t\"ios\": \"expo start --ios\",\n")
+	b.WriteString("\t\t\"web\": \"expo start --web\"\n")
 	b.WriteString("\t},\n")
 	b.WriteString("\t\"dependencies\": {\n")
-	b.WriteString("\t\t\"expo\": " + jsStr(expoVersion) + ",\n")
-	b.WriteString("\t\t\"" + expoStatusBarPkg + "\": " + jsStr(expoStatusBarVer) + ",\n")
-	b.WriteString("\t\t\"nativewind\": " + jsStr(nativeWindVersion) + ",\n")
-	b.WriteString("\t\t\"react\": " + jsStr(reactVersion) + ",\n")
-	b.WriteString("\t\t\"react-native\": " + jsStr(reactNativeVersion) + ",\n")
-	b.WriteString("\t\t\"react-native-safe-area-context\": " + jsStr(rnSafeAreaVersion) + ",\n")
-	b.WriteString("\t\t\"react-native-screens\": " + jsStr(rnScreensVersion) + "\n")
+	for i, d := range deps {
+		sep := ","
+		if i == len(deps)-1 {
+			sep = ""
+		}
+		b.WriteString("\t\t" + jsStr(d[0]) + ": " + jsStr(d[1]) + sep + "\n")
+	}
 	b.WriteString("\t},\n")
 	b.WriteString("\t\"devDependencies\": {\n")
-	b.WriteString("\t\t\"tailwindcss\": \"^3.4.0\"\n")
+	b.WriteString("\t\t\"tailwindcss\": " + jsStr(tailwindCSSVersion) + "\n")
 	b.WriteString("\t}\n")
 	b.WriteString("}\n")
+	return []byte(b.String())
+}
+
+// emitMobileEntry renders index.js — the Expo entry. It registers the root component (registerRootComponent)
+// AND imports "./global.css" FIRST: the NativeWind v4 CSS injection point. Without this import metro never
+// bundles the compiled CSS into the web export, and `npx expo export -p web` ships an unstyled page (the
+// className utilities still style NATIVELY in Expo Go, but the web export needs the CSS linked). The order
+// matters — the CSS import precedes the registration so the stylesheet is in the web bundle's first module.
+func emitMobileEntry(sourceHash string) []byte {
+	var b strings.Builder
+	b.WriteString(header("//", sourceHash))
+	b.WriteString("// The Expo entry. The \"./global.css\" import is the NativeWind v4 CSS injection point: it makes\n")
+	b.WriteString("// metro bundle the compiled utility CSS into the web export (npx expo export -p web). Without it\n")
+	b.WriteString("// the web page renders UNSTYLED (the classes style natively in Expo Go but the web needs the CSS).\n")
+	b.WriteString("import \"./global.css\";\n")
+	b.WriteString("import { registerRootComponent } from \"expo\";\n")
+	b.WriteString("import App from \"./App\";\n")
+	b.WriteString("registerRootComponent(App);\n")
+	return []byte(b.String())
+}
+
+// emitMobileMetroConfig renders metro.config.js — the metro bundler config wrapped by withNativeWind with
+// input "./global.css". withNativeWind installs the metro transformer that compiles the className utility
+// classes to CSS and links the global.css for the web export. Deterministic (no clock, no resolver).
+func emitMobileMetroConfig(sourceHash string) []byte {
+	var b strings.Builder
+	b.WriteString(header("//", sourceHash))
+	b.WriteString("// The metro bundler config wrapped by withNativeWind (input \"./global.css\"): the transformer\n")
+	b.WriteString("// that compiles the className utilities to CSS and links global.css into the web export.\n")
+	b.WriteString("const { getDefaultConfig } = require(\"expo/metro-config\");\n")
+	b.WriteString("const { withNativeWind } = require(\"nativewind/metro\");\n")
+	b.WriteString("\n")
+	b.WriteString("const config = getDefaultConfig(__dirname);\n")
+	b.WriteString("\n")
+	b.WriteString("module.exports = withNativeWind(config, { input: \"./global.css\" });\n")
+	return []byte(b.String())
+}
+
+// emitMobileTailwindConfig renders tailwind.config.js — the nativewind preset + PRECISE content globs.
+// The content globs are rooted at the app's OWN files (./App.tsx, ./*.tsx, ./components/**/*.tsx) so they
+// never recurse into node_modules (the perf warning + the slow scan that a naked ./**/* would cause).
+// Deterministic.
+func emitMobileTailwindConfig(sourceHash string) []byte {
+	var b strings.Builder
+	b.WriteString(header("//", sourceHash))
+	b.WriteString("// The NativeWind preset + PRECISE content globs (rooted at the app's own files — never the\n")
+	b.WriteString("// installed-deps tree, which a naked ./**/* would walk: the perf warning + the slow scan).\n")
+	b.WriteString("/** @type {import('tailwindcss').Config} */\n")
+	b.WriteString("module.exports = {\n")
+	b.WriteString("\tcontent: [\n")
+	b.WriteString("\t\t\"./App.tsx\",\n")
+	b.WriteString("\t\t\"./index.js\",\n")
+	b.WriteString("\t\t\"./*.tsx\",\n")
+	b.WriteString("\t\t\"./components/**/*.tsx\",\n")
+	b.WriteString("\t],\n")
+	b.WriteString("\tpresets: [require(\"nativewind/preset\")],\n")
+	b.WriteString("\ttheme: { extend: {} },\n")
+	b.WriteString("};\n")
 	return []byte(b.String())
 }
 
@@ -153,7 +236,7 @@ func emitMobileList(sec MasterSection, sourceHash string) []byte {
 	fmt.Fprintf(&b, "// Mobile child (Expo): the FlatList SCREEN DERIVED from master section %q. Fields = the section's\n", sec.Entity)
 	b.WriteString("// fields in SOURCE ORDER (the projection of the master, never invented); rows fetched from\n")
 	fmt.Fprintf(&b, "// GET %s via EXPO_PUBLIC_API_URL (the live Hono API). The touch idiom — NOT a web table.\n", route)
-	b.WriteString(`import { useState } from "react";` + "\n")
+	b.WriteString(`import { useEffect, useState } from "react";` + "\n")
 	b.WriteString(`import { ActivityIndicator, FlatList, Text, View } from "react-native";` + "\n\n")
 
 	// The API base, read from the Expo public env (EXPO_PUBLIC_* is inlined by the Expo bundler).
@@ -174,6 +257,12 @@ func emitMobileList(sec MasterSection, sourceHash string) []byte {
 	b.WriteString("\t\t\t.catch((e) => setError(String(e)))\n")
 	b.WriteString("\t\t\t.finally(() => setLoading(false));\n")
 	b.WriteString("\t};\n\n")
+	// Fetch on mount: without this effect `load` is never invoked, `loading` stays true forever and the
+	// screen spins eternally (the rows never arrive). The empty dep array runs it once, like the web child.
+	b.WriteString("\tuseEffect(() => {\n")
+	b.WriteString("\t\tload();\n")
+	b.WriteString("\t\t// eslint-disable-next-line react-hooks/exhaustive-deps\n")
+	b.WriteString("\t}, []);\n\n")
 	b.WriteString("\treturn (\n")
 	fmt.Fprintf(&b, "\t\t<View data-aidos-screen=%s className=\"rounded-lg border border-border bg-card p-4\">\n", jsStr(comp))
 	fmt.Fprintf(&b, "\t\t\t<Text className=\"mb-3 text-sm font-semibold text-foreground\">%s</Text>\n", sec.Entity)
@@ -269,7 +358,10 @@ func emitMobileApp(m MasterView, sourceHash string) []byte {
 	b.WriteString("// (actions). Each Pressable's onInvoke POSTs /<operation> to the live Hono API via\n")
 	b.WriteString("// EXPO_PUBLIC_API_URL (the touch app TRIGGERS the operation end-to-end). FN02-pure.\n")
 	b.WriteString(`import { ScrollView, View } from "react-native";` + "\n")
-	b.WriteString(`import { SafeAreaView } from "react-native-safe-area-context";` + "\n")
+	// SafeAreaProvider MUST wrap the tree: SafeAreaView reads the safe-area context, which only exists
+	// under a provider. Native Expo apps that forget it sometimes still render; react-native-web THROWS
+	// ("No safe area value available") and blanks the whole screen — so the provider is emitted at the root.
+	b.WriteString(`import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";` + "\n")
 	b.WriteString(`import { StatusBar } from "expo-status-bar";` + "\n")
 
 	// Component imports — canonical (sorted) order so the import block is byte-stable.
@@ -334,19 +426,21 @@ func emitMobileApp(m MasterView, sourceHash string) []byte {
 	b.WriteString("/** App — the emitted mobile view: the FlatList screens + the operation-triggering Pressables. */\n")
 	b.WriteString("export default function App() {\n")
 	b.WriteString("\treturn (\n")
-	b.WriteString("\t\t<SafeAreaView className=\"flex-1 bg-background\">\n")
-	b.WriteString("\t\t\t<StatusBar style=\"auto\" />\n")
-	b.WriteString("\t\t\t<ScrollView contentContainerClassName=\"flex flex-col gap-6 p-4\">\n")
-	b.WriteString("\t\t\t\t<View className=\"flex flex-row flex-wrap gap-2\">\n")
+	b.WriteString("\t\t<SafeAreaProvider>\n")
+	b.WriteString("\t\t\t<SafeAreaView className=\"flex-1 bg-background\">\n")
+	b.WriteString("\t\t\t\t<StatusBar style=\"auto\" />\n")
+	b.WriteString("\t\t\t\t<ScrollView contentContainerClassName=\"flex flex-col gap-6 p-4\">\n")
+	b.WriteString("\t\t\t\t\t<View className=\"flex flex-row flex-wrap gap-2\">\n")
 	for _, comp := range btnComps {
-		fmt.Fprintf(&b, "\t\t\t\t\t<%s given={given} onInvoke={(invoke) => { void postOperation(invoke); }} />\n", comp)
+		fmt.Fprintf(&b, "\t\t\t\t\t\t<%s given={given} onInvoke={(invoke) => { void postOperation(invoke); }} />\n", comp)
 	}
-	b.WriteString("\t\t\t\t</View>\n")
+	b.WriteString("\t\t\t\t\t</View>\n")
 	for _, comp := range listComps {
-		fmt.Fprintf(&b, "\t\t\t\t<%s />\n", comp)
+		fmt.Fprintf(&b, "\t\t\t\t\t<%s />\n", comp)
 	}
-	b.WriteString("\t\t\t</ScrollView>\n")
-	b.WriteString("\t\t</SafeAreaView>\n")
+	b.WriteString("\t\t\t\t</ScrollView>\n")
+	b.WriteString("\t\t\t</SafeAreaView>\n")
+	b.WriteString("\t\t</SafeAreaProvider>\n")
 	b.WriteString("\t);\n")
 	b.WriteString("}\n")
 

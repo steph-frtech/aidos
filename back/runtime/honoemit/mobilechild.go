@@ -61,6 +61,21 @@ const (
 	expoStatusBarPkg   = "expo-status-bar"
 	expoStatusBarVer   = "~1.12.1"
 	tailwindCSSVersion = "^3.4.0"
+
+	// The web-export deps. The mobile child is web-exportable out of the box (`npx expo export -p web`):
+	// react-native-web BRIDGES the RN primitives (View/Text/FlatList/Pressable) to the DOM, react-dom
+	// MOUNTS the bridged tree, @expo/metro-runtime is the Expo web runtime, react-native-worklets is the
+	// reanimated worklets plugin that babel-preset-expo's `jsxImportSource: nativewind` pipeline
+	// references (its absence breaks the web bundle). Pinned to the Expo SDK 51 web toolchain.
+	reactNativeWebVersion = "~0.19.10"
+	expoMetroRuntimeVer   = "~3.2.1"
+	rnWorkletsVersion     = "^0.9.2"
+
+	// reactMobileVersion is the React version the Expo SDK 51 / RN 0.74 toolchain expects. It is pinned
+	// EXACTLY (no caret) and is DISTINCT from the web child's reactVersion (^19.1.0): Expo 51 ships React
+	// 18.3.1, and react + react-dom MUST match it or the metro web bundle breaks. react-dom is pinned to
+	// the same version (the DOM renderer the web export mounts with).
+	reactMobileVersion = "18.3.1"
 )
 
 // MobileAdaptation is the per-platform OVERRIDE point the mobile child carries — the capitalisable
@@ -145,7 +160,16 @@ func EmitMobileChildAdapted(m MasterView, adapt MobileAdaptation) (MobileChild, 
 		artifact(dir+"app.json", TargetMobileApp, emitExpoAppJSON(m, adapt, sourceHash), sourceHash),
 		artifact(dir+"babel.config.js", TargetMobileApp, emitExpoBabelConfig(sourceHash), sourceHash),
 		artifact(dir+"global.css", TargetMobileApp, emitMobileGlobalCSS(sourceHash), sourceHash),
+		// index.js is the Expo entry. It registers the root component AND imports "./global.css" — the
+		// NativeWind v4 CSS injection point: without this import metro never bundles the compiled CSS into
+		// the web export, and `npx expo export -p web` ships an unstyled page.
+		artifact(dir+"index.js", TargetMobileApp, emitMobileEntry(sourceHash), sourceHash),
+		// metro.config.js wires withNativeWind(config, { input: "./global.css" }) — the metro transformer
+		// that compiles the className utilities to CSS for the web export.
+		artifact(dir+"metro.config.js", TargetMobileApp, emitMobileMetroConfig(sourceHash), sourceHash),
 		artifact(dir+"package.json", TargetMobileApp, emitMobilePackageJSON(m, sourceHash), sourceHash),
+		// tailwind.config.js carries the nativewind preset + PRECISE content globs (never node_modules).
+		artifact(dir+"tailwind.config.js", TargetMobileApp, emitMobileTailwindConfig(sourceHash), sourceHash),
 	}
 
 	// One FlatList SCREEN per section (fields = the section's fields in source order).

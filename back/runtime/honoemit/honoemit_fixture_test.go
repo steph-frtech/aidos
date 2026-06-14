@@ -128,6 +128,15 @@ const dispatcher = {
 out.dispatchedCount = await dispatchSendReceipt(outbox as any, dispatcher as any);
 out.dispatchedTarget = dispatchedTarget;
 
+// 4. CORS — a cross-origin child (mobile/desktop, separate origin) sends a preflight; the API
+// must answer it with access-control-allow-origin (ADR 0040 multi-platform). Without it the
+// browser blocks the mobile child's fetch to the same backend the web child uses.
+const preflight = await app.request("/entities/order", {
+  method: "OPTIONS",
+  headers: { origin: "https://shopapp-mobile-dev.example", "access-control-request-method": "GET" },
+});
+out.corsAllowOrigin = preflight.headers.get("access-control-allow-origin") ?? "";
+
 process.stdout.write(JSON.stringify(out));
 `
 	write(t, filepath.Join(dir, "harness.ts"), []byte(harness))
@@ -149,6 +158,7 @@ process.stdout.write(JSON.stringify(out));
 		OpBody           map[string]any `json:"opBody"`
 		DispatchedCount  int            `json:"dispatchedCount"`
 		DispatchedTarget string         `json:"dispatchedTarget"`
+		CorsAllowOrigin  string         `json:"corsAllowOrigin"`
 	}
 	if err := json.Unmarshal(stdout, &res); err != nil {
 		t.Fatalf("harness output not JSON: %v\nraw: %s", err, stdout)
@@ -165,6 +175,10 @@ process.stdout.write(JSON.stringify(out));
 	// THEN: the async worker dispatched exactly one job.
 	if res.DispatchedCount != 1 || res.DispatchedTarget != "t" {
 		t.Fatalf("async worker did not process the job: count=%d target=%q", res.DispatchedCount, res.DispatchedTarget)
+	}
+	// THEN: the cross-origin preflight is answered (multi-platform children reach the API, ADR 0040).
+	if res.CorsAllowOrigin == "" {
+		t.Fatalf("emitted server did not answer the cross-origin preflight: access-control-allow-origin empty")
 	}
 }
 

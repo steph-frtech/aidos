@@ -50,8 +50,9 @@ func honoDefaultManifest(project string) honoemit.StackManifest {
 		App: project,
 		Services: []honoemit.Service{
 			// Placeholder images — EmitPulumiStackHono REWRITES them by role (opts.HonoImage /
-			// InterpreterImage). MaterialiseHono sets opts.HonoImage to the per-project tag
-			// (<project>-hono:latest) so the server runs THIS project's routes, not the generic image.
+			// InterpreterImage). MaterialiseHono sets opts.HonoImage to the per-project CONTENT-ADDRESSED
+			// tag (<project>-hono:<hash12>) so the server runs THIS project's routes (and a code change
+			// yields a new tag → Pulumi recreates the container), never the generic image.
 			{Name: "server", Role: honoemit.RoleServer, Image: "aidos-hono:latest", InternalPort: 3000},
 			{Name: "interpreter", Role: honoemit.RoleInterpreter, Image: "aidos-interpreter:latest", InternalPort: 8080},
 			{Name: "db", Role: honoemit.RoleDatastore, Image: "postgres:16-alpine", InternalPort: 5432},
@@ -61,10 +62,51 @@ func honoDefaultManifest(project string) honoemit.StackManifest {
 	}
 }
 
-// honoServerImageTag is the deterministic per-project server image tag (<project>-hono:latest) the
-// scaffold builds into and the manifest references. One source of truth shared by the manifest and
-// the build gesture so they never drift.
-func honoServerImageTag(project string) string { return project + "-hono:latest" }
+// honoServerImageTag is the deterministic, CONTENT-ADDRESSED per-project server image tag the scaffold
+// builds into and the manifest references: `<project>-hono:<hash[:12]>`. The ref is the first 12 hex of
+// the SERVER SOURCE hash, so a change to the project's server source (a new op, a flipped WebDir) yields
+// a NEW tag — an IMMUTABLE content address, never the mutable `:latest`.
+//
+// Why this is the fix (S02 content-addressing): Pulumi keys the `server` container on this tag STRING.
+// With `:latest` the string never changes, so a code change leaves the input unchanged — `up` reports
+// "replaced" yet keeps the stale image (the container never runs the new code). A content-addressed tag
+// changes with the source, so Pulumi sees a changed input and RECREATES the container with the new code.
+//
+// PURE function of (project, hash): same inputs → same tag (reproducibility), distinct hashes → distinct
+// tags (content-addressing). The mirror imagetag_hono_test.go seals both. The truncation length (12 hex)
+// matches the S02/honoemit convention (sourceHash[:12]); a SHORTER hash is used verbatim (never padded).
+func honoServerImageTag(project, hash string) string {
+	ref := hash
+	if len(ref) > 12 {
+		ref = ref[:12]
+	}
+	return project + "-hono:" + ref
+}
+
+// serverSpecImageTag content-addresses the per-project server image tag from a SERVER SPEC: it hashes
+// the spec (ServerSourceHash — the SAME content address the emitted scaffold carries) and tags
+// `<project>-hono:<hash12>`. It is the ONE source of truth for the tag, called by both the
+// project-cut path (projectServerImageTag, the materialiser) and the genome path (found.go's recompile),
+// so the materialised program and the recompiled program reference byte-identical tags. A hash failure
+// falls back to the mutable `:latest` so the deploy still proceeds (the spec validation upstream already
+// refuses a malformed cut, so this is unreachable on the happy path; the staleness on that degenerate
+// path is the lesser evil). DETERMINISM-FIRST: a pure projection of the spec.
+func serverSpecImageTag(project string, spec honoemit.ServerSpec) string {
+	hash, err := honoemit.ServerSourceHash(spec)
+	if err != nil {
+		return project + "-hono:latest"
+	}
+	return honoServerImageTag(project, hash)
+}
+
+// projectServerImageTag is the per-project server image tag the materialiser/executor propagate: it
+// content-addresses the tag from the project's SERVER SPEC (the SAME projectServerSpec the scaffold is
+// emitted from). One source of truth shared by MaterialiseHono (which sets opts.HonoImage so the Pulumi
+// program references it) and BuildHonoServerImage (which builds the scaffold under that tag) — they never
+// drift. DETERMINISM-FIRST: a pure projection of the spec.
+func projectServerImageTag(project string) string {
+	return serverSpecImageTag(project, projectServerSpec(project))
+}
 
 // interpreterImageTag is the shared sidecar interpreter image tag. The manifest references it and the
 // ensure-image gesture builds it (from cmd/aidosinterpreter/Dockerfile). One source of truth.
@@ -142,10 +184,12 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath string) (Materia
 		return Materialised{}, fmt.Errorf("create %s: %w", dir, err)
 	}
 
-	// The server runs the PER-PROJECT image (<project>-hono:latest), built from the emitted scaffold
-	// below. EmitPulumiStackHono rewrites the role=server image to this, so the wired Pulumi program
-	// references the project's own routes — never the generic aidos-hono:latest placeholder.
-	opts := honoemit.StackHonoOpts{HonoImage: honoServerImageTag(project)}
+	// The server runs the PER-PROJECT, CONTENT-ADDRESSED image (<project>-hono:<hash12>), built from the
+	// emitted scaffold below. EmitPulumiStackHono rewrites the role=server image to this, so the wired
+	// Pulumi program references the project's own routes — never the generic aidos-hono:latest placeholder,
+	// and never the mutable :latest tag (so a code change → a new hash → a new tag → Pulumi RECREATES the
+	// container, closing the staleness gap the `:latest` tag caused).
+	opts := honoemit.StackHonoOpts{HonoImage: projectServerImageTag(project)}
 
 	// (a) Optional project DATA: emit the schema (+ seed) into the stack dir — what postgres mounts.
 	if entitiesPath != "" {
@@ -289,16 +333,18 @@ func projectWebSpec(project string) honoemit.WebAppSpec {
 }
 
 // BuildHonoServerImage is the GATED docker gesture (the side-effecting half of "build the per-project
-// Hono image"): it runs `docker build -t <project>-hono:latest <serverDir>` over the emitted scaffold
+// Hono image"): it runs `docker build -t <project>-hono:<hash12> <serverDir>` over the emitted scaffold
 // so the `server` container runs the PROJECT'S OWN routes, not the generic aidos-hono:latest. It
 // JUDGES nothing — it builds exactly the deterministic scaffold MaterialiseHono landed. It is invoked
 // by the executor (PulumiUpHono), never by the pure materialiser, so the unit mirror stays docker-free.
-// The image tag is deterministic (<project>-hono:latest); the build is the gated effect.
+// The image tag is the CONTENT-ADDRESSED per-project tag (projectServerImageTag) — the SAME tag the
+// wired Pulumi program references (opts.HonoImage), so the build and the program never drift; the build
+// is the gated effect. A code change → a new source hash → a new tag → a freshly-built, recreated image.
 func BuildHonoServerImage(project, serverDir string) (string, error) {
 	if serverDir == "" {
 		return "", errors.New("BuildHonoServerImage: no scaffold dir (run MaterialiseHono first)")
 	}
-	tag := honoServerImageTag(project)
+	tag := projectServerImageTag(project)
 	cmd := exec.Command("docker", "build", "-t", tag, serverDir)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("docker build %s: %w\n%s", tag, err, out)

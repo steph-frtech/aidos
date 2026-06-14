@@ -30,14 +30,18 @@ func TestMaterialiseHono_WiresThreeContainers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read index.ts: %v", err)
 	}
+	// The server runs the PER-PROJECT, CONTENT-ADDRESSED image (<project>-hono:<hash12>), built from the
+	// emitted scaffold — never the generic image, never the mutable :latest tag. A code change → a new
+	// source hash → a new tag → Pulumi recreates the container (the staleness fix). The tag is computed
+	// from the SAME source-of-truth function the materialiser/build gesture use, so the test never drifts.
+	wantServerTag := projectServerImageTag("shop")
 	for _, want := range []string{
 		`name: "shop-dev-server"`,
 		`name: "shop-dev-interpreter"`,
 		`name: "shop-dev-db"`,
 		"INTERPRETER_URL=http://shop-dev-interpreter:8080",
 		"DATABASE_URL=postgres://app:shop@shop-dev-db:5432/shop?sslmode=disable",
-		// The server runs the PER-PROJECT image (built from the emitted scaffold), not the generic one.
-		"shop-hono:latest",
+		wantServerTag,
 		"aidos-interpreter:latest",
 		"pg_isready",
 	} {
@@ -45,9 +49,16 @@ func TestMaterialiseHono_WiresThreeContainers(t *testing.T) {
 			t.Fatalf("index.ts missing %q:\n%s", want, string(idx))
 		}
 	}
+	// The server tag is content-addressed: <project>-hono:<12 hex>, NOT the mutable :latest.
+	if contains(wantServerTag, ":latest") {
+		t.Fatalf("the per-project server tag is still :latest (mutable): %q", wantServerTag)
+	}
+	if !contains(wantServerTag, "shop-hono:") {
+		t.Fatalf("the per-project server tag is not <project>-hono:<hash>: %q", wantServerTag)
+	}
 	// The generic placeholder must NOT appear — the per-project image replaced it (gap #3 closed).
 	if contains(string(idx), "aidos-hono:latest") {
-		t.Fatalf("the generic aidos-hono:latest leaked into the program; expected shop-hono:latest:\n%s", string(idx))
+		t.Fatalf("the generic aidos-hono:latest leaked into the program; expected %s:\n%s", wantServerTag, string(idx))
 	}
 	// The per-project server scaffold landed under server/ (server.ts/index.ts/package.json/Dockerfile).
 	for _, base := range []string{"server.ts", "index.ts", "package.json", "Dockerfile"} {

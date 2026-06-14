@@ -107,6 +107,15 @@ func TestEmitMobileChild_IsAnExpoApp(t *testing.T) {
 	if strings.Contains(app, "createRoot") || strings.Contains(app, "react-dom") {
 		t.Fatalf("App.tsx leaks the WEB mount (react-dom/createRoot) — the mobile mount is RN")
 	}
+	// The safe-area context MUST be provided at the root: App uses SafeAreaView, which reads the
+	// safe-area context; without a <SafeAreaProvider> wrapping it, react-native-web throws "No safe
+	// area value available" and blanks the screen. The provider must import AND wrap the tree.
+	if !strings.Contains(app, "SafeAreaProvider") {
+		t.Fatalf("App.tsx uses SafeAreaView without a SafeAreaProvider — the web export blanks (no safe-area context)")
+	}
+	if !strings.Contains(app, "<SafeAreaProvider>") || !strings.Contains(app, "</SafeAreaProvider>") {
+		t.Fatalf("App.tsx imports SafeAreaProvider but does not WRAP the tree with it")
+	}
 
 	// The web/desktop idioms must NOT leak into the mobile child.
 	for _, a := range arts {
@@ -145,6 +154,11 @@ func TestEmitMobileChild_SectionIsFlatListNotTable(t *testing.T) {
 		}
 		if !strings.Contains(list, "/entities/"+strings.ToLower(sec.Entity)) {
 			t.Fatalf("%s must fetch GET /entities/%s; got %q", sec.Entity, strings.ToLower(sec.Entity), firstNLines(list, 30))
+		}
+		// It MUST fetch ON MOUNT (useEffect) — otherwise `load` is never called, `loading` stays true
+		// forever and the screen spins eternally (the bug that blanked the rows on the live demo).
+		if !strings.Contains(list, "useEffect") {
+			t.Fatalf("%s defines load() but never calls it on mount (no useEffect) — the screen spins forever; got %q", sec.Entity, firstNLines(list, 30))
 		}
 		// Fields = the section's fields IN SOURCE ORDER (the projection of the master, never invented).
 		lastIdx := -1
@@ -240,6 +254,99 @@ func TestEmitMobileChild_DistinctFromWeb(t *testing.T) {
 	}
 	if sameComponentCompared == 0 {
 		t.Fatalf("expected at least one same-named .tsx (OrderList) to compare web vs mobile")
+	}
+}
+
+// TestEmitMobileChild_IsWebExportable — le mobile child émis est un projet Expo WEB-EXPORTABLE
+// COMPLET out-of-the-box (npx expo export -p web). Le bug d'origine : les className NativeWind
+// s'émettaient bien (elles stylent NATIVEMENT dans Expo Go) MAIS `expo export -p web` ne LIAIT
+// aucun CSS compilé dans index.html → page non stylée. La recette complète (la maquette qui tourne
+// déjà sous /tmp/shopapp-found) est portée dans l'émetteur :
+//
+//	(i)   app.json     : platforms inclut "web" + web.bundler == "metro" ;
+//	(ii)  package.json : react-native-web ET react-dom ET @expo/metro-runtime ET
+//	                     react-native-worklets (le plugin que jsxImportSource:nativewind référence) ;
+//	(iii) l'entrée (index.js) importe "./global.css" — LE POINT CLÉ de l'injection CSS NativeWind v4 ;
+//	(iv)  metro.config.js : withNativeWind(config, { input: "./global.css" }) ;
+//	(v)   tailwind.config.js : preset nativewind/preset + content globs PRÉCIS qui ne matchent PAS
+//	      node_modules (évite le warning perf + la lenteur).
+func TestEmitMobileChild_IsWebExportable(t *testing.T) {
+	m := masterOf(t)
+	child, br := EmitMobileChild(m)
+	if br != nil {
+		t.Fatalf("EmitMobileChild refused: %s", br.Explanation)
+	}
+	arts := child.Artifacts
+
+	// (i) app.json carries the "web" platform + the metro bundler (so `expo export -p web` runs).
+	appJSON := string(findArt(t, arts, "app.json").Bytes)
+	if !strings.Contains(appJSON, "\"web\"") {
+		t.Fatalf("app.json must include the \"web\" platform for web export; got %q", appJSON)
+	}
+	if !strings.Contains(appJSON, "\"bundler\": \"metro\"") {
+		t.Fatalf("app.json must set web.bundler == \"metro\"; got %q", appJSON)
+	}
+
+	// (ii) package.json carries the four web-export deps (react-native-web bridges RN→web, react-dom
+	// mounts it, @expo/metro-runtime is the web runtime, react-native-worklets is the plugin the
+	// babel-preset-expo jsxImportSource:nativewind pipeline references).
+	pkg := string(findArt(t, arts, "package.json").Bytes)
+	for _, dep := range []string{"react-native-web", "react-dom", "@expo/metro-runtime", "react-native-worklets"} {
+		if !strings.Contains(pkg, "\""+dep+"\"") {
+			t.Fatalf("package.json missing the web-export dep %q; got %q", dep, pkg)
+		}
+	}
+	// react + react-dom must be the SAME version Expo SDK 51 / RN 0.74 expects (18.3.1), NOT React 19
+	// (the web child's version). A mismatch breaks the Expo metro web bundle.
+	if !strings.Contains(pkg, "\"react\": \"18.3.1\"") {
+		t.Fatalf("package.json must pin react to 18.3.1 (Expo SDK 51 / RN 0.74); got %q", pkg)
+	}
+	if !strings.Contains(pkg, "\"react-dom\": \"18.3.1\"") {
+		t.Fatalf("package.json must pin react-dom to 18.3.1 (aligned with react); got %q", pkg)
+	}
+
+	// (iii) the entry (index.js) imports "./global.css" — without this NativeWind v4 never bundles the
+	// CSS, and the web export ships an unstyled page. THE key fix of the CSS injection.
+	idx := string(findArt(t, arts, "index.js").Bytes)
+	if !strings.Contains(idx, "./global.css") {
+		t.Fatalf("the entry (index.js) must import \"./global.css\" (NativeWind v4 CSS injection); got %q", idx)
+	}
+	// The "main" field of package.json must point at the emitted entry (coherent entry).
+	if !strings.Contains(pkg, "\"main\": \"index.js\"") {
+		t.Fatalf("package.json \"main\" must be the emitted entry index.js; got %q", pkg)
+	}
+
+	// (iv) metro.config.js wires withNativeWind with input ./global.css.
+	metro := string(findArt(t, arts, "metro.config.js").Bytes)
+	if !strings.Contains(metro, "withNativeWind") {
+		t.Fatalf("metro.config.js must call withNativeWind; got %q", metro)
+	}
+	if !strings.Contains(metro, "\"./global.css\"") {
+		t.Fatalf("metro.config.js must pass input \"./global.css\" to withNativeWind; got %q", metro)
+	}
+
+	// (v) tailwind.config.js uses the nativewind preset and PRECISE content globs that never match
+	// node_modules (the perf warning + the slowness). The content array must not contain a glob that
+	// matches node_modules (no bare "./**/*" that would recurse into node_modules).
+	tw := string(findArt(t, arts, "tailwind.config.js").Bytes)
+	if !strings.Contains(tw, "nativewind/preset") {
+		t.Fatalf("tailwind.config.js must use the nativewind/preset; got %q", tw)
+	}
+	if strings.Contains(tw, "node_modules") {
+		t.Fatalf("tailwind.config.js content must NOT reference node_modules; got %q", tw)
+	}
+	// A bare recursive glob (./**/*) would walk node_modules — the precise globs must be rooted at the
+	// app's own files (./App.tsx, ./*.tsx, ./components/**/*.tsx). Assert no naked "./**/*".
+	if strings.Contains(tw, "\"./**/*") {
+		t.Fatalf("tailwind.config.js must use PRECISE globs (no naked ./**/* that walks node_modules); got %q", tw)
+	}
+
+	// global.css still carries the three @tailwind directives (the utilities NativeWind compiles).
+	css := string(findArt(t, arts, "global.css").Bytes)
+	for _, dir := range []string{"@tailwind base", "@tailwind components", "@tailwind utilities"} {
+		if !strings.Contains(css, dir) {
+			t.Fatalf("global.css missing %q; got %q", dir, css)
+		}
 	}
 }
 

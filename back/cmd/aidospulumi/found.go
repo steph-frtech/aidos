@@ -216,10 +216,13 @@ func recompileFamilies(tree ProjectTree, want map[Family]bool) ([]FoundFile, err
 	}
 
 	// (7) infra — the Pulumi PROGRAM (the 3-container wired stack, from the genome's manifest). The
-	// per-project server image tag is the SAME the materialiser pins (honoServerImageTag), so the program
-	// references the project's own routes — the recompiled program byte-equals the materialised one.
+	// per-project server image tag is the CONTENT-ADDRESSED tag derived from the genome's OWN server spec
+	// (serverSpecImageTag over foundServerSpec) — the SAME content address the materialiser pins, so the
+	// recompiled program byte-equals the materialised one (and a code change yields a new tag → Pulumi
+	// recreates the container).
 	if want[FamilyInfra] {
-		infra, br := honoemit.EmitPulumiStackHono(tree.Name, foundEnv, tree.StackManifest, honoemit.StackHonoOpts{HonoImage: honoServerImageTag(tree.Name)})
+		serverTag := serverSpecImageTag(tree.Name, foundServerSpec(tree))
+		infra, br := honoemit.EmitPulumiStackHono(tree.Name, foundEnv, tree.StackManifest, honoemit.StackHonoOpts{HonoImage: serverTag})
 		if br != nil {
 			return nil, fmt.Errorf("found: recompile pulumi stack (%s): %s", br.Code, br.Explanation)
 		}
