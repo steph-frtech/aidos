@@ -43,6 +43,7 @@ describe("la grammaire d'intentions — un jeu CLOS, déclaré", () => {
 			"impacter",
 			"interroger",
 			"ouvrir",
+			"adapter",
 		]);
 	});
 

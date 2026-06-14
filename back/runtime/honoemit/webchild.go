@@ -101,3 +101,29 @@ func EmitWebChild(s WebAppSpec) (WebChild, *blockreason.BlockReason) {
 		Artifacts:  arts,
 	}, nil
 }
+
+// EmitWebChildAdapted is the web child's FIRST adaptation point (ADR 0071 cost (a)): it derives the
+// web child applying a ScreenDesign override (AdaptationOverride.Screen — per-coordinate ADR-0010
+// style tokens). The override re-styles the matching data-aidos-* elements (a nil/empty Screen leaves
+// EVERY artifact BYTE-IDENTICAL to EmitWebApp — the anti-drift property mirror (c) pins it). The
+// ParentID stays the MASTER (the override is platform-styling, never a new requirement). A malformed
+// spec is the SAME typed BlockReason EmitWebApp returns, never a partial child.
+//
+// This is the loopback's web reproduction seam: ReproduceScreen(ChildWeb) calls it with the resolved
+// overrides; EmitWebApp calls the SAME shared body with no override (so the two never drift).
+func EmitWebChildAdapted(s WebAppSpec, adapt AdaptationOverride) (WebChild, *blockreason.BlockReason) {
+	parentID, br := MasterViewHash(s)
+	if br != nil {
+		return WebChild{}, br
+	}
+	arts, br := emitWebAppOverridden(s, adapt.screenOverrides())
+	if br != nil {
+		return WebChild{}, br
+	}
+	return WebChild{
+		Target:     ChildWeb,
+		ParentID:   parentID,
+		MasterHash: parentID,
+		Artifacts:  arts,
+	}, nil
+}

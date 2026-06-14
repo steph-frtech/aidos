@@ -384,8 +384,10 @@ func TestEmitMobileChild_CarriesAdaptationPoint(t *testing.T) {
 	if baseAppJSON == appJSON {
 		t.Fatalf("the adaptation did not change any byte (no per-platform adaptation point)")
 	}
-	// The default child carries the empty adaptation (the capitalisable override slot).
-	if base.Adaptation != (MobileAdaptation{}) {
+	// The default child carries the empty adaptation (the capitalisable override slot). The
+	// MobileAdaptation now holds a Screen *ScreenOverride (ADR 0071, additive) so it is no longer
+	// == comparable; check the exported override fields are all zero.
+	if base.Adaptation.AppName != "" || base.Adaptation.Screen != nil {
 		t.Fatalf("default mobile child carries a non-empty adaptation: %+v", base.Adaptation)
 	}
 }

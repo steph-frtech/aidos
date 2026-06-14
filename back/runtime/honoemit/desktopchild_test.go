@@ -289,8 +289,10 @@ func TestEmitDesktopChild_CarriesAdaptationPoint(t *testing.T) {
 	if baseMain == main {
 		t.Fatalf("the adaptation did not change any byte (no per-platform adaptation point)")
 	}
-	// The default child carries the empty adaptation (the capitalisable override slot).
-	if base.Adaptation != (DesktopAdaptation{}) {
+	// The default child carries the empty adaptation (the capitalisable override slot). The
+	// DesktopAdaptation now holds a Screen *ScreenOverride (ADR 0071, additive) so it is no longer
+	// == comparable; check the exported override fields are all zero.
+	if base.Adaptation.WindowTitle != "" || base.Adaptation.Screen != nil {
 		t.Fatalf("default desktop child carries a non-empty adaptation: %+v", base.Adaptation)
 	}
 }

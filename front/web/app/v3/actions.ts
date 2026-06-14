@@ -25,6 +25,7 @@ const PALETTE: readonly string[] = [
 	"quel impact si je modifie <chemin>",
 	"montre-moi l'état du projet",
 	"ouvre l'écran <nom>",
+	"adapte <coord> : <property>=<token>",
 ];
 
 /** Extrait l'objet JSON d'une réponse de modèle qui peut porter de la prose / des fences. */

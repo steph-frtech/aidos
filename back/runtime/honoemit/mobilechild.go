@@ -88,6 +88,26 @@ type MobileAdaptation struct {
 	// AppName overrides the displayed Expo app name (app.json `expo.name`). Empty → the project name
 	// (the canonical default). A per-platform label tweak — it never alters the master requirement.
 	AppName string `json:"app_name,omitempty"`
+	// Screen is the NEW ScreenDesign override (ADR 0071) — per-coordinate ADR-0010 style tokens applied
+	// to the matching data-aidos-screen / data-aidos-field / data-aidos-invoke element at RENDER time.
+	// NIL → the canonical form UNCHANGED (anti-overwrite §9, byte-identity preserved). The single
+	// documented coordinate; the full multi-coordinate set rides screenAll (ReproduceScreen).
+	Screen *ScreenOverride `json:"screen,omitempty"`
+	// screenAll carries the FULL resolved override set for a multi-coordinate ScreenDesign reproduction.
+	// UNEXPORTED + excluded from the content address: the styling is a RENDER-time class change, not a
+	// structural source change.
+	screenAll []ScreenOverride
+}
+
+// screenOverrides returns the effective override set the mobile renderers apply. PURE.
+func (a MobileAdaptation) screenOverrides() []ScreenOverride {
+	if len(a.screenAll) > 0 {
+		return a.screenAll
+	}
+	if a.Screen != nil {
+		return []ScreenOverride{*a.Screen}
+	}
+	return nil
 }
 
 // MobileChild is the MOBILE CHILD of the master view: the Expo / React-Native artifacts (the touch
@@ -154,9 +174,13 @@ func EmitMobileChildAdapted(m MasterView, adapt MobileAdaptation) (MobileChild, 
 		return MobileChild{}, &br
 	}
 
+	overrides := adapt.screenOverrides()
+
 	dir := "gen/" + m.Project + "/mobile/"
 	arts := []Artifact{
 		artifact(dir+"aidos-expr.ts", TargetMobileApp, []byte(exprTwinSource), sourceHash),
+		// aidos-bridge.ts — the Design Lab runtime (ADR 0071), embedded verbatim (calque aidos-expr.ts).
+		artifact(dir+"aidos-bridge.ts", TargetMobileApp, []byte(aidosBridgeSource), sourceHash),
 		artifact(dir+"app.json", TargetMobileApp, emitExpoAppJSON(m, adapt, sourceHash), sourceHash),
 		artifact(dir+"babel.config.js", TargetMobileApp, emitExpoBabelConfig(sourceHash), sourceHash),
 		artifact(dir+"global.css", TargetMobileApp, emitMobileGlobalCSS(sourceHash), sourceHash),
@@ -172,14 +196,15 @@ func EmitMobileChildAdapted(m MasterView, adapt MobileAdaptation) (MobileChild, 
 		artifact(dir+"tailwind.config.js", TargetMobileApp, emitMobileTailwindConfig(sourceHash), sourceHash),
 	}
 
-	// One FlatList SCREEN per section (fields = the section's fields in source order).
+	// One FlatList SCREEN per section (fields = the section's fields in source order). The screen
+	// overrides re-style the matching data-aidos-screen / data-aidos-field (nil → bytes unchanged).
 	for _, sec := range m.Sections {
-		arts = append(arts, artifact(dir+pascal(sec.Entity)+"List.tsx", TargetMobileApp, emitMobileList(sec, sourceHash), sourceHash))
+		arts = append(arts, artifact(dir+pascal(sec.Entity)+"List.tsx", TargetMobileApp, emitMobileList(sec, sourceHash, overrides), sourceHash))
 	}
 
 	// One Pressable per action — evaluating the Expr twin client-side, POSTing /<operation> via onInvoke.
 	for _, act := range m.Actions {
-		arts = append(arts, artifact(dir+pascal(act.Control)+".tsx", TargetMobileApp, emitMobilePressable(act, sourceHash), sourceHash))
+		arts = append(arts, artifact(dir+pascal(act.Control)+".tsx", TargetMobileApp, emitMobilePressable(act, sourceHash, overrides), sourceHash))
 	}
 
 	// The App composition (FlatLists + Pressables, wired to POST /<operation> against EXPO_PUBLIC_API_URL).

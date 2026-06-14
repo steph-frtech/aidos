@@ -226,10 +226,13 @@ func emitMobileGlobalCSS(sourceHash string) []byte {
 // field IN SOURCE ORDER (the projection of the section, never invented). The form is NativeWind
 // token classes (no hardcoded hex). FN02-pure: the rows live in a useState inside the component. The
 // RN idiom (FlatList/View/Text), DISTINCT from the web <table>.
-func emitMobileList(sec MasterSection, sourceHash string) []byte {
+func emitMobileList(sec MasterSection, sourceHash string, overrides []ScreenOverride) []byte {
 	comp := pascal(sec.Entity) + "List"
 	route := "/entities/" + strings.ToLower(sec.Entity)
 	fields := sec.Fields
+	// The screen overrides (ADR 0071) re-style the matching coordinate (drift: screen=section,
+	// field=field). A nil/empty set (or no matching coordinate) yields "" → bytes unchanged (§9).
+	screenClass := screenClassSuffix(overrides, sectionCoord(sec.Entity))
 
 	var b strings.Builder
 	b.WriteString(header("//", sourceHash))
@@ -264,7 +267,7 @@ func emitMobileList(sec MasterSection, sourceHash string) []byte {
 	b.WriteString("\t\t// eslint-disable-next-line react-hooks/exhaustive-deps\n")
 	b.WriteString("\t}, []);\n\n")
 	b.WriteString("\treturn (\n")
-	fmt.Fprintf(&b, "\t\t<View data-aidos-screen=%s className=\"rounded-lg border border-border bg-card p-4\">\n", jsStr(comp))
+	fmt.Fprintf(&b, "\t\t<View data-aidos-screen=%s className=\"rounded-lg border border-border bg-card p-4%s\">\n", jsStr(comp), screenClass)
 	fmt.Fprintf(&b, "\t\t\t<Text className=\"mb-3 text-sm font-semibold text-foreground\">%s</Text>\n", sec.Entity)
 	b.WriteString("\t\t\t{loading ? (\n")
 	b.WriteString("\t\t\t\t<ActivityIndicator />\n")
@@ -280,7 +283,8 @@ func emitMobileList(sec MasterSection, sourceHash string) []byte {
 	// One Text row per field, in source order, carrying data-aidos-field=<field> (the testable mirror
 	// of the section's fields — the count + order asserted by the fixture). NOT a <td>.
 	for _, f := range fields {
-		fmt.Fprintf(&b, "\t\t\t\t\t\t\t<View data-aidos-field=%s className=\"flex flex-row justify-between gap-2\">\n", jsStr(f))
+		fieldClass := screenClassSuffix(overrides, fieldCoord(sec.Entity, f))
+		fmt.Fprintf(&b, "\t\t\t\t\t\t\t<View data-aidos-field=%s className=\"flex flex-row justify-between gap-2%s\">\n", jsStr(f), fieldClass)
 		fmt.Fprintf(&b, "\t\t\t\t\t\t\t\t<Text className=\"text-xs uppercase text-muted-foreground\">%s</Text>\n", f)
 		fmt.Fprintf(&b, "\t\t\t\t\t\t\t\t<Text className=\"text-sm text-foreground\">{String(item[%s] ?? \"\")}</Text>\n", jsStr(f))
 		b.WriteString("\t\t\t\t\t\t\t</View>\n")
@@ -301,7 +305,7 @@ func emitMobileList(sec MasterSection, sourceHash string) []byte {
 // catalogue the web/desktop use), shows only when visible, is touchable only when enabled, and calls
 // onInvoke(<operation>) on press. The operation is the action's Invoke verbatim (never invented). The
 // touch idiom (Pressable + NativeWind), DISTINCT from the web <button>.
-func emitMobilePressable(act MasterAction, sourceHash string) []byte {
+func emitMobilePressable(act MasterAction, sourceHash string, overrides []ScreenOverride) []byte {
 	comp := pascal(act.Control)
 	vw := act.VisibleWhen
 	if vw == "" {
@@ -311,6 +315,8 @@ func emitMobilePressable(act MasterAction, sourceHash string) []byte {
 	if ew == "" {
 		ew = "true"
 	}
+	// The action coordinate (drift: invoke→action). A nil/empty override yields "" → bytes unchanged.
+	actionClass := screenClassSuffix(overrides, actionCoord("", act.Control))
 
 	var b strings.Builder
 	b.WriteString(header("//", sourceHash))
@@ -337,7 +343,7 @@ func emitMobilePressable(act MasterAction, sourceHash string) []byte {
 	fmt.Fprintf(&b, "\t\t\taccessibilityLabel=%s\n", jsStr(comp))
 	b.WriteString("\t\t\tdisabled={!state.enabled}\n")
 	b.WriteString("\t\t\tonPress={() => { if (state.enabled) onInvoke(INVOKE); }}\n")
-	b.WriteString("\t\t\tclassName={state.enabled ? \"rounded-md bg-primary px-4 py-2\" : \"rounded-md bg-muted px-4 py-2 opacity-50\"}\n")
+	fmt.Fprintf(&b, "\t\t\tclassName={state.enabled ? \"rounded-md bg-primary px-4 py-2%s\" : \"rounded-md bg-muted px-4 py-2 opacity-50%s\"}\n", actionClass, actionClass)
 	b.WriteString("\t\t>\n")
 	fmt.Fprintf(&b, "\t\t\t<Text className=\"text-sm font-medium text-primary-foreground\">%s</Text>\n", comp)
 	b.WriteString("\t\t</Pressable>\n")

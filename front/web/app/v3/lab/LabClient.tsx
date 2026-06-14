@@ -40,6 +40,7 @@ const INTENT_LABELS: Record<IntentKind, string> = {
 	impacter: "intentImpacter",
 	interroger: "intentInterroger",
 	ouvrir: "intentOuvrir",
+	adapter: "intentAdapter",
 };
 
 /** Le verbe FORT canonique par intention — le préfixe de désambiguïsation (motif /v2/builder). */
@@ -53,6 +54,7 @@ const FORCE_PREFIX: Record<IntentKind, string> = {
 	impacter: "impact ",
 	interroger: "montre ",
 	ouvrir: "ouvre ",
+	adapter: "adapte ",
 };
 
 /**

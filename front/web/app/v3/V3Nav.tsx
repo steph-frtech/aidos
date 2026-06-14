@@ -8,6 +8,7 @@ import {
 	Layers,
 	ListChecks,
 	Map as MapIcon,
+	PenTool,
 	Search,
 	Server,
 	Settings,
@@ -21,9 +22,9 @@ import { PALETTE_OPEN_EVENT } from "./Palette";
 import { useV3Session } from "./V3Session";
 
 /**
- * La navigation V3 (ADR 0010 thème · ADR 0011 bilingue) : huit lentilles sur UNE même
+ * La navigation V3 (ADR 0010 thème · ADR 0011 bilingue) : neuf lentilles sur UNE même
  * session (AI Lab · Parcours produit · Spécifications · Historique · Environnements ·
- * Code · Instance · Paramètres) + le retour Workbench V2 en pied. Libellés AMICAUX
+ * Code · Instance · Paramètres · Design) + le retour Workbench V2 en pied. Libellés AMICAUX
  * (aucun jargon KRD en copie primaire). LE COMMUTATEUR DE PROJETS (ADR 0061) sous le
  * logo : le projet actif + un petit panneau (la liste — cliquer rouvre AVEC tout
  * l'historique, le rejeu — et « Nouveau projet »). En pied, l'ouverture de la PALETTE
@@ -40,6 +41,7 @@ export const ENTRIES = [
 	{ route: "/v3/code", key: "navCode", Icon: Code },
 	{ route: "/v3/instance", key: "navInstance", Icon: Server },
 	{ route: "/v3/parametrage", key: "navParams", Icon: Settings },
+	{ route: "/v3/design", key: "navDesign", Icon: PenTool },
 ] as const;
 
 export function V3Nav() {

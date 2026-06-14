@@ -87,6 +87,7 @@ const FORCE_PREFIX: Record<IntentKind, string> = {
 	impacter: "impact ",
 	interroger: "montre ",
 	ouvrir: "ouvre ",
+	adapter: "adapte ",
 };
 
 /**
@@ -322,6 +323,7 @@ export function BuilderClient({
 		impacter: t.intentImpacter,
 		interroger: t.intentInterroger,
 		ouvrir: t.intentOuvrir,
+		adapter: t.intentAdapter,
 	};
 	const tabLabel: Record<TabId, string> = {
 		arbre: t.tabArbre,

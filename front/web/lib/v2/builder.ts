@@ -30,6 +30,11 @@
  */
 
 import {
+	classifyGesture,
+	isKnownStyleToken,
+	type StyleToken,
+} from "../v3/design/screen-design";
+import {
 	type AnchorSuggestion,
 	anchorSymbols,
 	type CodeEdge,
@@ -60,6 +65,7 @@ export const INTENT_KINDS = [
 	"impacter",
 	"interroger",
 	"ouvrir",
+	"adapter",
 ] as const;
 export type IntentKind = (typeof INTENT_KINDS)[number];
 
@@ -107,6 +113,7 @@ export interface BuilderEvent {
 		| "deploiement"
 		| "delta_calcule"
 		| "ecran_ouvert"
+		| "ecran_adapte"
 		| "refus";
 	readonly detail: string;
 	/** La référence content-adressée touchée (chemin, id d'idée, version, route…). */
@@ -248,6 +255,10 @@ const LEXICONS: Record<
 		strong: ["ouvre", "ouvrir", "ecran", "panneau", "navigue"],
 		weak: ["page", "route", "aller", "vers"],
 	},
+	adapter: {
+		strong: ["adapte", "adapter", "style", "styler", "couleur", "design"],
+		weak: ["token", "radius", "fond", "marge", "espacement", "theme"],
+	},
 };
 
 /**
@@ -331,6 +342,39 @@ function stripCaptureVerb(text: string): string {
 		"",
 	);
 	return stripped.trim() === "" ? text.trim() : stripped.trim();
+}
+
+/**
+ * Extrait (référence de coordonnée, tokens) d'une phrase d'adaptation canonique
+ * « adapte <coord> : <property>=<token> [<property>=<token> …] ». PURE & TOTALE & fail-closed :
+ * sans « : » ou sans token reconnaissable → null (jamais une adaptation en douce). La référence
+ * de coordonnée est reprise VERBATIM (le système l'affiche ; le twin TS la re-valide contre le
+ * master côté lentille — ici, sous la ligne, on ne juge que la nature du token).
+ */
+function parseAdapt(
+	text: string,
+): { ref: string; tokens: StyleToken[] } | null {
+	const colon = text.indexOf(":");
+	if (colon < 0) return null;
+	// La partie gauche : retire le verbe d'adaptation, garde la référence de coordonnée.
+	const left = text
+		.slice(0, colon)
+		.replace(/^.*?(?:adapte[rz]?|style[rz]?|design)\s*/i, "")
+		.trim();
+	const right = text.slice(colon + 1).trim();
+	const tokens: StyleToken[] = [];
+	// Chaque « property=token » plié (accents retirés, minuscule).
+	for (const part of right.split(/[\s,;]+/)) {
+		const m = part
+			.normalize("NFD")
+			.replace(/[̀-ͯ]/g, "")
+			.toLowerCase()
+			.match(/^([a-z]+)=([a-z0-9#[\]-]+)$/);
+		if (m === null) continue;
+		tokens.push({ property: m[1], token: m[2] });
+	}
+	if (tokens.length === 0) return null;
+	return { ref: left, tokens };
 }
 
 /** Extrait (libellé, chemin parent) d'une greffe : « greffe X sous a/b », fail-closed. */
@@ -859,6 +903,63 @@ export function applyIntent(state: BuilderState, text: string): ApplyResult {
 					},
 				],
 				[],
+			);
+		}
+
+		case "adapter": {
+			// LE DESIGN LAB (ADR 0071, Onlook INVERSÉ) : un geste de STYLING PUR — re-styler une
+			// coordonnée EXISTANTE en tokens ADR 0010. PURE & TOTALE & DÉTERMINISTE & BELOW-THE-LINE :
+			// aucune écriture-vérité, un requirement SOFT content-adressé (le twin lib/v3/design le
+			// compose ; la lentille le capitalise). Un geste STRUCTUREL (ajout/retrait/réordre) passe
+			// par « capture l'idée : … » (intent capturer_idee) — JAMAIS ici (classifyGesture le tranche).
+			const a = parseAdapt(text);
+			if (a === null)
+				return finish(
+					state,
+					[
+						{
+							kind: "refus",
+							detail:
+								"adaptation refusée : phrase non reconnue (attendu « adapte <coord> : <property>=<token> », fail-closed)",
+							ref: "",
+						},
+					],
+					[],
+				);
+			// FAIL-CLOSED : chaque token DOIT être du catalogue FERMÉ ADR 0010 (hex/Tailwind arbitraire
+			// refusé) — le MÊME catalogue que le twin Go EmitScreenDesign (déterminisme-first §6).
+			const bad = a.tokens.find((s) => !isKnownStyleToken(s));
+			if (bad !== undefined)
+				return finish(
+					state,
+					[
+						{
+							kind: "refus",
+							detail: `adaptation refusée : le token ${bad.property}=${bad.token} est hors du catalogue FERMÉ ADR 0010 (jamais un hex, jamais une utilitaire arbitraire)`,
+							ref: a.ref,
+						},
+					],
+					[],
+				);
+			// Un geste de styling est below-the-line (classifyGesture sans intention structurelle →
+			// styling) ; on l'épingle pour rendre la garde explicite (un structurel ne fuit jamais ici).
+			const nature = classifyGesture({
+				coord: { kind: "section", entity: a.ref },
+				styles: a.tokens,
+			});
+			void nature; // toujours "styling" sur cette voie — la garde §8/BA12.
+			const stack = a.tokens.map((s) => `${s.property}=${s.token}`).join(" ");
+			return finish(
+				state,
+				[
+					{
+						kind: "ecran_adapte",
+						detail: `écran « ${a.ref} » adapté (${a.tokens.length} token(s) : ${stack}) — requirement SOFT below-the-line, aucune vérité écrite`,
+						ref: a.ref,
+					},
+				],
+				// L'IMPACT est below-the-line (composes) — la coordonnée re-stylée, pas une vérité.
+				[{ cible: a.ref, type: "composes" }],
 			);
 		}
 	}

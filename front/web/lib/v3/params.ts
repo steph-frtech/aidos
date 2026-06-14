@@ -75,6 +75,7 @@ export const CANONICAL_PHRASES: Record<IntentKind, string> = {
 	impacter: "quel impact si je modifie <chemin>",
 	interroger: "montre-moi l'état du projet",
 	ouvrir: "ouvre l'écran <nom>",
+	adapter: "adapte <coord> : <property>=<token>",
 };
 
 /** Le libellé déclaré par forme de preuve (la forme technique reste la valeur). */

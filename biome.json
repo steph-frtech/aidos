@@ -30,5 +30,13 @@
 				"organizeImports": "on"
 			}
 		}
-	}
+	},
+	"overrides": [
+		{
+			"includes": ["**/aidos-bridge.embed.ts", "**/aidos-expr.embed.ts"],
+			"formatter": { "enabled": false },
+			"linter": { "enabled": false },
+			"assist": { "enabled": false }
+		}
+	]
 }

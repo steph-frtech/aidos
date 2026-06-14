@@ -107,6 +107,18 @@ type WebAppSpec struct {
 // back in a FIXED, path-sorted order so the slice is byte-stable. A malformed spec is a typed
 // BlockReason (the honesty rule), never a partial render.
 func EmitWebApp(s WebAppSpec) ([]Artifact, *blockreason.BlockReason) {
+	// The canonical web app applies NO screen override (nil) — so EmitWebApp is byte-identical to
+	// EmitWebChildAdapted(s, AdaptationOverride{}) with no override (the anti-drift mirror (c) pins it).
+	return emitWebAppOverridden(s, nil)
+}
+
+// emitWebAppOverridden is the SHARED render body of EmitWebApp + EmitWebChildAdapted. It renders the
+// web app applying the resolved ScreenOverride set (ADR 0071) on the matching data-aidos-* elements.
+// PURE, TOTAL, byte-stable. A nil/empty override set leaves EVERY artifact byte-identical to the
+// canonical EmitWebApp output (screenClassSuffix returns "" → the className is unchanged) — the
+// property mirror (c) pins it. The aidos-bridge runtime is shipped as an additive artifact (the embed
+// of AidosBridgeSource, calque exprTwinSource) so the Design Lab iframe can read the data-aidos-*.
+func emitWebAppOverridden(s WebAppSpec, overrides []ScreenOverride) ([]Artifact, *blockreason.BlockReason) {
 	if br := validateWebApp(s); br != nil {
 		return nil, br
 	}
@@ -124,6 +136,9 @@ func EmitWebApp(s WebAppSpec) ([]Artifact, *blockreason.BlockReason) {
 	dir := "gen/" + s.Project + "/web/"
 	arts := []Artifact{
 		artifact(dir+"aidos-expr.ts", TargetWebApp, []byte(exprTwinSource), sourceHash),
+		// aidos-bridge.ts — the Design Lab runtime (ADR 0071), embedded verbatim (calque aidos-expr.ts).
+		// Additive (a new file, §9-clean): it changes no existing artifact's bytes.
+		artifact(dir+"aidos-bridge.ts", TargetWebApp, []byte(aidosBridgeSource), sourceHash),
 		artifact(dir+"index.html", TargetWebApp, emitIndexHTML(s, sourceHash), sourceHash),
 		artifact(dir+"main.tsx", TargetWebApp, emitMainTSX(sourceHash), sourceHash),
 		artifact(dir+"package.json", TargetWebApp, emitWebPackageJSON(s, sourceHash), sourceHash),
@@ -131,9 +146,10 @@ func EmitWebApp(s WebAppSpec) ([]Artifact, *blockreason.BlockReason) {
 		artifact(dir+"Dockerfile", TargetWebApp, emitWebDockerfile(sourceHash), sourceHash),
 	}
 
-	// One LIST view per entity (columns = attributes in source order).
+	// One LIST view per entity (columns = attributes in source order). The overrides re-style the
+	// matching <section data-aidos-view> / <th data-aidos-col> (a nil override leaves the bytes intact).
 	for _, e := range ents {
-		arts = append(arts, artifact(dir+listComponentName(e)+".tsx", TargetWebApp, emitListView(e, sourceHash), sourceHash))
+		arts = append(arts, artifact(dir+listComponentName(e)+".tsx", TargetWebApp, emitListView(e, sourceHash, overrides), sourceHash))
 	}
 
 	// One BUTTON per control→action — webcomponent.Emit (S38) reused verbatim, import rewritten.

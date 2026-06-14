@@ -148,7 +148,7 @@ func emitDesktopIndexHTML(m MasterView, sourceHash string) []byte {
 // /<operation> to the live API, evaluating the Expr client-side via the twin (evalState). The menu's
 // invoke channel (window.aidos.onInvoke) triggers the SAME actions — the keyboard/menu affordance.
 // This is the desktop idiom — NOT the web single-column page, NOT the mobile FlatList screen.
-func emitDesktopRenderer(m MasterView, sourceHash string) []byte {
+func emitDesktopRenderer(m MasterView, sourceHash string, overrides []ScreenOverride) []byte {
 	var b strings.Builder
 	b.WriteString(header("//", sourceHash))
 	b.WriteString("// Desktop child (Electron): the RENDERER — the DESKTOP view. Multi-column dense PANELS (one\n")
@@ -269,7 +269,14 @@ func emitDesktopRenderer(m MasterView, sourceHash string) []byte {
 	// One ActionButton per master Action — the literal data-aidos-invoke marker is baked at the call
 	// site (the deterministic per-action element); the ActionButton evaluates the Expr + POSTs.
 	for i, act := range m.Actions {
-		fmt.Fprintf(&b, "\t\t\t\t<span data-aidos-invoke=%s>\n", jsStr(act.Invoke))
+		// The action coordinate styling (drift: invoke→action) lands on the deterministic per-action
+		// <span data-aidos-invoke> wrapper. A nil/empty override yields "" → bytes unchanged (§9).
+		actionClass := screenClassSuffix(overrides, actionCoord("", act.Control))
+		if actionClass != "" {
+			fmt.Fprintf(&b, "\t\t\t\t<span data-aidos-invoke=%s className=\"%s\">\n", jsStr(act.Invoke), classBody(actionClass))
+		} else {
+			fmt.Fprintf(&b, "\t\t\t\t<span data-aidos-invoke=%s>\n", jsStr(act.Invoke))
+		}
 		fmt.Fprintf(&b, "\t\t\t\t\t<ActionButton action={ACTIONS[%d]} />\n", i)
 		b.WriteString("\t\t\t\t</span>\n")
 	}
@@ -278,7 +285,14 @@ func emitDesktopRenderer(m MasterView, sourceHash string) []byte {
 	// One Panel per section — the literal data-aidos-panel marker is baked at the call site (the
 	// deterministic per-section element), the Panel component carries the dense table + the fetch.
 	for _, sec := range m.Sections {
-		fmt.Fprintf(&b, "\t\t\t\t<div data-aidos-panel=%s>\n", jsStr(sec.Entity))
+		// The section coordinate styling (drift: panel→section) lands on the deterministic per-section
+		// <div data-aidos-panel> wrapper. A nil/empty override yields "" → bytes unchanged (§9).
+		sectionClass := screenClassSuffix(overrides, sectionCoord(sec.Entity))
+		if sectionClass != "" {
+			fmt.Fprintf(&b, "\t\t\t\t<div data-aidos-panel=%s className=\"%s\">\n", jsStr(sec.Entity), classBody(sectionClass))
+		} else {
+			fmt.Fprintf(&b, "\t\t\t\t<div data-aidos-panel=%s>\n", jsStr(sec.Entity))
+		}
 		fmt.Fprintf(&b, "\t\t\t\t\t<Panel entity=%s route=%s fields={%s} />\n",
 			jsStr(desktopPanelTitle(sec)), jsStr(desktopEntityRoute(sec)), fieldsLiteral(sec.Fields))
 		b.WriteString("\t\t\t\t</div>\n")

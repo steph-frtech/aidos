@@ -33,6 +33,7 @@ const INTENT_LABEL_KEYS: Record<IntentKind, string> = {
 	impacter: "intentImpacter",
 	interroger: "intentInterroger",
 	ouvrir: "intentOuvrir",
+	adapter: "intentAdapter",
 };
 
 /** Replie les accents + la casse — « écran » et « Ecran » se trouvent pareil. */

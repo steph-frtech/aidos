@@ -69,6 +69,25 @@ type DesktopAdaptation struct {
 	// WindowTitle overrides the BrowserWindow title (the default is the project name). A non-empty
 	// value is applied in main.js — the visible proof the per-platform adaptation point is live.
 	WindowTitle string `json:"window_title,omitempty"`
+	// Screen is the NEW ScreenDesign override (ADR 0071) — per-coordinate ADR-0010 style tokens applied
+	// to the matching data-aidos-panel / data-aidos-col / data-aidos-invoke element at RENDER time. NIL
+	// → the canonical form UNCHANGED (anti-overwrite §9). The single documented coordinate; the full
+	// multi-coordinate set rides screenAll (ReproduceScreen).
+	Screen *ScreenOverride `json:"screen,omitempty"`
+	// screenAll carries the FULL resolved override set for a multi-coordinate ScreenDesign reproduction.
+	// UNEXPORTED + excluded from the content address (a RENDER-time class change, not a structural one).
+	screenAll []ScreenOverride
+}
+
+// screenOverrides returns the effective override set the desktop renderers apply. PURE.
+func (a DesktopAdaptation) screenOverrides() []ScreenOverride {
+	if len(a.screenAll) > 0 {
+		return a.screenAll
+	}
+	if a.Screen != nil {
+		return []ScreenOverride{*a.Screen}
+	}
+	return nil
 }
 
 // DesktopChild is the DESKTOP CHILD of the master view: the Electron artifacts (the desktop idiom —
@@ -126,14 +145,18 @@ func EmitDesktopChildAdapted(m MasterView, adapt DesktopAdaptation) (DesktopChil
 	// yields new bytes + a new source hash, but the SAME parentId.
 	sourceHash := desktopFormHash(m, adapt)
 
+	overrides := adapt.screenOverrides()
+
 	dir := "gen/" + m.Project + "/desktop/"
 	arts := []Artifact{
 		artifact(dir+"main.js", TargetDesktopApp, emitDesktopMain(m, adapt, sourceHash), sourceHash),
 		artifact(dir+"preload.js", TargetDesktopApp, emitDesktopPreload(sourceHash), sourceHash),
 		artifact(dir+"index.html", TargetDesktopApp, emitDesktopIndexHTML(m, sourceHash), sourceHash),
-		artifact(dir+"renderer.tsx", TargetDesktopApp, emitDesktopRenderer(m, sourceHash), sourceHash),
+		artifact(dir+"renderer.tsx", TargetDesktopApp, emitDesktopRenderer(m, sourceHash, overrides), sourceHash),
 		artifact(dir+"package.json", TargetDesktopApp, emitDesktopPackageJSON(m, sourceHash), sourceHash),
 		artifact(dir+"aidos-expr.ts", TargetDesktopApp, []byte(exprTwinSource), sourceHash),
+		// aidos-bridge.ts — the Design Lab runtime (ADR 0071), embedded verbatim (calque aidos-expr.ts).
+		artifact(dir+"aidos-bridge.ts", TargetDesktopApp, []byte(aidosBridgeSource), sourceHash),
 	}
 	sortArtifacts(arts)
 

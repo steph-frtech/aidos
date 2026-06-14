@@ -142,11 +142,11 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 		// /v3 a REDIRIGÉ vers /v3/lab (la porte d'entrée est le chat).
 		await expect(page).toHaveURL(/\/v3\/lab$/);
 
-		// La nav offre les HUIT entrées (AI Lab · Parcours · Spécifications ·
-		// Historique · Environnements · Code · Instance · Paramètres) + le retour
-		// Workbench V2 en pied.
+		// La nav offre les NEUF entrées (AI Lab · Parcours · Spécifications ·
+		// Historique · Environnements · Code · Instance · Paramètres · Design) + le
+		// retour Workbench V2 en pied.
 		await expect(page.getByTestId("v3-nav")).toBeVisible();
-		await expect(page.getByTestId("v3-nav-item")).toHaveCount(8);
+		await expect(page.getByTestId("v3-nav-item")).toHaveCount(9);
 		await expect(page.getByTestId("v3-nav-workbench")).toBeVisible();
 
 		// Le HERO d'accueil — accueillant, en français simple — et ses 4 amorces.
@@ -807,5 +807,156 @@ test.describe("V3 — l'environnement isolé (ADR 0063) et les trois aperçus li
 			.click();
 		await expect(preview.getByText("Fichier")).toBeVisible();
 		await expect(page.getByTestId("v3-preview-desktop-note")).toBeVisible();
+	});
+});
+
+test.describe("V3 — le Studio de design (ADR 0071, Onlook INVERSÉ), Tranche 1", () => {
+	/**
+	 * HERMÉTIQUE PAR CONSTRUCTION (IA éteinte) : la boucle complète sur un écran sans
+	 * iframe live cross-origin (validée à la main sur le déploiement). L'e2e teste la
+	 * LENTILLE + la CAPTURE + le MUR de façon DÉTERMINISTE (le twin lib/v3/design,
+	 * records.Hash byte-égal Go), pas le rendu cross-origin. Le geste de design passe par
+	 * send(phrase canonique) — re-jugé par le réducteur (intent `adapter` → `ecran_adapte`,
+	 * below-the-line) ; un geste STRUCTUREL passe par send(« capture l'idée … ») → idée→/goal.
+	 */
+
+	test("la 9e lentille existe + est atteignable par ⌘K (Design)", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `design-nav-${testInfo.testId}`);
+
+		// La 9e entrée de nav (Design) est là — la lentille s'ouvre par la nav cliente.
+		await expect(
+			page.locator('[data-testid="v3-nav-item"][data-route="/v3/design"]'),
+		).toBeVisible();
+		await navTo(page, "/v3/design");
+		await expect(page.getByTestId("v3-design")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		// ⌘K : la palette trouve /v3/design et y navigue (le mur : elle n'écrit rien).
+		await page.keyboard.press("Control+k");
+		await expect(page.getByTestId("v3-palette")).toBeVisible();
+		await page.getByTestId("v3-palette-input").fill("design");
+		await expect(
+			page.locator('[data-testid="v3-palette-item"][data-route="/v3/design"]'),
+		).toBeVisible();
+	});
+
+	test("un geste de STYLING : sélectionner → token ADR 0010 → un ScreenDesign DRAFT (twin)", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `design-style-${testInfo.testId}`);
+
+		// On construit une coordonnée à designer : capture + promotion → l'app émet
+		// une section (le twin emitApp), que le layers-panel du studio rend.
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(2);
+
+		await navTo(page, "/v3/design");
+		await expect(page.getByTestId("v3-design")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		// Tant qu'on n'a rien sélectionné, le studio le dit honnêtement.
+		await expect(page.getByTestId("v3-design-noselect")).toBeVisible();
+
+		// LE LAYERS-PANEL porte au moins une coordonnée (la section émise) — on la SÉLECTIONNE.
+		const layer = page.getByTestId("v3-design-layer").first();
+		await expect(layer).toBeVisible();
+		const coordRef = (await layer.getAttribute("data-coord")) ?? "";
+		await layer.click();
+		await expect(page.getByTestId("v3-design-selected")).toContainText(
+			coordRef,
+		);
+
+		// LE STYLE-PANEL : un token du CATALOGUE FERMÉ ADR 0010 (bg=card) → aperçu optimiste,
+		// qui COMPOSE un ScreenDesign DRAFT via le twin (records.Hash) → la puce d'ID apparaît.
+		await page.getByTestId("v3-design-property").selectOption("bg");
+		await page.getByTestId("v3-design-token").selectOption("card");
+		await page.getByTestId("v3-design-add-token").click();
+		await expect(page.getByTestId("v3-design-draft")).toBeVisible();
+		await expect(page.getByTestId("v3-design-draft-token")).toContainText(
+			"bg=card",
+		);
+		// LE TWIN A COMPOSÉ : un ScreenDesign DRAFT content-adressé (l'ID hex du twin).
+		await expect(page.getByTestId("v3-design-draft-id")).toBeVisible();
+
+		// CAPTURE : send(« adapte <coord> : bg=card ») — re-jugé → un événement `ecran_adapte`
+		// below-the-line (aucune vérité écrite) ; le journal du studio le montre.
+		await page.getByTestId("v3-design-capture").click();
+		const applied = page.getByTestId("v3-design-applied-row");
+		await expect(applied.first()).toBeVisible({ timeout: 20_000 });
+		await expect(applied.first()).toContainText("adapté");
+		await expect(applied.first()).toContainText("below-the-line");
+	});
+
+	test("LE MUR : un geste STRUCTUREL → une idée hasMirror=false (PAS un ScreenDesign)", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `design-wall-${testInfo.testId}`);
+
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await navTo(page, "/v3/design");
+		await expect(page.getByTestId("v3-design")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		// On sélectionne une coordonnée puis on demande un changement de STRUCTURE : le studio
+		// ne re-style pas — il ROUTE vers le chat (« capture l'idée : … ») → idée→/goal.
+		await page.getByTestId("v3-design-layer").first().click();
+		await page.getByTestId("v3-design-structural").click();
+
+		// Retour au lab : le dernier tour est une CAPTURE D'IDÉE (carte amicale « idée
+		// ajoutée »), PAS une adaptation — le geste structurel a pris la porte du mur.
+		await navTo(page, "/v3/lab");
+		await expect(page.getByTestId("v3-msg-assistant").last()).toContainText(
+			"Votre idée a été ajoutée",
+		);
+
+		// SPÉCIFICATIONS : la spec créée est une IDÉE (statut « idée », hasMirror=false —
+		// jamais un ScreenDesign capitalisé below-the-line).
+		await navTo(page, "/v3/specs");
+		await expect(page.getByTestId("v3-specs-grid")).toBeVisible({
+			timeout: 20_000,
+		});
+		const idees = page.locator(
+			'[data-testid="v3-specs-row"][data-status="idee"]',
+		);
+		expect(await idees.count()).toBeGreaterThanOrEqual(1);
+	});
+
+	test("l'état NON DÉPLOYÉ offre le geste de déploiement (l'iframe live attend le déploiement)", async ({
+		page,
+	}, testInfo) => {
+		await openDeterministe(page, `design-deploy-${testInfo.testId}`);
+
+		// On prépare une version DEPUIS LE LAB (le chat y vit) : capture → promotion. Le
+		// cliquet exige une version posable avant le déploiement dev.
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(2);
+
+		// La lentille Design (nav cliente) : rien n'est encore déployé en dev → l'état
+		// « non déployé » + le bouton de déploiement (jamais une iframe morte).
+		await navTo(page, "/v3/design");
+		await expect(page.getByTestId("v3-design")).toBeVisible({
+			timeout: 20_000,
+		});
+		await expect(page.getByTestId("v3-design-not-deployed")).toBeVisible();
+
+		// LE GESTE DE DÉPLOIEMENT depuis le studio (le bouton appelle send en interne — aucune
+		// saisie de chat nécessaire ici, la lentille design n'a pas d'input).
+		await page.getByTestId("v3-design-deploy").click();
+
+		// L'app est désormais EN LIGNE en dev → l'iframe live est montée (le studio bascule
+		// de l'état « non déployé » à l'aperçu vivant). Le rendu cross-origin n'est pas testé
+		// ici (hermétique) — seule la BASCULE déterministe l'est.
+		await expect(page.getByTestId("v3-design-iframe")).toBeVisible({
+			timeout: 20_000,
+		});
+		await expect(page.getByTestId("v3-design-not-deployed")).toHaveCount(0);
 	});
 });

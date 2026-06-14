@@ -53,10 +53,13 @@ func blockWebApp(cause error) blockreason.BlockReason {
 // live in a useState INSIDE the component (function-scope), never a module-scope mutable binding.
 // The form is ADR-0010 token classes (no hardcoded hex). A column the AST does not pin is never
 // invented (the count matches AttributeSet).
-func emitListView(e entities.Entity, sourceHash string) []byte {
+func emitListView(e entities.Entity, sourceHash string, overrides []ScreenOverride) []byte {
 	comp := listComponentName(e)
 	route := "/entities/" + strings.ToLower(e.Name)
 	cols := entities.AttributeSet(e)
+	// The screen overrides (ADR 0071) re-style the matching coordinate's className. A nil/empty set
+	// (or no matching coordinate) yields "" → the className is byte-identical (anti-overwrite §9).
+	sectionClass := screenClassSuffix(overrides, sectionCoord(e.Name))
 
 	var b strings.Builder
 	b.WriteString(header("//", sourceHash))
@@ -80,7 +83,7 @@ func emitListView(e entities.Entity, sourceHash string) []byte {
 	b.WriteString("\t\t\t.catch((e) => setError(String(e)));\n")
 	b.WriteString("\t}, []);\n")
 	b.WriteString("\treturn (\n")
-	fmt.Fprintf(&b, "\t\t<section data-aidos-view=%s className=\"rounded-lg border border-border bg-card p-4\">\n", jsStr(comp))
+	fmt.Fprintf(&b, "\t\t<section data-aidos-view=%s className=\"rounded-lg border border-border bg-card p-4%s\">\n", jsStr(comp), sectionClass)
 	fmt.Fprintf(&b, "\t\t\t<h2 className=\"mb-3 text-sm font-semibold text-foreground\">%s</h2>\n", e.Name)
 	b.WriteString("\t\t\t{error ? (\n")
 	b.WriteString("\t\t\t\t<p className=\"text-sm text-destructive\">{error}</p>\n")
@@ -91,7 +94,8 @@ func emitListView(e entities.Entity, sourceHash string) []byte {
 	// One <th> per attribute, in source order, carrying data-aidos-col=<attr> (the testable mirror
 	// of the entity's AttributeSet — the count + order asserted by the fixture).
 	for _, col := range cols {
-		fmt.Fprintf(&b, "\t\t\t\t\t\t\t<th data-aidos-col=%s className=\"px-3 py-2 font-medium\">%s</th>\n", jsStr(col), col)
+		colClass := screenClassSuffix(overrides, fieldCoord(e.Name, col))
+		fmt.Fprintf(&b, "\t\t\t\t\t\t\t<th data-aidos-col=%s className=\"px-3 py-2 font-medium%s\">%s</th>\n", jsStr(col), colClass, col)
 	}
 	b.WriteString("\t\t\t\t\t\t</tr>\n")
 	b.WriteString("\t\t\t\t\t</thead>\n")

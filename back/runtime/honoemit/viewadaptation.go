@@ -48,6 +48,29 @@ type AdaptationOverride struct {
 	// AppName is the mobile child's displayed Expo app name override (MobileAdaptation.AppName).
 	// Read only when the requirement targets ChildMobile. Empty → the project name (the default).
 	AppName string `json:"app_name,omitempty"`
+	// Screen is the NEW additive ScreenDesign override (ADR 0071) — per-coordinate ADR-0010 style
+	// tokens + a per-platform label. NIL → the canonical form UNCHANGED (anti-overwrite §9: an empty
+	// override leaves the child byte-identical; the property mirror (c) pins it). The front twin
+	// mirrors this single ScreenOverride; a multi-coordinate ScreenDesign rides the unexported
+	// screenAll carrier (so the public content-address surface is exactly this one field).
+	Screen *ScreenOverride `json:"screen,omitempty"`
+	// screenAll carries the FULL resolved override set for a multi-coordinate ScreenDesign reproduction
+	// (ReproduceScreen). UNEXPORTED + excluded from JSON / the content address: the styling is applied
+	// at RENDER time (it does not change the structural source hash), so the loopback reproduces every
+	// coordinate without widening the public AdaptationOverride contract (Screen *ScreenOverride).
+	screenAll []ScreenOverride
+}
+
+// screenOverrides returns the effective override set the renderers apply: the full resolved set when a
+// multi-coordinate reproduction supplied it, else the single documented Screen override (or nil). PURE.
+func (o AdaptationOverride) screenOverrides() []ScreenOverride {
+	if len(o.screenAll) > 0 {
+		return o.screenAll
+	}
+	if o.Screen != nil {
+		return []ScreenOverride{*o.Screen}
+	}
+	return nil
 }
 
 // ViewAdaptation is the SOFT capitalised requirement the loopback persists — a validated per-platform
