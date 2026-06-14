@@ -780,3 +780,196 @@ export function toGestureInput(g: StructuralGesture): GestureInput {
 		changesComponentKind: g.kind === "add-action",
 	};
 }
+
+// ─── TRANCHE 4 : LE RE-JUGEMENT DÉTERMINISTE DU CHAT IA GATÉ (l'autorité, §6/§8) ────────────
+//
+// LE CHAT DESIGN (ADR 0071 §4) : l'utilisateur écrit en langage NATUREL LIBRE ; le LLM PROPOSE
+// une phrase canonique de la grammaire design FERMÉE (« adapte <coord> : <property>=<token> »)
+// ou la phrase structurelle (« capture l'idée : <besoin> »). C'est une PROPOSITION, jamais une
+// action. rejudgeDesignProposal() est l'AUTORITÉ DÉTERMINISTE : la proposition LLM est RE-PARSÉE
+// et RE-JUGÉE par CE code (le catalogue FERMÉ + composeScreenDesign + classifyGesture) AVANT
+// toute capture. IA ÉTEINTE, le rejeu reste VERT (le chemin déterministe suffit — la lentille
+// passe la phrase BRUTE de l'utilisateur ici, et le verdict est le même).
+//
+// LE LLM NE CAPTURE JAMAIS DIRECTEMENT : il propose, le déterministe dispose. Une proposition
+// VALIDE (tokens du catalogue, coordonnée du master) → un ScreenDesign DRAFT + la phrase
+// canonique à send() (le chemin T1) ; une proposition INVALIDE (hex, token étranger, propriété
+// inconnue) → REFUSÉE fail-closed (jamais capturée) ; une proposition STRUCTURELLE → routée vers
+// la porte idée→/goal (le mur §2). Jamais une génération LLM autoritaire (sinon AGENT_DETERMINISM_GAP).
+
+/**
+ * resolveCoordRef — RÉSOUT une référence textuelle de coordonnée (« produit », « produit.prix »,
+ * « checkout ») vers la coordonnée EXACTE que le master PIN. PURE & TOTALE & DÉTERMINISTE &
+ * fail-closed : une référence sans coordonnée correspondante → null (jamais une coordonnée
+ * inventée). C'est le verdict-pour-verdict de l'inverse de coordRef : un match exact sur
+ * coordRef(mc) plié (accents retirés, minuscule), departage stable par l'ordre du master.
+ */
+export function resolveCoordRef(
+	m: MasterDescriptor,
+	ref: string,
+): ScreenCoord | null {
+	const want = foldRef(ref);
+	if (want === "") return null;
+	for (const mc of m.coords) {
+		if (foldRef(coordRef(mc)) === want) return mc;
+	}
+	return null;
+}
+
+/** Plie une référence de coordonnée (accents retirés, minuscule, espaces compactés). PURE. */
+function foldRef(s: string): string {
+	return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+}
+
+/**
+ * parseAdaptProposal — PARSE une phrase canonique « adapte <coord> : <property>=<token> [<p>=<t> …] »
+ * (le MÊME parseur que parseAdapt du réducteur lib/v2/builder, ici exporté pour le re-jugement
+ * autoritaire). PURE & TOTALE & fail-closed : sans « : » ou sans token reconnaissable → null
+ * (jamais une adaptation en douce). La référence de coordonnée est reprise VERBATIM (re-validée
+ * ensuite contre le master). Les tokens sont pliés (accents retirés, minuscule).
+ */
+export function parseAdaptProposal(
+	text: string,
+): { ref: string; tokens: StyleToken[] } | null {
+	const colon = text.indexOf(":");
+	if (colon < 0) return null;
+	const left = text
+		.slice(0, colon)
+		.replace(/^.*?(?:adapte[rz]?|style[rz]?|design)\s*/i, "")
+		.trim();
+	const right = text.slice(colon + 1).trim();
+	const tokens: StyleToken[] = [];
+	for (const part of right.split(/[\s,;]+/)) {
+		const m = part
+			.normalize("NFD")
+			.replace(/[̀-ͯ]/g, "")
+			.toLowerCase()
+			.match(/^([a-z]+)=([a-z0-9#[\]/-]+)$/);
+		if (m === null) continue;
+		tokens.push({ property: m[1], token: m[2] });
+	}
+	if (tokens.length === 0) return null;
+	return { ref: left, tokens };
+}
+
+/** Une phrase est-elle une intention de CAPTURE D'IDÉE structurelle (« capture l'idée : … ») ? PURE. */
+export function isCapturePhrase(text: string): boolean {
+	const folded = foldRef(text);
+	return /^\s*(?:capture[rz]?|note[rz]?|enregistre[rz]?)\b/.test(folded);
+}
+
+/**
+ * Le VERDICT du re-jugement déterministe d'une proposition (le jeu CLOS, discriminé) :
+ *   - "styling"    : valide → un ScreenDesign DRAFT (le gate T1 passé) + la phrase canonique à send() ;
+ *   - "structural" : un besoin structurel → la phrase « capture l'idée : … » à send() (le mur §2) ;
+ *   - "refused"    : hex / token étranger / coordonnée absente / phrase non reconnue → fail-closed,
+ *                    JAMAIS capturée (un message clair, le BlockReason honnête).
+ */
+export type DesignVerdict =
+	| {
+			readonly nature: "styling";
+			readonly coord: ScreenCoord;
+			readonly styles: readonly StyleToken[];
+			readonly design: ScreenDesign;
+			readonly phrase: string;
+	  }
+	| {
+			readonly nature: "structural";
+			readonly need: string;
+			readonly phrase: string;
+	  }
+	| { readonly nature: "refused"; readonly block: DesignBlock };
+
+/** Le refus pour une proposition non reconnue (ni adaptation ni capture). FR, fail-closed. */
+function blockUnparseable(): DesignBlock {
+	return {
+		code: "out_of_scope",
+		explanation:
+			"Proposition refusée : la phrase n'est ni une adaptation de style (« adapte <coordonnée> : <propriété>=<jeton> ») ni une capture d'idée structurelle (« capture l'idée : … »). Le Design Lab ne capture QUE ce qu'il sait re-juger (fail-closed, le mur §8).",
+		howToFix: [
+			"Décrivez un changement de style sur un élément existant (couleur, taille, espacement, radius…).",
+			"Pour ajouter/retirer/réordonner un champ, formulez le besoin : il passera par une idée à valider.",
+		],
+	};
+}
+
+/**
+ * rejudgeDesignProposal — L'AUTORITÉ DÉTERMINISTE du chat IA gaté (ADR 0071 §4, le cœur de T4).
+ * PURE & TOTALE & DÉTERMINISTE & fail-closed. Prend une phrase (la PROPOSITION du LLM, OU le texte
+ * brut de l'utilisateur quand l'IA est éteinte) + le master, et la RE-JUGE entièrement par CE code :
+ *
+ *   1. STRUCTUREL — « capture l'idée : <besoin> » → classifyGesture le confirme structural →
+ *      verdict "structural" : la phrase « capture l'idée : … » à send() (la porte idée→/goal, le mur §2).
+ *      Le LLM ne décide PAS que c'est structurel ; le code le tranche (changesComponentKind).
+ *   2. STYLING — « adapte <coord> : <property>=<token> » → résout la coordonnée contre le master,
+ *      valide chaque token contre le catalogue FERMÉ via composeScreenDesign (l'autorité unique de
+ *      l'ID content-adressé) :
+ *        · coordonnée absente du master → REFUSÉE (geste structurel déguisé — composeScreenDesign
+ *          renvoie blockStructuralCoord nommant /goal) ;
+ *        · token hors-catalogue (hex, utilitaire arbitraire) → REFUSÉE (blockBadToken) ;
+ *        · sinon → verdict "styling" : le ScreenDesign DRAFT + la phrase canonique à send().
+ *   3. AUTRE (ni adaptation ni capture) → REFUSÉE (blockUnparseable).
+ *
+ * LE MUR (§2) : un verdict "styling" ne produit qu'un requirement SOFT below-the-line (capturé via
+ * send→applyIntent) ; un verdict "structural" ne produit qu'une idée (hasMirror=false) ; un verdict
+ * "refused" ne produit RIEN. JAMAIS une écriture-vérité, JAMAIS une capture directe par le LLM.
+ */
+export function rejudgeDesignProposal(
+	m: MasterDescriptor,
+	target: string,
+	proposal: string,
+): DesignVerdict {
+	const text = proposal.trim();
+	// (1) Une capture d'idée structurelle — le LLM a proposé la porte du mur, ou l'a paraphrasée.
+	if (isCapturePhrase(text)) {
+		const need = text
+			.replace(
+				/^\s*(?:capture[rz]?|note[rz]?|enregistre[rz]?)\s*(?:l['’]\s*idee|l['’]\s*idée)?\s*:?\s*/i,
+				"",
+			)
+			.trim();
+		return {
+			nature: "structural",
+			need: need === "" ? text : need,
+			// La phrase canonique normalisée à send() — RE-JUGÉE par le réducteur (capturer_idee).
+			phrase: `capture l'idée : ${need === "" ? text : need}`,
+		};
+	}
+	// (2) Une adaptation de style — re-parsée puis re-jugée contre le master + le catalogue FERMÉ.
+	const a = parseAdaptProposal(text);
+	if (a === null) {
+		return { nature: "refused", block: blockUnparseable() };
+	}
+	const coord = resolveCoordRef(m, a.ref);
+	if (coord === null) {
+		// La coordonnée n'existe PAS dans le master → c'est un geste STRUCTUREL déguisé (le mur §2).
+		return {
+			nature: "refused",
+			block: blockStructuralCoord({ kind: "section", entity: a.ref }),
+		};
+	}
+	// composeScreenDesign est l'AUTORITÉ : il re-valide chaque token contre le catalogue FERMÉ et
+	// content-adresse le ScreenDesign (le MÊME records.Hash que Go). Un token hors-catalogue → refus.
+	const r = composeScreenDesign(m, target, [{ coord, styles: a.tokens }]);
+	if (!r.ok) {
+		return { nature: "refused", block: r.block };
+	}
+	// La GARDE §8/BA12 explicite : un styling ne peut JAMAIS être un structurel déguisé.
+	const nature = classifyGesture({ coord, styles: a.tokens });
+	if (nature === "structural") {
+		// Défense en profondeur : si jamais classifyGesture trouvait une intention structurelle,
+		// on REFUSE le chemin styling (jamais une capture below-the-line d'un structurel).
+		return {
+			nature: "structural",
+			need: structuralNeed({ kind: "reorder-field", coord }),
+			phrase: routeStructuralGesture({ kind: "reorder-field", coord }),
+		};
+	}
+	return {
+		nature: "styling",
+		coord,
+		styles: a.tokens,
+		design: r.design,
+		phrase: canonicalAdaptPhrase(coord, a.tokens),
+	};
+}

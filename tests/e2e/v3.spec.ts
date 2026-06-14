@@ -1161,3 +1161,278 @@ test.describe("V3 — le Studio de design (ADR 0071, Onlook INVERSÉ), Tranche 1
 		await expect(applied.first()).toContainText("density=compact");
 	});
 });
+
+test.describe("V3 — le chat IA GATÉ du Design Lab (ADR 0071 §4, Tranche 4)", () => {
+	/**
+	 * HERMÉTIQUE PAR CONSTRUCTION (IA ÉTEINTE) : le chat design n'appelle JAMAIS le LLM réel
+	 * en e2e. IA éteinte, le texte BRUT de l'utilisateur EST la proposition, et le MÊME
+	 * re-jugement déterministe (rejudgeDesignProposal — le catalogue FERMÉ + composeScreenDesign)
+	 * fait autorité : une phrase canonique valide → ScreenDesign DRAFT capturé (le chemin T1) ;
+	 * un hex / token étranger → REFUSÉ fail-closed (jamais capturé — le gating) ; un besoin
+	 * structurel → routé vers idée→/goal (le mur §2). Le rejeu reste VERT sans IA.
+	 */
+
+	/** Prépare une coordonnée designable (capture → promotion → l'app émet une section) + sa réf. */
+	async function preparerCoordonnee(page: Page, nom: string): Promise<string> {
+		await openDeterministe(page, nom);
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(2);
+		await navTo(page, "/v3/design");
+		await expect(page.getByTestId("v3-design")).toBeVisible({
+			timeout: 20_000,
+		});
+		const layer = page.getByTestId("v3-design-layer").first();
+		await expect(layer).toBeVisible();
+		return (await layer.getAttribute("data-coord")) ?? "";
+	}
+
+	/** Tape un message dans le chat design et le PROPOSE (un tour re-jugé déterministe). */
+	async function proposer(page: Page, text: string): Promise<void> {
+		await page.getByTestId("v3-design-chat-input").fill(text);
+		await page.getByTestId("v3-design-chat-send").click();
+	}
+
+	test("une proposition de STYLING VALIDE → ScreenDesign DRAFT + adaptation capturée (le chemin T1)", async ({
+		page,
+	}, testInfo) => {
+		const coord = await preparerCoordonnee(
+			page,
+			`design-chat-ok-${testInfo.testId}`,
+		);
+
+		// IA ÉTEINTE : le texte brut (ici une phrase canonique) EST la proposition. Le re-jugement
+		// déterministe l'accepte → un verdict STYLING + le ScreenDesign DRAFT content-adressé.
+		await proposer(page, `adapte ${coord} : bg=card`);
+		await expect(page.getByTestId("v3-design-chat-styling")).toBeVisible({
+			timeout: 20_000,
+		});
+		await expect(page.getByTestId("v3-design-chat-design-id")).toBeVisible();
+
+		// LE DÉTERMINISTE DISPOSE : la phrase canonique a été send()ée → re-jugée par le réducteur
+		// (intent `adapter` → `ecran_adapte`, below-the-line). Le journal du studio le montre.
+		const applied = page.getByTestId("v3-design-applied-row");
+		await expect(applied.first()).toBeVisible({ timeout: 20_000 });
+		await expect(applied.first()).toContainText("bg=card");
+	});
+
+	test("une proposition HORS-CATALOGUE (hex) → REFUSÉE fail-closed, JAMAIS capturée (le gating)", async ({
+		page,
+	}, testInfo) => {
+		const coord = await preparerCoordonnee(
+			page,
+			`design-chat-hex-${testInfo.testId}`,
+		);
+
+		// Une proposition avec un HEX (jamais du catalogue ADR 0010) : le re-jugement déterministe
+		// la REFUSE — un message clair, et AUCUNE capture (le mur §8, fail-closed).
+		await proposer(page, `adapte ${coord} : bg=#ff0000`);
+		await expect(page.getByTestId("v3-design-chat-refused")).toBeVisible({
+			timeout: 20_000,
+		});
+		// Aucune adaptation capturée : ni verdict styling, ni ligne dans le journal.
+		await expect(page.getByTestId("v3-design-chat-styling")).toHaveCount(0);
+		await expect(page.getByTestId("v3-design-applied-row")).toHaveCount(0);
+
+		// Retour au lab : le chat principal n'a QUE les deux tours de préparation (rien send()é).
+		await navTo(page, "/v3/lab");
+		await expect(page.getByTestId("v3-msg-user")).toHaveCount(2);
+	});
+
+	test("une proposition STRUCTURELLE → routée vers idée→/goal (le mur §2, jamais un ScreenDesign)", async ({
+		page,
+	}, testInfo) => {
+		await preparerCoordonnee(page, `design-chat-struct-${testInfo.testId}`);
+
+		// Une demande STRUCTURELLE formulée en phrase canonique de capture : le re-jugement la
+		// route vers la PORTE du mur (idée→/goal), jamais un ScreenDesign below-the-line.
+		await proposer(
+			page,
+			"capture l'idée : ajouter un champ description au produit",
+		);
+		await expect(page.getByTestId("v3-design-chat-structural")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		// Retour au lab : le dernier tour est une CAPTURE D'IDÉE (carte amicale), PAS une adaptation.
+		await navTo(page, "/v3/lab");
+		await expect(page.getByTestId("v3-msg-assistant").last()).toContainText(
+			"Votre idée a été ajoutée",
+		);
+
+		// SPÉCIFICATIONS : la spec créée est une IDÉE (hasMirror=false) — jamais un ScreenDesign.
+		await navTo(page, "/v3/specs");
+		await expect(page.getByTestId("v3-specs-grid")).toBeVisible({
+			timeout: 20_000,
+		});
+		const idees = page.locator(
+			'[data-testid="v3-specs-row"][data-status="idee"]',
+		);
+		expect(await idees.count()).toBeGreaterThanOrEqual(1);
+	});
+});
+
+test.describe("V3 — les BRANCHES DE DESIGN = le VERSION DAG S24 + les checkpoints (ADR 0071 §5, Tranche 5)", () => {
+	/**
+	 * HERMÉTIQUE PAR CONSTRUCTION (IA ÉTEINTE) : les branches de design SONT le VERSION DAG S24
+	 * (KRD §120-§125). Le DAG est SEEDÉ depuis la maître (la racine = la version de référence) puis
+	 * chaque adaptation capturée (un `ecran_adapte`, content-adressé) le fait avancer d'un checkpoint.
+	 * Les mouvements (brancher / forker depuis un ancien point / restaurer) sont DÉTERMINISTES (le twin
+	 * design-branches → version-dag est l'autorité, §8) — AUCUN appel LLM. Append-only (§120) : rien
+	 * n'est jamais supprimé ; forker depuis un ancien point laisse l'ancienne ligne en place (§123).
+	 */
+
+	/** Prépare le studio sur un projet frais (capture + promotion → une section désignable). */
+	async function ouvrirStudio(page: Page, nom: string): Promise<void> {
+		await openDeterministe(page, nom);
+		await send(page, CAPTURE);
+		await send(page, "promeus la dernière idée");
+		await expect(page.getByTestId("v3-msg-assistant")).toHaveCount(2);
+		await navTo(page, "/v3/design");
+		await expect(page.getByTestId("v3-design")).toBeVisible({
+			timeout: 20_000,
+		});
+		await expect(page.getByTestId("v3-design-branches")).toBeVisible();
+	}
+
+	/** Capture une adaptation de style (un `ecran_adapte`) → un checkpoint de plus sur la ligne. */
+	async function capturerAdaptation(page: Page): Promise<void> {
+		await page.getByTestId("v3-design-layer").first().click();
+		await page.getByTestId("v3-design-property").selectOption("bg");
+		await page.getByTestId("v3-design-token").selectOption("card");
+		await page.getByTestId("v3-design-add-token").click();
+		await expect(page.getByTestId("v3-design-draft")).toBeVisible();
+		await page.getByTestId("v3-design-capture").click();
+		await expect(page.getByTestId("v3-design-applied-row").first()).toBeVisible(
+			{ timeout: 20_000 },
+		);
+	}
+
+	test("le DAG seedé : un checkpoint RACINE (la maître = le départ), la tête y est", async ({
+		page,
+	}, testInfo) => {
+		await ouvrirStudio(page, `design-branch-seed-${testInfo.testId}`);
+
+		// Sans aucune adaptation : un SEUL checkpoint, la RACINE, qui est la tête courante.
+		const checkpoints = page.getByTestId("v3-design-checkpoint");
+		await expect(checkpoints).toHaveCount(1);
+		await expect(
+			page.locator('[data-testid="v3-design-checkpoint"][data-root="true"]'),
+		).toHaveCount(1);
+		await expect(
+			page.locator('[data-testid="v3-design-checkpoint"][data-head="true"]'),
+		).toHaveCount(1);
+		// le résumé annonce le DAG (1 nœud, 0 arête).
+		await expect(page.getByTestId("v3-design-branches")).toHaveAttribute(
+			"data-node-count",
+			"1",
+		);
+	});
+
+	test("CRÉER une branche puis NAVIGUER : un checkpoint de plus, la tête bouge (append-only)", async ({
+		page,
+	}, testInfo) => {
+		await ouvrirStudio(page, `design-branch-create-${testInfo.testId}`);
+
+		// Une adaptation capturée fait avancer la ligne : design-base → design-1 (2 checkpoints).
+		await capturerAdaptation(page);
+		await expect(page.getByTestId("v3-design-checkpoint")).toHaveCount(2);
+
+		// On OUVRE le checkpoint-tête (le dernier) puis on CRÉE une branche alternative depuis lui.
+		const head = page.locator(
+			'[data-testid="v3-design-checkpoint"][data-head="true"]',
+		);
+		await head.click();
+		await expect(page.getByTestId("v3-design-branch-actions")).toBeVisible();
+		await page.getByTestId("v3-design-branch-create").click();
+
+		// APPEND-ONLY : un checkpoint de PLUS (3), la tête est la nouvelle branche.
+		await expect(page.getByTestId("v3-design-checkpoint")).toHaveCount(3);
+		await expect(page.getByTestId("v3-design-branch-head")).toContainText(
+			"branche-1",
+		);
+		// NAVIGUER : cliquer le checkpoint RACINE l'ouvre (la sélection bouge, le DAG intact).
+		const root = page.locator(
+			'[data-testid="v3-design-checkpoint"][data-root="true"]',
+		);
+		await root.click();
+		await expect(page.getByTestId("v3-design-branch-open")).toContainText(
+			"design-base",
+		);
+		// le DAG n'a pas rétréci (3 nœuds) — naviguer ne supprime rien.
+		await expect(page.getByTestId("v3-design-branches")).toHaveAttribute(
+			"data-node-count",
+			"3",
+		);
+	});
+
+	test("FORKER depuis un ANCIEN point : l'ancienne ligne RESTE, une nouvelle naît (§121/§123)", async ({
+		page,
+	}, testInfo) => {
+		await ouvrirStudio(page, `design-branch-fork-${testInfo.testId}`);
+
+		// Deux adaptations : design-base → design-1 → design-2 (3 checkpoints, une ligne).
+		await capturerAdaptation(page);
+		await page.getByTestId("v3-design-property").selectOption("radius");
+		await page.getByTestId("v3-design-token").selectOption("lg");
+		await page.getByTestId("v3-design-add-token").click();
+		await expect(page.getByTestId("v3-design-draft")).toBeVisible();
+		await page.getByTestId("v3-design-capture").click();
+		await expect(page.getByTestId("v3-design-checkpoint")).toHaveCount(3);
+
+		// On OUVRE design-1 (un ANCIEN point, pas la tête) et on FORKE depuis lui.
+		const ancien = page.locator(
+			'[data-testid="v3-design-checkpoint"][data-label="design-1"]',
+		);
+		await ancien.click();
+		await expect(page.getByTestId("v3-design-branch-open")).toContainText(
+			"design-1",
+		);
+		await page.getByTestId("v3-design-branch-fork").click();
+
+		// APPEND-ONLY (§123) : un checkpoint de PLUS (4) — l'ancienne ligne (design-2) reste DESSINÉE.
+		await expect(page.getByTestId("v3-design-checkpoint")).toHaveCount(4);
+		await expect(
+			page.locator(
+				'[data-testid="v3-design-checkpoint"][data-label="design-2"]',
+			),
+		).toHaveCount(1);
+		// la tête est la ligne FORKÉE depuis l'ancien point.
+		await expect(page.getByTestId("v3-design-branch-head")).toContainText(
+			"fork-1",
+		);
+		// deux pointes divergentes (design-2 ∧ fork-1) → la lisibilité du MERGE sémantique (§122).
+		await expect(page.getByTestId("v3-design-merge-ready")).toBeVisible();
+	});
+
+	test("RESTAURER un checkpoint : un retour-arrière (head-flag move), RIEN supprimé (§120)", async ({
+		page,
+	}, testInfo) => {
+		await ouvrirStudio(page, `design-branch-restore-${testInfo.testId}`);
+
+		// design-base → design-1 (2 checkpoints).
+		await capturerAdaptation(page);
+		await expect(page.getByTestId("v3-design-checkpoint")).toHaveCount(2);
+
+		// On OUVRE la RACINE (un ancien checkpoint) et on la RESTAURE (revenir en arrière).
+		const root = page.locator(
+			'[data-testid="v3-design-checkpoint"][data-root="true"]',
+		);
+		await root.click();
+		await page.getByTestId("v3-design-branch-restore").click();
+
+		// La tête est revenue sur la racine ; AUCUN checkpoint supprimé (append-only §120).
+		await expect(page.getByTestId("v3-design-branch-head")).toContainText(
+			"design-base",
+		);
+		await expect(page.getByTestId("v3-design-checkpoint")).toHaveCount(2);
+		await expect(page.getByTestId("v3-design-branches")).toHaveAttribute(
+			"data-node-count",
+			"2",
+		);
+		// LE MUR (§2) : retour au lab — aucune écriture-vérité ; le chat n'a QUE les 2 tours de prépa
+		// + l'adaptation send()ée (3 messages user), jamais un goal/kernel écrit depuis le studio.
+		await navTo(page, "/v3/lab");
+		await expect(page.getByTestId("v3-msg-user")).toHaveCount(3);
+	});
+});

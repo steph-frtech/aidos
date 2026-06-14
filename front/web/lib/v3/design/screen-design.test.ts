@@ -22,6 +22,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { parseFromIframe } from "./bridge-protocol";
 import {
+	canonicalAdaptPhrase,
 	classifyDrag,
 	classifyGesture,
 	classOf,
@@ -31,6 +32,9 @@ import {
 	type GestureInput,
 	isKnownStyleToken,
 	type MasterDescriptor,
+	parseAdaptProposal,
+	rejudgeDesignProposal,
+	resolveCoordRef,
 	routeDrag,
 	type ScreenCoord,
 	type ScreenOverride,
@@ -475,6 +479,190 @@ describe("(i) LE DRAG-DROP T3 — la frontière nudge-visuel (styling) vs réord
 	it("un nudge visuel VIDE (aucun token) ne propose RIEN (chaîne vide — la lentille n'émet rien)", () => {
 		expect(routeDrag({ coord: COORD, mode: "visual-nudge", styles: [] })).toBe(
 			"",
+		);
+	});
+});
+
+// ─── (j) TRANCHE 4 : LE RE-JUGEMENT DÉTERMINISTE DU CHAT IA GATÉ (l'autorité, §6/§8) ────────
+describe("(j) rejudgeDesignProposal — le re-jugement déterministe (le LLM propose, le code dispose)", () => {
+	it("une proposition de STYLING VALIDE (tokens du catalogue, coordonnée du master) → ScreenDesign DRAFT", () => {
+		// La PHRASE CANONIQUE que le LLM proposerait pour « rends le prix bleu ».
+		const proposal = "adapte produit.prix : text=primary";
+		const v = rejudgeDesignProposal(MASTER, "web", proposal);
+		expect(v.nature).toBe("styling");
+		if (v.nature !== "styling") return;
+		// Le ScreenDesign est l'EXACT records.Hash (composeScreenDesign est l'autorité unique).
+		const golden = composeScreenDesign(MASTER, "web", [
+			{
+				coord: { kind: "field", entity: "produit", field: "prix" },
+				styles: [{ property: "text", token: "primary" }],
+			},
+		]);
+		expect(golden.ok).toBe(true);
+		if (!golden.ok) return;
+		expect(v.design.id).toBe(golden.design.id);
+		expect(v.coord).toEqual({
+			kind: "field",
+			entity: "produit",
+			field: "prix",
+		});
+		// La phrase à send() est CANONIQUE (re-jugée une 2e fois par le réducteur).
+		expect(v.phrase).toBe(
+			canonicalAdaptPhrase(
+				{ kind: "field", entity: "produit", field: "prix" },
+				[{ property: "text", token: "primary" }],
+			),
+		);
+	});
+
+	it("une proposition HORS-CATALOGUE (hex) → REFUSÉE fail-closed (JAMAIS capturée) — le gating", () => {
+		// Le LLM (ou un utilisateur) propose un hex : le déterministe REFUSE, jamais ne capture.
+		const v = rejudgeDesignProposal(
+			MASTER,
+			"web",
+			"adapte produit : bg=#ff0000",
+		);
+		expect(v.nature).toBe("refused");
+		if (v.nature !== "refused") return;
+		expect(v.block.code).toBe("out_of_scope");
+		expect(v.block.howToFix.length).toBeGreaterThan(0);
+	});
+
+	it("une proposition avec un JETON ÉTRANGER (property/token hors catalogue) → REFUSÉE", () => {
+		const v = rejudgeDesignProposal(
+			MASTER,
+			"web",
+			"adapte produit : text=fuchsia",
+		);
+		expect(v.nature).toBe("refused");
+	});
+
+	it("une proposition sur une COORDONNÉE ABSENTE du master → REFUSÉE (structurel déguisé → /goal)", () => {
+		const v = rejudgeDesignProposal(MASTER, "web", "adapte facture : bg=card");
+		expect(v.nature).toBe("refused");
+		if (v.nature !== "refused") return;
+		// Le refus NOMME la porte structurelle (idée → /goal) — le mur honnête (§2).
+		expect(v.block.explanation.toLowerCase()).toContain("structurel");
+	});
+
+	it("une proposition STRUCTURELLE (« capture l'idée : … ») → routée vers idée→/goal (le mur §2)", () => {
+		const v = rejudgeDesignProposal(
+			MASTER,
+			"web",
+			"capture l'idée : ajouter un champ description au produit",
+		);
+		expect(v.nature).toBe("structural");
+		if (v.nature !== "structural") return;
+		// La phrase à send() est la PORTE du mur (jamais un ScreenDesign below-the-line).
+		expect(v.phrase.startsWith("capture l'idée :")).toBe(true);
+		expect(v.need).toContain("champ description");
+	});
+
+	it("une proposition NON RECONNUE (ni adaptation ni capture) → REFUSÉE (fail-closed)", () => {
+		const v = rejudgeDesignProposal(
+			MASTER,
+			"web",
+			"fais quelque chose de beau",
+		);
+		expect(v.nature).toBe("refused");
+	});
+
+	it("∀ proposition (texte arbitraire) : le verdict est TOTAL ∈ {styling,structural,refused}, jamais un crash", () => {
+		fc.assert(
+			fc.property(fc.string(), (text) => {
+				const v = rejudgeDesignProposal(MASTER, "web", text);
+				expect(["styling", "structural", "refused"]).toContain(v.nature);
+				// Un styling DOIT porter un ScreenDesign content-adressé valide ; un refus, un block.
+				if (v.nature === "styling") {
+					expect(v.design.parentId).toBe(MASTER_HASH);
+					expect(typeof v.design.id).toBe("string");
+				}
+				if (v.nature === "refused") expect(typeof v.block.code).toBe("string");
+			}),
+		);
+	});
+
+	it("∀ token DU CATALOGUE : « adapte produit : <p>=<t> » → styling ; un token étranger → refusé (la frontière exacte)", () => {
+		const props = Object.keys(STYLE_TOKENS);
+		fc.assert(
+			fc.property(fc.constantFrom(...props), (property) => {
+				const tok = STYLE_TOKENS[property][0];
+				const valid = rejudgeDesignProposal(
+					MASTER,
+					"web",
+					`adapte produit : ${property}=${tok}`,
+				);
+				expect(valid.nature).toBe("styling");
+				// Un token jamais déclaré pour cette property → REFUSÉ (jamais coercé).
+				const bad = rejudgeDesignProposal(
+					MASTER,
+					"web",
+					`adapte produit : ${property}=zzz_intrus`,
+				);
+				expect(bad.nature).toBe("refused");
+			}),
+		);
+	});
+
+	it("IA ÉTEINTE : le texte brut canonique passe le MÊME re-jugement (le chemin déterministe suffit)", () => {
+		// IA éteinte, la lentille passe le texte BRUT ; comme il EST une phrase canonique,
+		// le verdict est IDENTIQUE à celui d'une proposition LLM — le rejeu reste vert sans IA.
+		const phrase = "adapte produit : bg=card radius=lg";
+		const v = rejudgeDesignProposal(MASTER, "web", phrase);
+		expect(v.nature).toBe("styling");
+		if (v.nature !== "styling") return;
+		const golden = composeScreenDesign(MASTER, "web", [
+			{
+				coord: { kind: "section", entity: "produit" },
+				styles: [
+					{ property: "bg", token: "card" },
+					{ property: "radius", token: "lg" },
+				],
+			},
+		]);
+		expect(golden.ok).toBe(true);
+		if (!golden.ok) return;
+		expect(v.design.id).toBe(golden.design.id);
+	});
+});
+
+describe("(k) parseAdaptProposal + resolveCoordRef — les primitives PURES du re-jugement", () => {
+	it("resolveCoordRef résout les 3 natures (section/champ) et REFUSE une référence absente", () => {
+		expect(resolveCoordRef(MASTER, "produit")).toEqual({
+			kind: "section",
+			entity: "produit",
+		});
+		expect(resolveCoordRef(MASTER, "produit.prix")).toEqual({
+			kind: "field",
+			entity: "produit",
+			field: "prix",
+		});
+		// fail-closed : une référence sans coordonnée correspondante → null (jamais inventée).
+		expect(resolveCoordRef(MASTER, "inconnu")).toBeNull();
+		expect(resolveCoordRef(MASTER, "")).toBeNull();
+	});
+
+	it("parseAdaptProposal lit « adapte <ref> : <p>=<t> [<p>=<t>] » et fail-close sans « : »/token", () => {
+		const a = parseAdaptProposal("adapte produit : bg=card text=primary");
+		expect(a).not.toBeNull();
+		expect(a?.ref).toBe("produit");
+		expect(a?.tokens).toEqual([
+			{ property: "bg", token: "card" },
+			{ property: "text", token: "primary" },
+		]);
+		expect(parseAdaptProposal("adapte produit bg card")).toBeNull(); // pas de « : »
+		expect(parseAdaptProposal("adapte produit : rien")).toBeNull(); // aucun token
+	});
+
+	it("∀ entrée arbitraire : parseAdaptProposal ne crash JAMAIS (null ou un objet bien formé)", () => {
+		fc.assert(
+			fc.property(fc.string(), (text) => {
+				const a = parseAdaptProposal(text);
+				if (a !== null) {
+					expect(typeof a.ref).toBe("string");
+					expect(a.tokens.length).toBeGreaterThan(0);
+				}
+			}),
 		);
 	});
 });

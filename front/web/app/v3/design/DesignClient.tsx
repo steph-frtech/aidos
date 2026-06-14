@@ -2,7 +2,19 @@
 
 import { useMemo, useState } from "react";
 import { emitApp } from "@/lib/v2/builder";
+import type { VersionDag } from "@/lib/v2/version-dag";
 import type { FromIframe, ToIframe } from "@/lib/v3/design/bridge-protocol";
+import {
+	applyDesignMove,
+	buildDesignDag,
+	currentHead,
+	DESIGN_ROOT_LABEL,
+	type DesignBranchMove,
+	type DesignCapture,
+	type DesignCheckpoint,
+	listCheckpoints,
+	mergeReadiness,
+} from "@/lib/v3/design/design-branches";
 import {
 	componentKindKey,
 	deriveLayersTree,
@@ -13,9 +25,11 @@ import {
 	canonicalAdaptPhrase,
 	composeScreenDesign,
 	coordRef,
+	type DesignVerdict,
 	type DragGesture,
 	type MasterDescriptor,
 	PROPERTY_PREFIX,
+	rejudgeDesignProposal,
 	routeDrag,
 	routeStructuralGesture,
 	type ScreenCoord,
@@ -28,6 +42,7 @@ import {
 import { envStackOf } from "@/lib/v3/instance";
 import type { Strings } from "../friendly";
 import { useV3Session } from "../V3Session";
+import { designBranchPersistAction, designChatTurnAction } from "./actions";
 import { DesignIframe } from "./DesignIframe";
 
 /**
@@ -84,7 +99,8 @@ const PROPERTY_LABEL_KEY: Readonly<Record<string, string>> = {
 };
 
 export function DesignClient() {
-	const { state, send, instanceConfig, projectId, strings } = useV3Session();
+	const { state, send, instanceConfig, projectId, strings, aiEnabled } =
+		useV3Session();
 	const t = strings as Strings;
 
 	// L'URL live de l'app en dev : le motif %project%-%env% (envStackOf, ADR 0062).
@@ -103,7 +119,7 @@ export function DesignClient() {
 	const showIframe = deployedDev && devUrl !== "";
 
 	// La cible enfant en cours de design (web par défaut — la 1re voie d'adaptation web, ADR 0071).
-	const target: "web" = "web";
+	const target = "web" as const;
 
 	// L'app PROJETÉE depuis l'état (le twin emitApp — pure, jamais stockée). Chaque entité émise
 	// est une SECTION ; sa route est l'écran. C'est la coordonnée que l'app PIN, lisible hors iframe
@@ -272,6 +288,75 @@ export function DesignClient() {
 	/** LE DÉPLOIEMENT en dev : send(« déploie l'application en dev ») — l'app live devient designable. */
 	const deployDev = () => void send("déploie l'application en dev");
 
+	// ─── LE CHAT IA GATÉ DU DESIGN LAB (Tranche 4, ADR 0071 §4) ───────────────────────────
+	// L'utilisateur écrit en langage NATUREL LIBRE. IA active → le LLM PROPOSE une phrase
+	// canonique (designChatTurnAction) ; IA éteinte → le texte BRUT EST la proposition. Dans
+	// LES DEUX cas, rejudgeDesignProposal (le DÉTERMINISTE, l'AUTORITÉ) re-juge AVANT capture :
+	//   · styling valide   → send(phrase canonique) — re-jugé par le réducteur (ecran_adapte) ;
+	//   · structurel       → send(« capture l'idée : … ») — la porte idée→/goal (le mur §2) ;
+	//   · refusé           → un message clair, JAMAIS capturé (fail-closed, le mur §8).
+	// Le LLM ne capture JAMAIS directement : il propose, le déterministe dispose.
+	const [chatInput, setChatInput] = useState("");
+	const [chatReply, setChatReply] = useState<string | null>(null);
+	const [chatVerdict, setChatVerdict] = useState<DesignVerdict | null>(null);
+	const [chatBusy, setChatBusy] = useState(false);
+
+	/** Le RÉSUMÉ des coordonnées que le master PIN (pour le prompt — jamais une coordonnée inventée). */
+	const coordsSummary = useMemo(
+		() => master.coords.map((c) => coordRef(c)).join(", "),
+		[master],
+	);
+
+	/** Le RÉSUMÉ du catalogue FERMÉ (les properties + leurs jetons — le LLM ne propose que ça). */
+	const catalogueSummary = useMemo(
+		() =>
+			Object.entries(STYLE_TOKENS)
+				.map(([p, toks]) => `${p}: ${toks.join("/")}`)
+				.join(" · "),
+		[],
+	);
+
+	/**
+	 * UN TOUR de chat design : free NL → (IA) proposition LLM OU (déterministe) texte brut →
+	 * RE-JUGÉ par rejudgeDesignProposal (l'autorité). Un verdict valide est send()é (re-jugé une
+	 * 2e fois par le réducteur — défense en profondeur) ; un refus reste affiché, jamais capturé.
+	 */
+	const submitChat = async () => {
+		const text = chatInput.trim();
+		if (text === "" || chatBusy) return;
+		setChatBusy(true);
+		setChatReply(null);
+		setChatVerdict(null);
+		try {
+			// La PROPOSITION : le LLM (IA active) OU le texte brut (IA éteinte — le rejeu déterministe).
+			let proposal = text;
+			let reply: string | null = null;
+			if (aiEnabled) {
+				const out = await designChatTurnAction(
+					text,
+					coordsSummary,
+					catalogueSummary,
+				);
+				// Panne / réponse vide → repli déterministe : le texte brut EST la proposition.
+				if (out !== null) {
+					reply = out.reply;
+					proposal = out.proposal.trim() === "" ? text : out.proposal;
+				}
+			}
+			// LE RE-JUGEMENT DÉTERMINISTE (l'autorité) — le catalogue FERMÉ + composeScreenDesign.
+			const verdict = rejudgeDesignProposal(master, target, proposal);
+			setChatReply(reply);
+			setChatVerdict(verdict);
+			// Le déterministe DISPOSE : un verdict valide est send()é (re-jugé encore par le réducteur).
+			if (verdict.nature === "styling" || verdict.nature === "structural") {
+				setChatInput("");
+				void send(verdict.phrase);
+			}
+		} finally {
+			setChatBusy(false);
+		}
+	};
+
 	/** Les messages du bridge (iframe live) : re-sync coords + remontée d'une édition finie. */
 	const onBridge = (msg: FromIframe) => {
 		if (msg.type === "ready") {
@@ -292,6 +377,76 @@ export function DesignClient() {
 
 	// LES ÉVÉNEMENTS d'adaptation déjà émis dans la session (le journal below-the-line, rejoué).
 	const adaptations = state.log.filter((e) => e.kind === "ecran_adapte");
+
+	// ─── TRANCHE 5 : LES BRANCHES DE DESIGN = LE VERSION DAG S24 + LES CHECKPOINTS ────────────
+	// Les branches/checkpoints Onlook MAPPÉS sur le DAG S24 (ADR 0071 §5). RÉUTILISE le twin S24
+	// (lib/v3/design/design-branches → lib/v2/version-dag) — JAMAIS une logique recopiée. Le DAG est
+	// SEEDÉ depuis la maître (la racine = la version de référence) puis chaque adaptation capturée
+	// (un `ecran_adapte`, content-adressé) est PLIÉE en une arête (un ChangeSet S20) faisant avancer
+	// la tête. Les mouvements (brancher / forker depuis un ancien point / restaurer un checkpoint)
+	// sont DÉTERMINISTES (le twin l'autorité, §8) ; la persistance passe par designBranchPersistAction
+	// (une projection below-the-line, le mur §2 ; le MCP `dag` rôle `aidos` est le back-fill Postgres).
+
+	// Les captures de design de la session → les arêtes du DAG (l'id = le ref+detail de l'événement).
+	const designCaptures: DesignCapture[] = useMemo(
+		() =>
+			adaptations.map((e, i) => ({
+				captureId: `sd:${e.ref}:${i}`,
+				label: e.detail,
+			})),
+		[adaptations],
+	);
+
+	// Le DAG de design COURANT : seedé + plié des captures, puis surchargé des mouvements de branche
+	// joués dans la session (l'override pur en mémoire — la même donnée recalculée, jamais stockée).
+	const [branchDag, setBranchDag] = useState<VersionDag | null>(null);
+	const seededDag = useMemo(
+		() => buildDesignDag(designCaptures).dag,
+		[designCaptures],
+	);
+	// Le DAG affiché : l'override de mouvements s'il existe, sinon le DAG seedé du transcript.
+	const dag = branchDag ?? seededDag;
+
+	// Les checkpoints (topo-triés) que l'écran pose ; la tête courante (« où vous êtes »).
+	const checkpoints = useMemo(() => listCheckpoints(dag), [dag]);
+	const head = useMemo(() => currentHead(dag), [dag]);
+	const merge = useMemo(() => mergeReadiness(dag), [dag]);
+
+	// Le checkpoint OUVERT (cliqué) — pour naviguer/forker/restaurer depuis lui. Déterministe.
+	const [openCheckpoint, setOpenCheckpoint] = useState<string | null>(null);
+
+	/** Le compteur de branches créées dans la session — un label lisible déterministe (jamais une horloge). */
+	const [branchSeq, setBranchSeq] = useState(0);
+
+	/**
+	 * APPLIQUE un mouvement de branche de design (le jeu CLOS branch/fork/restore). DÉTERMINISTE :
+	 * le twin (l'autorité, §8) calcule le nouveau DAG ; on PERSISTE la projection (below-the-line, le
+	 * mur §2) en tir-et-oublie (une panne d'écriture ne casse jamais l'écran). Le label est lisible
+	 * et déterministe (branche-N / fork-N) ; le changeset réutilise l'id de la tête (la relation S20).
+	 */
+	const applyMove = (move: DesignBranchMove, targetId: string) => {
+		const seq = branchSeq + 1;
+		const label =
+			move === "branch"
+				? `branche-${seq}`
+				: move === "fork"
+					? `fork-${seq}`
+					: (dag.nodes.find((n) => n.id === targetId)?.label ?? targetId);
+		const changeset = `csd:${move}:${seq}`;
+		const next = applyDesignMove(dag, move, targetId, label, changeset);
+		setBranchDag(next);
+		if (move !== "restore") setBranchSeq(seq);
+		setOpenCheckpoint(currentHead(next)?.id ?? targetId);
+		if (projectId !== null) {
+			void designBranchPersistAction(projectId, move, next).catch(() => {});
+		}
+	};
+
+	/** Le checkpoint OUVERT (l'objet), ou null. */
+	const openCp: DesignCheckpoint | null = useMemo(
+		() => checkpoints.find((c) => c.id === openCheckpoint) ?? null,
+		[checkpoints, openCheckpoint],
+	);
 
 	/** Le NOM AFFICHABLE du composant (la source-kind) d'un nœud — i18n, jamais devinée. */
 	const componentLabel = (n: LayerNode): string | null => {
@@ -744,6 +899,251 @@ export function DesignClient() {
 							</div>
 						</div>
 					))}
+				</section>
+
+				{/* · LE CHAT IA GATÉ (Tranche 4) : langage naturel → proposition → re-jugé déterministe */}
+				<section
+					data-testid="v3-design-chat"
+					className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+				>
+					<div className="space-y-1">
+						<h2 className="text-sm font-semibold text-foreground">
+							{t.designChatHeading}
+						</h2>
+						<p className="text-xs leading-relaxed text-muted-foreground">
+							{t.designChatHint}
+						</p>
+					</div>
+
+					<div className="flex items-end gap-2">
+						<textarea
+							data-testid="v3-design-chat-input"
+							value={chatInput}
+							rows={2}
+							aria-label={t.designChatPlaceholder}
+							onChange={(e) => setChatInput(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" && !e.shiftKey) {
+									e.preventDefault();
+									void submitChat();
+								}
+							}}
+							placeholder={t.designChatPlaceholder}
+							className="max-h-32 min-h-[3rem] flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30 focus:outline-none"
+						/>
+						<button
+							type="button"
+							data-testid="v3-design-chat-send"
+							disabled={chatInput.trim() === "" || chatBusy}
+							onClick={() => void submitChat()}
+							className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							{t.designChatSend}
+						</button>
+					</div>
+
+					{/* l'indicateur de frappe (le tour IA en cours) */}
+					{chatBusy && (
+						<p
+							data-testid="v3-design-chat-busy"
+							className="text-[11px] text-muted-foreground italic"
+						>
+							{t.designChatBusy}
+						</p>
+					)}
+
+					{/* la réponse chaleureuse du LLM (IA active) — décor, jamais autoritaire */}
+					{chatReply !== null && (
+						<p
+							data-testid="v3-design-chat-reply"
+							className="rounded-md border border-border bg-muted/30 px-2.5 py-2 text-[11px] leading-relaxed text-foreground"
+						>
+							{chatReply}
+						</p>
+					)}
+
+					{/* LE VERDICT du re-jugement déterministe (l'autorité) — proposition → disposition */}
+					{chatVerdict !== null && chatVerdict.nature === "styling" && (
+						<div
+							data-testid="v3-design-chat-styling"
+							className="space-y-1.5 rounded-md border border-primary/40 bg-primary/5 px-2.5 py-2"
+						>
+							<p className="text-[11px] font-medium text-primary">
+								{t.designChatStyling}
+							</p>
+							<p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+								{chatVerdict.phrase}
+							</p>
+							<p className="font-mono text-[10px] text-muted-foreground">
+								ScreenDesign DRAFT —{" "}
+								<span data-testid="v3-design-chat-design-id">
+									{chatVerdict.design.id.slice(0, 12)}…
+								</span>
+							</p>
+						</div>
+					)}
+					{chatVerdict !== null && chatVerdict.nature === "structural" && (
+						<div
+							data-testid="v3-design-chat-structural"
+							className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-2"
+						>
+							<p className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
+								{t.designChatStructural}
+							</p>
+							<p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+								{chatVerdict.phrase}
+							</p>
+						</div>
+					)}
+					{chatVerdict !== null && chatVerdict.nature === "refused" && (
+						<p
+							data-testid="v3-design-chat-refused"
+							className="rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-2 text-[11px] leading-relaxed text-destructive"
+						>
+							{chatVerdict.block.explanation}
+						</p>
+					)}
+
+					<p className="text-[11px] leading-relaxed text-muted-foreground italic">
+						{t.designChatWall}
+					</p>
+				</section>
+
+				{/* · LES BRANCHES DE DESIGN (Tranche 5) : le VERSION DAG S24 + les checkpoints */}
+				<section
+					data-testid="v3-design-branches"
+					data-node-count={dag.nodes.length}
+					data-edge-count={dag.edges.length}
+					className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+				>
+					<div className="space-y-1">
+						<h2 className="text-sm font-semibold text-foreground">
+							{t.designBranchHeading}
+						</h2>
+						<p className="text-xs leading-relaxed text-muted-foreground">
+							{t.designBranchHint}
+						</p>
+					</div>
+
+					{/* « Où vous êtes » : la tête courante du DAG de design. */}
+					<p className="text-xs text-muted-foreground">
+						{t.designBranchHead} :{" "}
+						<span
+							data-testid="v3-design-branch-head"
+							className="rounded-md bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-primary"
+						>
+							{head?.label ?? DESIGN_ROOT_LABEL}
+						</span>
+					</p>
+
+					{/* LA LIGNE DE VERSIONS (topo-triée) : chaque checkpoint cliquable (naviguer). */}
+					<ul data-testid="v3-design-checkpoints" className="space-y-1">
+						{checkpoints.map((c) => {
+							const isHead = c.head;
+							const isOpen = c.id === openCheckpoint;
+							return (
+								<li key={c.id}>
+									<button
+										type="button"
+										data-testid="v3-design-checkpoint"
+										data-label={c.label}
+										data-head={isHead ? "true" : "false"}
+										data-root={c.isRoot ? "true" : "false"}
+										aria-current={isOpen ? "true" : undefined}
+										onClick={() => setOpenCheckpoint(c.id)}
+										className={[
+											"flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors",
+											isOpen
+												? "border-primary bg-primary/10 font-semibold text-primary"
+												: "border-border bg-background text-foreground hover:border-primary/40 hover:bg-primary/5",
+										].join(" ")}
+										style={{ paddingLeft: `${0.625 + c.rank * 0.6}rem` }}
+									>
+										<span className="min-w-0 flex-1 truncate font-mono">
+											{c.label}
+										</span>
+										{c.isRoot && (
+											<span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+												{t.designBranchRoot}
+											</span>
+										)}
+										{isHead && (
+											<span
+												data-testid="v3-design-checkpoint-head"
+												className="shrink-0 text-primary"
+											>
+												●
+											</span>
+										)}
+									</button>
+								</li>
+							);
+						})}
+					</ul>
+
+					{/* LES MOUVEMENTS (le jeu CLOS §121) sur le checkpoint OUVERT : brancher / forker /
+					    restaurer. Déterministes (le twin l'autorité) ; persistés below-the-line (le mur §2). */}
+					{openCp !== null && (
+						<div
+							data-testid="v3-design-branch-actions"
+							className="space-y-2 border-t border-border pt-3"
+						>
+							<p className="text-[11px] text-muted-foreground">
+								{t.designBranchSelected} :{" "}
+								<span
+									data-testid="v3-design-branch-open"
+									className="font-mono text-foreground"
+								>
+									{openCp.label}
+								</span>
+							</p>
+							<div className="flex flex-wrap gap-2">
+								{/* BRANCHER une ligne alternative depuis le checkpoint ouvert. */}
+								<button
+									type="button"
+									data-testid="v3-design-branch-create"
+									onClick={() => applyMove("branch", openCp.id)}
+									className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+								>
+									{t.designBranchCreate}
+								</button>
+								{/* FORKER depuis un ANCIEN point (checkout ancêtre + rebranch — l'ancienne ligne reste). */}
+								<button
+									type="button"
+									data-testid="v3-design-branch-fork"
+									onClick={() => applyMove("fork", openCp.id)}
+									className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+								>
+									{t.designBranchFork}
+								</button>
+								{/* RESTAURER ce checkpoint (un head-flag move arrière — rien supprimé). */}
+								<button
+									type="button"
+									data-testid="v3-design-branch-restore"
+									disabled={openCp.head}
+									onClick={() => applyMove("restore", openCp.id)}
+									className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+								>
+									{t.designBranchRestore}
+								</button>
+							</div>
+						</div>
+					)}
+
+					{/* LA LISIBILITÉ du MERGE (§122) : deux pointes divergentes → réconciliables par le
+					    merge SÉMANTIQUE (le miroir décide, jamais le diff textuel — back/archive/merge). */}
+					{merge.canMerge && (
+						<p
+							data-testid="v3-design-merge-ready"
+							className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-400"
+						>
+							{t.designBranchMerge}
+						</p>
+					)}
+
+					<p className="text-[11px] leading-relaxed text-muted-foreground italic">
+						{t.designBranchWall}
+					</p>
 				</section>
 
 				<p className="px-1 text-[11px] leading-relaxed text-muted-foreground italic">
