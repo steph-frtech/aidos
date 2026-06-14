@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { emitApp } from "@/lib/v2/builder";
+import { provisionStatusAction } from "../environnements/deploy-actions";
 import type { VersionDag } from "@/lib/v2/version-dag";
 import type { FromIframe, ToIframe } from "@/lib/v3/design/bridge-protocol";
 import {
@@ -116,7 +117,27 @@ export function DesignClient() {
 	// dans la session ; ADR 0052 : le déploiement réel est gaté, l'aperçu v0 suffit au studio).
 	// Tant qu'elle n'est pas déployée, on offre le geste de déploiement (jamais une iframe morte).
 	const deployedDev = state.envs.dev !== null && state.envs.dev !== undefined;
-	const showIframe = deployedDev && devUrl !== "";
+	// #4 (ADR 0071) — l'app est-elle RÉELLEMENT en ligne ? On poll le /healthz de <slug>-dev :
+	// si la stack du projet est montée (le vrai déploiement par projet), on monte l'IFRAME LIVE
+	// même si la session n'a pas encore de version dev — ainsi le studio designe sur la VRAIE app
+	// déployée et la preview optimiste (bg=rouge…) S'Y VOIT. Sans app live, on garde le geste deploy.
+	const [appLive, setAppLive] = useState(false);
+	useEffect(() => {
+		if (projectId === null) {
+			setAppLive(false);
+			return;
+		}
+		let alive = true;
+		void provisionStatusAction(projectId)
+			.then((r) => {
+				if (alive) setAppLive(r.up);
+			})
+			.catch(() => {});
+		return () => {
+			alive = false;
+		};
+	}, [projectId]);
+	const showIframe = (deployedDev || appLive) && devUrl !== "";
 
 	// La cible enfant en cours de design (web par défaut — la 1re voie d'adaptation web, ADR 0071).
 	const target = "web" as const;
@@ -1194,7 +1215,7 @@ export function DesignClient() {
 						<ul className="space-y-1">
 							{adaptations.map((e) => (
 								<li
-									key={`${e.ref} ${e.detail}`}
+									key={`${e.ref}-${e.detail}`}
 									data-testid="v3-design-applied-row"
 									className="rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-[11px] leading-relaxed text-muted-foreground"
 								>
