@@ -53,6 +53,24 @@ const (
 // targets the interpreter container by name on this port. Declared, never guessed.
 const interpreterInternalPort = 8080
 
+// The SHARED-substrate handles the emitted Hono server gets by DEFAULT (the user intention « toute belle
+// app … utilise le substrat gelé par défaut » — telemetry/cache/bus). They mirror the declared motifs in
+// front/web/lib/v3/instance.ts STACK_SERVICES: the collector + bus are INSTANCE-LEVEL (shared, no env),
+// the cache is PER-ENV (valkey-<env>). All reached by DNS name on the shared external traefik network —
+// the per-project program adds the ENV to reach them, never the (already-running) shared containers.
+const (
+	// otelTracesEndpoint — the shared OpenTelemetry collector's OTLP/HTTP BASE endpoint. The emitted
+	// instrumentation.ts (Task 1) builds the exporter url as `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`,
+	// so this MUST be the base (no /v1/traces suffix — else the url doubles to /v1/traces/v1/traces → 404).
+	// Absent → the app's startTelemetry() is a silent no-op, never a crash.
+	otelTracesEndpoint = "http://opentelemetry-collector:4318"
+	// natsURL — the shared NATS bus (instance-level, no per-env).
+	natsURL = "nats://nats:4222"
+	// valkeyHostPrefix — the per-env Valkey cache host prefix; the env is appended: valkey-<env>:6379.
+	valkeyHostPrefix = "valkey-"
+	valkeyPort       = "6379"
+)
+
 // StackHonoOpts is the OPT-IN data-mount + image dimension EmitPulumiStackHono adds. The ZERO value
 // renders the wired 3-container topology with the default images and NO data mounts (a valid, runnable
 // stack against an empty-but-initialised DB). With DataDir set, the datastore mounts the emitted
@@ -145,6 +163,15 @@ var (
 	ErrNoInterpreter = fmt.Errorf("honoemit: clean Hono stack declares no service role=interpreter (the sidecar)")
 	ErrNoDatastore   = fmt.Errorf("honoemit: clean Hono stack declares no service role=datastore (postgres)")
 )
+
+// envOf returns the env portion of a <project>-<env> stack id (everything after the LAST "-"), mirroring
+// projectOf. The per-env substrate handle (the cache: valkey-<env>) substitutes this. Pure & total.
+func envOf(stack string) string {
+	if i := strings.LastIndex(stack, "-"); i >= 0 {
+		return stack[i+1:]
+	}
+	return stack
+}
 
 // interpreterOf returns the (canonically-first) interpreter service, or false if none. The server's
 // INTERPRETER_URL targets it by container name.
@@ -365,6 +392,11 @@ func emitServerBodyHono(b *strings.Builder, stack, domain, netAttach string, s, 
 		fmt.Fprintf(b, "\t\t\t%s,\n", jsStr(url))
 	}
 	fmt.Fprintf(b, "\t\t\t%s,\n", jsStr(fmt.Sprintf("PORT=%d", s.InternalPort)))
+	// THE SUBSTRATE-BY-DEFAULT: the emitted app reaches the shared instance services (telemetry/cache/bus)
+	// by DNS name on the shared external network. The collector + bus are instance-level (shared); the
+	// cache is per-env (valkey-<env>); the OTel service.name defaults to the project namespace. Task 1's
+	// instrumentation reads OTEL_EXPORTER_OTLP_ENDPOINT/OTEL_SERVICE_NAME; the server reads REDIS_URL/NATS_URL.
+	emitServerSubstrateEnv(b, projectOf(stack), envOf(stack))
 	b.WriteString("\t\t],\n")
 
 	fmt.Fprintf(b, "\t\t%s\n", netAttach)
@@ -383,4 +415,17 @@ func emitServerBodyHono(b *strings.Builder, stack, domain, netAttach string, s, 
 	fmt.Fprintf(b, "\t\t\t{ label: %s, value: %s },\n",
 		jsStr("traefik.http.services."+stack+".loadbalancer.server.port"), jsStr(fmt.Sprintf("%d", s.InternalPort)))
 	b.WriteString("\t\t],\n")
+}
+
+// emitServerSubstrateEnv appends the four SHARED-substrate env handles the emitted Hono server gets by
+// default: OTEL_EXPORTER_OTLP_ENDPOINT (the shared collector's OTLP/HTTP traces endpoint), OTEL_SERVICE_NAME
+// (the OTel service.name, default = the project namespace), REDIS_URL (the PER-ENV shared Valkey cache,
+// valkey-<env>) and NATS_URL (the shared NATS bus). The collector + bus are instance-level (no env); only
+// the cache is per-env. Deterministic, byte-stable, fixed order. The values mirror the declared motifs in
+// front/web/lib/v3/instance.ts STACK_SERVICES (the single source of the substrate addresses).
+func emitServerSubstrateEnv(b *strings.Builder, project, env string) {
+	fmt.Fprintf(b, "\t\t\t%s,\n", jsStr("OTEL_EXPORTER_OTLP_ENDPOINT="+otelTracesEndpoint))
+	fmt.Fprintf(b, "\t\t\t%s,\n", jsStr("OTEL_SERVICE_NAME="+project))
+	fmt.Fprintf(b, "\t\t\t%s,\n", jsStr("REDIS_URL=redis://"+valkeyHostPrefix+env+":"+valkeyPort))
+	fmt.Fprintf(b, "\t\t\t%s,\n", jsStr("NATS_URL="+natsURL))
 }

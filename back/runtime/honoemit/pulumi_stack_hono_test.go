@@ -85,6 +85,50 @@ func TestStackHono_WiresThreeContainers(t *testing.T) {
 	}
 }
 
+// TestStackHono_ServerHasSubstrateEnv — the substrate-by-default frontier (the user intention « toute
+// belle app … utilise le substrat gelé par défaut »): the EMITTED Hono server container carries, in its
+// env, the four substrate handles to the SHARED instance services (telemetry/cache/bus), so the app is
+// wired to observability + cache + bus out of the box. The %env% is substituted to the stack's env (the
+// cache is per-env: valkey-<env>); the collector + bus are the shared instance-level containers reached
+// by DNS name on the same external network. Deterministic, byte-stable.
+func TestStackHono_ServerHasSubstrateEnv(t *testing.T) {
+	arts, br := EmitPulumiStackHono("shop", "staging", honoManifest(), StackHonoOpts{})
+	if br != nil {
+		t.Fatalf("EmitPulumiStackHono refused: %s", br.Explanation)
+	}
+	s := string(artByPath(t, arts, "gen/shop/infra/index.ts").Bytes)
+	for _, want := range []string{
+		// telemetry: the OTLP/HTTP BASE endpoint of the shared collector (Task 1's exporter appends
+		// /v1/traces). %env% irrelevant — the collector is instance-level (shared).
+		"OTEL_EXPORTER_OTLP_ENDPOINT=http://opentelemetry-collector:4318",
+		// telemetry: the OTel service.name defaults to the project namespace.
+		"OTEL_SERVICE_NAME=shop",
+		// cache: the SHARED Valkey, per-env (valkey-<env> — here staging).
+		"REDIS_URL=redis://valkey-staging:6379",
+		// bus: the SHARED NATS, instance-level (no %env%).
+		"NATS_URL=nats://nats:4222",
+	} {
+		mustContain(t, s, want, "clean Hono server substrate env")
+	}
+}
+
+// TestStackHono_CachePerEnv — the cache is the ONLY %env%-substituted substrate handle: dev/staging/prod
+// each point at their own valkey-<env>; the collector + bus stay instance-level (no env in the host).
+func TestStackHono_CachePerEnv(t *testing.T) {
+	for _, env := range []string{"dev", "staging", "prod"} {
+		arts, br := EmitPulumiStackHono("shop", env, honoManifest(), StackHonoOpts{})
+		if br != nil {
+			t.Fatalf("env %q refused: %s", env, br.Explanation)
+		}
+		s := string(artByPath(t, arts, "gen/shop/infra/index.ts").Bytes)
+		mustContain(t, s, "REDIS_URL=redis://valkey-"+env+":6379", "per-env cache handle")
+		// the bus + collector never carry the env (they are shared instance-level services).
+		if strings.Contains(s, "nats-"+env) || strings.Contains(s, "opentelemetry-collector-"+env) {
+			t.Fatalf("env %q: a shared substrate service was wrongly per-env'd:\n%s", env, s)
+		}
+	}
+}
+
 // TestStackHono_SidecarHasNoTraefikLabels — the sidecar is INTERNAL: only the server bears Traefik
 // labels. The interpreter container must carry envs but NO `traefik.enable` route (never public).
 func TestStackHono_SidecarHasNoTraefikLabels(t *testing.T) {
