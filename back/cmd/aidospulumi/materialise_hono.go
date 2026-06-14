@@ -24,11 +24,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
+	"github.com/steph-frtech/aidos/back/kernel/action"
+	"github.com/steph-frtech/aidos/back/kernel/control"
+	"github.com/steph-frtech/aidos/back/kernel/entities"
 	"github.com/steph-frtech/aidos/back/kernel/operation"
 	"github.com/steph-frtech/aidos/back/runtime/appdata"
 	"github.com/steph-frtech/aidos/back/runtime/honoemit"
 )
+
+// webBuildDir is the relative path (inside the server image) where the BUILT React view lands — the
+// path server.ts's serveStatic resolves and the server Dockerfile's web stage copies dist/ to. One
+// source of truth shared by the server spec (WebDir) and the emitted Dockerfile.
+const webBuildDir = "./web/dist"
 
 // honoDefaultManifest returns the clean-Hono-path 3-container topology for a project×env: the emitted
 // Hono server (role=server) + the Go interpreter sidecar (role=interpreter) + postgres (role=datastore),
@@ -180,6 +189,20 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath string) (Materia
 		return Materialised{}, fmt.Errorf("emitter refused the Hono server scaffold (%s): %s", br.Code, br.Explanation)
 	}
 
+	// (a3) Emit the React VIEW (EmitWebApp) into <serverDir>/web/ — INSIDE the server's docker build
+	// context, so the server Dockerfile's `web` stage runs `vite build` over it and the runtime serves
+	// the built dist/ (server.ts's serveStatic). This is the project's OWN view DERIVED from its
+	// entities (S35) + controls→actions (S11) — the app SERVES it on GET /, not a placeholder. Emission
+	// is PURE + deterministic (EmitWebApp, S38-bis). A malformed cut is a typed refusal, never a partial.
+	web, br := honoemit.EmitWebApp(projectWebSpec(project))
+	if br != nil {
+		return Materialised{}, fmt.Errorf("emitter refused the React view (%s): %s", br.Code, br.Explanation)
+	}
+	webDir := filepath.Join(serverDir, "web")
+	if err := os.MkdirAll(webDir, 0o755); err != nil {
+		return Materialised{}, fmt.Errorf("create %s: %w", webDir, err)
+	}
+
 	// (b) Emit the WIRED Pulumi program (3 containers) and land the three files byte-identically.
 	arts, br := honoemit.EmitPulumiStackHono(project, env, honoDefaultManifest(project), opts)
 	if br != nil {
@@ -209,6 +232,16 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath string) (Materia
 		files["server/"+name] = a.OutputHash
 	}
 
+	// Land the React VIEW under <serverDir>/web/ (byte-stable). Keyed "server/web/<base>" so the result
+	// inventory is unambiguous and the idempotence mirror covers it. The server Dockerfile builds it.
+	for _, a := range web {
+		name := filepath.Base(a.Path)
+		if err := os.WriteFile(filepath.Join(webDir, name), a.Bytes, 0o644); err != nil {
+			return Materialised{}, fmt.Errorf("write server/web/%s: %w", name, err)
+		}
+		files["server/web/"+name] = a.OutputHash
+	}
+
 	return Materialised{
 		Project:   project,
 		Env:       env,
@@ -224,13 +257,35 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath string) (Materia
 // sidecar registers (today the createOrder anchor; when the kernel.operation projection lands, the
 // executor reads the project's operations from the truth-store). It is a below-the-line projection
 // INPUT, never a truth write; the emitter renders exactly the ops it pins (one POST route per op).
+//
+// It ALSO carries the served VIEW: the entity names the list views read (so the server emits the read
+// route GET /entities/<e>) and the WebDir (so the server serves the static React build on GET /). The
+// entities are the SAME cut projectWebSpec lists — one source, the server reads what the view lists.
 func projectServerSpec(project string) honoemit.ServerSpec {
 	ops := []operation.Operation{operation.CreateOrder()}
 	view := make([]honoemit.Op, 0, len(ops))
 	for _, op := range ops {
 		view = append(view, honoemit.Op{Name: op.Name})
 	}
-	return honoemit.ServerSpec{Project: project, Ops: view}
+	web := projectWebSpec(project)
+	ents := make([]string, 0, len(web.Entities))
+	for _, e := range web.Entities {
+		ents = append(ents, strings.ToLower(e.Name))
+	}
+	return honoemit.ServerSpec{Project: project, Ops: view, Entities: ents, WebDir: webBuildDir}
+}
+
+// projectWebSpec builds the React VIEW spec from the project's entities (S35) + control→action cut
+// (S11) — the SAME tree the server serves. Today the demo cut (Order + the checkout button → createOrder
+// anchor); when the kernel projections land, the executor reads the project's entities/controls from the
+// truth-store. It is a below-the-line projection INPUT, never a truth write; EmitWebApp renders exactly
+// what it pins (one list view per entity, one button per control→action).
+func projectWebSpec(project string) honoemit.WebAppSpec {
+	return honoemit.WebAppSpec{
+		Project:  project,
+		Entities: []entities.Entity{entities.Order()},
+		Buttons:  []honoemit.ControlAction{{Control: control.CheckoutButton(), Action: action.CheckoutSubmit()}},
+	}
 }
 
 // BuildHonoServerImage is the GATED docker gesture (the side-effecting half of "build the per-project

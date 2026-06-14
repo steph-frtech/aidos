@@ -27,6 +27,7 @@ package honoemit
 // BlockReason typé (la forme S13), jamais un render partiel — exactement comme EmitServer.
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/steph-frtech/aidos/back/runtime/blockreason"
@@ -72,7 +73,7 @@ func EmitServerScaffold(s ServerSpec) ([]Artifact, *blockreason.BlockReason) {
 
 	index := emitBootIndex(s, sourceHash)
 	pkg := emitServerPackageJSON(s, sourceHash)
-	dockerfile := emitServerDockerfile(sourceHash)
+	dockerfile := emitServerDockerfile(s, sourceHash)
 
 	dir := "gen/" + s.Project + "/server/"
 	arts := []Artifact{
@@ -97,7 +98,16 @@ func emitBootIndex(s ServerSpec, sourceHash string) []byte {
 	b.WriteString("// Go sidecar interpreter (POST ${INTERPRETER_URL}/interpret) and serves via @hono/node-server.\n\n")
 	b.WriteString("import { serve } from \"@hono/node-server\";\n")
 	b.WriteString("import type { Context } from \"hono\";\n")
-	b.WriteString("import { createApp, type OperationInterpreter } from \"./server.ts\";\n\n")
+	b.WriteString("import { createApp, type OperationInterpreter } from \"./server.ts\";\n")
+	// When the server SERVES the view, server.ts mounts the static React build via @hono/node-server's
+	// serve-static (resolved relative to the process CWD, i.e. /app/web/dist in the image). The boot
+	// notes the dependency so the served-view wiring is visible at the entrypoint (no extra import — the
+	// middleware lives in createApp, where the routes are registered in order).
+	if s.WebDir != "" {
+		fmt.Fprintf(&b, "// SERVES THE VIEW: server.ts mounts the React build (@hono/node-server/serve-static) from %s\n", jsStr(s.WebDir))
+		b.WriteString("// (the built dist/ copied into the image). GET / returns the SPA shell; the API routes win first.\n")
+	}
+	b.WriteString("\n")
 
 	// authFromRequest — the PURE deriver of the caller identity from the request, INJECTED into createApp
 	// (deps.auth) so it runs in server.ts's first middleware (before every route, where c.get("auth")
@@ -181,12 +191,29 @@ func emitServerPackageJSON(s ServerSpec, sourceHash string) []byte {
 // build (install deps with the lockless package.json, copy the emitted TS) then a slim runtime that
 // runs `npm start` (node --experimental-strip-types index.ts). Deterministic — pinned base image,
 // no clock; the source hash rides in a comment so the artifact stays content-addressed.
-func emitServerDockerfile(sourceHash string) []byte {
+//
+// When the spec SERVES the view (WebDir set), an EXTRA `web` build stage runs `vite build` over the
+// emitted React app (copied under web/ next to the server) and the runtime copies the built dist/ to
+// web/dist — so the single server image serves BOTH the API and the React view from the same origin.
+// A spec with no WebDir emits the SAME Dockerfile it always did (no web stage — the no-fork guarantee).
+func emitServerDockerfile(s ServerSpec, sourceHash string) []byte {
 	var b strings.Builder
 	b.WriteString(header("#", sourceHash))
 	b.WriteString("# The emitted Hono server (ADR 0040): routes each operation to the Go sidecar interpreter.\n")
 	b.WriteString("# It reads INTERPRETER_URL (the sidecar base URL) and PORT (default 3000). Below the line:\n")
 	b.WriteString("# it writes NO Kernel truth — a runtime projection of the project's operations.\n\n")
+
+	if s.WebDir != "" {
+		// --- web build: compile the emitted React view (EmitWebApp) to static dist/ ---
+		b.WriteString("# --- web build: compile the emitted React view to static dist/ (vite build) ---\n")
+		b.WriteString("FROM node:22-alpine AS web\n")
+		b.WriteString("WORKDIR /web\n")
+		b.WriteString("COPY web/package.json ./\n")
+		b.WriteString("RUN npm install\n")
+		b.WriteString("COPY web/ ./\n")
+		b.WriteString("RUN npm run build\n\n")
+	}
+
 	b.WriteString("# --- build ---\n")
 	b.WriteString("FROM node:22-alpine AS build\n")
 	b.WriteString("WORKDIR /app\n")
@@ -197,6 +224,11 @@ func emitServerDockerfile(sourceHash string) []byte {
 	b.WriteString("FROM node:22-alpine\n")
 	b.WriteString("WORKDIR /app\n")
 	b.WriteString("COPY --from=build /app /app\n")
+	if s.WebDir != "" {
+		// The built React view lands at web/dist — the path server.ts's serveStatic({ root: "./web/dist" })
+		// resolves relative to the process CWD (/app). The view is served alongside the API.
+		b.WriteString("COPY --from=web /web/dist /app/web/dist\n")
+	}
 	b.WriteString("ENV PORT=3000\n")
 	b.WriteString("EXPOSE 3000\n")
 	b.WriteString("CMD [\"node\", \"--experimental-strip-types\", \"index.ts\"]\n")

@@ -138,6 +138,82 @@ func TestScaffold_ByteStable_AndFN02Pure(t *testing.T) {
 	})
 }
 
+// webServerSpec is the checkout spec carrying the web view: the entity names the list views read
+// (GET /entities/<entity>) AND the relative web build dir (./web/dist) the server serves the SPA from.
+// It is what MaterialiseHono builds — the server that serves BOTH the API and the React view.
+func webServerSpec() ServerSpec {
+	s := checkoutSpec()
+	s.Entities = []string{"order"}
+	s.WebDir = "./web/dist"
+	return s
+}
+
+// TestScaffold_ServesReactView — the view is SERVED by the app: when the spec pins a WebDir, server.ts
+// mounts the static React build (serveStatic) so GET / returns the SPA index, the boot imports it, and
+// the Dockerfile builds the web app (vite build) + copies dist/ into the server image. The API routes
+// (healthz, POST /<op>, GET /entities/<e>) still win — the static fallback is mounted LAST.
+func TestScaffold_ServesReactView(t *testing.T) {
+	arts, br := EmitServerScaffold(webServerSpec())
+	if br != nil {
+		t.Fatalf("EmitServerScaffold refused: %s", br.Explanation)
+	}
+	server := string(scaffoldByPath(t, arts, "server.ts").Bytes)
+	// The server serves the built React dist/ as static + an SPA fallback to index.html.
+	for _, want := range []string{
+		`import { serveStatic } from "@hono/node-server/serve-static";`,
+		`serveStatic({ root: "./web/dist" })`,
+		`serveStatic({ path: "./web/dist/index.html" })`,
+	} {
+		if !strings.Contains(server, want) {
+			t.Fatalf("server.ts (web) missing %q\n%s", want, server)
+		}
+	}
+	// The API routes are registered BEFORE the static catch-all so they win (order = bytes order).
+	apiIdx := strings.Index(server, `app.post("/createorder"`)
+	staticIdx := strings.Index(server, `serveStatic({ path: "./web/dist/index.html" })`)
+	if apiIdx < 0 || staticIdx < 0 || apiIdx > staticIdx {
+		t.Fatalf("the static SPA fallback must be mounted AFTER the API routes (api@%d, static@%d)", apiIdx, staticIdx)
+	}
+	// The read route the list views fetch: GET /entities/<entity>, one per pinned entity name.
+	if !strings.Contains(server, `app.get("/entities/order"`) {
+		t.Fatalf("server.ts (web) missing the read route GET /entities/order\n%s", server)
+	}
+	// The boot imports serveStatic (so the bundled middleware resolves) when WebDir is set.
+	idx := string(scaffoldByPath(t, arts, "index.ts").Bytes)
+	if !strings.Contains(idx, `serve-static`) {
+		t.Fatalf("boot index.ts must reference serve-static when the spec serves the view\n%s", idx)
+	}
+	// package.json keeps @hono/node-server (serveStatic ships with it — no new dep).
+	pkg := string(scaffoldByPath(t, arts, "package.json").Bytes)
+	if !strings.Contains(pkg, `"@hono/node-server":`) {
+		t.Fatalf("package.json must keep @hono/node-server (serveStatic ships with it)\n%s", pkg)
+	}
+	// The Dockerfile builds the web app (vite build) and copies dist/ into the server image.
+	df := string(scaffoldByPath(t, arts, "Dockerfile").Bytes)
+	for _, want := range []string{"web/", "run build", "web/dist"} {
+		if !strings.Contains(df, want) {
+			t.Fatalf("server Dockerfile (web) missing %q\n%s", want, df)
+		}
+	}
+}
+
+// TestScaffold_NoWebDir_NoStatic — the no-fork proof: a spec WITHOUT a WebDir emits the SAME pure
+// server it always did (no serveStatic, no static import). The web-serving is purely additive.
+func TestScaffold_NoWebDir_NoStatic(t *testing.T) {
+	arts, br := EmitServerScaffold(checkoutSpec())
+	if br != nil {
+		t.Fatalf("EmitServerScaffold refused: %s", br.Explanation)
+	}
+	server := string(scaffoldByPath(t, arts, "server.ts").Bytes)
+	if strings.Contains(server, "serveStatic") {
+		t.Fatalf("a spec with no WebDir must NOT emit serveStatic:\n%s", server)
+	}
+	idx := string(scaffoldByPath(t, arts, "index.ts").Bytes)
+	if strings.Contains(idx, "serve-static") {
+		t.Fatalf("a spec with no WebDir must NOT import serve-static in the boot:\n%s", idx)
+	}
+}
+
 // TestScaffold_MalformedRefused — the honesty rule: a malformed spec (empty project / unnamed op / bad
 // async trigger) is a typed BlockReason, never a partial scaffold (the server.ts validation owns it).
 func TestScaffold_MalformedRefused(t *testing.T) {
@@ -304,5 +380,102 @@ process.stdout.write(JSON.stringify(out));
 	}
 	if gotAuthIDs[1] != "dev" {
 		t.Fatalf("sidecar did not receive the deterministic dev default: $.auth.user.id = %q, want \"dev\"", gotAuthIDs[1])
+	}
+}
+
+// TestScaffold_ServesViewAndReadRoute is the WEB journey (the done-criterion of this step): GIVEN the
+// web server spec (WebDir + an entity), WHEN we emit the scaffold, drop a fake built dist/index.html and
+// BOOT server.ts under node against a fake sidecar, THEN GET / serves the React index (the SPA shell),
+// GET /entities/order returns a JSON array (the list view's read route, empty until the sidecar read
+// verb lands), and POST /createorder still reaches the sidecar (the API wins over the static fallback).
+func TestScaffold_ServesViewAndReadRoute(t *testing.T) {
+	node := nodeBin(t)
+	root := repoRoot(t)
+
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/interpret" || r.Method != http.MethodPost {
+			http.Error(w, "nope", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("content-type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"operation": "createOrder", "result": map[string]any{"id": "order-1"}, "events": []string{}})
+	}))
+	t.Cleanup(sidecar.Close)
+
+	arts, br := EmitServerScaffold(webServerSpec())
+	if br != nil {
+		t.Fatalf("EmitServerScaffold refused: %s", br.Explanation)
+	}
+
+	dir, err := os.MkdirTemp(root, "honoemit-web-")
+	if err != nil {
+		t.Fatalf("mkdir temp under root: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	write(t, filepath.Join(dir, "server.ts"), scaffoldByPath(t, arts, "server.ts").Bytes)
+	// A fake built React app under ./web/dist (what `vite build` produces in the image). The SPA index
+	// the server serves on GET / and on any non-API path (the catch-all fallback).
+	if err := os.MkdirAll(filepath.Join(dir, "web", "dist"), 0o755); err != nil {
+		t.Fatalf("mkdir web/dist: %v", err)
+	}
+	write(t, filepath.Join(dir, "web", "dist", "index.html"), []byte(`<!doctype html><html><body><div id="root">AIDOS-VIEW</div></body></html>`+"\n"))
+
+	// Boot harness: build the same interpreter + auth deriver the boot builds, create the app, and drive
+	// it through Hono's app.request — proving the EMITTED server.ts serves the view AND the API.
+	harness := `
+import { createApp } from "./server.ts";
+const baseUrl = process.env["INTERPRETER_URL"];
+const interpret = async (operation, input, auth) => {
+  const res = await fetch(` + "`${baseUrl}/interpret`" + `, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ operation, input, auth: auth ?? {} }) });
+  if (!res.ok) throw new Error("interpreter " + res.status);
+  return res.json();
+};
+const app = createApp({ interpret, auth: (c) => ({ user: { id: "dev" } }) });
+const out = {};
+const idxRes = await app.request("/");
+out.indexStatus = idxRes.status;
+out.indexBody = await idxRes.text();
+const entRes = await app.request("/entities/order");
+out.entStatus = entRes.status;
+out.entBody = await entRes.json();
+const opRes = await app.request("/createorder", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ total: 1 }) });
+out.opStatus = opRes.status;
+process.stdout.write(JSON.stringify(out));
+`
+	write(t, filepath.Join(dir, "harness.ts"), []byte(harness))
+
+	cmd := exec.Command(node, "--experimental-strip-types", "--no-warnings", filepath.Join(dir, "harness.ts"))
+	cmd.Dir = dir // run from the stack dir so serveStatic's relative ./web/dist resolves.
+	cmd.Env = append(os.Environ(), "INTERPRETER_URL="+sidecar.URL)
+	stdout, err := cmd.Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			t.Fatalf("emitted web scaffold failed to boot: %v\nstderr:\n%s", err, ee.Stderr)
+		}
+		t.Fatalf("node run failed: %v", err)
+	}
+
+	var res struct {
+		IndexStatus int    `json:"indexStatus"`
+		IndexBody   string `json:"indexBody"`
+		EntStatus   int    `json:"entStatus"`
+		EntBody     []any  `json:"entBody"`
+		OpStatus    int    `json:"opStatus"`
+	}
+	if err := json.Unmarshal(stdout, &res); err != nil {
+		t.Fatalf("harness output not JSON: %v\nraw: %s", err, stdout)
+	}
+	// THEN: GET / serves the React SPA shell (the view IS served by the app).
+	if res.IndexStatus != 200 || !strings.Contains(res.IndexBody, "AIDOS-VIEW") {
+		t.Fatalf("GET / did not serve the React index: status=%d body=%q", res.IndexStatus, res.IndexBody)
+	}
+	// GET /entities/order returns a JSON array (the read route the list view fetches; empty until the
+	// sidecar read verb lands — an honest empty list, never a 404).
+	if res.EntStatus != 200 || res.EntBody == nil {
+		t.Fatalf("GET /entities/order did not return a JSON array: status=%d body=%v", res.EntStatus, res.EntBody)
+	}
+	// POST /createorder still reaches the sidecar (the API route wins over the static fallback).
+	if res.OpStatus != 201 {
+		t.Fatalf("POST /createorder did not win over the static fallback: status=%d", res.OpStatus)
 	}
 }

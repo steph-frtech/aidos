@@ -94,9 +94,20 @@ type Op struct {
 // the project's Kernel operations (sync AND async). "câblé sur TOUTES les operations du
 // Kernel" — the emitter wires every operation; a sync op → an HTTP handler, an async op →
 // a worker dispatcher. The emitter never invents or omits an operation.
+//
+// Entities + WebDir carry the VIEW the server SERVES (the React view derived from the tree,
+// EmitWebApp). Both are OPTIONAL and purely additive — an empty Entities/WebDir emits the
+// SAME pure API server it always did (the no-fork guarantee):
+//   - Entities  : the entity names the list views read; the server emits one read route
+//     GET /entities/<entity> per name (so the served view's list fetches resolve).
+//   - WebDir     : the relative path (inside the server image) of the BUILT React dist/. When
+//     set, the server mounts the static React build (serveStatic) on GET / + a SPA
+//     catch-all — so the app SERVES the view alongside the API (same origin).
 type ServerSpec struct {
-	Project string
-	Ops     []Op
+	Project  string
+	Ops      []Op
+	Entities []string
+	WebDir   string
 }
 
 // Validation sentinels. A malformed spec/manifest is a BlockReason at the boundary; these
@@ -191,7 +202,12 @@ func serverSourceBody(s ServerSpec) ([]byte, error) {
 		}
 		ops = append(ops, ov)
 	}
-	body := map[string]any{"project": s.Project, "ops": ops}
+	// The served VIEW is part of the source: a new entity read route or a flipped WebDir changes
+	// the emitted server, so it must change the content address. Entity names are canonically sorted
+	// so input order never leaks into the hash.
+	ents := append([]string(nil), s.Entities...)
+	sort.Strings(ents)
+	body := map[string]any{"project": s.Project, "ops": ops, "entities": ents, "web_dir": s.WebDir}
 	return records.Canonicalize(mustJSON(body))
 }
 
@@ -225,9 +241,16 @@ func EmitServer(s ServerSpec) (Artifact, *blockreason.BlockReason) {
 	var b strings.Builder
 	b.WriteString(header("//", sourceHash))
 	b.WriteString("// S87 emitted app server (Hono/functional TS, ADR 0040). main+router+middleware+health+\n")
-	b.WriteString("// one handler per SYNC operation; async ops are wired in worker.ts.\n\n")
+	b.WriteString("// one handler per SYNC operation; async ops are wired in worker.ts. When the spec pins a\n")
+	b.WriteString("// WebDir it ALSO serves the React view (the static dist/) on GET / + an SPA fallback.\n\n")
 	b.WriteString("import { Hono } from \"hono\";\n")
-	b.WriteString("import type { Context } from \"hono\";\n\n")
+	b.WriteString("import type { Context } from \"hono\";\n")
+	// serveStatic ships with @hono/node-server (no new dep) — imported ONLY when the server serves the
+	// view (WebDir set), so a pure API server stays import-clean (the no-fork guarantee).
+	if s.WebDir != "" {
+		b.WriteString("import { serveStatic } from \"@hono/node-server/serve-static\";\n")
+	}
+	b.WriteString("\n")
 
 	// The operation interpreter callback port (ADR 0040 Déc.7): the handler hands the
 	// command to the Go sidecar interpreter; it re-implements no rule. A PORT, not a global.
@@ -271,6 +294,24 @@ func EmitServer(s ServerSpec) (Artifact, *blockreason.BlockReason) {
 		fmt.Fprintf(&b, "\t\tconst result = await deps.interpret(%s, input, auth);\n", jsStr(op.Name))
 		b.WriteString("\t\treturn c.json(result, 201);\n")
 		b.WriteString("\t});\n")
+	}
+	// One READ route per entity the served view lists (GET /entities/<entity>, canonical order). The
+	// list views fetch their rows here. The sidecar wire contract (POST /interpret) carries no read
+	// verb yet (a forward dependency — a sidecar query/list verb), so the route returns an honest
+	// EMPTY array: the list view renders its header + the "—" empty state, never a 404. When the
+	// sidecar gains a read verb this route delegates to it (the bytes change, the shape does not).
+	for _, name := range sortedNames(s.Entities) {
+		route := "/entities/" + strings.ToLower(name)
+		fmt.Fprintf(&b, "\tapp.get(%s, (c) => c.json([], 200)); // read route (sidecar read verb pending)\n", jsStr(route))
+	}
+	// The VIEW the app SERVES (WebDir set): the built React dist/ as static files + an SPA catch-all
+	// to index.html. Mounted LAST so the API routes above (healthz, POST /<op>, GET /entities/<e>) win;
+	// any other path falls through to the static assets, and an unknown path serves index.html (the SPA
+	// shell). Same origin as the API → the view's fetch(/entities/…) + POST /<op> reach the API, no CORS.
+	if s.WebDir != "" {
+		root := s.WebDir
+		fmt.Fprintf(&b, "\tapp.use(\"/*\", serveStatic({ root: %s }));\n", jsStr(root))
+		fmt.Fprintf(&b, "\tapp.get(\"*\", serveStatic({ path: %s }));\n", jsStr(strings.TrimRight(root, "/")+"/index.html"))
 	}
 	b.WriteString("\treturn app;\n")
 	b.WriteString("}\n")
@@ -340,4 +381,12 @@ func EmitWorker(s ServerSpec) (Artifact, *blockreason.BlockReason) {
 // It coins no route the source does not pin (honesty).
 func routeOf(name string) string {
 	return "/" + strings.ToLower(name)
+}
+
+// sortedNames returns a canonical-name-ordered COPY of a name slice (never mutating the caller's),
+// so input order never leaks into the emitted read routes.
+func sortedNames(in []string) []string {
+	out := append([]string(nil), in...)
+	sort.Strings(out)
+	return out
 }

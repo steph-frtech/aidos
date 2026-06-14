@@ -178,6 +178,60 @@ func TestMaterialiseHono_EmitsPerProjectServerScaffold(t *testing.T) {
 	}
 }
 
+// TestMaterialiseHono_MaterialisesWebView — the WEB half: MaterialiseHono ALSO materialises the React
+// view (EmitWebApp) under server/web/ (next to the server scaffold, in the server's docker build
+// context), the server.ts serves it (serveStatic) and reads the entities (GET /entities/<e>), and the
+// server Dockerfile builds the web app. The view is SERVED by the app — not a placeholder.
+func TestMaterialiseHono_MaterialisesWebView(t *testing.T) {
+	root := t.TempDir()
+	mat, err := MaterialiseHono(root, "shop", "dev", "", "")
+	if err != nil {
+		t.Fatalf("MaterialiseHono: %v", err)
+	}
+	webDir := filepath.Join(mat.ServerDir, "web")
+	// The emitted React view lands under server/web/ (the server's docker build context): the app
+	// composition, the React mount, the HTML shell, the buildable Vite scaffold, and ≥1 list view.
+	for _, base := range []string{"app.tsx", "main.tsx", "index.html", "package.json", "vite.config.ts", "OrderList.tsx", "CheckoutButton.tsx"} {
+		if _, err := os.Stat(filepath.Join(webDir, base)); err != nil {
+			t.Fatalf("web view missing %s under server/web/: %v", base, err)
+		}
+	}
+	// The server SERVES the view: server.ts mounts the static React build + reads the entity.
+	serverTS, err := os.ReadFile(filepath.Join(mat.ServerDir, "server.ts"))
+	if err != nil {
+		t.Fatalf("read server/server.ts: %v", err)
+	}
+	for _, want := range []string{`serveStatic({ root: "./web/dist" })`, `app.get("/entities/order"`} {
+		if !contains(string(serverTS), want) {
+			t.Fatalf("server.ts does not serve the view (%q):\n%s", want, string(serverTS))
+		}
+	}
+	// The server Dockerfile builds the React view (vite build) and copies dist/ into the image.
+	df, _ := os.ReadFile(filepath.Join(mat.ServerDir, "Dockerfile"))
+	for _, want := range []string{"AS web", "run build", "/app/web/dist"} {
+		if !contains(string(df), want) {
+			t.Fatalf("server Dockerfile does not build/serve the view (%q):\n%s", want, string(df))
+		}
+	}
+	// The web files are tracked in the result inventory (keyed server/web/<base>) and byte-stable.
+	again, err := MaterialiseHono(t.TempDir(), "shop", "dev", "", "")
+	if err != nil {
+		t.Fatalf("MaterialiseHono #2: %v", err)
+	}
+	webKeys := 0
+	for name, h := range mat.Files {
+		if len(name) >= 11 && name[:11] == "server/web/" {
+			webKeys++
+			if h2, ok := again.Files[name]; !ok || h2 != h {
+				t.Fatalf("web file %s hash drifted (%q vs %q)", name, h, h2)
+			}
+		}
+	}
+	if webKeys == 0 {
+		t.Fatalf("no server/web/ files were tracked in the result inventory")
+	}
+}
+
 // TestBuildHonoServerImage_RefusesEmptyDir — the gated docker gesture refuses an empty scaffold dir
 // (the honesty rule: never `docker build` an absent context). The actual build is docker-gated and
 // not exercised in the unit mirror.
