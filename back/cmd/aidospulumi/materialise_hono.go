@@ -19,18 +19,23 @@ package main
 // Materialise/MaterialiseApp restent intouchés — la voie Hono est PUREMENT ADDITIVE).
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/steph-frtech/aidos/back/kernel/action"
 	"github.com/steph-frtech/aidos/back/kernel/control"
 	"github.com/steph-frtech/aidos/back/kernel/entities"
 	"github.com/steph-frtech/aidos/back/kernel/operation"
+	"github.com/steph-frtech/aidos/back/kernel/records"
 	"github.com/steph-frtech/aidos/back/runtime/appdata"
+	"github.com/steph-frtech/aidos/back/runtime/blockreason"
 	"github.com/steph-frtech/aidos/back/runtime/honoemit"
 )
 
@@ -63,18 +68,20 @@ func honoDefaultManifest(project string) honoemit.StackManifest {
 }
 
 // honoServerImageTag is the deterministic, CONTENT-ADDRESSED per-project server image tag the scaffold
-// builds into and the manifest references: `<project>-hono:<hash[:12]>`. The ref is the first 12 hex of
-// the SERVER SOURCE hash, so a change to the project's server source (a new op, a flipped WebDir) yields
-// a NEW tag — an IMMUTABLE content address, never the mutable `:latest`.
+// builds into and the manifest references: `<project>-hono:<hash[:12]>`. The pure formatter; the `hash`
+// it receives is the EMITTED-OUTPUT content address (honoOutputHash — the bytes the docker build actually
+// compiles), so a change to ANY emitter (a new instrumentation.ts/Dockerfile/web view, even under the
+// same spec) yields a NEW tag — an IMMUTABLE content address, never the mutable `:latest`.
 //
 // Why this is the fix (S02 content-addressing): Pulumi keys the `server` container on this tag STRING.
 // With `:latest` the string never changes, so a code change leaves the input unchanged — `up` reports
-// "replaced" yet keeps the stale image (the container never runs the new code). A content-addressed tag
-// changes with the source, so Pulumi sees a changed input and RECREATES the container with the new code.
+// "replaced" yet keeps the stale image (the container never runs the new code). A tag content-addressed
+// over the EMITTED OUTPUT changes whenever the built bytes change, so Pulumi sees a changed input and
+// RECREATES the container with the new code (no manual `pulumi refresh` after an emitter change).
 //
 // PURE function of (project, hash): same inputs → same tag (reproducibility), distinct hashes → distinct
 // tags (content-addressing). The mirror imagetag_hono_test.go seals both. The truncation length (12 hex)
-// matches the S02/honoemit convention (sourceHash[:12]); a SHORTER hash is used verbatim (never padded).
+// matches the S02/honoemit convention (hash[:12]); a SHORTER hash is used verbatim (never padded).
 func honoServerImageTag(project, hash string) string {
 	ref := hash
 	if len(ref) > 12 {
@@ -83,29 +90,79 @@ func honoServerImageTag(project, hash string) string {
 	return project + "-hono:" + ref
 }
 
-// serverSpecImageTag content-addresses the per-project server image tag from a SERVER SPEC: it hashes
-// the spec (ServerSourceHash — the SAME content address the emitted scaffold carries) and tags
-// `<project>-hono:<hash12>`. It is the ONE source of truth for the tag, called by both the
-// project-cut path (projectServerImageTag, the materialiser) and the genome path (found.go's recompile),
-// so the materialised program and the recompiled program reference byte-identical tags. A hash failure
-// falls back to the mutable `:latest` so the deploy still proceeds (the spec validation upstream already
-// refuses a malformed cut, so this is unreachable on the happy path; the staleness on that degenerate
-// path is the lesser evil). DETERMINISM-FIRST: a pure projection of the spec.
-func serverSpecImageTag(project string, spec honoemit.ServerSpec) string {
-	hash, err := honoemit.ServerSourceHash(spec)
-	if err != nil {
+// honoOutputHash content-addresses the EMITTED OUTPUT of the per-project server image — the bytes the
+// docker build over serverDir ACTUALLY compiles: the Hono server scaffold (EmitServerScaffold(server))
+// PLUS the served React view (EmitWebApp(web)) when the server serves a view (server.WebDir != ""). It is
+// the FIX for the emitter-staleness gap: hashing the SPEC (ServerSourceHash) left the tag unchanged when
+// an EMITTER changed under the same spec (a new instrumentation.ts/Dockerfile/web view), so Pulumi kept
+// the stale image and a manual `pulumi refresh` was needed. Hashing the OUTPUT BYTES instead means any
+// emitter change → new bytes → new hash → new tag → Pulumi recreates the container.
+//
+// The bytes are folded path-sorted (the emitters already return path-sorted slices; we re-sort the
+// concatenation so server⊕web order never leaks) with a collision-safe encoding (path ⊕ \x00 ⊕ bytes ⊕
+// \x00) so a byte moving between a path and its content can never collide. DETERMINISM-FIRST: a PURE
+// function of the emitted bytes — same emitted output → same hash, a one-byte change → a new hash.
+//
+// An emitter REFUSAL (a malformed cut) returns "" so the caller falls back to the mutable `:latest`; the
+// spec validation upstream already refuses a malformed cut before deploy, so this is unreachable on the
+// happy path (the staleness on that degenerate path is the lesser evil).
+func honoOutputHash(server honoemit.ServerSpec, web honoemit.WebAppSpec, overrides []honoemit.ScreenOverride) string {
+	scaffold, br := honoemit.EmitServerScaffold(server)
+	if br != nil {
+		return ""
+	}
+	arts := append([]honoemit.Artifact(nil), scaffold...)
+
+	// The served React view is part of the BUILT scaffold (MaterialiseHono lands the view under
+	// serverDir/web/ and the server Dockerfile's web stage compiles it). Hash it too — so a change to the
+	// WEB emitter (a new view byte) OR a captured ScreenDesign override (a new fond/section class) also
+	// moves the tag (a new design → new bytes → new tag → Pulumi recreates the container, the permanence
+	// of the "red"). It hashes the SAME bytes the materialiser lands (emitProjectWebView with overrides),
+	// so the tag ≡ what is built. Folded ONLY when the server serves a view (server.WebDir != "").
+	if server.WebDir != "" {
+		webArts, br := emitWebViewArtifacts(web, overrides)
+		if br != nil {
+			return ""
+		}
+		arts = append(arts, webArts...)
+	}
+
+	sort.SliceStable(arts, func(i, j int) bool { return arts[i].Path < arts[j].Path })
+	var buf bytes.Buffer
+	for _, a := range arts {
+		buf.WriteString(a.Path)
+		buf.WriteByte(0)
+		buf.Write(a.Bytes)
+		buf.WriteByte(0)
+	}
+	return records.Hash(buf.Bytes())
+}
+
+// serverSpecImageTag content-addresses the per-project server image tag from the EMITTED OUTPUT: it hashes
+// the bytes EmitServerScaffold(server) ⊕ EmitWebApp(web) actually produce (honoOutputHash — the SAME bytes
+// BuildHonoServerImage docker-builds) and tags `<project>-hono:<hash12>`. It is the ONE source of truth for
+// the tag, called by both the project-cut path (projectServerImageTag, the materialiser) and the genome
+// path (found.go's recompile), so the materialised program and the recompiled program reference byte-
+// identical tags. An emitter refusal falls back to the mutable `:latest` so the deploy still proceeds (the
+// spec validation upstream already refuses a malformed cut, so this is unreachable on the happy path).
+// DETERMINISM-FIRST: a pure projection of the EMITTED OUTPUT — a change to ANY emitter (same spec) yields a
+// new tag, so Pulumi recreates the container instead of keeping the stale image.
+func serverSpecImageTag(project string, server honoemit.ServerSpec, web honoemit.WebAppSpec, overrides []honoemit.ScreenOverride) string {
+	hash := honoOutputHash(server, web, overrides)
+	if hash == "" {
 		return project + "-hono:latest"
 	}
 	return honoServerImageTag(project, hash)
 }
 
 // projectServerImageTag is the per-project server image tag the materialiser/executor propagate: it
-// content-addresses the tag from the project's SERVER SPEC (the SAME projectServerSpec the scaffold is
-// emitted from). One source of truth shared by MaterialiseHono (which sets opts.HonoImage so the Pulumi
-// program references it) and BuildHonoServerImage (which builds the scaffold under that tag) — they never
-// drift. DETERMINISM-FIRST: a pure projection of the spec.
-func projectServerImageTag(project string) string {
-	return serverSpecImageTag(project, projectServerSpec(project))
+// content-addresses the tag from the project's EMITTED OUTPUT (the SAME projectServerSpec scaffold +
+// projectWebSpec view the materialiser lands in serverDir). One source of truth shared by MaterialiseHono
+// (which sets opts.HonoImage so the Pulumi program references it) and BuildHonoServerImage (which builds
+// that scaffold under this tag) — they never drift: the tag IS the hash of the bytes that are built.
+// DETERMINISM-FIRST: a pure projection of the emitted output.
+func projectServerImageTag(project string, overrides []honoemit.ScreenOverride) string {
+	return serverSpecImageTag(project, projectServerSpec(project), projectWebSpec(project), overrides)
 }
 
 // interpreterImageTag is the shared sidecar interpreter image tag. The manifest references it and the
@@ -170,12 +227,22 @@ func EnsureInterpreterImage() (string, error) {
 // renders the WIRED Pulumi program (honoemit.EmitPulumiStackHono) and lands the three Pulumi files
 // byte-identically. Without entitiesPath it renders the wired topology with no data mount (the DB boots
 // empty). It is the clean-path twin of Materialise/MaterialiseApp; both are untouched (anti-overwrite).
-func MaterialiseHono(root, project, env, entitiesPath, seedPath string) (Materialised, error) {
+func MaterialiseHono(root, project, env, entitiesPath, seedPath, screenDesignPath string) (Materialised, error) {
 	if project == "" {
 		return Materialised{}, errors.New("--project is required")
 	}
 	if env == "" {
 		return Materialised{}, errors.New("--env is required")
+	}
+
+	// (0) Optional captured ScreenDesign overrides (ADR 0071, the PERMANENCE of the validated "red"):
+	// when --screen-design is passed, the validated per-coordinate style tokens are RE-APPLIED to the
+	// emitted web view (via EmitWebChildAdapted) so the design survives a redeploy. Without it the web
+	// view is byte-identical to the canonical EmitWebApp (anti-overwrite §9). Loaded once, shared by the
+	// scaffold hash + the materialised view, so the content-addressed tag matches the bytes built.
+	overrides, err := loadScreenOverrides(screenDesignPath)
+	if err != nil {
+		return Materialised{}, err
 	}
 
 	stack := project + "-" + env
@@ -189,7 +256,11 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath string) (Materia
 	// Pulumi program references the project's own routes — never the generic aidos-hono:latest placeholder,
 	// and never the mutable :latest tag (so a code change → a new hash → a new tag → Pulumi RECREATES the
 	// container, closing the staleness gap the `:latest` tag caused).
-	opts := honoemit.StackHonoOpts{HonoImage: projectServerImageTag(project)}
+	// The content-addressed tag folds the captured ScreenDesign overrides (so a validated design → new
+	// web bytes → a new tag → Pulumi recreates the container, the permanence of the "red"). Computed
+	// ONCE here and stored in Materialised so BuildHonoServerImage builds under the SAME tag (no drift).
+	imageTag := projectServerImageTag(project, overrides)
+	opts := honoemit.StackHonoOpts{HonoImage: imageTag}
 
 	// (a) Optional project DATA: emit the schema (+ seed) into the stack dir — what postgres mounts.
 	if entitiesPath != "" {
@@ -233,12 +304,17 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath string) (Materia
 		return Materialised{}, fmt.Errorf("emitter refused the Hono server scaffold (%s): %s", br.Code, br.Explanation)
 	}
 
-	// (a3) Emit the React VIEW (EmitWebApp) into <serverDir>/web/ — INSIDE the server's docker build
-	// context, so the server Dockerfile's `web` stage runs `vite build` over it and the runtime serves
-	// the built dist/ (server.ts's serveStatic). This is the project's OWN view DERIVED from its
-	// entities (S35) + controls→actions (S11) — the app SERVES it on GET /, not a placeholder. Emission
-	// is PURE + deterministic (EmitWebApp, S38-bis). A malformed cut is a typed refusal, never a partial.
-	web, br := honoemit.EmitWebApp(projectWebSpec(project))
+	// (a3) Emit the React VIEW into <serverDir>/web/ — INSIDE the server's docker build context, so the
+	// server Dockerfile's `web` stage runs `vite build` over it and the runtime serves the built dist/
+	// (server.ts's serveStatic). This is the project's OWN view DERIVED from its entities (S35) +
+	// controls→actions (S11) — the app SERVES it on GET /, not a placeholder. Emission is PURE +
+	// deterministic. A malformed cut is a typed refusal, never a partial.
+	//
+	// With captured ScreenDesign overrides (--screen-design, ADR 0071) the view is emitted via
+	// EmitWebChildAdapted (the SAME shared render body) so the validated per-coordinate ADR-0010 token
+	// classes are RE-APPLIED on the matching data-aidos-* elements — the design SURVIVES the redeploy
+	// (the permanence of the "red"). Without overrides it is byte-identical to EmitWebApp (anti-overwrite §9).
+	web, br := emitProjectWebView(project, overrides)
 	if br != nil {
 		return Materialised{}, fmt.Errorf("emitter refused the React view (%s): %s", br.Code, br.Explanation)
 	}
@@ -292,6 +368,7 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath string) (Materia
 		Stack:     stack,
 		Dir:       dir,
 		ServerDir: serverDir,
+		ImageTag:  imageTag,
 		URL:       url,
 		Files:     files,
 	}, nil
@@ -332,19 +409,81 @@ func projectWebSpec(project string) honoemit.WebAppSpec {
 	}
 }
 
+// emitWebViewArtifacts is the SINGLE source the materialiser AND the content-addressed tag use to render
+// the web view, applying the captured ScreenDesign overrides (ADR 0071). With NO overrides it is
+// byte-identical to honoemit.EmitWebApp (anti-overwrite §9); with overrides it routes through
+// EmitWebChildAdapted (re-styling the matching data-aidos-* elements). One function so the tag hashes
+// EXACTLY the bytes the materialiser lands (tag ≡ what is built). PURE, TOTAL, byte-stable.
+func emitWebViewArtifacts(web honoemit.WebAppSpec, overrides []honoemit.ScreenOverride) ([]honoemit.Artifact, *blockreason.BlockReason) {
+	return honoemit.EmitWebAppWithScreenOverrides(web, overrides)
+}
+
+// emitProjectWebView renders the project's web view (projectWebSpec) applying the captured ScreenDesign
+// overrides. The thin project-cut wrapper over emitWebViewArtifacts. PURE, TOTAL.
+func emitProjectWebView(project string, overrides []honoemit.ScreenOverride) ([]honoemit.Artifact, *blockreason.BlockReason) {
+	return emitWebViewArtifacts(projectWebSpec(project), overrides)
+}
+
+// loadScreenOverrides reads the optional --screen-design file into the captured per-coordinate overrides
+// (ADR 0071, the permanence of the validated "red"). The file is EITHER a JSON []honoemit.ScreenOverride
+// (the per-coordinate overrides directly) OR a JSON []honoemit.ScreenDesign (the captured designs — their
+// overrides are folded out). An empty path → nil (no override; the web view is byte-identical to
+// EmitWebApp). Detection is deterministic + fail-closed: a []ScreenDesign element carries a child_target
+// / overrides shape, a []ScreenOverride element carries a coord shape; a file that decodes to NEITHER is
+// an actionable error (never a silent empty). The overrides are returned in input order (the emitter
+// sorts them canonically downstream, sortedScreenOverrides — so the bytes are stable regardless of order).
+func loadScreenOverrides(path string) ([]honoemit.ScreenOverride, error) {
+	if path == "" {
+		return nil, nil
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read --screen-design %q: %w", path, err)
+	}
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "[]" || trimmed == "null" {
+		return nil, nil // an empty design file is the no-override case (byte-identical web view).
+	}
+
+	// First try the []ScreenDesign shape (the captured designs) — fold every design's overrides out. A
+	// design carries a "child_target"/"overrides" shape; a bare []ScreenOverride does not unmarshal a
+	// non-empty Overrides slice, so an empty result here means the file is NOT a []ScreenDesign.
+	var designs []honoemit.ScreenDesign
+	if err := json.Unmarshal(raw, &designs); err == nil {
+		var folded []honoemit.ScreenOverride
+		for _, d := range designs {
+			folded = append(folded, d.Overrides...)
+		}
+		if len(folded) > 0 {
+			return folded, nil
+		}
+	}
+
+	// Else the []ScreenOverride shape (the per-coordinate overrides directly).
+	var overrides []honoemit.ScreenOverride
+	if err := json.Unmarshal(raw, &overrides); err == nil && len(overrides) > 0 {
+		return overrides, nil
+	}
+
+	return nil, fmt.Errorf("--screen-design %q: the file decoded to neither a non-empty []honoemit.ScreenOverride nor a []honoemit.ScreenDesign with overrides", path)
+}
+
 // BuildHonoServerImage is the GATED docker gesture (the side-effecting half of "build the per-project
-// Hono image"): it runs `docker build -t <project>-hono:<hash12> <serverDir>` over the emitted scaffold
-// so the `server` container runs the PROJECT'S OWN routes, not the generic aidos-hono:latest. It
-// JUDGES nothing — it builds exactly the deterministic scaffold MaterialiseHono landed. It is invoked
-// by the executor (PulumiUpHono), never by the pure materialiser, so the unit mirror stays docker-free.
-// The image tag is the CONTENT-ADDRESSED per-project tag (projectServerImageTag) — the SAME tag the
-// wired Pulumi program references (opts.HonoImage), so the build and the program never drift; the build
-// is the gated effect. A code change → a new source hash → a new tag → a freshly-built, recreated image.
-func BuildHonoServerImage(project, serverDir string) (string, error) {
+// Hono image"): it runs `docker build -t <tag> <serverDir>` over the emitted scaffold so the `server`
+// container runs the PROJECT'S OWN routes, not the generic aidos-hono:latest. It JUDGES nothing — it
+// builds exactly the deterministic scaffold MaterialiseHono landed under the tag MaterialiseHono already
+// computed (mat.ImageTag — content-addressed over the SAME built bytes, INCLUDING any captured
+// ScreenDesign overrides, the SAME tag the wired Pulumi program references via opts.HonoImage). Passing
+// the resolved tag (rather than recomputing it) means the build + the program NEVER drift, even when an
+// override changed the web bytes. An empty tag falls back to the no-override project tag (compat). It is
+// invoked by the executor (PulumiUpHono), never by the pure materialiser, so the unit mirror stays docker-free.
+func BuildHonoServerImage(project, serverDir, tag string) (string, error) {
 	if serverDir == "" {
 		return "", errors.New("BuildHonoServerImage: no scaffold dir (run MaterialiseHono first)")
 	}
-	tag := projectServerImageTag(project)
+	if tag == "" {
+		tag = projectServerImageTag(project, nil)
+	}
 	cmd := exec.Command("docker", "build", "-t", tag, serverDir)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("docker build %s: %w\n%s", tag, err, out)
@@ -367,7 +506,7 @@ func PulumiUpHono(mat Materialised) (UpResult, error) {
 	// program (which references <project>-hono:latest) finds it. The gated docker gesture; the image
 	// carries this project's routes (gap closed: the server is no longer the generic placeholder).
 	if mat.ServerDir != "" {
-		if _, err := BuildHonoServerImage(mat.Project, mat.ServerDir); err != nil {
+		if _, err := BuildHonoServerImage(mat.Project, mat.ServerDir, mat.ImageTag); err != nil {
 			return UpResult{}, err
 		}
 	}

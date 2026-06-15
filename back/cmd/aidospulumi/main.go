@@ -64,6 +64,7 @@ func main() {
 	seed := fs.String("seed", "", "optional path to a seed.sql mounted as 02-seed.sql (only with --entities)")
 	appName := fs.String("app-name", "", "the human APP_NAME baked into the deployed app (only with --entities; defaults to the project)")
 	hono := fs.Bool("hono", false, "deploy the CLEAN Hono/TS path: emitted Hono server + Go interpreter sidecar + postgres (3 wired containers, ADR 0040)")
+	screenDesign := fs.String("screen-design", "", "OPTIONAL path to a JSON []honoemit.ScreenOverride OR []honoemit.ScreenDesign — re-applies captured Design Lab style tokens to the emitted web view on redeploy (only with --hono; omit → the canonical view, byte-identical)")
 	out := fs.String("out", "", "the export artefact path (X.aidos.json) — the portable genome (only for `export`; defaults to <project>.aidos.json)")
 	artifact := fs.String("artifact", "", "the portable genome to recompile (X.aidos.json) — only for `found`")
 	outRoot := fs.String("out-root", "", "the recompilation root `found` writes gen/<name>/ under (only for `found`; defaults to .found/<project>)")
@@ -72,7 +73,7 @@ func main() {
 
 	switch sub {
 	case "up":
-		runUp(*root, *project, *env, *entities, *seed, *appName, *hono)
+		runUp(*root, *project, *env, *entities, *seed, *appName, *hono, *screenDesign)
 	case "down":
 		runDown(*root, *project, *env)
 	case "emit":
@@ -95,6 +96,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: aidospulumi <up|down|emit|export|found> --project <p> [--env <e>] [--root <repo>] [--hono] [--entities <f.json> [--seed <f.sql>] [--app-name <name>]] [--out <X.aidos.json>] [--artifact <X.aidos.json> [--out-root <dir>]]")
 	fmt.Fprintln(os.Stderr, "  up     : materialise the emitted Pulumi stack + pulumi up --yes (prints {url, containers} JSON)")
 	fmt.Fprintln(os.Stderr, "           with --hono: the CLEAN Hono/TS path — emitted Hono server + Go interpreter sidecar + postgres (3 wired containers)")
+	fmt.Fprintln(os.Stderr, "           with --screen-design <f.json>: re-apply captured Design Lab style tokens to the emitted web view (only with --hono)")
 	fmt.Fprintln(os.Stderr, "           with --entities: deploy the project's OWN data (schema+entities[+seed] emitted, mounted by Pulumi)")
 	fmt.Fprintln(os.Stderr, "  down   : pulumi destroy --yes")
 	fmt.Fprintln(os.Stderr, "  emit   : print the emitted Pulumi program (in-memory, no pulumi) as JSON — the front preview source")
@@ -107,14 +109,15 @@ func usage() {
 // JSON. With --entities it deploys the project's OWN data (schema.sql + entities.json [+ seed.sql]
 // emitted by aidosappemit, mounted by the Pulumi program) — the per-project deploy; without it, the
 // gold-default topology (byte-identical to the existing executor). Any error is actionable on stderr.
-func runUp(root, project, env, entities, seed, appName string, hono bool) {
+func runUp(root, project, env, entities, seed, appName string, hono bool, screenDesign string) {
 	var mat Materialised
 	var err error
 	switch {
 	case hono:
 		// CLEAN Hono path: the emitted Hono server + the Go interpreter sidecar + postgres (3 wired
 		// containers). --entities mounts the project's schema; without it, the DB boots empty.
-		mat, err = MaterialiseHono(root, project, env, entities, seed)
+		// --screen-design re-applies captured Design Lab style tokens to the emitted web view (ADR 0071).
+		mat, err = MaterialiseHono(root, project, env, entities, seed, screenDesign)
 	case entities != "":
 		// Per-project DATA deploy: emit the project's data + the data-aware Pulumi program AVANT pulumi up.
 		mat, err = MaterialiseApp(root, project, env, entities, seed, appName)
@@ -195,7 +198,11 @@ type Materialised struct {
 	// project image from (BuildHonoServerImage). Empty for the non-Hono paths. A below-the-line
 	// projection output, never a truth.
 	ServerDir string `json:"serverDir,omitempty"`
-	URL       string `json:"url"`
+	// ImageTag is the CONTENT-ADDRESSED per-project Hono server image tag the wired Pulumi program
+	// references (opts.HonoImage) — computed ONCE in MaterialiseHono (folding any captured ScreenDesign
+	// overrides) so BuildHonoServerImage builds under the SAME tag (no drift). Empty for non-Hono paths.
+	ImageTag string `json:"imageTag,omitempty"`
+	URL      string `json:"url"`
 	// Files maps the materialised filename → its content hash (the byte-stable proof).
 	Files map[string]string `json:"files"`
 }

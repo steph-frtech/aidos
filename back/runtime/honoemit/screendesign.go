@@ -44,6 +44,7 @@ import (
 // CoordKind normalises the DOM-attribute drift the emitters already stamp into ONE closed kind set
 // (the single point the drift is reconciled, ADR 0071):
 //
+//	{data-aidos-root, root, app}                           → CoordRoot
 //	{data-aidos-view, data-aidos-screen, data-aidos-panel} → CoordSection
 //	{data-aidos-col,  data-aidos-field}                    → CoordField
 //	{data-aidos-invoke}                                    → CoordAction
@@ -52,6 +53,12 @@ import (
 type CoordKind string
 
 const (
+	// CoordRoot — the ROOT CONTAINER of a child (the app shell's background / fond). The web <main
+	// data-aidos-root>, the mobile root <View data-aidos-root>, the desktop root <section
+	// data-aidos-root> all project it. A root override re-styles the WHOLE app's fond (e.g.
+	// bg=destructive) — the only coordinate that is NOT an entity section/field/action but the shell
+	// itself. Its Entity is always the sentinel "root" (the app shell has no entity).
+	CoordRoot CoordKind = "root"
 	// CoordSection — an entity section (MasterSection.Entity). The web <section data-aidos-view>,
 	// the mobile <View data-aidos-screen>, the desktop <section data-aidos-panel> all project it.
 	CoordSection CoordKind = "section"
@@ -62,10 +69,50 @@ const (
 	CoordAction CoordKind = "action"
 )
 
+// rootEntitySentinel is the canonical Entity value a CoordRoot carries (the app shell has no entity;
+// "root" is the stable, deterministic sentinel the coordKey + match use). PURE constant.
+const rootEntitySentinel = "root"
+
+// rootCoord is the NORMALISED coordinate of a child's root container (the app shell / fond). The
+// single point the {data-aidos-root, root, app} drift is reconciled. PURE.
+func rootCoord() ScreenCoord {
+	return ScreenCoord{Kind: CoordRoot, Entity: rootEntitySentinel}
+}
+
+// normalizeRootCoord folds an under-specified root override onto the canonical root coordinate so a
+// front-supplied {kind:"root"|"app"|"section", entity:"root"|"app"} all reach the ONE rootCoord (the
+// "root/app" case the Design Lab emits a fond override under). It is the deterministic mapping the
+// task pins: if a coordinate names the root/app shell (Kind==CoordRoot, OR a section/empty-kind whose
+// Entity is the root/app sentinel), it is rewritten to the canonical rootCoord; every other coordinate
+// is returned verbatim. PURE, TOTAL — no coordinate is invented, only the root alias is canonicalised.
+func normalizeRootCoord(c ScreenCoord) ScreenCoord {
+	if c.Kind == CoordRoot {
+		return rootCoord()
+	}
+	// A section (or unspecified kind) whose Entity is the root/app sentinel IS the shell — map it to
+	// the canonical root coordinate (so a "root/app" override on the body re-styles the fond, the task
+	// §2 case: if no section coord for the root exists, the nearest mapping is the root container).
+	if (c.Kind == CoordSection || c.Kind == "") && isRootEntity(c.Entity) {
+		return rootCoord()
+	}
+	return c
+}
+
+// isRootEntity reports whether an entity name denotes the app shell (the closed {root, app} aliases).
+// PURE, TOTAL.
+func isRootEntity(entity string) bool {
+	switch entity {
+	case "root", "app":
+		return true
+	default:
+		return false
+	}
+}
+
 // IsKnownCoordKind reports whether k is a member of the closed coord-kind enum.
 func IsKnownCoordKind(k CoordKind) bool {
 	switch k {
-	case CoordSection, CoordField, CoordAction:
+	case CoordRoot, CoordSection, CoordField, CoordAction:
 		return true
 	default:
 		return false
@@ -422,6 +469,11 @@ func EmitScreenDesign(m MasterView, target ChildTarget, overrides []ScreenOverri
 // section); a CoordAction a master action's control. PURE, TOTAL — an unknown kind is never pinned.
 func coordExists(m MasterView, c ScreenCoord) bool {
 	switch c.Kind {
+	case CoordRoot:
+		// The root container (the app shell / fond) ALWAYS exists for a projectable master (every
+		// child renders a root). It is the only coordinate not tied to a section/field/action — the
+		// shell itself. Pinned iff the master is projectable (≥1 section and/or ≥1 action).
+		return len(m.Sections) > 0 || len(m.Actions) > 0
 	case CoordSection:
 		for _, sec := range m.Sections {
 			if sec.Entity == c.Entity {

@@ -216,12 +216,16 @@ func recompileFamilies(tree ProjectTree, want map[Family]bool) ([]FoundFile, err
 	}
 
 	// (7) infra — the Pulumi PROGRAM (the 3-container wired stack, from the genome's manifest). The
-	// per-project server image tag is the CONTENT-ADDRESSED tag derived from the genome's OWN server spec
-	// (serverSpecImageTag over foundServerSpec) — the SAME content address the materialiser pins, so the
-	// recompiled program byte-equals the materialised one (and a code change yields a new tag → Pulumi
-	// recreates the container).
+	// per-project server image tag is the CONTENT-ADDRESSED tag derived from the genome's OWN EMITTED
+	// OUTPUT (serverSpecImageTag over foundServerSpec ⊕ tree.WebAppSpec — the scaffold + the web view the
+	// genome recompiles) — the SAME content address the materialiser pins, so the recompiled program
+	// byte-equals the materialised one (and a change to ANY emitter yields a new tag → Pulumi recreates
+	// the container). tree.WebAppSpec is the genome's web cut (byte-identical to projectWebSpec for the
+	// demo cut), so the tag the genome emits equals the one the materialiser emits.
 	if want[FamilyInfra] {
-		serverTag := serverSpecImageTag(tree.Name, foundServerSpec(tree))
+		// The genome path captures no ScreenDesign overrides (nil) — the recompiled web is the canonical
+		// EmitWebApp form, byte-identical to the no-override materialisation (the tag matches).
+		serverTag := serverSpecImageTag(tree.Name, foundServerSpec(tree), tree.WebAppSpec, nil)
 		infra, br := honoemit.EmitPulumiStackHono(tree.Name, foundEnv, tree.StackManifest, honoemit.StackHonoOpts{HonoImage: serverTag})
 		if br != nil {
 			return nil, fmt.Errorf("found: recompile pulumi stack (%s): %s", br.Code, br.Explanation)

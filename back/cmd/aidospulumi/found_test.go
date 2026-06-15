@@ -308,7 +308,7 @@ func directEmission(t *testing.T, project string) map[string][]byte {
 	// (7) Le programme Pulumi (les 3 conteneurs câblés). Le tag serveur est le tag CONTENT-ADRESSÉ que
 	// le matérialiseur épingle (projectServerImageTag) — `found` le reproduit depuis la spec serveur du
 	// génome (qui, pour le cut démo, byte-égale projectServerSpec) : même hash → même tag → mêmes bytes.
-	infra, br := honoemit.EmitPulumiStackHono(project, foundEnv, honoDefaultManifest(project), honoemit.StackHonoOpts{HonoImage: projectServerImageTag(project)})
+	infra, br := honoemit.EmitPulumiStackHono(project, foundEnv, honoDefaultManifest(project), honoemit.StackHonoOpts{HonoImage: projectServerImageTag(project, nil)})
 	if br != nil {
 		t.Fatalf("direct EmitPulumiStackHono: %s", br.Explanation)
 	}

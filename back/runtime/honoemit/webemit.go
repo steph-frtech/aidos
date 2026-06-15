@@ -162,8 +162,10 @@ func emitWebAppOverridden(s WebAppSpec, overrides []ScreenOverride) ([]Artifact,
 	}
 
 	// The app composition (lists + buttons, wired to POST /<operation>) — emitted LAST because
-	// it imports every list + button name (the canonical order owns its import block).
-	arts = append(arts, artifact(dir+"app.tsx", TargetWebApp, emitAppTSX(ents, btns, sourceHash), sourceHash))
+	// it imports every list + button name (the canonical order owns its import block). The overrides
+	// re-style the ROOT container (<main data-aidos-root>) when a root/app coordinate matches (the
+	// "root/app" fond override) — a nil/empty set leaves the className byte-identical (anti-overwrite §9).
+	arts = append(arts, artifact(dir+"app.tsx", TargetWebApp, emitAppTSX(ents, btns, sourceHash, overrides), sourceHash))
 
 	sortArtifacts(arts)
 	return arts, nil

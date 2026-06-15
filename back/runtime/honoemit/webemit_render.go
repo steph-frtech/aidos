@@ -123,8 +123,14 @@ func emitListView(e entities.Entity, sourceHash string, overrides []ScreenOverri
 // emitAppTSX renders the app composition: it imports every list view + every button (canonical
 // name order — the import block is byte-stable), composes them, and WIRES each button's onInvoke
 // to POST /<operation> against the live Hono API (the view DECLARES via S38 AND TRIGGERS here).
-// FN02-pure: postOperation is a function; no module-scope mutable binding.
-func emitAppTSX(ents []entities.Entity, btns []ControlAction, sourceHash string) []byte {
+// FN02-pure: postOperation is a function; no module-scope mutable binding. The screen overrides
+// (ADR 0071) re-style the ROOT container (<main data-aidos-root>) when a root/app coordinate matches
+// — a nil/empty set yields "" → the className is byte-identical to the canonical form (anti-overwrite §9).
+func emitAppTSX(ents []entities.Entity, btns []ControlAction, sourceHash string, overrides []ScreenOverride) []byte {
+	// The ROOT container's override class (the "root/app" fond override): screenClassSuffix folds the
+	// root/app aliases onto the canonical rootCoord, so a {root|app} bg=destructive override re-styles
+	// the WHOLE app shell. No matching override → "" → <main> is byte-identical (the property mirror).
+	rootClass := screenClassSuffix(overrides, rootCoord())
 	var b strings.Builder
 	b.WriteString(header("//", sourceHash))
 	b.WriteString("// S38-bis web view: the APP composition — the lists (entities S35) + the buttons (controls→\n")
@@ -184,7 +190,15 @@ func emitAppTSX(ents []entities.Entity, btns []ControlAction, sourceHash string)
 	b.WriteString("/** App — the emitted web view: the lists + the operation-triggering buttons. */\n")
 	b.WriteString("export function App() {\n")
 	b.WriteString("\treturn (\n")
-	b.WriteString("\t\t<main className=\"mx-auto flex max-w-3xl flex-col gap-6 p-6\">\n")
+	// The root container (<main>). With NO root override, the line is BYTE-IDENTICAL to the canonical
+	// form (anti-overwrite §9 — no data-aidos-root, no extra class). With a "root/app" override it
+	// carries data-aidos-root (the shell coordinate) + the appended fond class (e.g. bg-destructive),
+	// re-styling the WHOLE app's background. The conditional keeps the no-override path byte-stable.
+	if rootClass == "" {
+		b.WriteString("\t\t<main className=\"mx-auto flex max-w-3xl flex-col gap-6 p-6\">\n")
+	} else {
+		fmt.Fprintf(&b, "\t\t<main data-aidos-root=\"root\" className=\"mx-auto flex max-w-3xl flex-col gap-6 p-6%s\">\n", rootClass)
+	}
 	b.WriteString("\t\t\t<header className=\"flex items-center justify-between\">\n")
 	b.WriteString("\t\t\t\t<h1 className=\"text-lg font-semibold text-foreground\">App</h1>\n")
 	b.WriteString("\t\t\t\t<div className=\"flex gap-2\">\n")

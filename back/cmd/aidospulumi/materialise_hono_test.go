@@ -18,7 +18,7 @@ import (
 func TestMaterialiseHono_WiresThreeContainers(t *testing.T) {
 	root := t.TempDir()
 
-	mat, err := MaterialiseHono(root, "shop", "dev", "", "")
+	mat, err := MaterialiseHono(root, "shop", "dev", "", "", "")
 	if err != nil {
 		t.Fatalf("MaterialiseHono: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestMaterialiseHono_WiresThreeContainers(t *testing.T) {
 	// emitted scaffold — never the generic image, never the mutable :latest tag. A code change → a new
 	// source hash → a new tag → Pulumi recreates the container (the staleness fix). The tag is computed
 	// from the SAME source-of-truth function the materialiser/build gesture use, so the test never drifts.
-	wantServerTag := projectServerImageTag("shop")
+	wantServerTag := projectServerImageTag("shop", nil)
 	for _, want := range []string{
 		`name: "shop-dev-server"`,
 		`name: "shop-dev-interpreter"`,
@@ -84,7 +84,7 @@ func TestMaterialiseHono_WithEntities(t *testing.T) {
 	root := t.TempDir()
 	entFile := writeEntitiesFile(t, t.TempDir())
 
-	mat, err := MaterialiseHono(root, "library", "dev", entFile, "")
+	mat, err := MaterialiseHono(root, "library", "dev", entFile, "", "")
 	if err != nil {
 		t.Fatalf("MaterialiseHono(entities): %v", err)
 	}
@@ -119,7 +119,7 @@ func TestMaterialiseHono_WithSeed(t *testing.T) {
 		t.Fatalf("write seed: %v", err)
 	}
 
-	mat, err := MaterialiseHono(root, "library", "prod", entFile, seedFile)
+	mat, err := MaterialiseHono(root, "library", "prod", entFile, seedFile, "")
 	if err != nil {
 		t.Fatalf("MaterialiseHono(seed): %v", err)
 	}
@@ -135,11 +135,11 @@ func TestMaterialiseHono_WithSeed(t *testing.T) {
 // TestMaterialiseHono_Idempotent — same inputs → byte-identical Pulumi file hashes across runs.
 func TestMaterialiseHono_Idempotent(t *testing.T) {
 	root := t.TempDir()
-	a, err := MaterialiseHono(root, "shop", "dev", "", "")
+	a, err := MaterialiseHono(root, "shop", "dev", "", "", "")
 	if err != nil {
 		t.Fatalf("MaterialiseHono #1: %v", err)
 	}
-	b, err := MaterialiseHono(root, "shop", "dev", "", "")
+	b, err := MaterialiseHono(root, "shop", "dev", "", "", "")
 	if err != nil {
 		t.Fatalf("MaterialiseHono #2: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestMaterialiseHono_Idempotent(t *testing.T) {
 // across runs. This is the deterministic half of gap #3 (the docker build is the gated half).
 func TestMaterialiseHono_EmitsPerProjectServerScaffold(t *testing.T) {
 	root := t.TempDir()
-	mat, err := MaterialiseHono(root, "shop", "dev", "", "")
+	mat, err := MaterialiseHono(root, "shop", "dev", "", "", "")
 	if err != nil {
 		t.Fatalf("MaterialiseHono: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestMaterialiseHono_EmitsPerProjectServerScaffold(t *testing.T) {
 		t.Fatalf("boot index.ts does not forward auth to the sidecar:\n%s", string(indexTS))
 	}
 	// Byte-stable: the scaffold file hashes match across a second materialisation.
-	again, err := MaterialiseHono(t.TempDir(), "shop", "dev", "", "")
+	again, err := MaterialiseHono(t.TempDir(), "shop", "dev", "", "", "")
 	if err != nil {
 		t.Fatalf("MaterialiseHono #2: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestMaterialiseHono_EmitsPerProjectServerScaffold(t *testing.T) {
 // server Dockerfile builds the web app. The view is SERVED by the app — not a placeholder.
 func TestMaterialiseHono_MaterialisesWebView(t *testing.T) {
 	root := t.TempDir()
-	mat, err := MaterialiseHono(root, "shop", "dev", "", "")
+	mat, err := MaterialiseHono(root, "shop", "dev", "", "", "")
 	if err != nil {
 		t.Fatalf("MaterialiseHono: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestMaterialiseHono_MaterialisesWebView(t *testing.T) {
 		}
 	}
 	// The web files are tracked in the result inventory (keyed server/web/<base>) and byte-stable.
-	again, err := MaterialiseHono(t.TempDir(), "shop", "dev", "", "")
+	again, err := MaterialiseHono(t.TempDir(), "shop", "dev", "", "", "")
 	if err != nil {
 		t.Fatalf("MaterialiseHono #2: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestMaterialiseHono_MaterialisesWebView(t *testing.T) {
 // (the honesty rule: never `docker build` an absent context). The actual build is docker-gated and
 // not exercised in the unit mirror.
 func TestBuildHonoServerImage_RefusesEmptyDir(t *testing.T) {
-	if _, err := BuildHonoServerImage("shop", ""); err == nil {
+	if _, err := BuildHonoServerImage("shop", "", ""); err == nil {
 		t.Fatalf("BuildHonoServerImage with no scaffold dir was NOT refused")
 	}
 }
@@ -291,10 +291,10 @@ func TestEnsureInterpreterImage_Idempotent(t *testing.T) {
 // TestMaterialiseHono_MissingArgs — an empty project/env is refused (the honesty rule).
 func TestMaterialiseHono_MissingArgs(t *testing.T) {
 	root := t.TempDir()
-	if _, err := MaterialiseHono(root, "", "dev", "", ""); err == nil {
+	if _, err := MaterialiseHono(root, "", "dev", "", "", ""); err == nil {
 		t.Fatalf("missing --project was NOT refused")
 	}
-	if _, err := MaterialiseHono(root, "p", "", "", ""); err == nil {
+	if _, err := MaterialiseHono(root, "p", "", "", "", ""); err == nil {
 		t.Fatalf("missing --env was NOT refused")
 	}
 }

@@ -127,3 +127,39 @@ func EmitWebChildAdapted(s WebAppSpec, adapt AdaptationOverride) (WebChild, *blo
 		Artifacts:  arts,
 	}, nil
 }
+
+// AdaptationOverrideFromScreens builds an AdaptationOverride that carries a FULL set of per-coordinate
+// ScreenOverride (the captured ScreenDesign, ADR 0071) — setting BOTH the public Screen field (the first
+// override, the front-twin's single-override surface) AND the unexported screenAll carrier (so a
+// multi-coordinate design reproduces EVERY coordinate, byte-stable). An EMPTY/nil set returns the zero
+// AdaptationOverride (Screen==nil → the canonical form, byte-identical to EmitWebApp, anti-overwrite §9).
+// It is the constructor a caller OUTSIDE the package (the aidospulumi executor) uses to feed captured
+// overrides into EmitWebChildAdapted without reaching the unexported screenAll directly. PURE.
+func AdaptationOverrideFromScreens(overrides []ScreenOverride) AdaptationOverride {
+	if len(overrides) == 0 {
+		return AdaptationOverride{}
+	}
+	resolved := sortedScreenOverrides(overrides)
+	first := resolved[0]
+	return AdaptationOverride{Screen: &first, screenAll: resolved}
+}
+
+// EmitWebAppWithScreenOverrides emits the web view applying a captured ScreenDesign override set (ADR
+// 0071) — the SINGLE seam the aidospulumi executor uses to re-apply validated per-coordinate style tokens
+// on a redeploy (the permanence of the "red"). With an EMPTY override set it is BYTE-IDENTICAL to
+// EmitWebApp(s) (it routes through the SAME shared body emitWebAppOverridden with nil overrides), so the
+// no-`--screen-design` path is unchanged (anti-overwrite §9). With overrides it routes through
+// EmitWebChildAdapted (re-styling the matching data-aidos-* elements, INCLUDING the root/app shell). It
+// returns the bare []Artifact (the materialiser lands them under server/web/ + hashes them for the tag).
+// PURE, TOTAL, byte-stable: same (spec, overrides) → same bytes.
+func EmitWebAppWithScreenOverrides(s WebAppSpec, overrides []ScreenOverride) ([]Artifact, *blockreason.BlockReason) {
+	if len(overrides) == 0 {
+		// No captured design → the canonical EmitWebApp form (byte-identical, the anti-drift property).
+		return EmitWebApp(s)
+	}
+	child, br := EmitWebChildAdapted(s, AdaptationOverrideFromScreens(overrides))
+	if br != nil {
+		return nil, br
+	}
+	return child.Artifacts, nil
+}

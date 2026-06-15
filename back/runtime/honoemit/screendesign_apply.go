@@ -42,8 +42,12 @@ func AidosBridgeSource() string { return aidosBridgeSource }
 // rendering them in that order keeps the bytes stable. NO match → "" → the className is unchanged
 // (byte-identity preserved — the determinism + anti-overwrite contract). Never panics.
 func screenClassSuffix(overrides []ScreenOverride, coord ScreenCoord) string {
+	want := normalizeRootCoord(coord)
 	for _, o := range overrides {
-		if o.Coord.coordKey() != coord.coordKey() {
+		// Normalise the override's coordinate so a front-supplied root/app alias ({kind:"root"|"app"|
+		// "section", entity:"root"|"app"}) folds onto the canonical rootCoord before matching (the
+		// "root/app" fond override, ADR 0071 §2). Section/field/action coords are returned verbatim.
+		if normalizeRootCoord(o.Coord).coordKey() != want.coordKey() {
 			continue
 		}
 		if len(o.Styles) == 0 {
