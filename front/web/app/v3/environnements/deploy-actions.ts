@@ -115,6 +115,9 @@ export async function deployProjectStackAction(
 	projectSlug: string,
 	entityNames: readonly string[],
 	env = "dev",
+	// Les ScreenOverride capturés dans le Design Lab (ADR 0071) : passés à --screen-design pour
+	// que les adaptations validées (ex bg=rouge) soient REPRODUITES sur l'app — la permanence.
+	screenOverrides: readonly unknown[] = [],
 ): Promise<DeployStackResult> {
 	const slug = slugify(projectSlug);
 	if (slug === "") {
@@ -124,20 +127,28 @@ export async function deployProjectStackAction(
 	const file = `/tmp/${slug}-${env}-entities.json`;
 	try {
 		await writeFile(file, entitiesPayload(entityNames), "utf8");
-		const { stdout } = await execFileP(
-			PULUMI_BIN,
-			[
-				"up",
-				"--hono",
-				"--project",
-				slug,
-				"--env",
-				env,
-				"--entities",
-				file,
-			],
-			{ cwd: REPO, timeout: 300_000, maxBuffer: 16 * 1024 * 1024 },
-		);
+		const args = [
+			"up",
+			"--hono",
+			"--project",
+			slug,
+			"--env",
+			env,
+			"--entities",
+			file,
+		];
+		// Les consignes d'apparence capturées → un fichier --screen-design ; le compilateur (aidospulumi)
+		// émet la vue web ADAPTÉE (EmitWebChildAdapted) → l'adaptation survit au redéploiement.
+		if (screenOverrides.length > 0) {
+			const designFile = `/tmp/${slug}-${env}-screen-design.json`;
+			await writeFile(designFile, JSON.stringify(screenOverrides), "utf8");
+			args.push("--screen-design", designFile);
+		}
+		const { stdout } = await execFileP(PULUMI_BIN, args, {
+			cwd: REPO,
+			timeout: 300_000,
+			maxBuffer: 16 * 1024 * 1024,
+		});
 		const parsed = JSON.parse(extractJson(stdout) || "{}") as {
 			status?: string;
 			url?: string;

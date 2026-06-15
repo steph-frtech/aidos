@@ -973,3 +973,40 @@ export function rejudgeDesignProposal(
 		phrase: canonicalAdaptPhrase(coord, a.tokens),
 	};
 }
+
+/**
+ * sessionScreenOverrides — les ScreenOverride CAPTURÉS dans la session : re-parse les phrases
+ * canoniques « adapte <coord> : <property>=<token> » du transcript (parseAdaptProposal) → la
+ * coordonnée (resolveCoordRef, ou le SENTINEL racine app/root → le conteneur <main data-aidos-root>)
+ * + les tokens du catalogue FERMÉ. Le DERNIER override par coordonnée gagne (append-only, la tête).
+ * PURE & TOTALE & fail-closed (une coord inconnue / un token hors-catalogue est IGNORÉ, jamais inventé).
+ * Passé au déploiement via --screen-design pour que les adaptations validées soient REPRODUITES sur
+ * l'app déployée — la PERMANENCE (le rouge survit au reload), ADR 0071.
+ */
+export function sessionScreenOverrides(
+	master: MasterDescriptor,
+	messages: readonly string[],
+): ScreenOverride[] {
+	const byCoord = new Map<string, ScreenOverride>();
+	for (const text of messages) {
+		const a = parseAdaptProposal(text);
+		if (a === null) continue;
+		const folded = a.ref
+			.normalize("NFD")
+			.replace(/[̀-ͯ]/g, "")
+			.toLowerCase()
+			.trim();
+		// Le sentinel RACINE (« app »/« root ») → le conteneur racine (normalizeRootCoord côté Go) ;
+		// sinon une coordonnée EXISTANTE de la maître (jamais une coord inventée → ignorée).
+		const coord: ScreenCoord | null =
+			folded === "app" || folded === "root"
+				? { kind: "section", entity: "app" }
+				: resolveCoordRef(master, a.ref);
+		if (coord === null) continue;
+		const styles = a.tokens.filter(isKnownStyleToken);
+		if (styles.length === 0) continue;
+		const key = `${coord.kind}:${coord.entity}:${coord.field ?? ""}:${coord.control ?? ""}`;
+		byCoord.set(key, { coord, styles });
+	}
+	return [...byCoord.values()];
+}

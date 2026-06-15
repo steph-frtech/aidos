@@ -239,6 +239,28 @@ func emitMainTSX(sourceHash string) []byte {
 	return []byte(b.String())
 }
 
+// adrThemeBlock is the ADR 0010 design-system theme (zinc + blue-600) injected into the index shell:
+// the tailwind.config maps each shadcn token colour to its CSS variable (so bg-card/text-foreground/
+// bg-destructive/text-primary/border-border resolve under the CDN), and :root pins the zinc light
+// theme variables. A FIXED literal — deterministic, byte-stable (no clock, no RNG).
+const adrThemeBlock = `		<script>
+			tailwind.config = { theme: { extend: { borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" }, colors: {
+				border: "hsl(var(--border))", input: "hsl(var(--input))", ring: "hsl(var(--ring))",
+				background: "hsl(var(--background))", foreground: "hsl(var(--foreground))",
+				primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
+				secondary: { DEFAULT: "hsl(var(--secondary))", foreground: "hsl(var(--secondary-foreground))" },
+				destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))" },
+				muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
+				accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
+				popover: { DEFAULT: "hsl(var(--popover))", foreground: "hsl(var(--popover-foreground))" },
+				card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" }
+			} } } };
+		</script>
+		<style>
+			:root { --background: 0 0% 100%; --foreground: 240 10% 3.9%; --card: 0 0% 100%; --card-foreground: 240 10% 3.9%; --popover: 0 0% 100%; --popover-foreground: 240 10% 3.9%; --primary: 221.2 83.2% 53.3%; --primary-foreground: 210 40% 98%; --secondary: 240 4.8% 95.9%; --secondary-foreground: 240 5.9% 10%; --muted: 240 4.8% 95.9%; --muted-foreground: 240 3.8% 46.1%; --accent: 240 4.8% 95.9%; --accent-foreground: 240 5.9% 10%; --destructive: 0 84.2% 60.2%; --destructive-foreground: 0 0% 98%; --border: 240 5.9% 90%; --input: 240 5.9% 90%; --ring: 221.2 83.2% 53.3%; --radius: 0.5rem; }
+		</style>
+`
+
 // emitIndexHTML renders the HTML shell: a #root mount, the Tailwind CDN (ADR 0010 tokens via
 // utility classes — the design system inherited), and the Vite module entry (main.tsx). The
 // source hash rides in a comment so the artifact stays content-addressed.
@@ -254,6 +276,11 @@ func emitIndexHTML(s WebAppSpec, sourceHash string) []byte {
 	// The design system inherited (ADR 0010): Tailwind utility classes resolve via the CDN; the
 	// emitted components use only token classes (bg-card, text-foreground, border-border, …).
 	b.WriteString("\t\t<script src=\"https://cdn.tailwindcss.com\"></script>\n")
+	// The ADR 0010 THEME (zinc + blue-600) — the CDN alone does NOT know the shadcn tokens
+	// (card/foreground/primary/destructive/border…), so we DECLARE them: tailwind.config maps each
+	// token color → its CSS variable, and :root pins the zinc light theme. Without this the token
+	// classes are inert (bg-destructive renders transparent). A fixed literal — byte-stable, no clock.
+	b.WriteString(adrThemeBlock)
 	b.WriteString("\t</head>\n")
 	b.WriteString("\t<body class=\"bg-background text-foreground\">\n")
 	b.WriteString("\t\t<div id=\"root\"></div>\n")

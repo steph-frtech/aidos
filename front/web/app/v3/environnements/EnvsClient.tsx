@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { sessionScreenOverrides } from "@/lib/v3/design/screen-design";
 import { deployProjectStackAction } from "./deploy-actions";
 import {
 	type AppProjection,
@@ -150,6 +151,7 @@ export function EnvsClient() {
 		codeEdges,
 		instanceConfig,
 		projectId,
+		messages,
 		strings: t,
 	} = useV3Session();
 	// Le PANNEAU D'ENVIRONNEMENT : le barreau ouvert (null = replié) + l'onglet actif.
@@ -185,11 +187,22 @@ export function EnvsClient() {
 		setRealBusy(true);
 		try {
 			// LE VRAI déploiement PAR PROJET : monte la stack docker dédiée du projet courant
-			// (server + interpreter + db) derrière <slug>-dev.sagedesk.fr, depuis SES entités.
+			// (server + interpreter + db) derrière <slug>-dev.sagedesk.fr, depuis SES entités —
+			// + les ScreenDesign capturés (Design Lab) RÉAPPLIQUÉS sur la vue (la permanence du rouge).
+			const app = emitApp(state);
+			const master = {
+				hash: app.version,
+				coords: app.entities.map((e) => ({
+					kind: "section" as const,
+					entity: e.name,
+				})),
+			};
 			setRealResult(
 				await deployProjectStackAction(
 					projectId ?? "app",
-					emitApp(state).entities.map((e) => e.name),
+					app.entities.map((e) => e.name),
+					"dev",
+					sessionScreenOverrides(master, messages),
 				),
 			);
 		} catch {
