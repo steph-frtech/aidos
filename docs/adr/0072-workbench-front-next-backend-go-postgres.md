@@ -1,0 +1,35 @@
+# ADR 0072 — Workbench = front Next + backend Go/Postgres ; la vérité vit en Postgres ; le front appelle le moteur ; twins TS = aperçu/fallback gouverné ; généré = Hono
+
+- **Statut :** accepté (décision humaine, 2026-06-15 : « GO » sur docs/plan/PLAN-branchements.md)
+- **Date :** 2026-06-15
+- **Contexte KRD :** CLAUDE.md §1 (Mandat B — toute vérité + sa méta vivent en Postgres) · §2 (le mur) · §3 (pile gelée : back = Go · base = Postgres · front = Next ; app émise = Hono) · §4 (structure : `back/` = le moteur de l'OS, seul écrivain de la vérité ; `front/web/` = projection) · §6/§8 (determinism-first) · §9 (anti-overwrite) · KRD Mandat B · ADR 0003 (pile gelée) · ADR 0040 (app émise multi-plateforme, backend Hono) · ADR 0006 (Doltgres = datastore de l'app émise, jamais le truth-store) · steps S17/S31 (projection kernel) · audit `w91305w3q`
+
+## Contexte
+
+L'audit `w91305w3q` (5 finders, ~40 items) a mis au jour un **pattern racine** : le moteur Go compile et teste la vérité, mais le Workbench ne l'appelle pas. Le front Next opère sur des **twins TS** (réimplémentations TypeScript des gestes Go) et persiste l'état dans des **transcripts fichiers** (`.aidos-projects`, `front/web/app/v3/projects-actions.ts`). Le moteur Go (`back/runtime/*`, `back/kernel/*`, `back/archive/*`) et la flotte de ~90 serveurs MCP (`back/mcp/`) existent, compilent, sont verts — mais ne sont reliés à aucun écran. Seules l'**émission** et le **déploiement** des apps (la piste DP, `back/cmd/aidospulumi/`) sont, eux, réellement Go.
+
+Cette dérive crée une ambiguïté de fond sur ce qu'**est** le Workbench, et sur le statut de Mandat B (« toute vérité vit en Postgres »). Lu comme une simple discipline de build, Mandat B autoriserait les twins TS + transcripts fichiers comme source de travail. C'est un **monstre** (CLAUDE.md §1) : une vérité (l'état kernel/mirrors d'un projet) qui ne vit pas là où le contrat l'exige, manipulée par du code (les twins) qui pourrait diverger silencieusement du moteur Go de référence — un **déni de determinism-first** (§6/§8 : si une fonction déterministe existe — le geste Go — elle est autoritative, l'autre s'y plie). Toute la suite du plan de branchements (la couture front↔Go en 0074, le truth-store live en 0073, le statut des twins, l'honnêteté des écrans en 0080) **découle** de la désambiguïsation de cette décision-mère.
+
+## Décision
+
+**Le backend du Workbench EST Go + Postgres. La vérité vit en Postgres, écrite par le Go à travers le mur. Le front Next *appelle* le moteur (via la gateway/MCP, ADR 0074) pour toute opération de vérité. Les twins TS sont un *aperçu / fallback gouverné*, jamais une source de vérité. L'app *générée* (la visée) reste Hono (réaffirme ADR 0040).**
+
+1. **La pile, sans ambiguïté.** Le Workbench est un **front Next/React** par-dessus un **backend Go + Postgres**. Le front ne *réimplémente* aucun geste de vérité : il **appelle** le moteur Go. Les schémas `kernel · mirrors · ideas · changesets · dag · brain · context · fitness` (CLAUDE.md §1) sont la vérité, en Postgres, et **seul le Go écrit dedans, à travers le mur** (§2). L'app **générée**, elle, est une autre pile (Hono + React/Expo/Electron, ADR 0040) avec **sa** donnée à elle — à ne jamais confondre avec le truth-store de l'OS.
+
+2. **Mandat B est runtime, pas seulement build.** « La vérité vit en Postgres » n'est **pas** qu'une discipline de construction : c'est la **persistance d'exécution** du Workbench. L'état kernel/mirrors/ideas/changesets/dag d'un projet **est** dans Postgres en live (la conséquence détaillée — transcript v3 devient une projection de Postgres — est gravée en ADR 0073). Le contrat est désormais lu littéralement : un état de vérité dans un fichier est une **projection régénérable**, jamais la source.
+
+3. **Les twins TS = aperçu / fallback gouverné.** Les réimplémentations TS d'un geste Go sont permises **uniquement** comme (a) **aperçu** optimiste local et (b) **fallback** quand le moteur est injoignable. Leur statut est **gouverné**, fail-closed :
+   - **Byte-égaux au Go** : chaque twin est apparié à son geste Go par un **miroir différentiel** (property test : même entrée → mêmes bytes en sortie côté Go et côté twin). Un twin qui diverge est une **vague de rouge**.
+   - **Jamais autoritatif** : conformément à determinism-first (§6/§8), le geste **Go est la référence** ; le twin s'y plie, jamais l'inverse. Un twin invoqué *silencieusement* à la place du Go (parce que le moteur est injoignable sans le dire) est un défaut — ADR 0074 grave l'e2e anti-fallback-silencieux qui l'interdit.
+   - **Jamais une porte vers la vérité** : un twin ne peut pas écrire kernel/mirrors/fitness ; toute écriture de vérité passe par le moteur Go et le mur.
+
+4. **Le front *appelle* le moteur.** La couture concrète (gateway MCP HTTP, enregistrement de la flotte, `AIDOS_GATEWAY_HTTP_URL`) est l'objet d'ADR 0074. Cet ADR-mère en fixe seulement l'obligation : toute opération de vérité (lire/écrire kernel, mirrors, ideas, changesets, dag, projeter une opération, lancer un runner de miroir) est un **appel au moteur Go**, pas une exécution dans le navigateur ou dans le serveur Next.
+
+5. **Généré = Hono.** L'app que le Workbench *construit* a son propre backend **Hono** (ADR 0040) et son propre datastore (Doltgres hors-prod / Postgres prod, ADR 0006). Ce n'est ni le moteur de l'OS, ni le truth-store de l'OS. La frontière est nette : **Workbench = Go/Postgres ; app générée = Hono + sa donnée**.
+
+## Conséquences
+
+- **Positif.** L'ambiguïté de Mandat B est levée : la vérité est en Postgres **en live**, le Go en est le seul écrivain, le front l'appelle. Le mur (§2) retrouve son sens runtime (le front ne peut écrire la vérité que via le moteur). Determinism-first (§6/§8) est respecté : le geste Go est autoritatif, le twin déféré et prouvé byte-égal. Anti-overwrite (§9) : aucun twin ne remplace silencieusement un geste — la divergence est une vague de rouge. Cette décision **gouverne tout le reste du plan** : 0073 (truth-store live), 0074 (la couture), 0080 (honnêteté des écrans), 0081 (statut du Go dormant — le Go est désormais explicitement *la référence*).
+- **Coûts assumés.** (a) Chaque twin TS encore en place doit gagner son **miroir différentiel** (byte-égalité Go↔twin) ou être retiré — un twin non prouvé est un monstre. (b) Le front cesse d'être autonome : il dépend du moteur joignable (d'où le fallback gouverné + l'e2e anti-fallback-silencieux d'ADR 0074). (c) Migration des transcripts fichiers vers la projection Postgres (ADR 0073).
+- **OpenQuestions (forward-deps, ne bloquent pas).** La persistance Postgres effective des projets (S17/S31) est levée par ADR 0073 ; tant qu'elle n'est pas back-fillée, le transcript fichier reste une **projection** tolérée (non la source). La liste exacte des twins à apparier ou retirer est triée par ADR 0081.
+- Le mur, le déterminisme et l'anti-overwrite sont **inchangés** ; cette décision les *rend littéraux* au runtime — le Workbench est, par construction, un front qui ne peut toucher la vérité qu'à travers le moteur Go.

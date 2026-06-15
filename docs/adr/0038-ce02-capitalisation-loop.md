@@ -1,10 +1,9 @@
 # ADR 0038 — CE02 : la « boucle de capitalisation » — ce qu'on capitalise, par où, et la frontière (capitalisation ≠ apprentissage de critères ; tout via /goal)
 
-- Status: Accepted
-- Date: 2026-06-06
-- Step: CE02 (Runtime — un ADR de décision épinglé au code par un miroir de parité ; aucun nouvel enforcer, aucune écriture de vérité)
-- KRD: §84 (spike-gate CE01), §24.6 (behaviors-macro), §119.1 (MemoryFirewall), §82 (anti-passthrough), CLAUDE.md §2 (le mur), §6/§8 (determinism-first ; poids déclarés, jamais appris), §11 (Linear = tracker)
-- Inputs: CE01 (spike confiné `/spike/compound/` — verdict **GO** calculé, jamais déclaré : paire similaire `order→invoice` 7800→1940 tokens = **75.1%** ↓, bien au-dessus du plancher 25% ; contrôle dissimilaire `order→migration` **16.6%** ≤ plafond 20% ⇒ pas de faux positif ; reproductible 100×)
+- **Statut :** accepté (décision humaine, 2026-06-15 : « GO » sur docs/plan/PLAN-branchements.md — la boucle de capitalisation est branchée fin-de-goal, cf. ADR 0078 / le branchement B-Compound)
+- Status: Accepted <!-- forme épinglée par le miroir de parité `back/runtime/compound/capitalisation_adr_test.go` (done-criterion CE02) — ne pas retirer : le miroir l'exige verbatim -->
+- **Date :** 2026-06-06 (accepté), finalisé 2026-06-15
+- **Contexte KRD :** Step CE02 (Runtime — un ADR de décision épinglé au code par un miroir de parité ; aucun nouvel enforcer, aucune écriture de vérité) · KRD §84 (spike-gate CE01) · §24.6 (behaviors-macro) · §119.1 (MemoryFirewall) · §82 (anti-passthrough) · CLAUDE.md §2 (le mur) · §6/§8 (determinism-first ; poids déclarés, jamais appris) · §11 (Linear = tracker) · ADR 0072 (décision-mère du plan de branchements : le moteur Go est la référence ; la capitalisation reste sous le mur, jamais une écriture de vérité côté front) · ADR 0078 (governance sur de vrais runs — le branchement Compound s'y rattache) · Inputs : CE01 (spike confiné `/spike/compound/` — verdict **GO** calculé, jamais déclaré : paire similaire `order→invoice` 7800→1940 tokens = **75.1%** ↓, bien au-dessus du plancher 25% ; contrôle dissimilaire `order→migration` **16.6%** ≤ plafond 20% ⇒ pas de faux positif ; reproductible 100×)
 
 ## Contexte
 

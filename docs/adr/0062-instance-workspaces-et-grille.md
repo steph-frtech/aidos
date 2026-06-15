@@ -1,7 +1,7 @@
 # ADR 0062 — L'instance, les workspaces et la grille : les 7 mandats (envs dev → staging → prod, palette ⌘K, VS Code par environnement, config d'instance, lentille Instance, vue Spécifications)
 
-- **Statut :** accepté (décision humaine, 2026-06-12)
-- **Date :** 2026-06-12
+- **Statut :** accepté (décision humaine, 2026-06-12 ; finalisé « proposed → accepted » le 2026-06-15 : « GO » sur docs/plan/PLAN-branchements.md — le contenu des 7 mandats est déjà live en V3)
+- **Date :** 2026-06-12 (finalisé 2026-06-15)
 - **Contexte KRD :** ADR 0059 (l'échelle d'environnements — le cliquet généralisé sur `ENV_LADDER`, une donnée) · ADR 0060 (Workbench V3 — une session, des lentilles ; la loi de couverture totale, addendum 2) · ADR 0061 (les projets persistants — rouvrir = rejouer, le magasin `.aidos-projects/`) · ADR 0057 (le réducteur pur, la grammaire fermée) · CLAUDE.md §2 (le mur) · §6/§8 (déterminisme-first, « done » calculé) · §9 (anti-overwrite, append-only) · §23 (la verticale — niveaux × facettes)
 
 ## Contexte
