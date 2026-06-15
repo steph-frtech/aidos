@@ -18,13 +18,13 @@ import { V3Nav } from "./V3Nav";
 import { V3SessionProvider } from "./V3Session";
 
 /**
- * Le layout du groupe de routes /v3 (V3 — ADR 0060) : UNE session, huit lentilles.
+ * Le layout du groupe de routes /v3 (V3 — ADR 0060) : UNE session, dix lentilles.
  *
  * Le SHELL V3 : une barre latérale gauche fixe (V3Nav) + le contenu + la PALETTE ⌘K
  * (Palette — « tous les écrans au meilleur endroit »), le tout enveloppé
  * dans la V3SessionProvider — chaque lentille (/v3/lab, /v3/parcours, /v3/specs,
- * /v3/history, /v3/environnements, /v3/code, /v3/instance, /v3/parametrage) lit la
- * MÊME session rejouable. ADDITIF : les
+ * /v3/history, /v3/environnements, /v3/code, /v3/instance, /v3/parametrage, /v3/design,
+ * /v3/emetteurs) lit la MÊME session rejouable. ADDITIF : les
  * V1 et V2 restent intactes. Le layout racine pousse le `<body>` de `sm:pl-64` pour
  * la barre V1 fixe ; la V3 ayant SA propre nav, on récupère cette gouttière avec
  * `sm:-ml-64` (le motif du shell V2).
@@ -59,6 +59,7 @@ const KEYS = [
 	"navInstance",
 	"navParams",
 	"navDesign",
+	"navEmetteurs",
 	"navWorkbench",
 	"paletteOpen",
 	"palettePlaceholder",
@@ -400,6 +401,44 @@ const KEYS = [
 	"envBadgeSpec",
 	"envBadgeEbauche",
 	"envBadgePublie",
+	"emetteursTitle",
+	"emetteursIntro",
+	"emetteursSamplesHeading",
+	"emetteursSamplesHint",
+	"caseOrder",
+	"caseOrderChanged",
+	"emetteursEmitBtn",
+	"emetteursReEmitBtn",
+	"emetteursResetBtn",
+	"emetteursAppHeading",
+	"emetteursAppHint",
+	"emetteursAppEmpty",
+	"emetteursSourceHashLabel",
+	"emetteursContractHeading",
+	"emetteursContractHint",
+	"emetteursTargetsHeading",
+	"emetteursColPath",
+	"emetteursColOutputHash",
+	"emetteursReEmitHeading",
+	"emetteursReEmitHint",
+	"emetteursReEmitRounds",
+	"emetteursReEmitStable",
+	"emetteursReEmitDrift",
+	"emetteursReEmitAllStable",
+	"emetteursPreviewHeading",
+	"emetteursPreviewHint",
+	"emetteursPreviewTable",
+	"emetteursPreviewPrimaryKey",
+	"emetteursColColumn",
+	"emetteursColSqlType",
+	"emetteursColTsType",
+	"emetteursColNullable",
+	"emetteursColPrimaryKey",
+	"emetteursYes",
+	"emetteursNo",
+	"emetteursEmpty",
+	"emetteursProposeNote",
+	"emetteursDeterminismNote",
 ] as const;
 
 export default async function V3Layout({ children }: { children: ReactNode }) {
@@ -495,9 +534,9 @@ export default async function V3Layout({ children }: { children: ReactNode }) {
 					<V3Nav />
 				</aside>
 				<main className="min-w-0 flex-1 px-4 py-6 sm:px-8">
-						<ProvisioningBanner />
-						{children}
-					</main>
+					<ProvisioningBanner />
+					{children}
+				</main>
 			</div>
 			{/* LA PALETTE ⌘K — montée DANS la provider (elle lit state.screens). */}
 			<Palette />

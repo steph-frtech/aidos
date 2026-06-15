@@ -142,11 +142,11 @@ test.describe("V3 — une session, cinq lentilles (le réducteur est la loi)", (
 		// /v3 a REDIRIGÉ vers /v3/lab (la porte d'entrée est le chat).
 		await expect(page).toHaveURL(/\/v3\/lab$/);
 
-		// La nav offre les NEUF entrées (AI Lab · Parcours · Spécifications ·
-		// Historique · Environnements · Code · Instance · Paramètres · Design) + le
-		// retour Workbench V2 en pied.
+		// La nav offre les DIX entrées (AI Lab · Parcours · Spécifications ·
+		// Historique · Environnements · Code · Instance · Paramètres · Design ·
+		// Émetteurs) + le retour Workbench V2 en pied.
 		await expect(page.getByTestId("v3-nav")).toBeVisible();
-		await expect(page.getByTestId("v3-nav-item")).toHaveCount(9);
+		await expect(page.getByTestId("v3-nav-item")).toHaveCount(10);
 		await expect(page.getByTestId("v3-nav-workbench")).toBeVisible();
 
 		// Le HERO d'accueil — accueillant, en français simple — et ses 4 amorces.
@@ -551,6 +551,78 @@ test.describe("V3 — la palette, les spécifications, l'aperçu par env, l'inst
 		// Le formulaire de réglages expose l'ÉCHELLE paramétrable (CSV) — en
 		// LECTURE SEULE ici : rien n'est saisi, rien n'est enregistré (hermétique).
 		await expect(page.getByTestId("v3-inst-ladder")).toBeVisible();
+	});
+
+	test("les émetteurs (la 10e lentille) : DDL · Go · TS depuis le twin, byte-stable", async ({
+		page,
+	}, testInfo) => {
+		// HERMÉTIQUE : projet frais + IA éteinte, puis la lentille Émetteurs par la nav cliente.
+		await openDeterministe(page, `emetteurs-${testInfo.testId}`);
+		await navTo(page, "/v3/emetteurs");
+
+		// La lentille est visible (le portage de /v2/emetteurs dans la session V3).
+		await expect(page.getByTestId("v3-emetteurs")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		// On CHOISIT une source d'entité du registre clos (le twin ENTITY_CASES — les
+		// vraies sources que le Go pinne) puis on émet (l'émission est groupée à la sélection).
+		await page
+			.locator('[data-testid="v3-emetteurs-sample"][data-id="order"]')
+			.click();
+		await expect(page.getByTestId("v3-emetteurs-result")).toBeVisible();
+
+		// LES TROIS PROJECTIONS (DDL · Go · TS) sont présentes — un onglet par cible émise.
+		await expect(page.getByTestId("v3-emetteurs-tab")).toHaveCount(3);
+		await expect(
+			page.locator('[data-testid="v3-emetteurs-tab"][data-target="pg-ddl"]'),
+		).toBeVisible();
+		await expect(
+			page.locator('[data-testid="v3-emetteurs-tab"][data-target="go-sqlc"]'),
+		).toBeVisible();
+		await expect(
+			page.locator('[data-testid="v3-emetteurs-tab"][data-target="ts-types"]'),
+		).toBeVisible();
+
+		// LE DDL est rendu par défaut (le premier onglet, octets émis lisibles) — la vérité
+		// de stockage en tête (DISPLAY_TARGETS du twin).
+		const bytes = page.getByTestId("v3-emetteurs-bytes");
+		await expect(bytes).toHaveAttribute("data-target", "pg-ddl");
+		await expect(bytes).toContainText("CREATE TABLE");
+
+		// BASCULER sur l'onglet Go : les octets du struct sqlc (le même twin, jamais un fork).
+		await page
+			.locator('[data-testid="v3-emetteurs-tab"][data-target="go-sqlc"]')
+			.click();
+		await expect(page.getByTestId("v3-emetteurs-bytes")).toHaveAttribute(
+			"data-target",
+			"go-sqlc",
+		);
+
+		// LA RE-ÉMISSION prouve la byte-stabilité (mêmes octets à chaque tour — un émetteur
+		// pur n'a aucun état caché) : les trois cibles byte-identiques.
+		await page.getByTestId("v3-emetteurs-reemit").click();
+		const report = page.getByTestId("v3-emetteurs-reemit-report");
+		await expect(report).toBeVisible();
+		await expect(report).toHaveAttribute("data-all-stable", "true");
+		await expect(page.getByTestId("v3-emetteurs-all-stable")).toBeVisible();
+
+		// LE MUR (§2) : le bouton de proposition déclare data-proposes="goal" — modifier une
+		// source PROPOSE → /goal, jamais une écriture directe depuis l'écran.
+		await expect(page.getByTestId("v3-emetteurs-propose")).toHaveAttribute(
+			"data-proposes",
+			"goal",
+		);
+
+		// LA 10e LENTILLE EST ATTEIGNABLE PAR ⌘K (« tous les écrans au meilleur endroit »).
+		await page.keyboard.press("Control+k");
+		await expect(page.getByTestId("v3-palette")).toBeVisible();
+		await page.getByTestId("v3-palette-input").fill("emetteurs");
+		await expect(
+			page.locator(
+				'[data-testid="v3-palette-item"][data-route="/v3/emetteurs"]',
+			),
+		).toBeVisible();
 	});
 });
 
