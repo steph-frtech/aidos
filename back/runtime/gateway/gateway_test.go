@@ -116,6 +116,26 @@ func TestRouteStackEngraveIsTruthWrite(t *testing.T) {
 	}
 }
 
+// TestRouteRealityIngestToolsBelowLine: the ADR 0081 reality-ingest server the gateway
+// now fronts is BELOW THE LINE — a same-project, same-identity call routes through (its
+// tools detect/ingest/render a prod divergence into a DRAFT idea, never a kernel write).
+// Fault-injection: the gateway really routes the prod→kernel on-ramp's tools, so `/learn`
+// has its door (the capability ceases to be dormant — ADR 0081, issue A).
+func TestRouteRealityIngestToolsBelowLine(t *testing.T) {
+	reg := gateway.DefaultRegistry()
+	scope := projectwall.Scope{Identity: "alice", ActiveProject: "proj-a"}
+	target := projectwall.Target{ProjectID: "proj-a"}
+	for _, tool := range []string{"detect_divergence", "ingest_divergence", "render_idea_text"} {
+		d := reg.Route(gateway.Call{Scope: scope, Tool: tool, Target: target})
+		if d.Outcome != gateway.OutcomeRoute {
+			t.Fatalf("reality-ingest below-line tool %q not routed: %v", tool, d.Outcome)
+		}
+		if d.Tool == nil || d.Tool.Server != "reality-ingest" {
+			t.Fatalf("reality-ingest tool %q routed to the wrong server: %+v", tool, d.Tool)
+		}
+	}
+}
+
 func TestDefaultToolsReproducible(t *testing.T) {
 	a := gateway.DefaultTools()
 	b := gateway.DefaultTools()

@@ -123,6 +123,13 @@ func main() {
 	var src CutSource = EmptyCutSource{}
 	if pool != nil {
 		src = &PgCutSource{Pool: pool}
+		// Wire the SELECT-only Postgres goal-check source (ADR 0081, issue A): the
+		// goal-check half now reads the REAL red-set verdicts + the REAL densimètre
+		// score + the declared floor + the monster set, so "done" is computed over
+		// live truth, not the in-memory no-op. ONLY when a pool exists — absent a
+		// DATABASE_URL the default NoGoalSource stays installed (goal-check is a no-op,
+		// fail-open without a DB), so the interactive cockpit's Stop is UNCHANGED.
+		goalSource = NewPgGoalCheckSource(pool)
 	}
 	os.Exit(Run(ctx, os.Stdin, os.Stdout, src, log))
 }
