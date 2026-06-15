@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyIntent, initBuilderState } from "../v2/builder";
 import { bareTree } from "../v2/composition";
-import { gridOf, specsOf } from "./specs";
+import { gridOf, STACK_SPECS, specsOf, specsWithStack } from "./specs";
 
 /**
  * V3 — le MIROIR de la VUE SPÉCIFICATIONS (ADR 0062) : « une vue où on voit les
@@ -47,6 +47,45 @@ describe("specsOf — chaque vérité du projet, avec son statut calculé", () =
 	it("DÉTERMINISTE : même état → mêmes lignes", () => {
 		const st = richState();
 		expect(specsOf(st)).toEqual(specsOf(st));
+	});
+});
+
+describe("ADR 0076 — le SUBSTRAT GELÉ est une spec dès la création", () => {
+	it("un projet NEUF (transcript vide) a déjà ses specs de pile, jamais 0", () => {
+		const fresh = initBuilderState([], bareTree());
+		expect(specsOf(fresh)).toHaveLength(0); // aucune idée encore
+		const withStack = specsWithStack(fresh);
+		expect(withStack.length).toBe(STACK_SPECS.length); // … mais la pile gelée est là
+		expect(withStack.length).toBeGreaterThanOrEqual(9);
+		// la grille d'un projet neuf est DÉJÀ peuplée (plus de « 0 partout »).
+		const grid = gridOf(withStack);
+		expect(grid.reduce((n, c) => n + c.specIds.length, 0)).toBe(
+			STACK_SPECS.length,
+		);
+		// les composants clés du substrat gelé (ADR 0003) sont présents.
+		const keys = STACK_SPECS.map((s) => s.id);
+		for (const k of [
+			"stack:app",
+			"stack:api",
+			"stack:db",
+			"stack:auth",
+			"stack:telemetry",
+		]) {
+			expect(keys).toContain(k);
+		}
+	});
+
+	it("specsWithStack PRÉFIXE le substrat aux specs de conversation (additif, déterministe)", () => {
+		const st = richState();
+		const ws = specsWithStack(st);
+		expect(ws).toEqual([...STACK_SPECS, ...specsOf(st)]);
+		expect(specsWithStack(st)).toEqual(specsWithStack(st)); // déterministe
+		// chaque spec de pile a une coordonnée valide + statut kernel (gelé).
+		for (const s of STACK_SPECS) {
+			expect(s.status).toBe("kernel");
+			expect(s.level.length).toBeGreaterThan(0);
+			expect(s.facet.length).toBe(1);
+		}
 	});
 });
 

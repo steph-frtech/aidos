@@ -60,6 +60,101 @@ export function specsOf(state: BuilderState): SpecRow[] {
 	});
 }
 
+/**
+ * ADR 0076/0080 — LES SPECS DU SUBSTRAT GELÉ : toute app émise EMBARQUE la pile gelée
+ * (ADR 0003), donc ses composants SONT des spécifications présentes DÈS LA CRÉATION du
+ * projet — pas des besoins à découvrir au fil de la conversation. On les DÉCLARE (une
+ * donnée close, le miroir de STACK_SERVICES côté specs) avec leur coordonnée niveau ×
+ * facette et le statut `kernel` (un GELÉ : la pile est une décision figée, embarquée à
+ * chaque build), version stable `stack@2026`. Résultat : un projet neuf affiche déjà sa
+ * grille peuplée par le substrat, jamais « 0 / aucune spécification » (déterministe).
+ */
+export const STACK_SPECS: readonly SpecRow[] = (
+	[
+		{
+			key: "app",
+			level: "product",
+			facet: "F",
+			intent:
+				"L'application déployée (le shell Hono + vues) — votre produit en ligne.",
+		},
+		{
+			key: "api",
+			level: "operation",
+			facet: "F",
+			intent:
+				"L'API Hono : les opérations métier de l'app, servies par son backend.",
+		},
+		{
+			key: "db",
+			level: "entity",
+			facet: "R",
+			intent:
+				"La base versionnée (Doltgres hors-prod / Postgres prod, ADR 0006) : la donnée, append-only.",
+		},
+		{
+			key: "cache",
+			level: "operation",
+			facet: "B",
+			intent: "Le cache Valkey : le budget de latence des lectures chaudes.",
+		},
+		{
+			key: "workflows",
+			level: "operation",
+			facet: "F",
+			intent:
+				"Les workflows Windmill : l'orchestration des tâches asynchrones de l'app.",
+		},
+		{
+			key: "bus",
+			level: "operation",
+			facet: "R",
+			intent:
+				"Le bus d'événements NATS : la messagerie asynchrone fiable entre composants.",
+		},
+		{
+			key: "telemetry",
+			level: "control",
+			facet: "R",
+			intent:
+				"La télémétrie OpenTelemetry → Postgres : traces et métriques observables de l'app.",
+		},
+		{
+			key: "auth",
+			level: "control",
+			facet: "S",
+			intent:
+				"L'authentification Better-Auth : l'accès gardé (sessions, identité).",
+		},
+		{
+			key: "docs",
+			level: "product",
+			facet: "X",
+			intent:
+				"Les docs de l'app (Fumadocs + Scalar) : l'expérience développeur/utilisateur.",
+		},
+	] as const
+).map((s) => ({
+	id: `stack:${s.key}`,
+	intent: s.intent,
+	level: s.level,
+	facet: s.facet,
+	scale: `app/${s.key}`,
+	status: "kernel" as const,
+	mirrorForm: null,
+	version: "stack@2026",
+}));
+
+/**
+ * TOUTES les specs du projet, SUBSTRAT GELÉ COMPRIS. Le substrat (STACK_SPECS) est présent
+ * dès la création — il PRÉCÈDE les specs issues de la conversation. specsOf reste inchangé
+ * (son contrat — une ligne par idée — ne bouge pas, §9 anti-overwrite) ; cette projection
+ * l'AUGMENTE du baseline gelé. PURE & TOTALE & DÉTERMINISTE.
+ */
+export function specsWithStack(state: BuilderState): SpecRow[] {
+	return [...STACK_SPECS, ...specsOf(state)];
+}
+
 /** La GRILLE niveau × facette — comptes conservés, ordre stable (niveau puis facette). */
 export function gridOf(rows: readonly SpecRow[]): GridCell[] {
 	const cells = new Map<

@@ -4,7 +4,7 @@ import { Fragment, useMemo, useState } from "react";
 import type { MirrorForm } from "@/lib/besoin-completeness";
 import { SOURCE_ORDER } from "@/lib/besoin-grammar";
 import { FACET_NAME, FACETS, type FacetLetter } from "@/lib/grid";
-import { gridOf, type SpecRow, specsOf } from "@/lib/v3/specs";
+import { gridOf, type SpecRow, specsWithStack } from "@/lib/v3/specs";
 import type { Strings } from "../friendly";
 import { useV3Session } from "../V3Session";
 
@@ -157,7 +157,8 @@ export function SpecsClient() {
 	const [filter, setFilter] = useState<StatusFilter>("tous");
 
 	// LA PROJECTION PURE : les specs + la grille (comptes conservés) — jamais stockées.
-	const rows = useMemo(() => specsOf(state), [state]);
+	// ADR 0076 — le SUBSTRAT GELÉ est compris : une app neuve affiche déjà ses specs de pile.
+	const rows = useMemo(() => specsWithStack(state), [state]);
 	const counts = useMemo(() => {
 		const m = new Map<string, number>();
 		for (const c of gridOf(rows))
