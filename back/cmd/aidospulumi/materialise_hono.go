@@ -36,6 +36,7 @@ import (
 	"github.com/steph-frtech/aidos/back/kernel/records"
 	"github.com/steph-frtech/aidos/back/runtime/appdata"
 	"github.com/steph-frtech/aidos/back/runtime/blockreason"
+	"github.com/steph-frtech/aidos/back/runtime/generators"
 	"github.com/steph-frtech/aidos/back/runtime/honoemit"
 )
 
@@ -157,12 +158,14 @@ func serverSpecImageTag(project string, server honoemit.ServerSpec, web honoemit
 
 // projectServerImageTag is the per-project server image tag the materialiser/executor propagate: it
 // content-addresses the tag from the project's EMITTED OUTPUT (the SAME projectServerSpec scaffold +
-// projectWebSpec view the materialiser lands in serverDir). One source of truth shared by MaterialiseHono
-// (which sets opts.HonoImage so the Pulumi program references it) and BuildHonoServerImage (which builds
-// that scaffold under this tag) — they never drift: the tag IS the hash of the bytes that are built.
-// DETERMINISM-FIRST: a pure projection of the emitted output.
-func projectServerImageTag(project string, overrides []honoemit.ScreenOverride) string {
-	return serverSpecImageTag(project, projectServerSpec(project), projectWebSpec(project), overrides)
+// projectWebSpec view the materialiser lands in serverDir, for the SAME entity cut `ents`). One source of
+// truth shared by MaterialiseHono (which sets opts.HonoImage so the Pulumi program references it) and
+// BuildHonoServerImage (which builds that scaffold under this tag) — they never drift: the tag IS the hash
+// of the bytes that are built. Because the entities flow into BOTH specs, a change to the project's entity
+// cut moves the tag (a Page-cut app gets a different tag from the gold Order cut → Pulumi recreates the
+// container with the project's own view). DETERMINISM-FIRST: a pure projection of the emitted output.
+func projectServerImageTag(project string, ents []entities.Entity, overrides []honoemit.ScreenOverride) string {
+	return serverSpecImageTag(project, projectServerSpec(project, ents), projectWebSpec(project, ents), overrides)
 }
 
 // interpreterImageTag is the shared sidecar interpreter image tag. The manifest references it and the
@@ -251,24 +254,35 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath, screenDesignPat
 		return Materialised{}, fmt.Errorf("create %s: %w", dir, err)
 	}
 
+	// (0b) Load the project's ENTITIES (the --entities catalogue) ONCE, up front — they drive the WHOLE
+	// projection: the web list views (one per entity), the server read routes (GET /entities/<e>), AND the
+	// content-addressed image tag. Converted from the schema-source shape (generators.EntitySource) to the
+	// kernel entity AST (entities.Entity) via entitySourceToEntity (the FORWARD twin of entitiesToSchemaSource).
+	// EMPTY (no --entities) → the gold/zero-entities demo cut is restored downstream (Order + checkout).
+	var srcEnts []generators.EntitySource
+	if entitiesPath != "" {
+		srcEnts, err = loadEntities(entitiesPath)
+		if err != nil {
+			return Materialised{}, err
+		}
+	}
+	ents := entitySourcesToEntities(srcEnts)
+
 	// The server runs the PER-PROJECT, CONTENT-ADDRESSED image (<project>-hono:<hash12>), built from the
 	// emitted scaffold below. EmitPulumiStackHono rewrites the role=server image to this, so the wired
 	// Pulumi program references the project's own routes — never the generic aidos-hono:latest placeholder,
 	// and never the mutable :latest tag (so a code change → a new hash → a new tag → Pulumi RECREATES the
 	// container, closing the staleness gap the `:latest` tag caused).
-	// The content-addressed tag folds the captured ScreenDesign overrides (so a validated design → new
-	// web bytes → a new tag → Pulumi recreates the container, the permanence of the "red"). Computed
-	// ONCE here and stored in Materialised so BuildHonoServerImage builds under the SAME tag (no drift).
-	imageTag := projectServerImageTag(project, overrides)
+	// The content-addressed tag folds the project's ENTITIES (so a Page-cut app gets a different tag from
+	// the gold Order cut → Pulumi recreates the container with the project's own view) AND the captured
+	// ScreenDesign overrides (so a validated design → new web bytes → a new tag). Computed ONCE here and
+	// stored in Materialised so BuildHonoServerImage builds under the SAME tag (no drift).
+	imageTag := projectServerImageTag(project, ents, overrides)
 	opts := honoemit.StackHonoOpts{HonoImage: imageTag}
 
 	// (a) Optional project DATA: emit the schema (+ seed) into the stack dir — what postgres mounts.
 	if entitiesPath != "" {
-		entities, err := loadEntities(entitiesPath)
-		if err != nil {
-			return Materialised{}, err
-		}
-		schema, _, err := appdata.EmitProjectData(project, entities)
+		schema, _, err := appdata.EmitProjectData(project, srcEnts)
 		if err != nil {
 			return Materialised{}, err
 		}
@@ -299,7 +313,7 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath, screenDesignPat
 	if err := os.MkdirAll(serverDir, 0o755); err != nil {
 		return Materialised{}, fmt.Errorf("create %s: %w", serverDir, err)
 	}
-	scaffold, br := honoemit.EmitServerScaffold(projectServerSpec(project))
+	scaffold, br := honoemit.EmitServerScaffold(projectServerSpec(project, ents))
 	if br != nil {
 		return Materialised{}, fmt.Errorf("emitter refused the Hono server scaffold (%s): %s", br.Code, br.Explanation)
 	}
@@ -314,7 +328,7 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath, screenDesignPat
 	// EmitWebChildAdapted (the SAME shared render body) so the validated per-coordinate ADR-0010 token
 	// classes are RE-APPLIED on the matching data-aidos-* elements — the design SURVIVES the redeploy
 	// (the permanence of the "red"). Without overrides it is byte-identical to EmitWebApp (anti-overwrite §9).
-	web, br := emitProjectWebView(project, overrides)
+	web, br := emitProjectWebView(project, ents, overrides)
 	if br != nil {
 		return Materialised{}, fmt.Errorf("emitter refused the React view (%s): %s", br.Code, br.Explanation)
 	}
@@ -374,38 +388,66 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath, screenDesignPat
 	}, nil
 }
 
-// projectServerSpec builds the Hono ServerSpec from the project's operation cut — the SAME cut the
-// sidecar registers (today the createOrder anchor; when the kernel.operation projection lands, the
-// executor reads the project's operations from the truth-store). It is a below-the-line projection
-// INPUT, never a truth write; the emitter renders exactly the ops it pins (one POST route per op).
+// projectServerSpec builds the Hono ServerSpec from the project's ENTITIES (ents) + the operation cut.
+// The served VIEW's entity names drive the READ routes (GET /entities/<e>) and the WebDir serves the
+// static React build (GET /). The entities are the SAME cut projectWebSpec(project, ents) lists — ONE
+// SOURCE, the server reads exactly what the view lists (no Order/Page mismatch — THE FIX: a Page app's
+// server reads /entities/page, not /entities/order, so the sidecar queries the table that EXISTS).
 //
-// It ALSO carries the served VIEW: the entity names the list views read (so the server emits the read
-// route GET /entities/<e>) and the WebDir (so the server serves the static React build on GET /). The
-// entities are the SAME cut projectWebSpec lists — one source, the server reads what the view lists.
-func projectServerSpec(project string) honoemit.ServerSpec {
+// The OPERATIONS cut (the POST /<op> WRITE routes) stays the demo createOrder anchor for now: the Hono
+// server emitter (EmitServerScaffold) is a FROZEN contract that REFUSES a spec with zero operations
+// (validateServer → ErrNoOps — a server with no verb is not projectable), so a generic project cannot
+// emit a truly op-less server until the kernel.operation projection (S17/S31, OpenQuestion) feeds the
+// project's own operations. The op cut is HARMLESS on a generic project — the read-only view never calls
+// the POST route (projectWebSpec carries NO demo button on a non-empty entity cut), so no checkout button
+// reaches a Page app; the mismatch the user reported was the READ side (/entities/order on Page data),
+// and THAT now follows the project. A below-the-line projection INPUT, never a truth write.
+func projectServerSpec(project string, ents []entities.Entity) honoemit.ServerSpec {
+	web := projectWebSpec(project, ents)
+
+	// Operations: the createOrder anchor (the only operation the system knows pre-kernel-projection). The
+	// emitter requires ≥1 op (ErrNoOps), so this is the minimal projectable cut; the generic project's view
+	// renders no button bound to it, so it is an unused endpoint, never a wrong button on the screen.
 	ops := []operation.Operation{operation.CreateOrder()}
 	view := make([]honoemit.Op, 0, len(ops))
 	for _, op := range ops {
 		view = append(view, honoemit.Op{Name: op.Name})
 	}
-	web := projectWebSpec(project)
-	ents := make([]string, 0, len(web.Entities))
+
+	entNames := make([]string, 0, len(web.Entities))
 	for _, e := range web.Entities {
-		ents = append(ents, strings.ToLower(e.Name))
+		entNames = append(entNames, strings.ToLower(e.Name))
 	}
-	return honoemit.ServerSpec{Project: project, Ops: view, Entities: ents, WebDir: webBuildDir}
+	return honoemit.ServerSpec{Project: project, Ops: view, Entities: entNames, WebDir: webBuildDir}
 }
 
-// projectWebSpec builds the React VIEW spec from the project's entities (S35) + control→action cut
-// (S11) — the SAME tree the server serves. Today the demo cut (Order + the checkout button → createOrder
-// anchor); when the kernel projections land, the executor reads the project's entities/controls from the
-// truth-store. It is a below-the-line projection INPUT, never a truth write; EmitWebApp renders exactly
-// what it pins (one list view per entity, one button per control→action).
-func projectWebSpec(project string) honoemit.WebAppSpec {
+// projectWebSpec builds the React VIEW spec from the project's ENTITIES (S35) — one read-only list view
+// per entity, the columns being the entity's attributes in source order (entities.AttributeSet). It is a
+// below-the-line projection INPUT, never a truth write; EmitWebApp renders exactly what it pins.
+//
+// FALLBACK (retro-compat, the gold/zero-entities path): when ents is EMPTY the canonical demo cut is
+// restored — the Order entity + the checkout button (control→action → the createOrder anchor) — so the
+// gold demo and any zero-entity deploy keep their proven view byte-for-byte (anti-overwrite §9). This is
+// the LEAST-SURPRISING fallback: the gold form is what every existing mirror (imagetag/found/materialise)
+// already pins, and an empty WebAppSpec would be refused by EmitWebApp (validateWebApp: no entity ∧ no
+// button). With ents non-empty the view lists the PROJECT'S entities and carries NO demo button (Buttons
+// nil) — a generic project declares no operations/controls yet, so its view is read-only (the listing
+// views only; no headless checkout button on data that has no checkout op).
+func projectWebSpec(project string, ents []entities.Entity) honoemit.WebAppSpec {
+	if len(ents) == 0 {
+		// The gold/zero-entities cut: Order + the checkout button → createOrder (byte-identical to the
+		// pre-S35-fix form, so every existing mirror stays green).
+		return honoemit.WebAppSpec{
+			Project:  project,
+			Entities: []entities.Entity{entities.Order()},
+			Buttons:  []honoemit.ControlAction{{Control: control.CheckoutButton(), Action: action.CheckoutSubmit()}},
+		}
+	}
+	// The generic project cut: the project's OWN entities, read-only (no demo button).
 	return honoemit.WebAppSpec{
 		Project:  project,
-		Entities: []entities.Entity{entities.Order()},
-		Buttons:  []honoemit.ControlAction{{Control: control.CheckoutButton(), Action: action.CheckoutSubmit()}},
+		Entities: append([]entities.Entity(nil), ents...),
+		Buttons:  nil,
 	}
 }
 
@@ -418,10 +460,11 @@ func emitWebViewArtifacts(web honoemit.WebAppSpec, overrides []honoemit.ScreenOv
 	return honoemit.EmitWebAppWithScreenOverrides(web, overrides)
 }
 
-// emitProjectWebView renders the project's web view (projectWebSpec) applying the captured ScreenDesign
-// overrides. The thin project-cut wrapper over emitWebViewArtifacts. PURE, TOTAL.
-func emitProjectWebView(project string, overrides []honoemit.ScreenOverride) ([]honoemit.Artifact, *blockreason.BlockReason) {
-	return emitWebViewArtifacts(projectWebSpec(project), overrides)
+// emitProjectWebView renders the project's web view (projectWebSpec for the SAME entity cut `ents`)
+// applying the captured ScreenDesign overrides. The thin project-cut wrapper over emitWebViewArtifacts.
+// PURE, TOTAL — the view lists the project's entities (or the gold demo cut when ents is empty).
+func emitProjectWebView(project string, ents []entities.Entity, overrides []honoemit.ScreenOverride) ([]honoemit.Artifact, *blockreason.BlockReason) {
+	return emitWebViewArtifacts(projectWebSpec(project, ents), overrides)
 }
 
 // loadScreenOverrides reads the optional --screen-design file into the captured per-coordinate overrides
@@ -482,7 +525,8 @@ func BuildHonoServerImage(project, serverDir, tag string) (string, error) {
 		return "", errors.New("BuildHonoServerImage: no scaffold dir (run MaterialiseHono first)")
 	}
 	if tag == "" {
-		tag = projectServerImageTag(project, nil)
+		// Compat fallback only (the executor always passes mat.ImageTag): the gold/zero-entities tag.
+		tag = projectServerImageTag(project, nil, nil)
 	}
 	cmd := exec.Command("docker", "build", "-t", tag, serverDir)
 	if out, err := cmd.CombinedOutput(); err != nil {

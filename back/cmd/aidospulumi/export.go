@@ -204,12 +204,17 @@ func ExportProject(project string) ProjectTree {
 }
 
 // exportProjectTree is the shared assembler: with entities==nil the schema source is DERIVED from the
-// web spec's entities (the same cut the views list — one source); with entities set (the --entities
-// catalogue) the genome carries the caller's own schema source. Both paths assemble the SAME manifest,
-// operation cut and web spec the matérialiseurs read, so the genome is the faithful arbre either way.
+// web spec's gold/zero-entities cut (the same cut the views list — one source); with entities set (the
+// --entities catalogue) the genome carries the caller's own schema source AND the web view lists THOSE
+// entities (projectWebSpec for the same cut — one source, the genome's view ≡ its schema). Both paths
+// assemble the SAME manifest, operation cut and web spec the matérialiseurs read, so the genome is the
+// faithful arbre either way.
 func exportProjectTree(project string, schema []generators.EntitySource) ProjectTree {
-	web := projectWebSpec(project)
+	// The web view lists the PROJECT'S entities (converted from the schema source); with no --entities the
+	// gold/zero-entities cut (Order + checkout) is restored (projectWebSpec(project, nil)).
+	web := projectWebSpec(project, entitySourcesToEntities(schema))
 	if schema == nil {
+		// No catalogue: derive the schema from the gold web cut (the same Order the view lists — one source).
 		schema = entitiesToSchemaSource(web.Entities)
 	}
 	return ProjectTree{
@@ -280,6 +285,56 @@ func scalarToGeneratorType(t entities.ScalarType) string {
 	default:
 		return string(t)
 	}
+}
+
+// generatorTypeToScalar is the EXACT INVERSE of scalarToGeneratorType: it maps a generators DDL token
+// (S34: text/numeric/int/bool/timestamptz, the appdata EntitySource vocabulary) back to the entity scalar
+// token (S35: entities.ScalarType — string/numeric→decimal/…). The two closed sets differ ONLY on
+// text↔string and numeric↔decimal; int/bool/timestamptz are shared. A PURE total function over the closed
+// set; an unrecognised token is returned verbatim (cast to ScalarType) so the entity Validate downstream
+// fires its typed UNKNOWN_ATTRIBUTE_TYPE refusal — never a silently coerced column (honesty, §8).
+func generatorTypeToScalar(t string) entities.ScalarType {
+	switch t {
+	case "text":
+		return entities.TypeString
+	case "numeric":
+		return entities.TypeDecimal
+	case "int":
+		return entities.TypeInt
+	case "bool":
+		return entities.TypeBool
+	case "timestamptz":
+		return entities.TypeTimestamptz
+	default:
+		return entities.ScalarType(t)
+	}
+}
+
+// entitySourceToEntity is the PURE converter from the schema-source shape (generators.EntitySource —
+// the --entities catalogue / appdata vocabulary, a name + Fields{Name,Type}) to the kernel entity SOURCE
+// AST (entities.Entity — the shape the web view (S35) and the server read routes project from). It is the
+// FORWARD twin of entitiesToSchemaSource (the reverse projection) — round-trip byte-coherent: the field
+// NAMES carry over verbatim IN SOURCE ORDER (the column order the list view lists — entities.AttributeSet),
+// and each type token is translated through generatorTypeToScalar (the inverse of the token map the schema
+// path uses). No identifier/required is invented (the catalogue pins none — the read-only list view needs
+// neither), so the entity is the minimal projectable AST: name + ordered scalar attributes. PURE, TOTAL,
+// deterministic — a deterministic token map, no clock, no RNG, no guess.
+func entitySourceToEntity(es generators.EntitySource) entities.Entity {
+	attrs := make([]entities.Attribute, 0, len(es.Fields))
+	for _, f := range es.Fields {
+		attrs = append(attrs, entities.Attribute{Name: f.Name, Type: generatorTypeToScalar(f.Type)})
+	}
+	return entities.Entity{Name: es.Name, Attributes: attrs}
+}
+
+// entitySourcesToEntities maps a slice of schema sources to entity ASTs, preserving input order (the
+// project OWNS its catalogue order — the list views list in that order). PURE, TOTAL.
+func entitySourcesToEntities(in []generators.EntitySource) []entities.Entity {
+	out := make([]entities.Entity, 0, len(in))
+	for _, es := range in {
+		out = append(out, entitySourceToEntity(es))
+	}
+	return out
 }
 
 // capitalisedAdaptations returns the project's capitalised SOFT per-platform adaptations (the loopback

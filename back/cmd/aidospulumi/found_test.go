@@ -255,7 +255,7 @@ func directEmission(t *testing.T, project string) map[string][]byte {
 	out := map[string][]byte{}
 
 	// (1) Le schéma — depuis les entités du web spec (la même source que l'export dérive).
-	web := projectWebSpec(project)
+	web := projectWebSpec(project, nil)
 	schema, _, err := appdata.EmitProjectData(project, entitiesToSchemaSource(web.Entities))
 	if err != nil {
 		t.Fatalf("direct EmitProjectData: %v", err)
@@ -263,7 +263,7 @@ func directEmission(t *testing.T, project string) map[string][]byte {
 	out["schema.sql"] = schema
 
 	// (2) Le serveur Hono émis (scaffold) — depuis le ServerSpec du projet.
-	scaffold, br := honoemit.EmitServerScaffold(projectServerSpec(project))
+	scaffold, br := honoemit.EmitServerScaffold(projectServerSpec(project, nil))
 	if br != nil {
 		t.Fatalf("direct EmitServerScaffold: %s", br.Explanation)
 	}
@@ -308,7 +308,7 @@ func directEmission(t *testing.T, project string) map[string][]byte {
 	// (7) Le programme Pulumi (les 3 conteneurs câblés). Le tag serveur est le tag CONTENT-ADRESSÉ que
 	// le matérialiseur épingle (projectServerImageTag) — `found` le reproduit depuis la spec serveur du
 	// génome (qui, pour le cut démo, byte-égale projectServerSpec) : même hash → même tag → mêmes bytes.
-	infra, br := honoemit.EmitPulumiStackHono(project, foundEnv, honoDefaultManifest(project), honoemit.StackHonoOpts{HonoImage: projectServerImageTag(project, nil)})
+	infra, br := honoemit.EmitPulumiStackHono(project, foundEnv, honoDefaultManifest(project), honoemit.StackHonoOpts{HonoImage: projectServerImageTag(project, nil, nil)})
 	if br != nil {
 		t.Fatalf("direct EmitPulumiStackHono: %s", br.Explanation)
 	}

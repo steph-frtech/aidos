@@ -94,8 +94,8 @@ func TestHonoServerImageTag_DistinctHashesDistinctTags(t *testing.T) {
 // artifact) → a DIFFERENT hash; the SAME output → the SAME hash. This is the property that closes the
 // emitter-staleness gap: a new instrumentation.ts / Dockerfile / web view → new bytes → new hash → new tag.
 func TestHonoOutputHash_HashesEmittedBytes(t *testing.T) {
-	server := projectServerSpec("shop")
-	web := projectWebSpec("shop")
+	server := projectServerSpec("shop", nil)
+	web := projectWebSpec("shop", nil)
 
 	base := honoOutputHash(server, web, nil)
 	if base == "" {
@@ -138,8 +138,8 @@ func TestHonoOutputHash_HashesEmittedBytes(t *testing.T) {
 // address on the SORTIE: a change to an EMITTER (same spec) → new output bytes → new hash → new tag →
 // a recreated container, NO manual `pulumi refresh` needed.
 func TestServerSpecImageTag_TracksEmittedOutput(t *testing.T) {
-	server := projectServerSpec("shop")
-	web := projectWebSpec("shop")
+	server := projectServerSpec("shop", nil)
+	web := projectWebSpec("shop", nil)
 
 	got := serverSpecImageTag("shop", server, web, nil)
 	outHash := honoOutputHash(server, web, nil)
@@ -162,14 +162,14 @@ func TestServerSpecImageTag_TracksEmittedOutput(t *testing.T) {
 // projectWebSpec)) — the SAME bytes BuildHonoServerImage docker-builds. So the tag never names a digest
 // the build did not produce: tag ≡ built output.
 func TestProjectServerImageTag_MatchesBuiltScaffold(t *testing.T) {
-	got := projectServerImageTag("shop", nil)
+	got := projectServerImageTag("shop", nil, nil)
 
 	// The bytes BuildHonoServerImage builds: the server scaffold + the served React view.
-	scaffold, br := honoemit.EmitServerScaffold(projectServerSpec("shop"))
+	scaffold, br := honoemit.EmitServerScaffold(projectServerSpec("shop", nil))
 	if br != nil {
 		t.Fatalf("EmitServerScaffold(shop): %s", br.Explanation)
 	}
-	webArts, br := honoemit.EmitWebApp(projectWebSpec("shop"))
+	webArts, br := honoemit.EmitWebApp(projectWebSpec("shop", nil))
 	if br != nil {
 		t.Fatalf("EmitWebApp(shop): %s", br.Explanation)
 	}

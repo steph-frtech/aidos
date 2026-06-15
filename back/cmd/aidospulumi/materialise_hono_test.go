@@ -34,7 +34,7 @@ func TestMaterialiseHono_WiresThreeContainers(t *testing.T) {
 	// emitted scaffold — never the generic image, never the mutable :latest tag. A code change → a new
 	// source hash → a new tag → Pulumi recreates the container (the staleness fix). The tag is computed
 	// from the SAME source-of-truth function the materialiser/build gesture use, so the test never drifts.
-	wantServerTag := projectServerImageTag("shop", nil)
+	wantServerTag := projectServerImageTag("shop", nil, nil)
 	for _, want := range []string{
 		`name: "shop-dev-server"`,
 		`name: "shop-dev-interpreter"`,
