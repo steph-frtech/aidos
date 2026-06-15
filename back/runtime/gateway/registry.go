@@ -1,19 +1,23 @@
 package gateway
 
 // DefaultRegistry is the CLOSED, content-addressable set of MCP tools the S58 gateway
-// exposes over HTTP — EVERY tool of the 14 existing AIDOS MCP servers the roadmap
+// exposes over HTTP — EVERY tool of the 15 existing AIDOS MCP servers the roadmap
 // names (store · mirror-runner · changeset · dag · idea-intake · memory · context ·
 // evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project ·
-// provision — the 14th ACTIVATED at DP13: the stack/bootstrap/profile tools),
+// provision — the 14th ACTIVATED at DP13: the stack/bootstrap/profile tools — ·
+// reality-ingest — the 15th REGISTERED at ADR 0081: the prod→kernel on-ramp the gateway
+// must front so `/learn` has its door, never a dormant capability),
 // PLUS the explicitly-fenced truth-zone write namespace (CLAUDE.md §2).
 //
-// THE WALL, ENCODED AS DATA (server-side). All 14 servers' real tools are BELOW THE
+// THE WALL, ENCODED AS DATA (server-side). All 15 servers' real tools are BELOW THE
 // LINE — they read/op the archive·brain·context·ideas·changesets·dag·besoin schemas
 // the agent role MAY touch (the changeset_* tools ARE the legal ChangeSet door, the
 // only path truth moves: they stay below-line because they propose/stage/apply through
 // the gate, never a raw kernel write; the provision stack.* tools re-emit/project over
-// the StackManifest AST + the observed host state, never a kernel write). None of the
-// 14 holds a GRANT to write kernel/mirrors/fitness — that is the wall by construction.
+// the StackManifest AST + the observed host state, never a kernel write; the
+// reality-ingest tools detect a prod divergence and project it into a DRAFT idea, never
+// a kernel write — WroteKernel is always false). None of the 15 holds a GRANT to write
+// kernel/mirrors/fitness — that is the wall by construction.
 //
 // The truth-zone WRITE namespace (kernel_write · mirror_write · fitness_write ·
 // stack.engrave_manifest) is NOT a real tool of any server — it is the door a naïve or
@@ -78,6 +82,13 @@ func DefaultTools() []Tool {
 	// + the observed host state, writing no truth. The `stack.engrave_manifest` door is
 	// the fenced truth-write namespace below (refused with a ChangeSet-pointing reason).
 	t = append(t, below("provision", "plan", "images", "stack.emit", "stack.select_profile", "stack.bootstrap", "stack.resolve_ports", "stack.print_urls")...)
+	// 15. reality-ingest — the S106/E12 prod→kernel on-ramp (ADR 0081, issue A): detect a
+	// deployed app's telemetry DIVERGENCE, ingest it as a project-scoped RealityMirror +
+	// a DRAFT idea (template text, provenance=incident), or render that idea text. ALL
+	// BELOW THE LINE: every tool is a PURE read whose WroteKernel is false; the only
+	// outward edge is a DRAFT idea (idea → mirror → /goal → approval). Registering it
+	// here makes `/learn`'s door reachable — the capability ceases to be dormant.
+	t = append(t, below("reality-ingest", "detect_divergence", "ingest_divergence", "render_idea_text")...)
 
 	// THE FENCED TRUTH-ZONE WRITE NAMESPACE (§2). Not a real tool of any server — the
 	// door a caller might craft to move truth directly. Registered as TruthWrite so the
@@ -95,15 +106,17 @@ func DefaultTools() []Tool {
 	return t
 }
 
-// GatewayServers is the closed list of the 14 MCP servers the gateway exposes (display
+// GatewayServers is the closed list of the 15 MCP servers the gateway exposes (display
 // + the completeness assertion: every named server has ≥1 exposed tool). Ordered. The
 // 14th — `provision` — is ACTIVATED at DP13 (the scaffold the gateway now fronts:
 // every provisioning op is an MCP tool, ADR 0009; a scaffold the gateway never fronts
-// is dead).
+// is dead). The 15th — `reality-ingest` — is REGISTERED at ADR 0081 (issue A): the
+// prod→kernel on-ramp the gateway must front so `/learn` has its door; a capability the
+// gateway never fronts is the symmetric monster of an orphan mirror (§1, §5 generalised).
 func GatewayServers() []string {
 	return []string{
 		"store", "mirror-runner", "changeset", "dag", "idea-intake", "memory",
 		"context", "evolve", "backtester", "telemetry-reader", "pact-verifier",
-		"mutation-runner", "project", "provision",
+		"mutation-runner", "project", "provision", "reality-ingest",
 	}
 }
