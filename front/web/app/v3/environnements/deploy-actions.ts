@@ -21,6 +21,38 @@ const PULUMI_BIN =
 	process.env.AIDOS_PULUMI_BIN ||
 	"/data/dev/aidos/.deploy-pulumi/aidospulumi-bin";
 const REPO = process.env.AIDOS_REPO || "/data/dev/aidos";
+const PULUMI_BUILD = `${REPO}/.claude/scripts/aidospulumi-build.sh`;
+
+/**
+ * ADR 0077 — REBUILD DÉTERMINISTE avant déploiement. Le binaire de déploiement DOIT être
+ * une fonction pure de ses sources (determinism-first §8) ; sans ce rebuild, un changement
+ * d'émetteur (mêmes specs) laisserait tourner un binaire périmé. On recompile AVANT chaque
+ * `up` (go build caché → quasi-instantané si inchangé). Verdict :
+ *   - "ok"     → binaire frais, on déploie ;
+ *   - "stale"  → les sources ne compilent pas → on NE déploie PAS un binaire périmé ;
+ *   - "absent" → script de build absent (infra) → repli sur le binaire existant (best-effort).
+ */
+async function ensureFreshPulumiBin(): Promise<{
+	state: "ok" | "stale" | "absent";
+	detail: string;
+}> {
+	try {
+		const { stdout } = await execFileP("bash", [PULUMI_BUILD], {
+			cwd: REPO,
+			timeout: 180_000,
+			maxBuffer: 8 * 1024 * 1024,
+		});
+		return { state: "ok", detail: stdout.trim() };
+	} catch (e) {
+		const msg = String((e as { stderr?: string }).stderr ?? e);
+		// Script absent (ENOENT) → repli gouverné sur le binaire existant ; sinon les
+		// sources ne compilent pas → binaire périmé refusé (honnêteté determinism-first).
+		if (msg.includes("ENOENT") || msg.includes("No such file")) {
+			return { state: "absent", detail: "build script absent" };
+		}
+		return { state: "stale", detail: msg.slice(0, 300) };
+	}
+}
 
 /** Le slug docker/Traefik-sûr (minuscule, alphanum + tirets) — la clé de stack par projet. */
 function slugify(s: string): string {
@@ -47,8 +79,7 @@ function extractJson(text: string): string {
  * aucune entité (projet neuf), une entité « Page » minimale tient la stack debout.
  */
 function entitiesPayload(entityNames: readonly string[]): string {
-	const names =
-		entityNames.length > 0 ? entityNames.slice(0, 12) : ["Page"];
+	const names = entityNames.length > 0 ? entityNames.slice(0, 12) : ["Page"];
 	const entities = names.map((raw) => {
 		const name = raw.replace(/[^A-Za-z0-9]/g, "") || "Item";
 		return {
@@ -126,6 +157,17 @@ export async function deployProjectStackAction(
 	const url = `https://${slug}-${env}.sagedesk.fr`;
 	const file = `/tmp/${slug}-${env}-entities.json`;
 	try {
+		// ADR 0077 — rebuild déterministe : jamais déployer un binaire périmé. Sources
+		// cassées → on refuse (le binaire ne refléterait plus le code courant).
+		const fresh = await ensureFreshPulumiBin();
+		if (fresh.state === "stale") {
+			return {
+				ok: false,
+				url: null,
+				detail: `rebuild aidospulumi échoué (sources non compilables) — déploiement refusé pour ne pas servir un binaire périmé : ${fresh.detail}`,
+				containers: [],
+			};
+		}
 		await writeFile(file, entitiesPayload(entityNames), "utf8");
 		const args = [
 			"up",
