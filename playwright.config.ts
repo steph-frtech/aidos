@@ -28,7 +28,15 @@ export default defineConfig({
 		// target the live gateway (:8787 → source "live") or a blackhole port (unreachable
 		// → declared "demo", the anti-silent-fallback fault-injection). An already-set
 		// process.env var is NOT overridden by .env.local, so this value wins for the run.
-		env: { AIDOS_GATEWAY_HTTP_URL: process.env.AIDOS_GATEWAY_HTTP_URL ?? "" },
+		//
+		// ISOLATION (le bug des 906 artefacts) : les e2e écrivent leurs projets dans un
+		// dossier JETABLE, jamais le vrai .aidos-projects — sinon chaque run pollue le
+		// magasin réel et noie le commutateur. AIDOS_PROJECTS_DIR par défaut isolé.
+		env: {
+			AIDOS_GATEWAY_HTTP_URL: process.env.AIDOS_GATEWAY_HTTP_URL ?? "",
+			AIDOS_PROJECTS_DIR:
+				process.env.AIDOS_PROJECTS_DIR ?? "/tmp/aidos-e2e-projects",
+		},
 	},
 	projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

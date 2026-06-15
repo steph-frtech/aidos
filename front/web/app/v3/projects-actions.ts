@@ -48,8 +48,14 @@ import {
  * projection rejouable, ADR 0061) ; l'EXISTENCE/identité du projet vit en Postgres.
  */
 
-/** Le dossier des projets persistés (gitignoré à la racine du dépôt). */
-const PROJECTS_DIR = "/data/dev/aidos/.aidos-projects";
+/**
+ * Le dossier des projets persistés (gitignoré à la racine du dépôt). ISOLABLE via
+ * AIDOS_PROJECTS_DIR : les runs e2e/Playwright pointent vers un dossier JETABLE pour ne
+ * PAS polluer le vrai magasin (cause racine des 906 artefacts qui noyaient le switcher).
+ * En prod, l'env est absente → le vrai dossier.
+ */
+const PROJECTS_DIR =
+	process.env.AIDOS_PROJECTS_DIR || "/data/dev/aidos/.aidos-projects";
 
 /** Le cookie du projet actif (lu par le layout /v3 à chaque rendu). */
 const ACTIVE_COOKIE = "aidos-v3-project";
