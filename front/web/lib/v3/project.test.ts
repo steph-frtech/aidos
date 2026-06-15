@@ -2,6 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { bareTree } from "../v2/composition";
 import {
+	classifyNewName,
 	type ProjectRecord,
 	parseProject,
 	projectSlug,
@@ -90,6 +91,90 @@ describe("projectSlug / sortProjects — identité et ordre déterministes", () 
 						prev.savedAt > cur.savedAt ||
 							(prev.savedAt === cur.savedAt && prev.id <= cur.id),
 					).toBe(true);
+				}
+			}),
+		);
+	});
+});
+
+describe("classifyNewName — la création REFUSE avec motif (le doublon n'est plus muet)", () => {
+	const taken = new Set(["toto", "ma-boutique", "to-to"]);
+
+	it("nom VIDE / blancs uniquement → empty", () => {
+		expect(classifyNewName("", taken)).toEqual({ ok: false, reason: "empty" });
+		expect(classifyNewName("   ", taken)).toEqual({
+			ok: false,
+			reason: "empty",
+		});
+		expect(classifyNewName("\t\n ", taken)).toEqual({
+			ok: false,
+			reason: "empty",
+		});
+	});
+
+	it("nom sans caractère slug-able → unusable (jamais un id vide silencieux)", () => {
+		for (const n of ["!!!", "----", "@#$%", "🎉🎉", "  …  "]) {
+			expect(classifyNewName(n, taken)).toEqual({
+				ok: false,
+				reason: "unusable",
+			});
+		}
+	});
+
+	it("DOUBLON exact → duplicate (le cas que l'utilisateur a signalé)", () => {
+		expect(classifyNewName("toto", taken)).toEqual({
+			ok: false,
+			reason: "duplicate",
+		});
+		expect(classifyNewName("Ma boutique", taken)).toEqual({
+			ok: false,
+			reason: "duplicate",
+		});
+	});
+
+	it("DOUBLON insensible à la CASSE et aux ACCENTS (même slug)", () => {
+		for (const n of ["Toto", "TOTO", "  toto  ", "Tôtô", "tóto"]) {
+			expect(classifyNewName(n, taken)).toEqual({
+				ok: false,
+				reason: "duplicate",
+			});
+		}
+	});
+
+	it("un nom GÉNUINEMENT différent passe (≠ slug → ok)", () => {
+		expect(classifyNewName("Titi", taken)).toEqual({ ok: true, slug: "titi" });
+		// « to to » → « to-to » : déjà pris ; « toto2 » → « toto2 » : libre.
+		expect(classifyNewName("to to", taken)).toEqual({
+			ok: false,
+			reason: "duplicate",
+		});
+		expect(classifyNewName("toto2", taken)).toEqual({
+			ok: true,
+			slug: "toto2",
+		});
+	});
+
+	it("le slug est tronqué à 48 → deux noms partageant les 48 premiers caractères collisionnent", () => {
+		const long = "a".repeat(60);
+		const first = classifyNewName(long, new Set());
+		expect(first).toEqual({ ok: true, slug: "a".repeat(48) });
+		// une fois ce slug pris, un autre nom qui s'y réduit est un doublon.
+		expect(
+			classifyNewName(`${long}-suffixe-ignoré`, new Set([projectSlug(long)])),
+		).toEqual({
+			ok: false,
+			reason: "duplicate",
+		});
+	});
+
+	it("DÉTERMINISTE : même (nom, pris) → même verdict ; le verdict ok porte le slug exact", () => {
+		fc.assert(
+			fc.property(fc.string({ maxLength: 30 }), (n) => {
+				const a = classifyNewName(n, taken);
+				expect(classifyNewName(n, taken)).toEqual(a);
+				if (a.ok) {
+					expect(a.slug).toBe(projectSlug(n));
+					expect(taken.has(a.slug)).toBe(false);
 				}
 			}),
 		);

@@ -1,12 +1,6 @@
 "use server";
 
-import {
-	existsSync,
-	mkdirSync,
-	readdirSync,
-	readFileSync,
-	writeFileSync,
-} from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { cookies } from "next/headers";
 import postgres from "postgres";
@@ -20,9 +14,9 @@ import {
 import type { AppProjection } from "@/lib/v2/builder";
 import { filesOf } from "@/lib/v3/emit-files";
 import {
+	classifyNewName,
 	type ProjectRecord,
 	parseProject,
-	projectSlug,
 	serializeProject,
 	sortProjects,
 } from "@/lib/v3/project";
@@ -247,19 +241,36 @@ export async function saveProjectAction(record: {
 }
 
 /**
- * CRÉE un projet : id = slug du nom (+ suffixe « -2 », « -3 »… déterministe en cas
- * de collision), transcript VIDE — « créer une app crée un projet ». Nom imprononçable
- * (slug vide) → null, fail-closed.
+ * Le RÉSULTAT d'une création — discriminé : on ne renvoie plus « null » muet ni un
+ * suffixe « -2 » silencieux. Un nom dupliqué/vide/imprononçable est REFUSÉ avec un motif
+ * que l'écran transforme en ALERTE (le défaut « aucune alerte sur doublon » est corrigé).
+ */
+export type CreateProjectOutcome =
+	| { ok: true; record: ProjectRecord }
+	| { ok: false; reason: "empty" | "unusable" | "duplicate"; slug?: string };
+
+/**
+ * CRÉE un projet (transcript VIDE) — « créer une app crée un projet ». Refuse, AVEC MOTIF :
+ * un nom vide/blanc (empty), un nom sans caractère slug-able (unusable), ou un nom dont le
+ * slug existe DÉJÀ (duplicate — insensible à la casse/aux accents). Les slugs pris sont
+ * rassemblés des DEUX sources : les fichiers locaux ET le registre Postgres (ADR 0073, la
+ * source d'existence) — donc un doublon est détecté même si le fichier local manque. Plus
+ * de suffixe « -2 » muet : un doublon s'arrête là, l'écran alerte et propose d'ouvrir l'existant.
  */
 export async function createProjectAction(
 	name: string,
-): Promise<ProjectRecord | null> {
-	const clean = name.trim();
-	const base = projectSlug(clean);
-	if (base === "") return null;
+): Promise<CreateProjectOutcome> {
 	ensureDir();
-	let id = base;
-	for (let n = 2; existsSync(fileOf(id)); n += 1) id = `${base}-${n}`;
+	// Les slugs DÉJÀ pris = ids des fichiers locaux ∪ slugs du registre Postgres.
+	const taken = new Set<string>(readAll().map((p) => p.id));
+	const registry = await liveV3Slugs();
+	if (registry) for (const slug of registry.keys()) taken.add(slug);
+
+	const verdict = classifyNewName(name, taken);
+	if (!verdict.ok) return { ok: false, reason: verdict.reason };
+
+	const id = verdict.slug;
+	const clean = name.trim();
 	const record: ProjectRecord = {
 		id,
 		name: clean,
@@ -271,7 +282,7 @@ export async function createProjectAction(
 	// ADR 0073 — enregistre le nouveau projet dans le truth-store Postgres (source
 	// d'existence, content-adressé, append-only). Best-effort : le fichier reste la garantie.
 	await registerV3Project(id, clean);
-	return record;
+	return { ok: true, record };
 }
 
 /** Les barreaux d'environnement admis pour un workspace (le vocabulaire canonique). */

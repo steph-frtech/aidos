@@ -54,6 +54,8 @@ export function V3Nav() {
 		useV3Session();
 	const [open, setOpen] = useState(false);
 	const [newName, setNewName] = useState("");
+	// L'alerte de création : le motif de refus (doublon / vide / imprononçable), ou null.
+	const [createError, setCreateError] = useState<string | null>(null);
 
 	return (
 		<nav
@@ -131,11 +133,23 @@ export function V3Nav() {
 						<form
 							className="mt-2 flex flex-col gap-1 border-t border-border pt-2"
 							aria-label={t("projectsNew")}
-							onSubmit={(e) => {
+							onSubmit={async (e) => {
 								e.preventDefault();
-								if (newName.trim() === "") return;
-								void createProject(newName);
+								const outcome = await createProject(newName);
+								if (!outcome.ok) {
+									// Refus → ALERTE (le défaut « aucune alerte sur doublon » corrigé).
+									setCreateError(
+										outcome.reason === "duplicate"
+											? t("projectsErrDuplicate")
+											: outcome.reason === "unusable"
+												? t("projectsErrUnusable")
+												: t("projectsErrEmpty"),
+									);
+									return;
+								}
+								setCreateError(null);
 								setNewName("");
+								setOpen(false);
 							}}
 						>
 							<label
@@ -148,10 +162,23 @@ export function V3Nav() {
 								id="v3-project-new-name"
 								data-testid="v3-project-new-name"
 								value={newName}
-								onChange={(e) => setNewName(e.target.value)}
+								onChange={(e) => {
+									setNewName(e.target.value);
+									if (createError !== null) setCreateError(null);
+								}}
+								aria-invalid={createError !== null}
 								placeholder={t("projectsNewPlaceholder")}
-								className="w-full rounded border border-input bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+								className="w-full rounded border border-input bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring aria-[invalid=true]:border-destructive"
 							/>
+							{createError !== null && (
+								<p
+									data-testid="v3-project-create-error"
+									role="alert"
+									className="px-1 text-[11px] font-medium text-destructive"
+								>
+									{createError}
+								</p>
+							)}
 							<button
 								type="submit"
 								data-testid="v3-project-create"

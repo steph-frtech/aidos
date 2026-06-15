@@ -453,10 +453,13 @@ export default async function V3Layout({ children }: { children: ReactNode }) {
 		activeId !== null ? await loadProjectAction(activeId) : null;
 	let projectList = await listProjectsAction();
 	if (initialProject === null) {
-		initialProject =
-			projectList.length > 0
-				? await loadProjectAction(projectList[0].id)
-				: await createProjectAction("Mon application");
+		if (projectList.length > 0) {
+			initialProject = await loadProjectAction(projectList[0].id);
+		} else {
+			// Bootstrap : aucun projet → en créer un par défaut (jamais un doublon ici).
+			const created = await createProjectAction("Mon application");
+			initialProject = created.ok ? created.record : null;
+		}
 		projectList = await listProjectsAction();
 	}
 

@@ -88,6 +88,32 @@ export function projectSlug(name: string): string {
 		.slice(0, 48);
 }
 
+/**
+ * Le VERDICT d'un nom de projet proposé — la validation PURE de la création (déterministe,
+ * miroir : project.test.ts). Avant, un nom dupliqué glissait silencieusement vers « toto-2 »
+ * (aucune alerte) ; désormais la création REFUSE un doublon et l'écran alerte. Les trois
+ * refus clos :
+ *   - empty    : nom vide / blancs uniquement ;
+ *   - unusable : le nom n'a aucun caractère slug-able (ex. « !!! », emoji) → slug vide ;
+ *   - duplicate: le slug existe déjà (insensible à la casse/aux accents — projectSlug plie
+ *                « Tôto » et « toto » sur le même slug). takenSlugs = les slugs DÉJÀ pris
+ *                (fichiers + registre Postgres, l'appelant les rassemble des deux sources).
+ */
+export type NewNameVerdict =
+	| { readonly ok: true; readonly slug: string }
+	| { readonly ok: false; readonly reason: "empty" | "unusable" | "duplicate" };
+
+export function classifyNewName(
+	name: string,
+	takenSlugs: ReadonlySet<string>,
+): NewNameVerdict {
+	if (name.trim() === "") return { ok: false, reason: "empty" };
+	const slug = projectSlug(name);
+	if (slug === "") return { ok: false, reason: "unusable" };
+	if (takenSlugs.has(slug)) return { ok: false, reason: "duplicate" };
+	return { ok: true, slug };
+}
+
 /** TRIE les projets : le plus récemment sauvé d'abord, départage stable par id. */
 export function sortProjects(ps: readonly ProjectRecord[]): ProjectRecord[] {
 	return [...ps].sort((a, b) =>

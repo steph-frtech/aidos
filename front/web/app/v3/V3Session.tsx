@@ -25,6 +25,7 @@ import { replayTo, type SessionTurn, turnsOf } from "@/lib/v3/session";
 import { chatTurnAction } from "./actions";
 import { deployProjectStackAction } from "./environnements/deploy-actions";
 import {
+	type CreateProjectOutcome,
 	createProjectAction,
 	emitWorkspaceAction,
 	type ProjectSummary,
@@ -86,7 +87,7 @@ export interface V3SessionValue {
 	/** Bascule vers un autre projet : sauve l'en-cours, pose le cookie, recharge (rejeu). */
 	readonly switchProject: (id: string) => Promise<void>;
 	/** Crée un projet (transcript vide) et bascule dessus — « créer une app crée un projet ». */
-	readonly createProject: (name: string) => Promise<void>;
+	readonly createProject: (name: string) => Promise<CreateProjectOutcome>;
 	/** L'ÉCHELLE de l'instance (ladderOf(config)) — la DONNÉE que chaque rejeu suit. */
 	readonly ladder: readonly string[];
 	/** La config d'instance chargée côté serveur (parse fail-closed du twin). */
@@ -331,10 +332,13 @@ export function V3SessionProvider({
 
 	/** CRÉE un projet (transcript vide, slug déterministe) puis bascule dessus. */
 	const createProject = useCallback(
-		async (name: string) => {
+		async (name: string): Promise<CreateProjectOutcome> => {
 			await persistNow();
-			const record = await createProjectAction(name);
-			if (record === null) return;
+			const outcome = await createProjectAction(name);
+			// Refus (doublon / vide / imprononçable) → on REMONTE le motif à l'écran (l'alerte) ;
+			// on ne bascule ni ne déploie rien (plus de doublon silencieux « toto-2 »).
+			if (!outcome.ok) return outcome;
+			const record = outcome.record;
 			await setActiveProjectAction(record.id);
 			// #1 (ADR 0040/0043) : « chaque projet est des docker à déployer au moment où on le
 			// crée » — on MONTE sa stack tout de suite (server · base · interpréteur) et le bandeau
@@ -344,6 +348,7 @@ export function V3SessionProvider({
 			}
 			void deployProjectStackAction(record.id, []);
 			router.refresh();
+			return outcome;
 		},
 		[persistNow, router],
 	);
