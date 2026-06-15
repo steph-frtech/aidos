@@ -118,6 +118,9 @@ back/cmd/aidosappemit/
 # per-project Pulumi deploy workdirs (node_modules + emitted infra programs, not committed)
 .deploy-pulumi/
 
+# compiled harness hook binaries (ADR 0075 — the hooks that fire; ELF, never committed)
+.claude/hooks/bin/
+
 # V3 persisted projects (replayable transcripts, user data — never committed)
 .aidos-projects/
 
