@@ -1,6 +1,8 @@
 package telemetrysink
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -56,6 +58,27 @@ func TestTracesHandler_EmptyIs200NoWrite(t *testing.T) {
 	rr := post(NewMux(sink), `{"resourceSpans":[]}`)
 	if rr.Code != http.StatusOK || len(sink.rows) != 0 {
 		t.Errorf("empty export: want 200 + 0 rows, got %d / %d", rr.Code, len(sink.rows))
+	}
+}
+
+func TestTracesHandler_GzipBody(t *testing.T) {
+	// The otelcol otlphttp exporter gzips by default — the sink must decompress.
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write([]byte(fixtureExport)); err != nil {
+		t.Fatal(err)
+	}
+	gz.Close()
+	sink := &fakeSink{}
+	req := httptest.NewRequest(http.MethodPost, "/v1/traces", &buf)
+	req.Header.Set("Content-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+	NewMux(sink).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("gzip body: want 200, got %d (%s)", rr.Code, rr.Body.String())
+	}
+	if len(sink.rows) != 2 {
+		t.Fatalf("gzip body: want 2 persisted spans, got %d", len(sink.rows))
 	}
 }
 

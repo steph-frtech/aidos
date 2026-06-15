@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -67,8 +68,13 @@ type otlpSpan struct {
 	Attributes        []otlpKeyValue `json:"attributes"`
 }
 
+// otlpStatus.Code is RAW because the OTLP/JSON status code is encoded INCONSISTENTLY by
+// producers: the otelcol json exporter emits the enum as a NUMBER (1/2), the spec's proto3
+// mapping allows the enum NAME string ("STATUS_CODE_OK"), and an UNSET status is often
+// omitted entirely. statusOf normalises all three; typing it `string` would 400 the
+// collector's numeric form (the bug this fixes).
 type otlpStatus struct {
-	Code string `json:"code"`
+	Code json.RawMessage `json:"code"`
 }
 
 type otlpKeyValue struct {
@@ -105,8 +111,10 @@ func (v otlpValue) flatten() string {
 var ErrNoSpans = errors.New("telemetrysink: no spans in export")
 
 // statusOf normalises the OTLP status code to the short text telemetry.span stores
-// ("ok" | "error" | "unset"). A missing code is "unset" (the OTLP default), never invented.
-func statusOf(code string) string {
+// ("ok" | "error" | "unset"), accepting the enum as a JSON number (1/2), the name string
+// ("STATUS_CODE_OK"), or absent. A missing/unknown code is "unset" — never invented.
+func statusOf(raw json.RawMessage) string {
+	code := strings.Trim(strings.TrimSpace(string(raw)), `"`)
 	switch code {
 	case "STATUS_CODE_OK", "1", "Ok":
 		return "ok"

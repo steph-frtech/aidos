@@ -1,0 +1,35 @@
+# ADR 0076 phase 2 — config du collector OpenTelemetry instance-level.
+# Source TRACKED (le runtime .deploy-pulumi/otel/config.yaml est gitignored) : workbench-up.sh
+# substitue __SINK_ENDPOINT__ par http://<gateway-du-réseau-collector>:4319/v1/traces (le host,
+# où tourne back/cmd/telemetry-sink) puis place ce fichier + redémarre le collector.
+#
+# Les traces sortent vers DEUX exporters : `debug` (stdout, inchangé — aucune régression) ET
+# `otlphttp/span-sink` (encodage JSON → le sink Go → telemetry.span). Si le sink est injoignable,
+# l'otlphttp retry/drop mais le collector + debug continuent (dégradation gouvernée).
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+exporters:
+  debug:
+    verbosity: normal
+  otlphttp/span-sink:
+    traces_endpoint: __SINK_ENDPOINT__
+    encoding: json
+    tls:
+      insecure: true
+    retry_on_failure:
+      enabled: true
+    sending_queue:
+      enabled: true
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [debug, otlphttp/span-sink]
+    metrics:
+      receivers: [otlp]
+      exporters: [debug]

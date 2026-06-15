@@ -1,11 +1,14 @@
 package telemetrysink
 
 import (
+	"compress/gzip"
 	"context"
 	"errors"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 )
 
 // SpanSink is what the HTTP handler needs to persist a decoded export. The pgx Writer
@@ -25,10 +28,29 @@ func TracesHandler(sink SpanSink) http.HandlerFunc {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		body, err := io.ReadAll(io.LimitReader(r.Body, 16<<20)) // 16 MiB ceiling
+		// OTLP/HTTP producers (the otelcol otlphttp exporter) GZIP the payload by default —
+		// decompress when announced, else the JSON parse trips on the gzip magic (\x1f).
+		var src io.Reader = r.Body
+		if strings.EqualFold(r.Header.Get("Content-Encoding"), "gzip") {
+			gz, err := gzip.NewReader(r.Body)
+			if err != nil {
+				http.Error(w, "bad gzip", http.StatusBadRequest)
+				return
+			}
+			defer gz.Close()
+			src = gz
+		}
+		body, err := io.ReadAll(io.LimitReader(src, 64<<20)) // 64 MiB decompressed ceiling
 		if err != nil {
 			http.Error(w, "read body", http.StatusBadRequest)
 			return
+		}
+		if os.Getenv("AIDOS_TELEMETRY_SINK_DEBUG") == "1" {
+			snip := body
+			if len(snip) > 600 {
+				snip = snip[:600]
+			}
+			log.Printf("telemetrysink: RX %d bytes: %s", len(body), snip)
 		}
 		rows, err := Decode(body)
 		if errors.Is(err, ErrNoSpans) {
@@ -36,6 +58,13 @@ func TracesHandler(sink SpanSink) http.HandlerFunc {
 			return
 		}
 		if err != nil {
+			// Log the reason + a body snippet so a producer-encoding mismatch is diagnosable
+			// (the fail-closed 400 is correct; silent rejection would hide it).
+			snippet := body
+			if len(snippet) > 400 {
+				snippet = snippet[:400]
+			}
+			log.Printf("telemetrysink: decode 400: %v | body: %s", err, snippet)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

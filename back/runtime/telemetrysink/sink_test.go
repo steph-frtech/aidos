@@ -1,6 +1,7 @@
 package telemetrysink
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -104,10 +105,12 @@ func TestDecode_EmptyIsNoSpans(t *testing.T) {
 }
 
 func TestStatusOf(t *testing.T) {
+	// Accept the enum as a NAME string, a quoted/unquoted NUMBER (otelcol emits 1/2), or absent.
 	for code, want := range map[string]string{
-		"STATUS_CODE_OK": "ok", "STATUS_CODE_ERROR": "error", "": "unset", "STATUS_CODE_UNSET": "unset",
+		`"STATUS_CODE_OK"`: "ok", `"STATUS_CODE_ERROR"`: "error", ``: "unset",
+		`"STATUS_CODE_UNSET"`: "unset", `1`: "ok", `2`: "error", `0`: "unset",
 	} {
-		if got := statusOf(code); got != want {
+		if got := statusOf(json.RawMessage(code)); got != want {
 			t.Errorf("statusOf(%q) = %q, want %q", code, got, want)
 		}
 	}

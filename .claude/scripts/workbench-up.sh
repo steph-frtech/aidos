@@ -55,6 +55,36 @@ echo "▶ web: launch next start (:$WEB_PORT) — loads front/web/.env.local"
 ( cd "$REPO/front/web" && setsid nohup "$REPO/node_modules/.bin/next" start --port "$WEB_PORT" >"$WEB_LOG" 2>&1 < /dev/null & disown 2>/dev/null || true )
 if wait_port "$WEB_PORT" 60; then echo "✓ web UP on :$WEB_PORT"; else echo "✗ web NOT UP — log:"; tail -20 "$WEB_LOG"; exit 1; fi
 
+# ── 2b. telemetry-sink (:4319) + collector → sink (ADR 0076 phase 2) ──────────────────
+# Le sink OTLP→Postgres persiste les spans de l'app émise dans telemetry.span (sinon perdus
+# sur le `debug` du collector). Durable (setsid nohup), branché sur la base de vérité.
+SINK_ADDR="${AIDOS_TELEMETRY_SINK_ADDR:-:4319}"
+SINK_PORT="${SINK_ADDR#:}"
+SINK_BIN="$REPO/.deploy-pulumi/telemetry-sink"
+SINK_DSN="${AIDOS_TELEMETRY_SINK_DSN:-$(grep -oE 'POSTGRES_CONNECTION_STRING=.*' "$REPO/front/web/.env.local" 2>/dev/null | head -1 | cut -d= -f2-)}"
+if [ -n "$SINK_DSN" ]; then
+	echo "▶ telemetry-sink: build + (re)launch on $SINK_ADDR"
+	(cd "$REPO/back" && go build -o "$SINK_BIN" ./cmd/telemetry-sink) || echo "  ✗ sink build failed (skip)"
+	pkill -f 'telemetry-sink' 2>/dev/null || true
+	wait_free "$SINK_PORT" 8 || true
+	if [ -x "$SINK_BIN" ]; then
+		setsid nohup env AIDOS_TELEMETRY_SINK_ADDR="$SINK_ADDR" AIDOS_TELEMETRY_SINK_DSN="$SINK_DSN" "$SINK_BIN" >/tmp/telemetry-sink.log 2>&1 < /dev/null &
+		disown 2>/dev/null || true
+		wait_port "$SINK_PORT" 8 && echo "✓ telemetry-sink UP on $SINK_ADDR" || echo "  ✗ sink NOT UP (collector keeps debug)"
+	fi
+	# Reconfigure the instance collector to ALSO export traces to the sink (debug kept).
+	if docker inspect opentelemetry-collector >/dev/null 2>&1; then
+		GW="$(docker inspect opentelemetry-collector --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' 2>/dev/null | head -c 32)"
+		[ -z "$GW" ] && GW="172.18.0.1"
+		CFG="$REPO/.deploy-pulumi/otel/config.yaml"
+		mkdir -p "$(dirname "$CFG")"
+		sed "s#__SINK_ENDPOINT__#http://$GW:$SINK_PORT/v1/traces#" "$REPO/.claude/scripts/otel-collector-config.yaml" > "$CFG"
+		docker restart opentelemetry-collector >/dev/null 2>&1 && echo "✓ collector reconfiguré → sink ($GW:$SINK_PORT) + debug" || echo "  ✗ collector restart failed"
+	fi
+else
+	echo "▶ telemetry-sink: pas de DSN → ignoré (spans restent sur le debug du collector)"
+fi
+
 # ── 3. healthchecks ───────────────────────────────────────────────────────────────────
 echo "▶ healthcheck gateway (one-shot stateless gateway_servers):"
 curl -s -X POST "http://127.0.0.1:$GW_PORT" -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
