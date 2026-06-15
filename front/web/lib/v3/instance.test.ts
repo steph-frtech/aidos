@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	defaultInstanceConfig,
 	envStackOf,
+	hostProbeable,
 	INSTANCE_TOOLS,
 	ladderOf,
 	parseInstanceConfig,
@@ -74,6 +75,23 @@ describe("l'ÉCHELLE PARAMÉTRABLE + la STACK PAR ENVIRONNEMENT (DP14)", () => {
 		for (const k of ["app", "db", "telemetry", "docs", "auth"])
 			expect(keys).toContain(k);
 		expect(new Set(keys).size).toBe(keys.length);
+	});
+
+	it("ADR 0080 — honnêteté : probe ⟺ endpoint hôte (https) ; jamais affirmer live un service interne", () => {
+		// La règle est PURE : sondable ⟺ l'URL est un endpoint joignable par l'hôte (https Traefik).
+		for (const s of STACK_SERVICES) {
+			expect(hostProbeable(s)).toBe(s.urlPattern.startsWith("https://"));
+		}
+		// app/docs/auth sont sondables ; les services internes au réseau docker NE le sont PAS.
+		const probeable = STACK_SERVICES.filter(hostProbeable).map((s) => s.key);
+		expect(probeable).toContain("app");
+		expect(probeable).not.toContain("bus"); // nats:// interne
+		expect(probeable).not.toContain("cache"); // redis:// interne
+		expect(probeable).not.toContain("telemetry"); // collector interne
+		// envStackOf porte le drapeau ; un service interne reste DÉCLARÉ, jamais « live » affirmé.
+		const dev = envStackOf("dev", defaultInstanceConfig());
+		expect(dev.find((e) => e.key === "app")?.probe).toBe(true);
+		expect(dev.find((e) => e.key === "bus")?.probe).toBe(false);
 	});
 
 	it("envStackOf : chaque env a SA stack — %env% substitué, db Doltgres en non-prod / Postgres en prod", () => {

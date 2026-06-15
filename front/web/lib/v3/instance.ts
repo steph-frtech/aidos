@@ -148,6 +148,19 @@ export interface StackService {
 }
 
 /**
+ * ADR 0080 — HONNÊTETÉ : ce service est-il VÉRIFIABLE en HTTP depuis le Workbench (l'hôte) ?
+ * Vrai UNIQUEMENT pour les endpoints joignables par l'hôte via Traefik (https://…). Les
+ * services internes au réseau docker (nats:, redis:, windmill:8000, opentelemetry-collector:
+ * 4318, api-hono-…:3001, doltgres://172.17.0.1) NE sont PAS sondables depuis l'hôte → la vue
+ * les DÉCLARE (adresse interne) sans jamais affirmer « live » ce qu'elle ne peut prouver
+ * (anti-faux-positif, §8) ; leur vivacité réelle s'observe via « Les conteneurs » (docker ps).
+ * Pur et déterministe (miroir : instance.test.ts).
+ */
+export function hostProbeable(s: Pick<StackService, "urlPattern">): boolean {
+	return s.urlPattern.startsWith("https://");
+}
+
+/**
  * LA STACK DÉCLARÉE PAR ENVIRONNEMENT — la palette substrat DP14/DP30 :
  * l'app émise, sa donnée (Doltgres non-prod / Postgres prod — ADR 0006), la
  * télémétrie (OTel→Postgres, lecteur S/MCP telemetry-reader), les docs de
@@ -227,6 +240,8 @@ export interface EnvStackEntry {
 	readonly key: string;
 	readonly labelKey: string;
 	readonly url: string;
+	/** ADR 0080 — sondable en HTTP depuis l'hôte (https Traefik) ? Sinon : déclaré, non affirmé live. */
+	readonly probe: boolean;
 }
 
 /**
@@ -248,12 +263,15 @@ export function envStackOf(
 				: env === "prod" && s.prodPattern !== undefined
 					? s.prodPattern
 					: s.urlPattern;
+		const url = pattern
+			.replaceAll("%env%", env)
+			.replaceAll("%project%", projectSlug || "app");
 		return {
 			key: s.key,
 			labelKey: s.labelKey,
-			url: pattern
-				.replaceAll("%env%", env)
-				.replaceAll("%project%", projectSlug || "app"),
+			url,
+			// ADR 0080 — sondable seulement si l'URL résolue est un endpoint hôte (https).
+			probe: url.startsWith("https://"),
 		};
 	});
 }
