@@ -24,6 +24,11 @@ export default defineConfig({
 		url: baseURL,
 		reuseExistingServer: !process.env.CI,
 		timeout: 120_000,
+		// ADR 0074 — forward the gateway endpoint to the dev server so the cutover e2e can
+		// target the live gateway (:8787 → source "live") or a blackhole port (unreachable
+		// → declared "demo", the anti-silent-fallback fault-injection). An already-set
+		// process.env var is NOT overridden by .env.local, so this value wins for the run.
+		env: { AIDOS_GATEWAY_HTTP_URL: process.env.AIDOS_GATEWAY_HTTP_URL ?? "" },
 	},
 	projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

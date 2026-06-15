@@ -141,9 +141,20 @@ func newMCPServer() *mcp.Server {
 // httpHandler builds the MCP-over-HTTP handler: the SAME server served over JSON-RPC/
 // HTTP via the SDK's StreamableHTTPHandler (the HTTP honours the MCP — provider
 // verification). JSONResponse keeps the wire deterministic (no random SSE ids).
+//
+// Stateless: true — the front SDK (front/web/lib/gateway-sdk.ts) issues ONE-SHOT,
+// project-scoped `tools/call` POSTs (no initialize → no Mcp-Session-Id handshake): it
+// carries the (identity, project) scope in the call arguments + headers, statelessly,
+// because the gateway router IS a pure function of (scope, tool, target) — there is no
+// server session state to keep (determinism-first, §8). A session-required handler
+// would reject every front call ("invalid during session initialization") and force a
+// SILENT twin fallback — exactly the defect ADR 0074 forbids. Stateless accepts the
+// one-shot call AND the full handshake (the SDK clients in pact/transport tests), so the
+// HTTP still honours the MCP. Idempotent reads only; truth-writes never reach here (the
+// wall refuses them server-side before any dispatch).
 func httpHandler() http.Handler {
 	srv := newMCPServer()
-	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv }, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv }, &mcp.StreamableHTTPOptions{JSONResponse: true, Stateless: true})
 }
 
 func main() {
