@@ -1,9 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { sessionScreenOverrides } from "@/lib/v3/design/screen-design";
-import { deployProjectStackAction } from "./deploy-actions";
+import { useEffect, useState } from "react";
 import {
 	type AppProjection,
 	type BuilderState,
@@ -12,9 +10,22 @@ import {
 	type EnvName,
 	emitApp,
 } from "@/lib/v2/builder";
-import { envStackOf, type InstanceConfig } from "@/lib/v3/instance";
+import { sessionScreenOverrides } from "@/lib/v3/design/screen-design";
+import {
+	type EnvStackEntry,
+	envStackOf,
+	type InstanceConfig,
+} from "@/lib/v3/instance";
+import {
+	type ProbeResult,
+	probeStatusLabelKey,
+	probeStatusOf,
+	probeStatusTestId,
+} from "@/lib/v3/probe-status";
 import { type StackJournalEntry, stackJournalOf } from "@/lib/v3/stack-journal";
 import { useV3Session } from "../V3Session";
+import { deployProjectStackAction } from "./deploy-actions";
+import { sondeAction } from "./sonde-actions";
 
 /**
  * /v3/environnements — LES ENVIRONNEMENTS : l'échelle (state.ladder, une DONNÉE de
@@ -648,28 +659,7 @@ function EnvDetail({
 				<div className="space-y-3">
 					<ul className="space-y-1.5">
 						{stack.map((row) => (
-							<li
-								key={row.key}
-								className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5"
-							>
-								<span className="text-xs font-medium text-foreground">
-									{t[row.labelKey] ?? row.key}
-								</span>
-								<span className="ml-auto font-mono text-[11px] text-muted-foreground">
-									{row.url === "" ? t.instStackUnprovisioned : row.url}
-								</span>
-								{/* · v0 HONNÊTE sous la ligne « app » : l'URL dev sert l'aperçu ÉMIS
-								    du workspace (certificat par défaut possible) — les conteneurs
-								    réels par projet/env arrivent avec la piste DP. */}
-								{row.key === "app" && (
-									<p
-										data-testid="v3-env-stack-v0-note"
-										className="w-full text-[11px] leading-relaxed text-muted-foreground italic"
-									>
-										{t.envStackV0Note}
-									</p>
-								)}
-							</li>
+							<StackRow key={row.key} row={row} t={t} />
 						))}
 					</ul>
 					{/* · l'HONNÊTETÉ : le provisionnement réel par couple projet/env = la piste DP */}
@@ -679,6 +669,66 @@ function EnvDetail({
 				</div>
 			)}
 		</section>
+	);
+}
+
+/**
+ * UNE LIGNE de stack avec son STATUT HONNÊTE (ADR 0080 step 2). Un service sondable
+ * depuis l'hôte (probe=true, https Traefik) est RÉELLEMENT sondé (sondeAction) → « en
+ * ligne / hors ligne / sonde… » ; un service interne au réseau docker (probe=false) reste
+ * « déclaré » — on n'affirme JAMAIS « live » ce qu'on ne peut prouver d'ici (§8). La
+ * projection (probe, sonde) → statut est PURE (lib/v3/probe-status).
+ */
+function StackRow({ row, t }: { row: EnvStackEntry; t: Strings }) {
+	const [result, setResult] = useState<ProbeResult | undefined>(undefined);
+	useEffect(() => {
+		if (!row.probe || row.url === "") return;
+		let alive = true;
+		void sondeAction(row.url).then((r) => {
+			if (alive) setResult({ up: r.up });
+		});
+		return () => {
+			alive = false;
+		};
+	}, [row.probe, row.url]);
+	const status = probeStatusOf(row.probe, row.url === "" ? undefined : result);
+	const cls =
+		status === "up"
+			? "bg-primary/10 text-primary"
+			: status === "down"
+				? "bg-destructive/10 text-destructive"
+				: "bg-muted text-muted-foreground";
+	return (
+		<li
+			data-testid="v3-env-stack-row"
+			data-service={row.key}
+			className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-2.5 py-1.5"
+		>
+			<span className="text-xs font-medium text-foreground">
+				{t[row.labelKey] ?? row.key}
+			</span>
+			<span
+				data-testid={probeStatusTestId(status)}
+				data-status={status}
+				className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${cls}`}
+			>
+				{t[probeStatusLabelKey(status)] ?? status}
+			</span>
+			<span className="ml-auto font-mono text-[11px] text-muted-foreground">
+				{row.url === "" ? t.instStackUnprovisioned : row.url}
+			</span>
+			{/* · v0 HONNÊTE sous la ligne « app » : l'URL dev sert l'aperçu ÉMIS du
+			    workspace (certificat par défaut possible) — les conteneurs réels par
+			    projet/env arrivent avec la piste DP. */}
+			{row.key === "app" && (
+				<p
+					data-testid="v3-env-stack-v0-note"
+					className="w-full text-[11px] leading-relaxed text-muted-foreground italic"
+				>
+					{t.envStackV0Note}
+				</p>
+			)}
+		</li>
 	);
 }
 
