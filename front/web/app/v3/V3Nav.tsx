@@ -16,6 +16,7 @@ import {
 	Server,
 	Settings,
 	Sparkles,
+	Workflow,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -40,6 +41,7 @@ export const ENTRIES = [
 	{ route: "/v3/lab", key: "navLab", Icon: Sparkles },
 	{ route: "/v3/parcours", key: "navParcours", Icon: MapIcon },
 	{ route: "/v3/specs", key: "navSpecs", Icon: ListChecks },
+	{ route: "/v3/operation", key: "navOperation", Icon: Workflow },
 	{ route: "/v3/history", key: "navHistory", Icon: History },
 	{ route: "/v3/environnements", key: "navEnvs", Icon: Layers },
 	{ route: "/v3/code", key: "navCode", Icon: Code },

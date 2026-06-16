@@ -53,6 +53,7 @@ const KEYS = [
 	"navLab",
 	"navParcours",
 	"navSpecs",
+	"navOperation",
 	"navHistory",
 	"navEnvs",
 	"navCode",
