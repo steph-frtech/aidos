@@ -15,7 +15,6 @@ import {
 	emitApp,
 	type IntentKind,
 	initBuilderState,
-	type ScreenRef,
 	type Understanding,
 	understand,
 } from "@/lib/v2/builder";
@@ -284,20 +283,19 @@ function EnvCard({
 
 export function BuilderClient({
 	t,
-	v1Screens,
 	codeNodes,
 	codeEdges,
 }: {
 	t: Strings;
-	/** Les écrans V1 scannés côté serveur (app/<dir>) — injectés en DONNÉES dans le twin. */
-	v1Screens: readonly ScreenRef[];
 	/** Le graphe de code extrait côté serveur (le motif /v2/code) — le delta au grain code. */
 	codeNodes: readonly CodeNode[];
 	codeEdges: readonly CodeEdge[];
 }) {
 	// ── l'état d'écran event-sourcé : l'état réduit + les tours (append-only) ──────────
+	// L'inventaire des écrans est le REGISTRE D'ÉCRANS COMPLET (déclaré, faisant autorité —
+	// initBuilderState() le prend par défaut) : TOUTE la nav atteignable, pas un scan partiel.
 	const [builderState, setBuilderState] = useState<BuilderState>(() =>
-		initBuilderState(v1Screens),
+		initBuilderState(),
 	);
 	const [turns, setTurns] = useState<readonly Turn[]>([]);
 	const [input, setInput] = useState("");

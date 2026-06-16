@@ -10,10 +10,17 @@ import {
 	INTENT_KINDS,
 	initBuilderState,
 	resolveScreen,
+	type ScreenRef,
 	understand,
 } from "./builder";
 import type { CodeEdge, CodeNode } from "./code-graph";
 import { nodeByPath } from "./composition";
+import {
+	ALL_SCREENS,
+	canonicalOpenPhrase,
+	registryHash,
+	registryIsTotal,
+} from "./screen-registry";
 import { SCREENS } from "./screens";
 
 /**
@@ -440,27 +447,166 @@ describe("DELTA — « voir les deltas » : l'écart CALCULÉ entre l'état cour
 	});
 });
 
-// ── OUVRIR — la couverture TOTALE du Workbench (« il sait tout faire ») ───────
+// ── LE REGISTRE D'ÉCRANS COMPLET PILOTE LA LOI DE COUVERTURE DE LA NAV ─────────
+//
+// L'EXTENSION (au-delà des phrases que les écrans émettent). Le registre canonique que le
+// miroir itère n'est plus le seul registre V2 (22 écrans) : c'est ALL_SCREENS — TOUTES les
+// capacités de la nav, déclarées en données (racine V1 + V2 + V3, 209 écrans). La loi de
+// couverture s'applique à CHACUNE : « ouvre <écran> » s'accroche au type de réponse `ouvrir`
+// et resolveScreen résout l'écran vers SA route — JAMAIS le fallthrough « incomprise »/« écran
+// introuvable ». Une capacité de la nav que le chat ne sait pas atteindre serait un MONSTRE
+// (l'inverse d'un miroir orphelin) ; ce miroir l'attrape par construction.
+//
+// NON TAUTOLOGIQUE. Le miroir n'est pas « le code prouve le code » : la propriété dédiée RETIRE
+// une entrée de l'inventaire passé à resolveScreen et exige que le miroir ROUGISSE en NOMMANT
+// l'écran devenu inatteignable. La couverture est donc une vraie contrainte, pas une identité.
 
-describe("OUVRIR — chaque écran du Workbench est atteignable depuis le chat", () => {
-	it("LA LOI DE COUVERTURE : ∀ écran du registre V2, « ouvre <titre> » résout vers SA route", () => {
+/** Récupère un écran du registre par sa route (jette si absent — la cible du test DOIT exister). */
+function screenAt(route: string): ScreenRef {
+	const sc = ALL_SCREENS.find((s) => s.route === route);
+	if (sc === undefined) throw new Error(`écran ${route} absent du registre`);
+	return sc;
+}
+
+describe("LE REGISTRE D'ÉCRANS COMPLET — l'autorité que le miroir itère", () => {
+	it("le registre est TOTAL : route non vide, route UNIQUE, label non vide (pas de monstre structurel)", () => {
+		expect(registryIsTotal()).toBe(true);
+		expect(ALL_SCREENS.length).toBeGreaterThan(100); // racine + V2 + V3 (toute la nav)
+		const routes = ALL_SCREENS.map((s) => s.route);
+		expect(new Set(routes).size).toBe(routes.length);
+	});
+
+	it("le registre est content-adressé STABLE (déterministe — même registre → même empreinte)", () => {
+		expect(registryHash()).toBe(registryHash());
+	});
+
+	it("le registre V2 déclaré (SCREENS) est INCLUS dans le registre complet (aucun écran V2 perdu)", () => {
+		const routes = new Set(ALL_SCREENS.map((s) => s.route));
+		for (const e of SCREENS)
+			expect(routes.has(`/v2/${e.slug}`), `V2 /${e.slug} absent`).toBe(true);
+	});
+});
+
+describe("OUVRIR — ∀ capacité de la nav (le registre COMPLET) est atteignable depuis le chat", () => {
+	it("LA LOI DE COUVERTURE (registre COMPLET) : ∀ écran de ALL_SCREENS, sa phrase canonique s'accroche à `ouvrir` ET résout vers SA route — JAMAIS le fallthrough", () => {
+		const st = S();
+		// L'inventaire du réducteur EST le registre complet (initBuilderState le prend par défaut).
+		const inventory = new Set(st.screens.map((s) => s.route));
+		for (const sc of ALL_SCREENS) {
+			expect(inventory.has(sc.route), `écran ${sc.route} hors inventaire`).toBe(
+				true,
+			);
+			const phrase = canonicalOpenPhrase(sc);
+			// (a) la phrase s'accroche au type de réponse `ouvrir` (jamais « incomprise »/« ambigue »).
+			const u = understand(st, phrase);
+			expect(u.status, `« ${phrase} » → ${u.status}`).toBe("comprise");
+			expect(u.attente).toBe("ouvrir");
+			// (b) le réducteur OUVRE l'écran (jamais un refus), vers SA route.
+			const r = applyIntent(st, phrase);
+			const ev = r.events.find((e) => e.kind === "ecran_ouvert");
+			expect(
+				ev,
+				`écran ${sc.route} inatteignable (« ${phrase} »)`,
+			).toBeDefined();
+			expect(ev?.ref, `« ${phrase} » devait ouvrir ${sc.route}`).toBe(sc.route);
+			expect(r.events.some((e) => e.kind === "refus")).toBe(false);
+		}
+	});
+
+	it("LA PREUVE DE NON-TAUTOLOGIE : retirer une entrée de l'inventaire fait ROUGIR le miroir en NOMMANT l'écran inatteignable", () => {
+		// On choisit un écran-cible (une capacité réelle de la nav), on l'OTE de l'inventaire,
+		// et on vérifie que la loi de couverture ÉCHOUE précisément sur lui (resolveScreen ne
+		// retourne plus SA route). Si le miroir restait vert malgré le retrait, il serait tautologique.
+		const target = screenAt("/v3/code");
+		const reduced: ScreenRef[] = ALL_SCREENS.filter(
+			(s) => s.route !== target.route,
+		);
+		// L'écran retiré n'est plus résolu vers SA route (la couverture est BRISÉE → le miroir rougirait).
+		const got = resolveScreen(reduced, canonicalOpenPhrase(target));
+		expect(
+			got?.route,
+			`/v3/code ne devrait plus résoudre vers lui-même une fois retiré (got ${got?.route ?? "null"})`,
+		).not.toBe("/v3/code");
+		// Et la LOI complète, rejouée sur l'inventaire amputé, échoue EN NOMMANT l'écran manquant.
+		const offenders = ALL_SCREENS.filter((sc) => {
+			const r = resolveScreen(reduced, canonicalOpenPhrase(sc));
+			return r === null || r.route !== sc.route;
+		}).map((s) => s.route);
+		expect(offenders, "le retrait DOIT casser la couverture").toContain(
+			"/v3/code",
+		);
+	});
+
+	it("les écrans V3 (sous-routes /v3/*, JAMAIS énumérées par le scan plat) sont atteignables — l'angle mort comblé", () => {
+		const st = S();
+		for (const route of ["/v3/code", "/v3/bench", "/v3/evolve", "/v3/design"]) {
+			const r = applyIntent(st, canonicalOpenPhrase(screenAt(route)));
+			const ev = r.events.find((e) => e.kind === "ecran_ouvert");
+			expect(ev?.ref, `${route} inatteignable`).toBe(route);
+		}
+	});
+
+	it("les HOMONYMES sont DÉPARTAGÉS déterministiquement (/v2/code ≠ /v3/code ≠ … via le préfixe de section)", () => {
+		const st = S();
+		const pairs: [string, string][] = [
+			["/v2/code", "/v3/code"],
+			["/goal", "/v2/goal"],
+			["/conscience", "/v2/conscience"],
+			["/policy", "/v2/policy"],
+			["/deploy", "/v2/deploy"],
+			["/operation", "/v3/operation"],
+			["/ai-lab", "/v2/ai-lab"],
+		];
+		const openedRoute = (route: string): string | undefined =>
+			applyIntent(st, canonicalOpenPhrase(screenAt(route))).events.find(
+				(e) => e.kind === "ecran_ouvert",
+			)?.ref;
+		for (const [a, b] of pairs) {
+			expect(openedRoute(a)).toBe(a);
+			expect(openedRoute(b)).toBe(b);
+		}
+	});
+
+	it("OUVRIR n'écrit JAMAIS la vérité (le MUR : ouvrir ROUTE, n'exécute aucune écriture-vérité)", () => {
+		const st = S();
+		for (const sc of ALL_SCREENS.slice(0, 20)) {
+			const r = applyIntent(st, canonicalOpenPhrase(sc));
+			// aucune mutation : pas d'idée, pas de kernel, pas d'env touché ; seul le journal grandit.
+			expect(r.state.ideas).toEqual(st.ideas);
+			expect(r.state.kernels).toEqual(st.kernels);
+			expect(r.state.envs).toEqual(st.envs);
+			expect(r.impacts).toEqual([]);
+		}
+	});
+
+	it("le registre V2 déclaré reste atteignable par sa SECTION + son SLUG (la rétrocompat de WB2-25, honnête)", () => {
+		// HONNÊTETÉ (le coût documenté de la couverture totale) : maintenant que les écrans-RACINE
+		// cohabitent dans l'inventaire, un TITRE FR EN PROSE est parfois AMBIGU — « …d'opération »
+		// (titre de /v2/workflows) accroche le token « operation » de la route-racine /operation
+		// (qui touche en plus le bonus de slug exact), et un homonyme exact (« conscience »,
+		// « deploy ») se départage par l'ordre de route (la racine < /v2/…). Ce n'est PAS un défaut :
+		// la phrase NON ambiguë cite la SECTION + le SLUG — l'adresse canonique d'un écran (le slug
+		// est le segment terminal de sa route, ce que la nav V2 lie de toute façon : /v2/<slug>).
+		// Chaque écran V2 résout alors vers SA route, sans collision avec la racine.
 		const st = S();
 		for (const entry of SCREENS) {
-			const r = applyIntent(st, `ouvre ${entry.fr.title}`);
+			const r = applyIntent(st, `ouvre v2 ${entry.slug}`);
 			const ev = r.events.find((e) => e.kind === "ecran_ouvert");
-			expect(ev, `écran ${entry.slug} inatteignable`).toBeDefined();
+			expect(ev, `écran v2/${entry.slug} inatteignable`).toBeDefined();
 			expect(ev?.ref).toBe(`/v2/${entry.slug}`);
 		}
 	});
 
-	it("les écrans V1 injectés sont atteignables aussi (l'inventaire est une donnée, pas du code)", () => {
+	it("les écrans injectés runtime (extraScreens) restent atteignables (l'inventaire reste une donnée extensible)", () => {
 		const st = initBuilderState([
-			{ route: "/why-tree", label: "why-tree l'arbre des pourquoi" },
-			{ route: "/agents", label: "agents la couche agent" },
+			{
+				route: "/dynamic-screen",
+				label: "dynamic screen écran dynamique injecté",
+			},
 		]);
-		const r = applyIntent(st, "ouvre l'écran why-tree");
+		const r = applyIntent(st, "ouvre dynamic screen");
 		const ev = r.events.find((e) => e.kind === "ecran_ouvert");
-		expect(ev?.ref).toBe("/why-tree");
+		expect(ev?.ref).toBe("/dynamic-screen");
 	});
 
 	it("∀ texte : resolveScreen est TOTAL et DÉTERMINISTE ; aucune accroche → null (jamais une invention)", () => {
@@ -474,9 +620,23 @@ describe("OUVRIR — chaque écran du Workbench est atteignable depuis le chat",
 		expect(resolveScreen(S().screens, "zzz qqq www")).toBeNull();
 	});
 
-	it("ouvrir un écran introuvable → refus (fail-closed)", () => {
+	it("ouvrir un écran introuvable → refus (fail-closed — une route INVENTÉE n'existe jamais)", () => {
 		const r = applyIntent(S(), "ouvre l'écran zzzqqq");
 		expect(r.events.some((e) => e.kind === "refus")).toBe(true);
+	});
+
+	it("une capacité qui ÉCRIT LA VÉRITÉ reste routée par le MUR (idée → /goal), jamais exécutée par « ouvrir »", () => {
+		// « promouvoir » est le seul intent qui approche la vérité — il PROPOSE un ChangeSet DRAFT,
+		// jamais une écriture. Le miroir prouve : même la capacité d'écriture passe par la porte.
+		const base = applyIntent(
+			S(),
+			"capture l'idée : au checkout, débiter une seule fois",
+		).state;
+		const r = applyIntent(base, "promeus la dernière idée");
+		const k = r.events.find((e) => e.kind === "kernel_propose");
+		expect(k).toBeDefined();
+		expect(r.state.kernels[0].wroteKernel).toBe(false);
+		expect(r.state.kernels[0].changeSet.status).toBe("DRAFT");
 	});
 });
 

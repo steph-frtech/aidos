@@ -2,7 +2,6 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import type { ScreenRef } from "@/lib/v2/builder";
 import { assembleGraph, extractFromSource } from "@/lib/v2/code-extract";
 import { BuilderClient } from "./BuilderClient";
 
@@ -118,22 +117,12 @@ export default async function V2BuilderScreen() {
 		? cwd
 		: join(cwd, "front", "web");
 
-	// (a) L'INVENTAIRE des écrans V1 : les dossiers d'app/ (hors v2, api et les dossiers privés
-	// `_` non routables), TRIÉS — injectés en DONNÉES dans le twin (le registre V2 déclaré est
-	// toujours couvert par initBuilderState ; ici s'ajoute TOUT le reste du Workbench).
-	const v1Screens: ScreenRef[] = readdirSync(join(absBase, "app"), {
-		withFileTypes: true,
-	})
-		.filter(
-			(e) =>
-				e.isDirectory() &&
-				e.name !== "v2" &&
-				e.name !== "api" &&
-				!e.name.startsWith("_"),
-		)
-		.map((e) => ({ route: `/${e.name}`, label: e.name.replace(/-/g, " ") }))
-		.sort((a, b) => (a.route < b.route ? -1 : 1));
-
+	// L'INVENTAIRE des écrans n'est PLUS un scan : il est DÉCLARÉ (le REGISTRE D'ÉCRANS COMPLET,
+	// lib/v2/screen-registry → ALL_SCREENS), pris par défaut par initBuilderState() côté client.
+	// Le registre fait AUTORITÉ — il couvre TOUTE la nav (racine V1 + V2 + V3, dont les sous-routes
+	// /v3/* que le scan plat de app/<dir> n'énumérait pas, l'angle mort/monstre désormais comblé).
+	// Le miroir (builder.test.ts) ITÈRE ce registre et prouve la couverture (∀ écran atteignable).
+	//
 	// (b) Le GRAPHE DE CODE (le motif /v2/code) : extrait des twins lib/v2 RÉELS par l'API
 	// compilateur TypeScript (code-extract, côté serveur seulement), trié (même dépôt → même graphe).
 	const libDir = join(absBase, "lib", "v2");
@@ -176,12 +165,7 @@ export default async function V2BuilderScreen() {
 				{t("wallNote")}
 			</p>
 
-			<BuilderClient
-				t={strings}
-				v1Screens={v1Screens}
-				codeNodes={codeNodes}
-				codeEdges={codeEdges}
-			/>
+			<BuilderClient t={strings} codeNodes={codeNodes} codeEdges={codeEdges} />
 		</div>
 	);
 }

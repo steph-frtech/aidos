@@ -48,11 +48,10 @@ import {
 	placeIntent,
 	seedComposes,
 } from "./composition";
-import { GLOSSARY } from "./glossary";
 import { type MirrorSpec, type ProposedKernel, promoteIdea } from "./goal";
 import { composeIdea, type Idea } from "./idea";
 import type { KernelNode } from "./kernel-tree";
-import { SCREENS } from "./screens";
+import { ALL_SCREENS } from "./screen-registry";
 
 /** Le jeu CLOS des intentions — tout ce que le chat sait faire, déclaré, rien d'autre. */
 export const INTENT_KINDS = [
@@ -252,22 +251,16 @@ export function initBuilderState(
 	tree?: readonly KernelNode[],
 	ladder: readonly string[] = ENV_LADDER,
 ): BuilderState {
-	// Le registre V2 (déclaré, clos) est TOUJOURS couvert ; les écrans V1 s'injectent
-	// en données (l'inventaire vient du scan serveur, jamais codé en dur ici).
-	const v2: ScreenRef[] = SCREENS.map((e) => ({
-		route: `/v2/${e.slug}`,
-		label: `${e.slug} ${e.fr.title} ${e.en.title}`,
-	}));
-	// Les CONCEPTS du glossaire servis par la route dynamique /v2/[slug] (la loi de
-	// couverture a attrapé l'angle mort : « anatomie » & co n'ont pas de page dédiée
-	// mais SONT des écrans réels — l'inventaire les déclare aussi).
-	const dedicated = new Set(SCREENS.map((e) => e.slug));
-	const concepts: ScreenRef[] = GLOSSARY.filter(
-		(g) => !dedicated.has(g.slug),
-	).map((g) => ({
-		route: `/v2/${g.slug}`,
-		label: `${g.slug} ${g.fr.def} ${g.en.def}`,
-	}));
+	// LE REGISTRE D'ÉCRANS COMPLET (ALL_SCREENS) est l'inventaire par défaut, faisant AUTORITÉ :
+	// TOUTES les capacités de la nav — racine (V1), V2, V3 — déclarées en données (jamais le seul
+	// scan du système de fichiers, qui n'énumère pas les sous-routes /v3/* → un angle mort/monstre).
+	// `extraScreens` reste pour une augmentation runtime (un écran dynamique scanné en plus) ; le
+	// registre déclaré garantit la COUVERTURE que le miroir prouve. Les routes en double sont
+	// idempotentes (Map par route — le registre déclaré l'emporte, l'injection ne le contredit pas).
+	const byRoute = new Map<string, ScreenRef>();
+	for (const s of ALL_SCREENS) byRoute.set(s.route, s);
+	for (const s of extraScreens)
+		if (!byRoute.has(s.route)) byRoute.set(s.route, s);
 	return {
 		// Par défaut le seed de démo (les écrans V2 illustrent le concept) ; la V3
 		// passe bareTree() — un PROJET NEUF est NU (loi au miroir).
@@ -276,7 +269,7 @@ export function initBuilderState(
 		kernels: [],
 		ladder,
 		envs: Object.fromEntries(ladder.map((e) => [e, null])),
-		screens: [...v2, ...concepts, ...extraScreens],
+		screens: [...byRoute.values()],
 		log: [],
 	};
 }
