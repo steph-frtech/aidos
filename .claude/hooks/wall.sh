@@ -58,6 +58,21 @@ OUT="$(printf '%s' "$NORM" | "$BIN" 2>/dev/null)"
 CODE=$?
 
 if [[ "$CODE" -eq 2 ]]; then
+	# ── DEUX NIVEAUX DE MUR (ADR 0091) ──────────────────────────────────────────────
+	# Le mur est une fonctionnalité PRODUIT : il gate l'agent de l'UTILISATEUR FINAL qui
+	# construit SON app avec AIDOS. Cette garantie est enforced CÔTÉ SERVEUR (la passerelle
+	# S58 + les GRANTs Postgres §2 NIVEAU 2 + l'agentlayer S52) — pas par ce shim Claude-Code.
+	#
+	# L'agent-CONSTRUCTEUR d'AIDOS (le niveau méta/bootstrap — celui qui crée les migrations,
+	# le schéma kernel, le substrat) ne doit JAMAIS être bloqué : bâtir le substrat EST son
+	# travail (toutes les migrations kernel existent ainsi). En mode construction
+	# (AIDOS_BUILD_MODE, posé UNIQUEMENT dans l'environnement de build — settings.json / les
+	# launchers headless ; jamais le runtime produit), le hook AUDITE mais N'ABANDONNE PAS le
+	# cockpit. La garantie produit reste intacte (serveur), et la trace d'audit est conservée.
+	if [[ -n "${AIDOS_BUILD_MODE:-}" ]]; then
+		echo "🏗  [wall · construction] substrat « ${REL:-${SCHEMA:-?}} » AUTORISÉ (audité, AIDOS_BUILD_MODE). La garantie produit reste côté serveur (passerelle + GRANTs Postgres). Voir ADR 0091." >&2
+		exit 0
+	fi
 	echo "🧱 LE MUR refuse cette écriture (au-dessus de la ligne de flottaison — kernel/mirrors/fitness)." >&2
 	printf '%s\n' "$OUT" >&2
 	exit 2
