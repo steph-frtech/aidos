@@ -1,6 +1,7 @@
 package projectsrv
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -43,7 +44,32 @@ func toBody(p project.Project) ([]byte, error) {
 	return p.CanonicalBody()
 }
 
+// unwrapJSONString heals a double-encoded jsonb body. A correct project body is always a
+// JSON OBJECT (`{…}`), but the legacy V3 front writer (front/web/app/v3/projects-actions.ts)
+// stored some rows as a jsonb STRING SCALAR — the object's JSON text wrapped in quotes and
+// escaped (`"{\"slug\":…}"`). pgx hands that back as a quoted, escaped string, which cannot
+// unmarshal into the row struct. This pure, total normaliser unwraps a leading string scalar
+// (bounded, so a triple-encoding still heals) back to the object bytes; a genuine object is
+// returned untouched (determinism-first: same bytes → same bytes). The reader is tolerant so
+// existing rows decode regardless of which writer produced them; the writer is fixed
+// separately so no new double-encoded row is created.
+func unwrapJSONString(body []byte) []byte {
+	for range 5 {
+		trimmed := bytes.TrimSpace(body)
+		if len(trimmed) == 0 || trimmed[0] != '"' {
+			return body
+		}
+		var inner string
+		if err := json.Unmarshal(trimmed, &inner); err != nil {
+			return body
+		}
+		body = []byte(inner)
+	}
+	return body
+}
+
 func fromRow(id string, body []byte) (project.Project, error) {
+	body = unwrapJSONString(body)
 	var b struct {
 		Slug      string            `json:"slug"`
 		Name      string            `json:"name"`

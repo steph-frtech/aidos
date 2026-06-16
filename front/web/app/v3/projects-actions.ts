@@ -98,6 +98,12 @@ async function registerV3Project(id: string, name: string): Promise<void> {
 	const createdAt = `${new Date().toISOString().slice(0, 10)}T00:00:00Z`;
 	try {
 		const p = newProject(id, name, V3_OWNER, createdAt);
+		// The body MUST land as a jsonb OBJECT. canonicalBody returns the canonical JSON
+		// TEXT (used for the content-address id); passing that text with `::jsonb` made
+		// postgres.js store a double-encoded jsonb STRING SCALAR (`"{…}"`), which the Go
+		// project store could not decode (found-by-running, S59 fan-out). We parse it back to
+		// the object and let postgres.js serialise it as jsonb (c.json) — guaranteed object
+		// type. The id stays the content-address of the canonical text (unchanged).
 		const body = canonicalBody({
 			slug: id,
 			name,
@@ -105,10 +111,11 @@ async function registerV3Project(id: string, name: string): Promise<void> {
 			createdAt,
 			lifecycle: "active",
 		});
+		const bodyObject = JSON.parse(body) as Parameters<typeof c.json>[0];
 		await c.begin(async (tx) => {
 			await tx`
 				insert into projects.project (id, body, version)
-				values (${p.id}, ${body}::jsonb, ${p.id})
+				values (${p.id}, ${c.json(bodyObject)}, ${p.id})
 				on conflict (id) do nothing`;
 			await tx`
 				insert into projects.dag_root (project_id, node_id, label)
