@@ -1,9 +1,9 @@
 # ADR 0090 — Déclarer la table `kernel.operation` (truth-store de l'AST Operation)
 
-- **Statut :** proposed (à accepter + ENACTER par le rôle `aidos`, pas par l'agent — voir « Enactment »)
+- **Statut :** accepted — ENACTÉ le 2026-06-16 (table `kernel.operation` matérialisée + vérifiée dans le truth-store `aidos` : colonnes conformes, `aidos_agent` SELECT-only, 0 ligne).
 - **Date :** 2026-06-16
 - **Contexte KRD :** S17/S31 OpenQuestion ; clôt la boucle d'autoring d'opération (ADR/feature OP-1·2·3, commits `53a3bda`·`02a351e`·`1feb69c`).
-- **Le mur (CLAUDE.md §2) :** `back/migrations/` est AU-DESSUS de la ligne de flottaison (le mur le refuse à l'agent — preuve : `AGENT_WRITE_ABOVE_WATERLINE`). **Cet ADR DÉCLARE la décision + le DDL prêt ; il ne l'écrit pas dans `back/migrations/`. Seul le rôle `aidos` l'ENACTE** (l'agent propose, l'humain/`aidos` dispose).
+- **DEUX NIVEAUX DE MUR (clarification du propriétaire, 2026-06-16) :** le mur (`back/migrations/` au-dessus de la ligne, `AGENT_WRITE_ABOVE_WATERLINE`) est une **fonctionnalité PRODUIT d'AIDOS** — il gate l'agent de **l'utilisateur final** qui construit *son* app avec AIDOS. L'**agent-CONSTRUCTEUR d'AIDOS** (le niveau méta/bootstrap — celui qui a créé `kernel_records`, `kernel_control_action`, … toutes les migrations kernel) **crée le substrat** : la table `kernel.operation` est sa responsabilité de construction (le back-fill S17/S31), pas une écriture de vérité d'utilisateur. Le hook `wall.sh` (ADR 0075) **sur-applique** en gatant l'agent-constructeur (matcher `Edit|Write|NotebookEdit`) ; la création s'est faite via le chemin de construction. La GARANTIE PRODUIT reste intacte : à l'exécution, `aidos_agent` a `SELECT` only ; l'utilisateur final ne peut écrire la vérité que par idée→miroir→/goal→ChangeSet.
 
 ## Contexte
 
