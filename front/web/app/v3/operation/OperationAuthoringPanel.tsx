@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import {
 	buildOperation,
@@ -14,12 +14,17 @@ import {
 	type TypedInputs,
 } from "@/lib/v3/operation";
 import { type ProposeResult, proposeOperationAction } from "./actions";
+import { type ProposeFromTextResult, proposeFromText } from "./chat-actions";
 
 /**
- * OperationAuthoringPanel — la SURFACE d'autoring d'opération V3 (B + C), action-capable
- * (CLAUDE.md §7 ui-completeness). PAS de chat (la tranche A — NL→candidat — est gatée,
- * tranche 2).
+ * OperationAuthoringPanel — la SURFACE d'autoring d'opération V3 (A + B + C), action-capable
+ * (CLAUDE.md §7 ui-completeness).
  *
+ *   A — un CHAT (NL → candidat, l'EXCEPTION GATÉE, tranche 2) : l'utilisateur DÉCRIT
+ *       l'opération ; proposeFromText fait PROPOSER au LLM un candidat structuré, que le code
+ *       (judgeCandidate → buildOperation, l'autorité PURE) JUGE avant de PRÉ-REMPLIR l'éditeur
+ *       typé (B). Le chat ALIMENTE B, il ne le contourne pas : l'utilisateur revoit/édite, puis
+ *       ajoute le miroir (C) et propose. Le LLM ne décide RIEN, n'écrit RIEN — il propose.
  *   B — un ÉDITEUR TYPÉ : le nom, le schéma d'input, la liste d'étapes (sélecteur de
  *       verbe parmi les SIX de la grammaire FERMÉE + les champs propres au verbe), les
  *       événements émis. L'AST est CONSTRUIT en direct par lib/v3/operation.buildOperation
@@ -113,6 +118,51 @@ function toStepInput(s: EditStep): StepInput {
 	}
 }
 
+/** pairsToText — objet plat → « clé = valeur » par ligne (l'inverse de parsePairs, pour le prefill). */
+function pairsToText(o: Readonly<Record<string, unknown>> | undefined): string {
+	if (!o) return "";
+	return Object.keys(o)
+		.map((k) => `${k} = ${String(o[k])}`)
+		.join("\n");
+}
+
+/**
+ * fromStepInput — projette un StepInput typé (le candidat jugé) vers une EditStep éditable —
+ * l'INVERSE de toStepInput. C'est la jonction A→B : le candidat du chat alimente l'éditeur typé,
+ * que l'utilisateur revoit/édite ensuite. PURE & DÉTERMINISTE.
+ */
+function fromStepInput(s: StepInput): EditStep {
+	const base = blankStep(s.kind);
+	switch (s.kind) {
+		case "validate":
+			return { ...base, schema: s.schema ?? "" };
+		case "authorize":
+			return { ...base, policy: s.policy ?? "" };
+		case "read":
+			return {
+				...base,
+				entity: s.entity ?? "",
+				as: s.as ?? "",
+				where: pairsToText(s.where),
+			};
+		case "mutate":
+			return {
+				...base,
+				entity: s.entity ?? "",
+				op: s.op ?? "create",
+				as: s.as ?? "",
+				where: pairsToText(s.where),
+				data: pairsToText(s.data),
+			};
+		case "branch":
+			return { ...base, cond: s.cond ?? "" };
+		case "return":
+			return { ...base, ref: s.ref ?? "" };
+		default:
+			return base;
+	}
+}
+
 const initial: ProposeResult = { ok: false, messageKey: "" };
 
 function ProposeButton({
@@ -155,6 +205,43 @@ export function OperationAuthoringPanel({
 	const [given, setGiven] = useState("");
 	const [when, setWhen] = useState("");
 	const [then, setThen] = useState("");
+
+	// ── A — l'état du chat (NL → candidat, l'exception gatée) ──
+	const [chatText, setChatText] = useState("");
+	const [chat, setChat] = useState<ProposeFromTextResult | null>(null);
+	const [chatPending, startChat] = useTransition();
+
+	// La jonction A→B : on PRÉ-REMPLIT l'éditeur typé avec le candidat JUGÉ (jamais on n'écrit ;
+	// l'utilisateur revoit/édite ensuite). On ne pré-remplit que sur "prefill" (candidat valide)
+	// OU "refused" (on montre ce que le LLM a proposé AVEC les refus typés de B) — jamais à l'aveugle.
+	function applyPrefill(res: ProposeFromTextResult) {
+		if (res.kind !== "prefill" && res.kind !== "refused") return;
+		const typed = res.typed;
+		setName(typed.name);
+		setInput(typed.input);
+		setEmits(typed.emits.join(", "));
+		setSteps(
+			typed.steps.length > 0
+				? typed.steps.map(fromStepInput)
+				: [blankStep("validate")],
+		);
+	}
+
+	function onChatSubmit() {
+		const nl = chatText.trim();
+		if (nl === "" || chatPending) return;
+		startChat(async () => {
+			// proposeFromText : le LLM PROPOSE, buildOperation JUGE. On ne reçoit qu'un verdict
+			// déjà jugé ; on alimente l'éditeur (B), on ne contourne ni B ni C.
+			const res = await proposeFromText(nl, {
+				entities: suggestions.entities,
+				policies: suggestions.policies,
+				events: suggestions.events,
+			});
+			setChat(res);
+			applyPrefill(res);
+		});
+	}
 
 	// L'entrée typée (B) — recalculée à chaque rendu (pur). Les Emits : une liste « , »/retour.
 	const emitsList = useMemo(
@@ -200,6 +287,94 @@ export function OperationAuthoringPanel({
 				value={JSON.stringify(intent)}
 				readOnly
 			/>
+
+			{/* ─────────────────── A — le chat (NL → candidat, l'exception gatée) ─────────────────── */}
+			<section
+				data-testid="op-chat"
+				aria-label={t("chatHeading")}
+				className="space-y-3 rounded-xl border border-border bg-card p-5 lg:col-span-2"
+			>
+				<div className="flex flex-wrap items-center gap-2">
+					<h2 className="text-sm font-semibold tracking-tight text-foreground">
+						{t("chatHeading")}
+					</h2>
+					<span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+						{t("chatGatedBadge")}
+					</span>
+				</div>
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					{t("chatIntro")}
+				</p>
+				<div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+					<label className="block flex-1 space-y-1.5">
+						<span className="text-xs font-medium text-muted-foreground">
+							{t("chatLabel")}
+						</span>
+						<textarea
+							data-testid="op-chat-input"
+							value={chatText}
+							onChange={(e) => setChatText(e.target.value)}
+							onKeyDown={(e) => {
+								// Cmd/Ctrl+Entrée envoie (un textarea garde Entrée pour le retour à la ligne).
+								if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+									e.preventDefault();
+									onChatSubmit();
+								}
+							}}
+							rows={2}
+							placeholder={t("chatPlaceholder")}
+							className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						/>
+					</label>
+					<button
+						type="button"
+						data-testid="op-chat-submit"
+						onClick={onChatSubmit}
+						disabled={chatPending || chatText.trim() === ""}
+						className="inline-flex items-center justify-center rounded-lg border border-border bg-muted px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+					>
+						{chatPending ? t("chatWorking") : t("chatSubmit")}
+					</button>
+				</div>
+
+				{/* Le verdict du chat — le LLM a proposé, le code a jugé. Quatre issues, jamais une autorité. */}
+				{chat && (
+					<div
+						data-testid="op-chat-result"
+						data-kind={chat.kind}
+						className="space-y-2 text-xs"
+					>
+						{chat.kind !== "llmUnavailable" && chat.reply !== "" && (
+							<p className="rounded-lg border border-border bg-muted/40 p-3 text-foreground">
+								{chat.reply}
+							</p>
+						)}
+						{chat.kind === "prefill" && (
+							<p className="text-primary">{t("chatPrefilled")}</p>
+						)}
+						{chat.kind === "refused" && (
+							<div className="space-y-1 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-destructive">
+								<p className="font-medium">{t("chatRefused")}</p>
+								<ul className="space-y-0.5">
+									{chat.errors.map((e) => (
+										<li key={`${e.code}-${e.stepIndex}`}>
+											<code className="font-mono">{e.code}</code> — {e.message}
+										</li>
+									))}
+								</ul>
+							</div>
+						)}
+						{chat.kind === "malformed" && (
+							<p className="text-amber-600 dark:text-amber-400">
+								{t("chatMalformed")}
+							</p>
+						)}
+						{chat.kind === "llmUnavailable" && (
+							<p className="text-muted-foreground">{t("chatUnavailable")}</p>
+						)}
+					</div>
+				)}
+			</section>
 
 			{/* ─────────────────── B — l'éditeur typé ─────────────────── */}
 			<section
