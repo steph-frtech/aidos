@@ -31,10 +31,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	cs "github.com/steph-frtech/aidos/back/archive/changeset"
+	"github.com/steph-frtech/aidos/back/kernel/links"
+	"github.com/steph-frtech/aidos/back/runtime/redwave"
+	"github.com/steph-frtech/aidos/back/runtime/redwork"
 )
 
 // ── Tool I/O types ──
@@ -96,11 +100,21 @@ type listOutput struct {
 	Envelopes []statusOutput `json:"envelopes"`
 }
 
+// FanOut is the red-wave fan-out seam: it is invoked AFTER a ChangeSet is stamped APPLIED (a
+// DRAFT → APPLIED flip IS a kernel bump, KRD §42/§74/§98) with the applied envelope, so the
+// fan-out can compute + enqueue the red wave. It is BEST-EFFORT: the apply is already committed
+// when it fires, so an error is logged, never surfaced as an apply failure (§42 — the wave is a
+// downstream worklist, not part of the apply transaction). A nil FanOut means "no fan-out wired"
+// (the default prod NewServer; the gateway wires the real one via NewServerWithRedWave).
+type FanOut func(ctx context.Context, applied cs.ChangeSet) error
+
 // server wires the MCP tools to one changeset Store. It is unexported: callers construct
-// the configured *mcp.Server via NewServer and never touch the handlers directly.
+// the configured *mcp.Server via NewServer / NewServerWithRedWave and never touch the handlers
+// directly. fanOut is the optional red-wave seam fired after a successful apply.
 type server struct {
-	store *cs.Store
-	now   func() time.Time
+	store  *cs.Store
+	now    func() time.Time
+	fanOut FanOut
 }
 
 func (s *server) open(ctx context.Context, _ *mcp.CallToolRequest, in openInput) (*mcp.CallToolResult, openOutput, error) {
@@ -124,10 +138,21 @@ func (s *server) apply(ctx context.Context, _ *mcp.CallToolRequest, in idInput) 
 	}
 	applied, br := cs.Apply(c, s.now(), cs.SpecHasMirror)
 	if br != nil {
+		// BLOCKED: the completeness gate refused — Stamp is NEVER reached, so the red-wave fan-out
+		// NEVER fires (no bump on a non-apply, §42). This is the discriminant the mirror pins.
 		return nil, applyOutput{ID: c.ID, Status: string(c.Status), Blocked: true, BlockCode: string(br.Code), HowToFix: br.HowToFix, Explanation: br.Explanation}, nil
 	}
 	if err := s.store.Stamp(ctx, applied); err != nil {
 		return nil, applyOutput{}, err
+	}
+	// APPLIED: a DRAFT → APPLIED flip IS a kernel bump (KRD §42/§74/§98). NOW — and only now,
+	// after Stamp succeeds — fire the red-wave fan-out on the applied envelope. It is BEST-EFFORT:
+	// the apply is already committed, so a fan-out error is logged, never rolled back into an apply
+	// failure (the wave is a downstream worklist, below the waterline — the wall, CLAUDE.md §2).
+	if s.fanOut != nil {
+		if err := s.fanOut(ctx, applied); err != nil {
+			log.Printf("changeset: red-wave fan-out for %s failed (apply stands, best-effort): %v", applied.ID, err)
+		}
 	}
 	return nil, applyOutput{ID: applied.ID, Status: string(applied.Status), AppliedAt: applied.AppliedAt.UTC().Format(time.RFC3339)}, nil
 }
@@ -208,12 +233,89 @@ func (s *server) load(ctx context.Context, id string, want cs.Status) (cs.Change
 	return c, nil
 }
 
+// newServer is the internal constructor: it wires the handlers to a Store, a clock and an
+// OPTIONAL red-wave fan-out. The exported NewServer / NewServerWithRedWave delegate here so the
+// in-package mirror can drive the handlers with a spy fan-out directly. A nil fanOut means no
+// fan-out (the apply still works; it simply fires no wave).
+func newServer(store *cs.Store, now func() time.Time, fanOut FanOut) *server {
+	return &server{store: store, now: now, fanOut: fanOut}
+}
+
+// RedWaveFanOut builds the production fan-out: it turns an APPLIED ChangeSet into a kernel bump
+// and ENQUEUES the resulting red wave into runtime.red_work_queue, through the SAME reusable seam
+// the PostKernelChange hook uses (redwork.FireRedWave + redwork.PgRedWorkQueue). The wave is
+// computed by the PURE engine (determinism-first, no LLM); this adapter only DERIVES the bump from
+// the applied delta and persists the rows below the waterline (the wall, CLAUDE.md §2).
+//
+// The bump derivation: the bumped source is the spec_delta's Target, the wave_id is the changeset
+// id (the bump's content hash), and the mirror edge is seeded from the mirror_delta's Target (the
+// completeness gate guarantees a mirror_delta exists for any applied spec change), so the wave at
+// least reddens the mirror first (mirror-first, §42). The FULL projection-link graph (api/db/types
+// fan-out) is resolved by S17's runtime link feed once it lands — OpenQuestion OQ-S22-1, a forward
+// dependency (CLAUDE.md §6 bootstrap exception): until then the wave carries the mirror seed, the
+// minimum honest wave, never a fabricated graph.
+func RedWaveFanOut(q *redwork.PgRedWorkQueue) FanOut {
+	return func(ctx context.Context, applied cs.ChangeSet) error {
+		if applied.SpecDelta == nil {
+			return nil // a mirror-only envelope bumps no kernel source — no wave (§42).
+		}
+		rows := redwork.FireRedWave(changeToBump(applied))
+		return q.Enqueue(ctx, rows)
+	}
+}
+
+// changeToBump derives the KernelChange (bump) from an applied envelope. PURE: it reads only the
+// applied deltas, coins no version, fetches nothing. The edge graph is the mirror seed the
+// completeness gate guarantees; the broader projection graph lands with OQ-S22-1.
+func changeToBump(applied cs.ChangeSet) redwork.KernelChange {
+	bumped := applied.SpecDelta.Target
+	c := redwork.KernelChange{
+		Bumped: []string{bumped},
+		Heads:  links.Heads{bumped: bumpedHead},
+		WaveID: applied.ID,
+	}
+	if applied.MirrorDelta != nil {
+		c.Edges = []redwave.Edge{{
+			Link: links.Link{
+				Kind: links.KindMirrors,
+				From: links.Ref{ID: applied.MirrorDelta.Target, Version: pinnedVersion},
+				To:   links.Ref{ID: bumped, Version: pinnedVersion},
+			},
+			LoadBearing: true,
+			Layer:       redwave.LayerMirror,
+		}}
+	}
+	return c
+}
+
+// pinnedVersion / bumpedHead model the bump: the consumers pin the OLD version (pinnedVersion)
+// while the bumped source's head MOVED (bumpedHead), so links.Resolve reports the mirror stale and
+// the wave fires (§42). They are the bump shape, not real DAG versions — those arrive with
+// OQ-S22-1's runtime head feed.
+const (
+	pinnedVersion = "v1"
+	bumpedHead    = "v2"
+)
+
 // NewServer builds the configured ChangeSet *mcp.Server over a single changeset Store and a
-// clock. It registers the six capability-door tools (open/apply/revert/discard/status/list)
-// — identical behaviour whether driven by the standalone stdio binary or the S59 gateway
-// dispatcher over an in-memory transport. The clock is injectable (deterministic tests).
+// clock, WITHOUT a red-wave fan-out (the apply applies; it fires no wave). It registers the six
+// capability-door tools (open/apply/revert/discard/status/list) — identical behaviour whether
+// driven by the standalone stdio binary or the S59 gateway dispatcher over an in-memory transport.
+// The clock is injectable (deterministic tests). Prefer NewServerWithRedWave in production so a
+// DRAFT → APPLIED flip fires the red wave (Trou dormant #2 wiring).
 func NewServer(store *cs.Store, now func() time.Time) *mcp.Server {
-	s := &server{store: store, now: now}
+	return registerTools(newServer(store, now, nil))
+}
+
+// NewServerWithRedWave builds the server WIRED to the red-wave fan-out: every successful apply
+// (DRAFT → APPLIED) fires the wave and enqueues it into runtime.red_work_queue (the live trigger
+// of the §42 vague de rouge). This is the production wiring used by the gateway/stdio binary.
+func NewServerWithRedWave(store *cs.Store, now func() time.Time, q *redwork.PgRedWorkQueue) *mcp.Server {
+	return registerTools(newServer(store, now, RedWaveFanOut(q)))
+}
+
+// registerTools attaches the six capability-door tools to a fresh *mcp.Server bound to s.
+func registerTools(s *server) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "aidos-changeset", Version: "v0.1.0"}, nil)
 	mcp.AddTool(srv, &mcp.Tool{Name: "changeset_open", Description: "Stage a DRAFT envelope (spec_delta + mirror_delta together); returns the content-addressed id."}, s.open)
 	mcp.AddTool(srv, &mcp.Tool{Name: "changeset_apply", Description: "Run the commit-gate (completeness law) then stamp APPLIED — the only path that applies."}, s.apply)

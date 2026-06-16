@@ -1,10 +1,10 @@
-package main
+package redwork
 
-// Fault-injection mirror for the S22 PostKernelChange hook (CLAUDE.md §5 hook-honesty: a
-// hook that never fires is dead — break what it watches, assert it goes red). It proves,
-// in-process (the pure FireRedWave engine) and end-to-end (Testcontainers + real Postgres):
+// Fault-injection mirror for the red-wave FAN-OUT seam (CLAUDE.md §5 hook-honesty: a seam that
+// never fires is dead — break what it watches, assert it goes red). It proves, in-process (the
+// pure FireRedWave engine) and end-to-end (Testcontainers + real Postgres):
 //
-//   - a real entity bump (Order v1 → v2) FIRES the wave and reddens api/db/types (done part 1);
+//   - a real entity bump (Order v1 → v2) FIRES the wave and reddens api/db/types;
 //   - the wave is ENQUEUED as `open` RedWorkItems with wave_id == the bump hash, mirror first;
 //   - a COSMETIC button bump does NOT fire a view item (the negative — §112);
 //   - the agent role may INSERT+SELECT runtime.red_work_queue but is DENIED
@@ -12,7 +12,12 @@ package main
 //   - the wall HOLDS: the agent role is DENIED INSERT into mirrors.mirror.
 //
 // FAULT INJECTION: TestFaultInjection_WaveMustFire asserts the wave is NON-empty on a real
-// bump — if the engine silently stopped firing (the hook went dead), this goes red.
+// bump — if the engine silently stopped firing (the seam went dead), this goes red.
+//
+// Moved here verbatim from the hook's package main when FireRedWave + PgRedWorkQueue were
+// extracted into this reusable library (so both the hook and the changeset apply handler share
+// it). The migration paths shifted (one dir deeper) and the package name changed; the assertions
+// are unchanged.
 
 import (
 	"context"
@@ -55,11 +60,11 @@ func orderBumpChange() KernelChange {
 }
 
 // TestFaultInjection_WaveMustFire — the hook-honesty proof: a real bump MUST fire a non-empty
-// wave reddening api/db/types. A dead hook (empty wave on a real bump) goes red here.
+// wave reddening api/db/types. A dead seam (empty wave on a real bump) goes red here.
 func TestFaultInjection_WaveMustFire(t *testing.T) {
 	rows := FireRedWave(orderBumpChange())
 	if len(rows) == 0 {
-		t.Fatalf("HOOK DEAD: a real Order bump must FIRE a non-empty red wave (§42), got 0 items")
+		t.Fatalf("SEAM DEAD: a real Order bump must FIRE a non-empty red wave (§42), got 0 items")
 	}
 	got := map[string]bool{}
 	for _, r := range rows {
@@ -67,7 +72,7 @@ func TestFaultInjection_WaveMustFire(t *testing.T) {
 	}
 	for _, want := range []string{"Order.schema.fixture", "api", "db", "types"} {
 		if !got[want] {
-			t.Fatalf("an entity bump must redden %q (done part 1), wave targets = %v", want, got)
+			t.Fatalf("an entity bump must redden %q, wave targets = %v", want, got)
 		}
 	}
 	if rows[0].Target != "Order.schema.fixture" {
@@ -148,7 +153,7 @@ func startRedWavePostgres(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
-// TestPgRedWorkQueueRoundTrip — the wave fired by the hook is enqueued as `open` rows and read back.
+// TestPgRedWorkQueueRoundTrip — the wave fired by the seam is enqueued as `open` rows and read back.
 func TestPgRedWorkQueueRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	pool := startRedWavePostgres(t)

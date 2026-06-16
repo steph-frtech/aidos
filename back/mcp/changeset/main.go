@@ -18,9 +18,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	cs "github.com/steph-frtech/aidos/back/archive/changeset"
 	"github.com/steph-frtech/aidos/back/mcp/changeset/changesetsrv"
+	"github.com/steph-frtech/aidos/back/runtime/redwork"
 )
 
 func main() {
@@ -35,7 +37,19 @@ func main() {
 	}
 	defer st.Close()
 
-	srv := changesetsrv.NewServer(st, time.Now)
+	// Trou dormant #2: a DRAFT → APPLIED flip IS a kernel bump — wire the red-wave fan-out so the
+	// apply fires the §42 vague de rouge into runtime.red_work_queue (below the waterline, same
+	// database as the changesets schema, reusing the changeset DSN for the agent-role pool). On a
+	// pool error we serve the un-fanned server (the apply still applies; it fires no wave).
+	var srv *mcp.Server
+	pool, perr := pgxpool.New(ctx, dsn)
+	if perr != nil {
+		log.Printf("changeset: red-wave fan-out disabled (red_work_queue pool: %v) — apply still applies", perr)
+		srv = changesetsrv.NewServer(st, time.Now)
+	} else {
+		defer pool.Close()
+		srv = changesetsrv.NewServerWithRedWave(st, time.Now, &redwork.PgRedWorkQueue{Pool: pool})
+	}
 	if err := srv.Run(ctx, &mcp.StdioTransport{}); err != nil {
 		log.Fatalf("changeset: run: %v", err)
 	}

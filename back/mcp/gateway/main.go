@@ -61,6 +61,7 @@ import (
 	"github.com/steph-frtech/aidos/back/runtime/gatewaydispatch"
 	"github.com/steph-frtech/aidos/back/runtime/markitdown"
 	"github.com/steph-frtech/aidos/back/runtime/projectwall"
+	"github.com/steph-frtech/aidos/back/runtime/redwork"
 )
 
 // ── Tool I/O types (JSON-serialisable; the scope is the active (identity, project)) ──
@@ -246,11 +247,22 @@ func serverDSN(fallbackEnv string) string {
 // over the mocked ContextGraph View regardless of any configured store.
 var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	"changeset": func(ctx context.Context) (*mcp.Server, error) {
-		store, err := cs.NewStore(ctx, serverDSN("AIDOS_CHANGESET_DSN"))
+		dsn := serverDSN("AIDOS_CHANGESET_DSN")
+		store, err := cs.NewStore(ctx, dsn)
 		if err != nil {
 			return nil, err
 		}
-		return changesetsrv.NewServer(store, time.Now), nil
+		// Trou dormant #2: a DRAFT → APPLIED flip IS a kernel bump, so wire the red-wave fan-out
+		// here (the live trigger). The queue writes runtime.red_work_queue below the waterline —
+		// same database as the changesets schema, so we reuse the changeset DSN for the agent-role
+		// pool. If the pool cannot open we fall back to the un-fanned server (the apply still
+		// works; it simply fires no wave) rather than refusing the whole changeset capability.
+		pool, perr := pgxpool.New(ctx, dsn)
+		if perr != nil {
+			log.Printf("gateway: red-wave fan-out disabled (red_work_queue pool: %v) — apply still applies", perr)
+			return changesetsrv.NewServer(store, time.Now), nil
+		}
+		return changesetsrv.NewServerWithRedWave(store, time.Now, &redwork.PgRedWorkQueue{Pool: pool}), nil
 	},
 	"store": func(ctx context.Context) (*mcp.Server, error) {
 		store, err := contentstore.New(ctx, serverDSN("AIDOS_ARCHIVE_DSN"))
