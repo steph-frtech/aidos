@@ -2,6 +2,7 @@
 
 import {
 	ChevronDown,
+	ClipboardCheck,
 	Code,
 	Dna,
 	FileCode2,
@@ -47,6 +48,7 @@ export const ENTRIES = [
 	{ route: "/v3/design", key: "navDesign", Icon: PenTool },
 	{ route: "/v3/emetteurs", key: "navEmetteurs", Icon: FileCode2 },
 	{ route: "/v3/evolve", key: "navEvolve", Icon: Dna },
+	{ route: "/v3/bench", key: "navBench", Icon: ClipboardCheck },
 ] as const;
 
 export function V3Nav() {

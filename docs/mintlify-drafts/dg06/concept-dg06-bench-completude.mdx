@@ -1,0 +1,78 @@
+---
+title: "DG06 — Bench de complétude"
+description: "La lentille Workbench qui rend visible le GAIN du bench différentiel multi-LLM : par spec, le match%, les types manquants et le différentiel par modèle."
+---
+
+# Bench de complétude (DG06)
+
+## Concept
+
+Le **bench de complétude** est la lentille Workbench V3 (`/v3/bench`) issue de l'étape DG06 du track DIFFUSIONGEMMA. Elle rend visible, par spec, le **match%** de couverture des types de requirement — la fraction des types attendus que les candidats (les sorties de modèles) surfacent — les **types manquants** (les trous proposés), et le **différentiel par modèle** (single vs A∪B), soit la preuve du gain du bench différentiel multi-LLM décrit dans l'ADR 0079.
+
+### La métrique DG03 : MatchPct = présents / attendus
+
+La métrique de complétude (implémentée dans `back/runtime/requirementbench/completeness_dg03.go`) est une **fonction pure** sur le jeu fermé de 22 types de requirement (la taxonomie `taxonomy.go`) :
+
+```
+MatchPct = |types attendus couverts par l'union des candidats| / |types attendus|
+```
+
+- **Attendus** = le set fermé déclaré par la spec (`ExpectedKinds`), propriété du propriétaire humain (le mur, §2) — jamais appris, jamais élargi par un modèle.
+- **Couverts** = les types que l'union de tous les candidats surfacent (via l'extracteur déterministe `Extract`).
+- **Vacuoirement 1,0** quand la spec déclare aucun type attendu (une spec sans structure est totalement couverte).
+
+Le MatchPct est un **comptage de types**, jamais un score de qualité, jamais un jugement LLM. Le juge est déterministe (§8).
+
+### Le gain différentiel multi-modèle (ADR 0079)
+
+L'hypothèse validée par le spike DG01 : comparer ≥2 modèles **révèle des types de requirement** qu'un seul recompile manquerait. Sur la spec canonique hermétique DG06 :
+
+- Le modèle **"single"** (le recompile déterministe seul) surfa ce les types courants (vue + contrôle + action + opération) mais **manque les cross-cutting** (invariant + policy + error).
+- Le modèle **"A"** surfac e invariant + error.
+- Le modèle **"B"** surfac e policy.
+- L'**union single∪A∪B** couvre les 7 attendus → MatchPct = 100%.
+
+Le différentiel est visible dans la table « Différentiel par modèle » : chaque modèle porte son MatchPct seul + les types que l'union révèle mais qu'il manque.
+
+### Le twin pur (déterminisme-first §6/§8)
+
+La lentille ne ré-implémente aucune logique Go. Le twin `front/web/lib/v3/bench-view.ts` est **byte-cohérent** avec `back/runtime/requirementbench` :
+
+| Go (back/runtime/requirementbench) | Twin TS (lib/v3/bench-view.ts) |
+|---|---|
+| `Extract(text)` | `extract(output)` |
+| `union(sets...)` | `kindUnion(sets)` |
+| `diff(a, b)` | `kindDiff(a, b)` |
+| `Derive(spec, candidates)` | `deriveBenchReport(spec, candidates)` |
+| `CompletenessReport` | `BenchReport` |
+
+Le twin est prouvé par un miroir **fast-check** (`bench-view.test.ts`) incluant le **miroir de reproductibilité** : même (spec, candidats) ⇒ même report, 100×.
+
+### Le mur (§2)
+
+Le bench **propose**, il ne gouverne pas (ADR 0072). Un type manquant est une **PROPOSITION** de trou : il passe par `idea → mirror → /goal humain, via firewall.ViaIdea`. La lentille ne porte aucune écriture de vérité (`kernel / mirrors / fitness`). Le bouton « Lancer le bench » envoie un geste au chat via `send()` (ui-completeness §6/§7) — jamais headless.
+
+## Écran
+
+La lentille `/v3/bench` comprend trois sections :
+
+1. **La spec canonique** — le specId, la barre de match%, les types manquants (badges destructifs) et les types présents (badges primaires).
+2. **Le différentiel par modèle** — une table avec une ligne par candidat : son match% seul, la barre de progression, et les types qu'il manque vs l'union.
+3. **Lancer le bench** — un bouton qui envoie le geste canonique au chat (`send()`), avec un indicateur de confirmation.
+
+La lentille est **thémée** (tokens ADR 0010 — `primary`, `destructive`, `muted`, `foreground`, jamais de valeurs hexadécimales ou `zinc-*` codées en dur) et **bilingue** (ADR 0011 — clés `bench*` dans `messages/{fr,en}.json`, FR par défaut).
+
+## Navigation
+
+La lentille est ajoutée à la nav V3 (`front/web/app/v3/V3Nav.tsx`) avec l'icône `ClipboardCheck` (lucide-react), non utilisée par les autres lentilles.
+
+## Références
+
+- ADR 0079 : DiffusionGemma — bench LLM différentiel REPLANIFIÉ (port replaceable, spike-gated)
+- ADR 0088 : le port `RequirementBench` (slot `Formal caps`, replaceable)
+- ADR 0072 : le Go comme référence, le twin comme projection gouvernée
+- `back/runtime/requirementbench/` : le moteur Go (DG02–DG05)
+- `front/web/lib/v3/bench-view.ts` : le twin pur
+- `front/web/lib/v3/bench-view.test.ts` : le miroir fast-check
+- `front/web/app/v3/bench/` : la lentille Workbench
+- `tests/e2e/dg06-bench.spec.ts` : l'e2e Playwright

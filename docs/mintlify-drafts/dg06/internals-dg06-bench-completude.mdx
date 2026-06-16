@@ -1,0 +1,107 @@
+---
+title: "DG06 — Internals : Bench de complétude"
+description: "Les internals de la lentille /v3/bench : Implémentation, Méta, Méta-méta."
+---
+
+# Internals — Bench de complétude (DG06)
+
+## Implémentation
+
+### Le twin pur `lib/v3/bench-view.ts`
+
+Le twin est la **seule** source de dérivation pour la lentille. Il expose :
+
+- `extract(output: string): RequirementKind[]` — l'extracteur déterministe (scanne `KIND_MARKERS`, insensible à la casse, retourne dans l'ordre de `ALL_KINDS`).
+- `kindUnion(sets)` et `kindDiff(a, b)` — l'arithmétique ensembliste dans l'ordre canonique.
+- `deriveBenchReport(spec, candidates): BenchReport` — le report PUREMENT DÉRIVÉ (byte-cohérent avec Go `Derive`).
+- `deriveModelDiffs(spec, candidates): ModelDiff[]` — le différentiel par modèle.
+- `projectBenchRow(spec, candidates): BenchRow` — la ligne affichable.
+- `runCanonical(): BenchRow` — le run hermétique (spec + candidats canoniques, aucun réseau).
+- `kindLabelKey(kind)` et `roleLabelKey(role)` — les clés i18n (jeu déclaré et clos).
+
+Le twin n'utilise ni `Date.now()`, ni `Math.random()`, ni réseau. Même entrée ⇒ même sortie (le miroir de reproductibilité le prouve sur 100 runs).
+
+### Le miroir fast-check `lib/v3/bench-view.test.ts`
+
+Le miroir pin cinq propriétés :
+
+1. **Byte-cohérence** : `extract` surfac e exactement les types dont les marqueurs sont présents.
+2. **Arithmétique** : `kindUnion` et `kindDiff` sont corrects (jeu d'exemples + cas limites).
+3. **Dérivation principale** : le run canonique donne MatchPct = 1,0 ; un seul modèle manque les cross-cutting.
+4. **Différentiel** : le modèle "single" manque des types que A+B lui apportent.
+5. **Miroir de reproductibilité** (fast-check) : `deriveBenchReport` et `runCanonical` sont déterministes sur 100× ; MatchPct ∈ [0,1] ∀ (spec, candidats) ; MissingTypes ⊆ ExpectedKinds.
+
+### La lentille `app/v3/bench/`
+
+La lentille suit exactement le motif EG05 (`app/v3/evolve/`) :
+
+- `page.tsx` (Server Component) : récupère les strings i18n + rend le titre/intro, délègue `BenchClient`.
+- `BenchClient.tsx` (Client Component) : `useMemo(() => projectBenchRow(...), [])` → la projection PURE, jamais re-calculée autrement. `useState(false)` pour l'indicateur `launched`. `send()` pour le bouton.
+
+Les trois sections de l'écran (spec, diff, run) ont chacune leur `data-testid` Playwright-stable :
+- `v3-bench` (conteneur racine)
+- `v3-bench-spec` (la spec canonique, `data-spec-id`)
+- `v3-bench-match-pct` (`data-pct` = MatchPct arrondi à 2 décimales)
+- `v3-bench-no-missing` / `v3-bench-missing-kind` / `v3-bench-present-kind`
+- `v3-bench-diff-table` + `v3-bench-model-diff` (`data-role`) + `v3-bench-model-missed`
+- `v3-bench-run` (le bouton) + `v3-bench-launched` (l'indicateur)
+
+### La nav et le layout
+
+**V3Nav.tsx** : ajout de `ClipboardCheck` dans l'import lucide-react et de l'entrée
+```ts
+{ route: "/v3/bench", key: "navBench", Icon: ClipboardCheck }
+```
+dans `ENTRIES`. Aucune autre entrée touchée.
+
+**layout.tsx** : ajout des 52 clés `bench*` + `navBench` dans le tableau `KEYS` (après `envBadgePublie`).
+
+**messages/{fr,en}.json** : 47 clés ajoutées en fin de section `v3` (navBench, benchTitle … benchKind_case_edge).
+
+### L'e2e Playwright `tests/e2e/dg06-bench.spec.ts`
+
+Trois tests hermétiques (port `PLAYWRIGHT_WEB_PORT`, projet frais par test, IA éteinte en mode déterministe pur) :
+
+1. **Rendu** : nav offre `/v3/bench`, section rend, match% canonique = 100%, aucun type manquant.
+2. **Différentiel** : 3 lignes de modèles, "single" porte des types manqués vs union.
+3. **ui-completeness** : clic sur `v3-bench-run` → `v3-bench-launched` visible → retour au lab → `v3-msg-assistant` visible (le tour a traversé le réducteur).
+
+---
+
+## Méta
+
+### Pourquoi un twin et pas un appel direct au Go ?
+
+La règle déterminisme-first (§6/§8) : la lentille est côté client Next (RSC/browser) ; le Go tourne côté serveur derrière son port. Plutôt que d'exposer un round-trip réseau pour chaque rendu, on **porte la logique pure** (l'arithmétique ensembliste) côté TS — le Go reste LA RÉFÉRENCE, le twin est la projection gouvernée (ADR 0072). La byte-cohérence est prouvée par le miroir fast-check (reproductibilité 100×) ; si le Go change, le twin doit bouger aussi (la divergence cassera le miroir).
+
+### Pourquoi `ClipboardCheck` pour la nav ?
+
+L'icône doit signifier « vérification de complétude » et ne pas être déjà utilisée par les autres lentilles. `ClipboardCheck` (lucide-react) satisfait les deux — les lentilles existantes utilisent Sparkles, Map, ListChecks, History, Layers, Code, Server, Settings (aucun ClipboardCheck).
+
+### Pourquoi le jeu de candidats canoniques est-il "single + A + B" ?
+
+Le spike DG01 a montré que le gain différentiel se mesure sur ≥2 modèles divergents. Le jeu canonique illustre le cas minimal : "single" (le recompile déterministe, le plancher) + "A" (révèle les invariants et les cas d'erreur) + "B" (révèle les politiques d'authz). L'union couvre tous les 7 attendus ; chaque modèle seul en rate plusieurs. Le DG01 verdict "go" porte exactement ce résultat.
+
+### Pourquoi les clés `benchKind_*` utilisent des underscores ?
+
+La clé est générée par `kindLabelKey(kind)` : `kind.replace(/\./g, "_")` préfixé par `benchKind_`. C'est le mapping déclaré dans le LAYOUT KEYS et dans messages/{fr,en}.json. Les points ne sont pas valides dans les noms de propriétés i18n sans escaping — les underscores sont idiomatiques.
+
+---
+
+## Méta-méta
+
+### Ce que DG06 révèle sur le mur
+
+La lentille démontre que le mur (§2) est **compatible avec la visualisation des trous** : on peut rendre visible un type de requirement manquant (un trou proposé) sans jamais l'écrire comme vérité. Le trou est affiché comme une **proposition** (`data-testid="v3-bench-missing-kind"`) ; il ne devient une vérité que si un humain ouvre un `/goal` après l'avoir vu. L'écran ne sait pas si ce /goal a été ouvert — il propose, il ne gouverne pas. C'est la formule générale du mur dans une UI : **voir n'est pas écrire**.
+
+### Ce que le twin révèle sur la gouvernance des projections
+
+Le twin pur est un **contrat de byte-cohérence** entre le Go et le TS. Il n'est pas un port (un port remplace), ni un adaptateur (un adaptateur transforme le protocole) : c'est une **projection gouvernée** — une copie minimaliste qui prouve par le miroir qu'elle dérive correctement de la référence. Si la référence Go change sa taxonomie (un 23ème type de requirement), la projection TS doit changer en même temps — et le miroir fast-check détectera immédiatement la divergence. La gouvernance est dans le test, pas dans une interface partagée.
+
+### Ce que DG06 révèle sur l'ui-completeness
+
+Chaque lentille V3 doit avoir un bouton qui exécute (`send()`) — jamais une lecture passive. Pour le bench, l'exécution n'est pas le calcul du report (il est déjà PROJETÉ, pur, instantané) : c'est l'envoi du geste au chat. Le geste déclenche côté Go le vrai bench avec les vrais modèles (DG04) — ce que la projection hermétique du twin ne peut pas faire seule. La lentille TS projette la forme ; le Go exécute la substance. Le bouton est le pont entre les deux : il envoie le geste, il ne simule pas le résultat.
+
+### Position dans la verticale KRD
+
+DG06 est le terminus du track DIFFUSIONGEMMA : DG01 (spike go/no-go) → DG02 (port + types) → DG03 (métrique pure) → DG04 (adapter modèles) → DG05 (multimodal) → **DG06 (lentille Workbench)**. La lentille est la surface d'adoption : elle rend visible à l'équipe le gain différentiel, valide la métrique DG03 sur des specs réelles, et ouvre la porte à des `/goal` ciblés sur les types manquants les plus fréquents.
