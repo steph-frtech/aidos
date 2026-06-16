@@ -20,6 +20,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -422,22 +423,38 @@ func projectServerSpec(project string, ents []entities.Entity) honoemit.ServerSp
 
 // projectOps is the SINGLE SEAM that resolves a project's OPERATION cut (the POST /<op> write routes the
 // emitted server carries). It is THE wiring point the operation projector reaches the per-project emission
-// path through (appdata.EmitProjectServer reuses the SAME honoemit.EmitServer under the hood — no second
-// projector, ADR 0007 reuse).
+// path through (appdata.EmitProjectServer / honoemit.EmitServer under the hood — no second projector, ADR
+// 0007 reuse).
 //
-// TODAY it returns the createOrder anchor: the per-project operation SOURCE (kernel.operation scoped to the
-// project, or the V3 specs) is the documented S17/S31 OpenQuestion (0 ops live in prod), and the Hono server
-// emitter REFUSES a spec with zero operations (validateServer → ErrNoOps — a server with no verb is not
-// projectable). So the anchor is the minimal projectable cut; a generic read-only view binds no button to it,
-// so it is an unused endpoint, never a wrong button on screen. A below-the-line projection INPUT, never a
-// truth write (the wall §2): reading kernel.operation is SELECT-only, and this emits no operation AST.
+// IT NOW CONSUMES kernel.operation (the rebranchement). When a kernel DSN is available (the env
+// AIDOS_KERNEL_DSN — the agent's SELECT-only grant, the wall §2), it READS the project's own operations
+// from kernel.operation (appdata.ReadProjectOps: SELECT-only, decode the JSONB AST, PURE map → honoemit.Op
+// with Name + Async + Trigger). The emitted server then carries each project op's route (and the worker
+// its async dispatchers). It writes NO truth — reading kernel.operation is SELECT-only and the mapping is
+// a below-the-line projection.
 //
-// When the per-project op source lands (S17/S31), this is the ONE function that changes — it returns the
-// project's OWN operations (their names + async flags + triggers); the emitted server then carries each
-// project op's route (and the worker its async dispatchers) with no other materialiser change. DETERMINISM-
-// FIRST: a pure resolver (today a constant anchor; tomorrow a pure read of a per-project source), no LLM.
+// THE DOCUMENTED FALLBACK (additivity, anti-overwrite §9). When NO DSN is set, OR the read fails (e.g. the
+// kernel.operation table not yet migrated — S17/S31 forward-dep), OR the read yields ZERO ops, the seam
+// falls back to the createOrder ANCHOR. This is required for two reasons: (1) the gold/demoshop/techstore
+// deploy path carries no DSN, so it stays BYTE-IDENTICAL to the pre-rebranchement form (every existing
+// mirror green); (2) the Hono server emitter REFUSES a spec with zero operations (validateServer →
+// ErrNoOps — a server with no verb is not projectable), so an empty cut would break emission — the anchor
+// is the minimal projectable cut, an unused endpoint a read-only view binds no button to.
+//
+// DETERMINISM-FIRST (§6/§8): the mapping inside ReadProjectOps is a PURE function of the decoded AST (no
+// LLM, no clock, no RNG); only the SELECT touches the world, isolated behind the appdata OpSource seam
+// (the unit mirror drives it with a MOCK source, never the DB).
 func projectOps(project string) []honoemit.Op {
-	_ = project // the per-project source the seam will key on (S17/S31 OpenQuestion) — the anchor today.
+	if dsn := os.Getenv("AIDOS_KERNEL_DSN"); dsn != "" {
+		// Read the project's OWN operations from kernel.operation (SELECT-only, the wall §2). A read error
+		// or a zero-op cut falls back to the anchor below — the read NEVER breaks the deploy (the gold
+		// path stays projectable, the forward-dep table-absent case degrades to the anchor cleanly).
+		if ops, err := appdata.ReadProjectOps(context.Background(), dsn, project); err == nil && len(ops) > 0 {
+			return ops
+		}
+	}
+	// Fallback: the createOrder anchor (no DSN / read error / zero ops). Byte-identical to the
+	// pre-rebranchement form, so the gold/demoshop/techstore deploys are untouched (additive).
 	ops := []operation.Operation{operation.CreateOrder()}
 	view := make([]honoemit.Op, 0, len(ops))
 	for _, op := range ops {
