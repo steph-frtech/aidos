@@ -36,6 +36,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -48,6 +49,11 @@ type runInput struct {
 	Cell   string `json:"cell" jsonschema:"the kernel cell (operation/policy id) to evolve — read-only, never invented"`
 	Budget int    `json:"budget" jsonschema:"the search budget for this run"`
 	Seed   int64  `json:"seed" jsonschema:"the deterministic seed — the run is replayable; never read from the ambient"`
+	// Generator selects the EG04 search-strategy generator behind the frozen seam (EG04):
+	// "" | "deterministic" (the fallback), "novelty" | "poet" | "mome" (the diversity /
+	// stepping-stone generators). Whichever is chosen, it only PROPOSES — the deterministic
+	// Promote gate disposes, and the run still emits only can_write (the wall is unchanged).
+	Generator string `json:"generator,omitempty" jsonschema:"the EG04 generator behind the seam — deterministic | novelty | poet | mome (default deterministic)"`
 }
 
 type emittedOut struct {
@@ -97,6 +103,38 @@ type runGetInput struct {
 	RunID string `json:"run_id"`
 }
 
+// coverageInput drives evolve_coverage (EG04): it measures, on a declared multi-niche cell,
+// the gate-passing niche coverage of each EG04 generator vs the deterministic baseline. The
+// cell's niches / approved set / out-of-sample floor are PASSED IN (read-only, never invented);
+// the budget+seed make the measurement replayable.
+type coverageInput struct {
+	Cell                    string   `json:"cell" jsonschema:"the cell id — read-only, never invented"`
+	Niches                  []string `json:"niches" jsonschema:"the cell's DECLARED behavioral niches (the coverage denominator)"`
+	AuthorityApprovedNiches []string `json:"authority_approved_niches" jsonschema:"the subset the authority approved for promotion"`
+	OutOfSampleThreshold    float64  `json:"out_of_sample_threshold" jsonschema:"the §87 out-of-sample fidelity floor"`
+	Budget                  int      `json:"budget" jsonschema:"the search budget"`
+	Seed                    int64    `json:"seed" jsonschema:"the deterministic seed — the measurement is replayable"`
+}
+
+// generatorCoverage is one row of the coverage report: a named EG04 generator and the number of
+// distinct gate-passing niches it covered. WritesTruth is ALWAYS false (a generator never writes
+// truth — it only proposes; the gate disposes; promotion is the human /goal).
+type generatorCoverage struct {
+	Name        string `json:"name"`
+	Coverage    int    `json:"coverage"`
+	WritesTruth bool   `json:"writes_truth"`
+}
+
+// coverageOutput is the EG04 coverage report: the deterministic baseline coverage and each
+// generator's coverage measured by the SAME frozen gate. The generators only change WHAT is
+// proposed; the gate (JudgeCandidate → Promote) is unchanged. A higher Coverage means the
+// generator widened the MAP-Elites niche coverage — the EG04 win.
+type coverageOutput struct {
+	Cell       string              `json:"cell"`
+	Baseline   int                 `json:"baseline" jsonschema:"the deterministic FixtureProposer's gate-passing niche coverage"`
+	Generators []generatorCoverage `json:"generators" jsonschema:"each EG04 generator's gate-passing niche coverage — widens vs baseline"`
+}
+
 type runListOutput struct {
 	RunIDs []string `json:"run_ids"`
 }
@@ -137,18 +175,89 @@ func (s *store) list() []string {
 type server struct {
 	store   *store
 	sampler evolve.Sampler
+	// selfPlay arms the EG03 self-play Proposer behind the frozen seam (the gated LLM
+	// exception, §6). When false (the default), the deterministic sampler is the sole producer.
+	selfPlay bool
+	// proposer is the INJECTED self-play Proposer used when selfPlay is armed. Production
+	// injects ClaudeProposer (real CLI + deterministic fallback); the hermetic tests inject
+	// FixtureProposer so they never touch the network. Nil ⇒ self-play disabled.
+	proposer evolve.Proposer
 }
 
 // deterministicSampler is the injected, pure sampler used when no real generator is
 // wired: it returns a stable parent + a green-evidence variant keyed off the cell.
-// The real self-play / AlphaEvolve generator lives behind this seam.
+// The real self-play / AlphaEvolve generator (EG03) lives behind this seam — see
+// selfPlaySamplerFor below, which plugs evolve.NewSelfPlaySampler (the self-play
+// Proposer) into this exact seam. The wall (CLAUDE.md §2) is unchanged either way:
+// the sampler only PROPOSES; the deterministic Promote gate disposes.
 func deterministicSampler(cell string, seed int64) (string, evolve.Variant, evolve.Evidence) {
 	return "parent-" + cell, evolve.Variant{ID: "var-" + cell, Niche: cell + "/baseline"},
 		evolve.Evidence{Mirror: evolve.MirrorGreen, OutOfSample: evolve.OutOfSampleGreen, AuthorityApproved: false, Fitness: 0.5}
 }
 
+// defaultCellFor builds a minimal, HONEST Cell view for a cell id when the self-play
+// sampler is wired: a single declared+approved baseline niche (the loop never invents a
+// niche the cell does not declare). A real deployment reads the cell's declared niches
+// from the kernel projection; here the MCP keeps the conservative baseline so the seam is
+// exercisable without a DB.
+func defaultCellFor(cellID string) evolve.Cell {
+	niche := cellID + "/baseline"
+	return evolve.Cell{
+		ID:                      cellID,
+		Niches:                  []string{niche},
+		AuthorityApprovedNiches: []string{niche},
+		OutOfSampleThreshold:    0.55,
+	}
+}
+
+// selfPlaySamplerFor is the EG03 wiring: it plugs the INJECTED self-play Proposer into the
+// frozen Sampler seam for the given cell. The IA is confined to PROPOSING; the deterministic
+// promotion-gate re-judges every variant. In production the proposer is ClaudeProposer (the
+// REAL CLI generator WITH a deterministic FixtureProposer fallback); the hermetic tests inject
+// FixtureProposer directly so they NEVER touch the network.
+func selfPlaySamplerFor(cellID string, budget int, proposer evolve.Proposer) evolve.Sampler {
+	return evolve.NewSelfPlaySampler(defaultCellFor(cellID), proposer, budget)
+}
+
+// selfPlayEnabled reports whether the real self-play generator is wired (env-gated, so the
+// default + the hermetic tests stay on the deterministic sampler). AIDOS_EVOLVE_SELFPLAY=1
+// arms the EG03 generator behind the seam (the gated LLM exception, §6).
+func selfPlayEnabled() bool { return os.Getenv("AIDOS_EVOLVE_SELFPLAY") == "1" }
+
+// generatorByName maps an EG04 generator name to its DETERMINISTIC Proposer behind the frozen
+// seam. These are SEARCH STRATEGIES (Novelty-Search / POET / MOME), NOT LLMs — seeded, no
+// network. An unknown / empty name yields nil (the caller falls back to the deterministic
+// sampler). Boids/ACO/PSO are deliberately ABSENT (ADR 0089: pedigree, never coded).
+func generatorByName(name string) evolve.Proposer {
+	switch name {
+	case "novelty":
+		return evolve.NoveltySearchProposer
+	case "poet":
+		return evolve.POETProposer
+	case "mome":
+		return evolve.MOMEProposer
+	default:
+		return nil
+	}
+}
+
+// eg04Generators is the closed, ordered set of EG04 generator names the coverage report
+// measures (Boids/ACO/PSO are NOT here — ADR 0089). Ordered for a deterministic report.
+var eg04Generators = []string{"novelty", "poet", "mome"}
+
 func (s *server) evolveRun(_ context.Context, _ *mcp.CallToolRequest, in runInput) (*mcp.CallToolResult, runOutput, error) {
-	run := evolve.Evolve(in.Cell, in.Budget, in.Seed, s.sampler)
+	// The sampler is the frozen seam (EG02). By default it is the deterministic fallback;
+	// when self-play is armed (EG03), a per-cell self-play Proposer is plugged in; when an
+	// EG04 generator is named (novelty | poet | mome), that DETERMINISTIC search strategy is
+	// plugged into the SAME seam. Whichever — the generator only PROPOSES, the deterministic
+	// Promote gate disposes, and the harness is invariant to which (EG02). No LLM in EG04.
+	sampler := s.sampler
+	if gen := generatorByName(in.Generator); gen != nil {
+		sampler = selfPlaySamplerFor(in.Cell, in.Budget, gen)
+	} else if s.selfPlay && s.proposer != nil {
+		sampler = selfPlaySamplerFor(in.Cell, in.Budget, s.proposer)
+	}
+	run := evolve.Evolve(in.Cell, in.Budget, in.Seed, sampler)
 	runID := "run-" + run.Variant.ID
 	s.store.put(runID, run)
 
@@ -211,6 +320,35 @@ func (s *server) evolveRunList(_ context.Context, _ *mcp.CallToolRequest, _ stru
 	return nil, runListOutput{RunIDs: s.store.list()}, nil
 }
 
+// evolveCoverage measures the EG04 win (ADR 0009 capability door): for a declared multi-niche
+// cell it reports the DETERMINISTIC baseline's gate-passing niche coverage and each EG04
+// generator's coverage, measured by the SAME frozen gate (evolve.NicheCoverage → JudgeCandidate
+// → Promote). The generators only change WHAT is proposed; the Judge=mirror is untouched. A
+// higher coverage means the generator widened the MAP-Elites niche coverage — without changing
+// the promotion-gate. DETERMINISTIC (same inputs → same report); HERMETIC (search strategies,
+// no LLM, no network). It writes NO truth — WritesTruth is always false.
+func (s *server) evolveCoverage(_ context.Context, _ *mcp.CallToolRequest, in coverageInput) (*mcp.CallToolResult, coverageOutput, error) {
+	cell := evolve.Cell{
+		ID:                      in.Cell,
+		Niches:                  in.Niches,
+		AuthorityApprovedNiches: in.AuthorityApprovedNiches,
+		OutOfSampleThreshold:    in.OutOfSampleThreshold,
+	}
+	out := coverageOutput{
+		Cell:     in.Cell,
+		Baseline: evolve.NicheCoverage(cell, evolve.FixtureProposer, in.Budget, in.Seed),
+	}
+	for _, name := range eg04Generators {
+		gen := generatorByName(name)
+		out.Generators = append(out.Generators, generatorCoverage{
+			Name:        name,
+			Coverage:    evolve.NicheCoverage(cell, gen, in.Budget, in.Seed),
+			WritesTruth: false, // a generator never writes truth — it only proposes; the gate disposes.
+		})
+	}
+	return nil, out, nil
+}
+
 // newMCPServer builds the MCP server and registers the evolve tools.
 func newMCPServer(s *server) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "aidos-evolve", Version: "v0.1.0"}, nil)
@@ -219,6 +357,7 @@ func newMCPServer(s *server) *mcp.Server {
 	mcp.AddTool(srv, &mcp.Tool{Name: "evolve_propose_promotion", Description: "Record a PROMOTION PROPOSAL gated on mirror_green ∧ out_of_sample_green ∧ authority_approval — never the freeze itself (the door is the human /goal)."}, s.evolveProposePromotion)
 	mcp.AddTool(srv, &mcp.Tool{Name: "evolve_run_get", Description: "Read a recorded EvolutionRun by id."}, s.evolveRunGet)
 	mcp.AddTool(srv, &mcp.Tool{Name: "evolve_run_list", Description: "List recorded EvolutionRun ids."}, s.evolveRunList)
+	mcp.AddTool(srv, &mcp.Tool{Name: "evolve_coverage", Description: "Measure the EG04 win: gate-passing MAP-Elites niche coverage of each deterministic generator (novelty | poet | mome) vs the deterministic baseline, by the SAME frozen gate (the generators widen coverage without changing the promotion-gate or the Judge=mirror). Hermetic: search strategies, no LLM."}, s.evolveCoverage)
 	return srv
 }
 
@@ -226,8 +365,22 @@ func newServer() *server {
 	return &server{store: newStore(), sampler: deterministicSampler}
 }
 
+// newServerWithSelfPlay builds a server with the EG03 self-play generator armed behind the
+// frozen seam, injecting the given Proposer (production: ClaudeProposer = real CLI +
+// deterministic fallback; tests: FixtureProposer = hermetic). The deterministic sampler
+// remains the fallback authority (used when the Proposer yields nothing).
+func newServerWithSelfPlay(proposer evolve.Proposer) *server {
+	return &server{store: newStore(), sampler: deterministicSampler, selfPlay: true, proposer: proposer}
+}
+
 func main() {
-	srv := newMCPServer(newServer())
+	s := newServer()
+	if selfPlayEnabled() {
+		// Production arms the REAL self-play generator (the gated LLM exception, §6): the
+		// claude CLI with a deterministic FixtureProposer fallback.
+		s = newServerWithSelfPlay(evolve.ClaudeProposer)
+	}
+	srv := newMCPServer(s)
 	if err := srv.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatalf("evolve: run: %v", err)
 	}
