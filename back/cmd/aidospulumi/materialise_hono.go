@@ -405,20 +405,45 @@ func MaterialiseHono(root, project, env, entitiesPath, seedPath, screenDesignPat
 func projectServerSpec(project string, ents []entities.Entity) honoemit.ServerSpec {
 	web := projectWebSpec(project, ents)
 
-	// Operations: the createOrder anchor (the only operation the system knows pre-kernel-projection). The
-	// emitter requires ≥1 op (ErrNoOps), so this is the minimal projectable cut; the generic project's view
-	// renders no button bound to it, so it is an unused endpoint, never a wrong button on the screen.
-	ops := []operation.Operation{operation.CreateOrder()}
-	view := make([]honoemit.Op, 0, len(ops))
-	for _, op := range ops {
-		view = append(view, honoemit.Op{Name: op.Name})
-	}
+	// Operations: resolved by the SINGLE per-project ops seam (projectOps) — the documented wiring point
+	// for the operation projector. Today kernel.operation carries no project ops (0 ops in prod; per-project
+	// op authoring is the S17/S31 OpenQuestion), so the seam returns the createOrder anchor and this spec is
+	// byte-identical to the pre-wiring form (every existing mirror stays green). When the op source lands,
+	// projectOps returns the project's OWN operations and the emitted server carries their routes — no other
+	// line in this materialiser changes.
+	view := projectOps(project)
 
 	entNames := make([]string, 0, len(web.Entities))
 	for _, e := range web.Entities {
 		entNames = append(entNames, strings.ToLower(e.Name))
 	}
 	return honoemit.ServerSpec{Project: project, Ops: view, Entities: entNames, WebDir: webBuildDir}
+}
+
+// projectOps is the SINGLE SEAM that resolves a project's OPERATION cut (the POST /<op> write routes the
+// emitted server carries). It is THE wiring point the operation projector reaches the per-project emission
+// path through (appdata.EmitProjectServer reuses the SAME honoemit.EmitServer under the hood — no second
+// projector, ADR 0007 reuse).
+//
+// TODAY it returns the createOrder anchor: the per-project operation SOURCE (kernel.operation scoped to the
+// project, or the V3 specs) is the documented S17/S31 OpenQuestion (0 ops live in prod), and the Hono server
+// emitter REFUSES a spec with zero operations (validateServer → ErrNoOps — a server with no verb is not
+// projectable). So the anchor is the minimal projectable cut; a generic read-only view binds no button to it,
+// so it is an unused endpoint, never a wrong button on screen. A below-the-line projection INPUT, never a
+// truth write (the wall §2): reading kernel.operation is SELECT-only, and this emits no operation AST.
+//
+// When the per-project op source lands (S17/S31), this is the ONE function that changes — it returns the
+// project's OWN operations (their names + async flags + triggers); the emitted server then carries each
+// project op's route (and the worker its async dispatchers) with no other materialiser change. DETERMINISM-
+// FIRST: a pure resolver (today a constant anchor; tomorrow a pure read of a per-project source), no LLM.
+func projectOps(project string) []honoemit.Op {
+	_ = project // the per-project source the seam will key on (S17/S31 OpenQuestion) — the anchor today.
+	ops := []operation.Operation{operation.CreateOrder()}
+	view := make([]honoemit.Op, 0, len(ops))
+	for _, op := range ops {
+		view = append(view, honoemit.Op{Name: op.Name})
+	}
+	return view
 }
 
 // projectWebSpec builds the React VIEW spec from the project's ENTITIES (S35) — one read-only list view

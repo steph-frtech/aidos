@@ -51,16 +51,36 @@ func MaterialiseApp(root, project, env, entitiesPath, seedPath, appName string) 
 		return Materialised{}, fmt.Errorf("create %s: %w", dir, err)
 	}
 
-	// (a) Emit the project's DATA (pure) and land it in the stack dir — what Pulumi will mount.
-	schema, entitiesJSON, err := appdata.EmitProjectData(project, entities)
+	// (a) Emit the project's DATA + (additively) its OPERATION SERVER via appdata.EmitProjectServer — the
+	// per-project emitter that WIRES the operation projector into this path (reusing honoemit.EmitServer, no
+	// second projector). It is a SUPER-SET of EmitProjectData: with NO ops it returns the SAME schema.sql +
+	// entities.json byte-for-byte (Server/Worker nil) — so the generic aidos-app data path is byte-identical
+	// to before (zero regression on demoshop/techstore). With ops resolved (projectOps — the S17/S31 seam) it
+	// ALSO lands server.ts (+ worker.ts when async) the deploy mounts. Today projectOps returns the createOrder
+	// anchor and the generic admin server (aidos-app:latest) ignores the extra server.ts file, so the live
+	// behaviour is unchanged; the operation server is materialised, ready for the wired-image path.
+	ps, err := appdata.EmitProjectServer(project, entities, projectOps(project))
 	if err != nil {
 		return Materialised{}, err
 	}
+	schema, entitiesJSON := ps.Schema, ps.EntitiesJSON
 	if err := os.WriteFile(filepath.Join(dir, "schema.sql"), schema, 0o644); err != nil {
 		return Materialised{}, fmt.Errorf("write schema.sql: %w", err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "entities.json"), entitiesJSON, 0o644); err != nil {
 		return Materialised{}, fmt.Errorf("write entities.json: %w", err)
+	}
+	// Land the OPERATION SERVER artifacts additively (only when ops resolved → Server non-nil). The generic
+	// aidos-app admin server does not run them, but materialising them here closes the emission gap (the
+	// operation projector now reaches the per-project deploy dir). A pure projection, byte-stable.
+	for _, art := range []*honoemit.Artifact{ps.Server, ps.Worker} {
+		if art == nil {
+			continue
+		}
+		name := filepath.Base(art.Path)
+		if err := os.WriteFile(filepath.Join(dir, name), art.Bytes, 0o644); err != nil {
+			return Materialised{}, fmt.Errorf("write %s: %w", name, err)
+		}
 	}
 
 	// (b) The optional seed — copied verbatim as seed.sql (Pulumi mounts it as 02-seed.sql).
