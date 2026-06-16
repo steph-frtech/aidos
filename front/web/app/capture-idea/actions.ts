@@ -9,6 +9,9 @@ import {
 	PROPOSES_KINDS,
 	type Proposes,
 } from "@/lib/capture-idea";
+import { readVia } from "@/lib/gateway-sdk";
+import { panelScope } from "@/lib/panelScope";
+import { inboxDecoder } from "./live";
 
 /**
  * Server Actions for the /capture-idea Workbench panel (S64 — « Capturez votre idée »).
@@ -97,49 +100,49 @@ function isProposes(v: string): v is Proposes {
 }
 
 /**
- * inboxSnapshot reads the live per-project ideas inbox (the active project from the
- * S57 cookie), falling back to the deterministic demo on any failure. THE WALL: a read.
+ * inboxSnapshot reads the live per-project ideas inbox THROUGH THE GATEWAY (the S59 cutover,
+ * ADR 0092 kill-twins). The DIRECT Postgres SELECT this used to run is DELETED: ADR 0092 welds
+ * the live path to ONE door — the Go engine via the passerelle. The inbox now reads the
+ * below-the-line `idea_list` tool of the idea-intake server, project-scoped, decoded by the PURE
+ * decoder in ./live, with the deterministic demo rows preserved as the fallback. THE WALL: a
+ * READ only — the captureIdeaAction write (the action gate) is unchanged; promotion is /goal.
+ *
+ * The active project is still resolved from the S57 cookie (the inbox is per-project): it scopes
+ * BOTH the displayed activeProjectId label AND the `idea_list` project_id filter. An absent
+ * active project, or any gateway miss (unreachable / undispatched / refused / malformed), yields
+ * the deterministic demo rows (source: "demo") — the panel and its e2e stay autonomous.
  */
 export async function inboxSnapshot(): Promise<InboxSnapshot> {
 	const ctx = await activeProjectContext();
 	const activeProjectId = ctx.activeId;
-	const c = client();
-	if (!c || !activeProjectId) {
-		return {
-			source: "demo",
-			activeProjectId: activeProjectId ?? DEMO_PROJECT,
-			rows: DEMO_ROWS,
-		};
+	if (!activeProjectId) {
+		return { source: "demo", activeProjectId: DEMO_PROJECT, rows: DEMO_ROWS };
 	}
-	try {
-		const rows = await c<
-			{ id: string; body: Record<string, unknown>; project_id: string }[]
-		>`select id, body, project_id
-		  from ideas.idea
-		  where project_id = ${activeProjectId}
-		  order by id`;
-		return {
-			source: "live",
-			activeProjectId,
-			rows: rows.map((r) => {
-				const prov = (r.body.provenance ?? {}) as Record<string, string>;
-				return {
-					id: r.id,
-					proposes: r.body.proposes as Proposes,
-					intent: String(r.body.intent ?? ""),
-					provenance: {
-						source: (prov.source as "human" | "incident") ?? "human",
-						detail: String(prov.detail ?? ""),
-					},
-					status: r.body.status as CapturedIdea["status"],
-					projectId: r.project_id,
-				};
-			}),
-		};
-	} catch (err) {
-		console.warn("[/capture-idea] inbox failed:", (err as Error).message);
+	const scope = await panelScope();
+	const { data, source } = await readVia(
+		scope,
+		"idea_list",
+		{ project_id: activeProjectId },
+		inboxDecoder,
+		{ rows: [] },
+	);
+	// A live-but-empty inbox is a legitimate state (a fresh project with no idea yet) — surface it
+	// live. Only a gateway MISS (source:"demo") falls back to the demo rows so the example shows.
+	if (source === "demo") {
 		return { source: "demo", activeProjectId, rows: DEMO_ROWS };
 	}
+	return {
+		source: "live",
+		activeProjectId,
+		rows: data.rows.map((r) => ({
+			id: r.id,
+			proposes: r.proposes,
+			intent: r.intent,
+			provenance: r.provenance,
+			status: r.status,
+			projectId: r.projectId || activeProjectId,
+		})),
+	};
 }
 
 /**

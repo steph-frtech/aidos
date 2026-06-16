@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { VersionDagPanel } from "@/components/VersionDagPanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
-import { liveHeads } from "./actions";
+import { liveGraph, liveHeads } from "./actions";
+import { LiveGraph } from "./LiveGraph";
 import { LiveHeads } from "./LiveHeads";
 
 // Read the live DAG heads of the active project on every request (the S59 cutover): the
@@ -39,6 +40,7 @@ export default async function VersionDagPage() {
 	const t = await getTranslations("versionDag");
 	const tc = await getTranslations("common");
 	const live = await liveHeads();
+	const graph = await liveGraph();
 
 	const labels = {
 		branchLabel: t("branchLabel"),
@@ -116,6 +118,26 @@ export default async function VersionDagPage() {
 							demo: tc("demo"),
 							liveTitle: t("liveTitle"),
 							demoTitle: t("demoTitle"),
+						}}
+					/>
+				</div>
+
+				{/* Live DAG whole graph — read through the gateway (dag_get), demo fallback */}
+				<div className="mt-10">
+					<LiveGraph
+						view={graph}
+						labels={{
+							heading: t("liveGraphHeading"),
+							intro: t("liveGraphIntro"),
+							empty: t("liveGraphEmpty"),
+							live: tc("live"),
+							demo: tc("demo"),
+							liveTitle: t("liveGraphLiveTitle"),
+							demoTitle: t("liveGraphDemoTitle"),
+							aboveBand: t("aboveBand"),
+							belowBand: t("belowBand"),
+							headBadge: t("headBadge"),
+							edgesHeading: t("edgesHeading"),
 						}}
 					/>
 				</div>

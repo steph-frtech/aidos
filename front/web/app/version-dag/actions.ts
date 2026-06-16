@@ -9,6 +9,9 @@ import {
 	str,
 } from "@/lib/gateway-sdk";
 import { panelScope } from "@/lib/panelScope";
+import { DEMO_GRAPH, graphDecoder, type LiveGraphView } from "./live";
+
+export type { LiveGraphView } from "./live";
 
 /**
  * /version-dag Server Actions (S59 cutover). It reads the LIVE current heads of the active
@@ -51,4 +54,28 @@ export async function liveHeads(): Promise<LiveHeadsView> {
 		return { heads: DEMO_HEADS, source: "demo" };
 	}
 	return { heads: data.heads, source };
+}
+
+/**
+ * liveGraph reads the active project's WHOLE version-DAG (nodes + edges + heads) through the
+ * gateway (the below-the-line `dag_get` read — the read the Go server documents as "for
+ * /version-dag rendering"), decoded with the PURE decoder from ./live, with the deterministic
+ * demo graph preserved as the fallback (`source: "live" | "demo"`). A READ only — the wall
+ * (§2): recording a node/edge rides the `aidos` writer role through the dag MCP, never here.
+ */
+export async function liveGraph(): Promise<LiveGraphView> {
+	const scope = await panelScope();
+	const { data, source } = await readVia(
+		scope,
+		"dag_get",
+		{},
+		graphDecoder,
+		DEMO_GRAPH,
+	);
+	// Never render a blank live graph: an empty live DAG still falls back to the demo graph
+	// so the panel and its e2e stay autonomous (the example is always visible).
+	if (source === "live" && data.nodes.length === 0) {
+		return { ...DEMO_GRAPH, source: "demo" };
+	}
+	return { ...data, source };
 }

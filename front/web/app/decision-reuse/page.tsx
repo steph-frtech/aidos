@@ -3,6 +3,12 @@ import { getTranslations } from "next-intl/server";
 import { DecisionReusePanel } from "@/components/DecisionReusePanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import type { Dimension } from "@/lib/contextgraph";
+import { LiveContextGraph } from "./LiveContextGraph";
+import { liveContextGraph } from "./liveActions";
+
+// Read the live ContextGraph view of the active project on every request (the S59 cutover):
+// the view is read through the gateway (context_graph_query), never baked into a static page.
+export const dynamic = "force-dynamic";
 
 // Determinism-first: the reuse gate (the deterministic, LLM-free four-dimension verdict) is a
 // pure projection in lib/contextgraph.ts (the twin of back/archive/brain/contextgraph), covered
@@ -31,6 +37,8 @@ export const metadata: Metadata = {
  */
 export default async function DecisionReusePage() {
 	const t = await getTranslations("decisionReuse");
+	const tc = await getTranslations("common");
+	const graph = await liveContextGraph();
 
 	const dim: Record<Dimension, string> = {
 		time: t("dimTime"),
@@ -117,6 +125,29 @@ export default async function DecisionReusePage() {
 						{t("exampleBody")}
 					</p>
 				</section>
+
+				{/* Live ContextGraph view — read through the gateway (context_graph_query), demo fallback */}
+				<div className="mt-10">
+					<LiveContextGraph
+						view={graph}
+						labels={{
+							heading: t("liveHeading"),
+							intro: t("liveIntro"),
+							empty: t("liveEmpty"),
+							live: tc("live"),
+							demo: tc("demo"),
+							liveTitle: t("liveTitle"),
+							demoTitle: t("liveDemoTitle"),
+							layersLabel: t("liveLayersLabel"),
+							mirrorsLabel: t("liveMirrorsLabel"),
+							contractsLabel: t("liveContractsLabel"),
+							memoryLabel: t("liveMemoryLabel"),
+							loadBearing: t("liveLoadBearing"),
+							redMirror: t("liveRedMirror"),
+							publicContract: t("livePublicContract"),
+						}}
+					/>
+				</div>
 
 				<footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
 					{t("footer")}

@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { MemoryFirewallPanel } from "@/components/MemoryFirewallPanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { LiveRecall } from "./LiveRecall";
+import { liveRecall } from "./liveActions";
+
+// Read the live recalled memories of the active project on every request (the S59 cutover):
+// the recall is read through the gateway (memory_recall), never baked into a static page.
+export const dynamic = "force-dynamic";
 
 // Determinism-first: the firewall (the always-blocked Memory → Kernel gate, the six-stage flow)
 // is a pure projection in lib/firewall.ts (the twin of back/archive/brain/firewall), covered by
@@ -32,6 +38,8 @@ export const metadata: Metadata = {
  */
 export default async function MemoryFirewallPage() {
 	const t = await getTranslations("memoryFirewall");
+	const tc = await getTranslations("common");
+	const recall = await liveRecall();
 
 	const labels = {
 		captureCta: t("captureCta"),
@@ -116,6 +124,27 @@ export default async function MemoryFirewallPage() {
 						{t("exampleBody")}
 					</p>
 				</section>
+
+				{/* Live recalled memories — read through the gateway (memory_recall), demo fallback */}
+				<div className="mt-10">
+					<LiveRecall
+						view={recall}
+						labels={{
+							heading: t("liveHeading"),
+							intro: t("liveIntro"),
+							empty: t("liveEmpty"),
+							live: tc("live"),
+							demo: tc("demo"),
+							liveTitle: t("liveTitle"),
+							demoTitle: t("liveDemoTitle"),
+							kindLabel: t("liveKindLabel"),
+							provenanceLabel: t("liveProvenanceLabel"),
+							taintLabel: t("liveTaintLabel"),
+							scoreLabel: t("liveScoreLabel"),
+							noTaint: t("liveNoTaint"),
+						}}
+					/>
+				</div>
 
 				<footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
 					{t("footer")}

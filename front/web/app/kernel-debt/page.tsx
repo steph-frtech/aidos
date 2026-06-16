@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { KernelDebtPanel } from "@/components/KernelDebtPanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { LiveMutation } from "./LiveMutation";
+import { liveMutation } from "./liveActions";
+
+// Read the engine's live mutation verdict on every request (the S59 cutover): the verdict is
+// read through the gateway (run_mutation), never baked into a static page.
+export const dynamic = "force-dynamic";
 
 // Determinism-first: the debt ledger + the trim plan are computed by a PURE twin of
 // back/runtime/debt.Scan + back/runtime/debt/trim.SuggestTrim (lib/kernel-debt.ts),
@@ -22,6 +28,8 @@ export const metadata: Metadata = {
 
 export default async function KernelDebtPage() {
 	const t = await getTranslations("kernelDebt");
+	const tc = await getTranslations("common");
+	const mutation = await liveMutation();
 	const labels = {
 		scenarioLabel: t("scenarioLabel"),
 		ledgerTitle: t("ledgerTitle"),
@@ -80,6 +88,25 @@ export default async function KernelDebtPage() {
 				</h2>
 
 				<KernelDebtPanel labels={labels} />
+
+				{/* Live mutation verdict — read through the gateway (run_mutation), demo fallback */}
+				<LiveMutation
+					view={mutation}
+					labels={{
+						heading: t("liveHeading"),
+						intro: t("liveIntro"),
+						live: tc("live"),
+						demo: tc("demo"),
+						liveTitle: t("liveTitle"),
+						demoTitle: t("liveDemoTitle"),
+						verdictLabel: t("liveVerdictLabel"),
+						scoreLabel: t("liveScoreLabel"),
+						thresholdLabel: t("liveThresholdLabel"),
+						survivorsLabel: t("liveSurvivorsLabel"),
+						noSurvivors: t("liveNoSurvivors"),
+						blockLabel: t("liveBlockLabel"),
+					}}
+				/>
 			</main>
 		</div>
 	);
