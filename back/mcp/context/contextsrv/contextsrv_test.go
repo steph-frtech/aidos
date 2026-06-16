@@ -1,4 +1,4 @@
-package main
+package contextsrv
 
 // MCP server tests for the ContextRouter capability door (S33). These prove the capability is
 // wired end-to-end over the mocked read-only view AND that the wall holds: the server compiles,
@@ -10,6 +10,12 @@ import (
 
 	rctx "github.com/steph-frtech/aidos/back/runtime/context"
 )
+
+// newTestServer builds the unexported handler holder over the deterministic ExampleView, so the
+// handler-level smoke tests drive the SAME code path NewServer registers as tools.
+func newTestServer() *server {
+	return &server{view: ExampleView{}, packs: map[string]rctx.ContextPack{}}
+}
 
 func contains(xs []string, x string) bool {
 	for _, v := range xs {
@@ -23,7 +29,7 @@ func contains(xs []string, x string) bool {
 // TestCompile_CheckoutPack proves the capability compiles the done-criterion pack: checkout
 // inclusions present, billing internals + stale + out-of-scope memory excluded.
 func TestCompile_CheckoutPack(t *testing.T) {
-	s := newServer()
+	s := newTestServer()
 	_, out, err := s.compile(context.Background(), nil, compileInput{Goal: "checkout-apply-promo", Branch: "main"})
 	if err != nil {
 		t.Fatalf("compile: %v", err)
@@ -53,7 +59,7 @@ func TestCompile_CheckoutPack(t *testing.T) {
 
 // TestPackGet_Replay proves a compiled pack is replayable by its content hash (versioned packs).
 func TestPackGet_Replay(t *testing.T) {
-	s := newServer()
+	s := newTestServer()
 	_, out, _ := s.compile(context.Background(), nil, compileInput{Goal: "checkout-apply-promo", Branch: "main"})
 	_, got, err := s.packGet(context.Background(), nil, packGetInput{Hash: out.Pack.Hash})
 	if err != nil {
@@ -74,7 +80,7 @@ func TestPackGet_Replay(t *testing.T) {
 
 // TestGraphQuery_ReadOnly proves the read-only query indexes work over the mocked view.
 func TestGraphQuery_ReadOnly(t *testing.T) {
-	s := newServer()
+	s := newTestServer()
 	_, out, err := s.graphQuery(context.Background(), nil, graphQueryInput{By: "by_bc", Value: "billing"})
 	if err != nil {
 		t.Fatalf("graphQuery: %v", err)
@@ -97,7 +103,7 @@ func TestWall_NoTruthWriteTool(t *testing.T) {
 	// The compile path produces a pack that always forbids the wall paths — proven structurally:
 	// Compile is the only mutation the server performs and it writes no truth, only an in-memory
 	// pack cache value.
-	s := newServer()
+	s := newTestServer()
 	_, out, _ := s.compile(context.Background(), nil, compileInput{Goal: "checkout-apply-promo", Branch: "main"})
 	if !contains(out.Pack.Boundaries.ForbiddenPaths, "/kernel/**") {
 		t.Fatal("the wall must be rendered as a forbidden boundary on every pack")

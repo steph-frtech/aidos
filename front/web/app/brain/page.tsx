@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
-import { BRAIN_DECISIONS, BRAIN_MEMORY } from "@/lib/workbench-graph-data";
+import { BRAIN_DECISIONS } from "@/lib/workbench-graph-data";
+import { liveBrain } from "./actions";
+import { LiveBrain } from "./LiveBrain";
+
+// Read the live brain MemoryItems of the active project on every request (the S59 cutover):
+// the live memory is read through the gateway (memory_recall), never baked into a static page.
+export const dynamic = "force-dynamic";
 
 /**
  * /brain — the brain cockpit (AIDOS step S44). A READ-ONLY projection over the `brain`
@@ -26,6 +32,8 @@ const verdictClass: Record<string, string> = {
 
 export default async function BrainPage() {
 	const t = await getTranslations("brain");
+	const tc = await getTranslations("common");
+	const live = await liveBrain();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -63,40 +71,24 @@ export default async function BrainPage() {
 					</p>
 				</section>
 
-				{/* Memory items */}
-				<section
-					aria-label={t("memoryHeading")}
-					data-testid="brain-memory"
-					className="mt-10 space-y-4"
-				>
-					<h2 className="text-lg font-semibold tracking-tight text-foreground">
-						{t("memoryHeading")}
-					</h2>
-					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-						{BRAIN_MEMORY.map((m) => (
-							<div
-								key={m.id}
-								data-testid={`memory-${m.id}`}
-								className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-sm"
-							>
-								<div className="flex items-center justify-between gap-2">
-									<span className="font-mono text-xs font-semibold text-card-foreground">
-										{m.id}
-									</span>
-									<span className="rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium tracking-wide text-muted-foreground uppercase">
-										{t(`kind_${m.kind}` as "kind_episodic")}
-									</span>
-								</div>
-								<p className="text-sm leading-relaxed text-muted-foreground">
-									{m.summary}
-								</p>
-								<span className="mt-1 inline-flex w-fit rounded-full border border-border bg-muted px-2 py-0.5 text-[0.65rem] font-medium text-muted-foreground">
-									{m.taint}
-								</span>
-							</div>
-						))}
-					</div>
-				</section>
+				{/* Memory items — read live through the gateway (memory_recall), demo fallback */}
+				<LiveBrain
+					view={live}
+					labels={{
+						heading: t("memoryHeading"),
+						intro: t("liveIntro"),
+						empty: t("liveEmpty"),
+						live: tc("live"),
+						demo: tc("demo"),
+						liveTitle: t("liveTitle"),
+						demoTitle: t("demoTitle"),
+						kindNames: {
+							episodic: t("kind_episodic"),
+							semantic: t("kind_semantic"),
+							procedural: t("kind_procedural"),
+						},
+					}}
+				/>
 
 				{/* Reuse decisions / firewall verdicts */}
 				<section

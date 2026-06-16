@@ -1699,7 +1699,14 @@
 		"provenanceLinkLabel": "provenance (back-link to the idea)",
 		"staysHarvestedNote": "The idea stays harvested — no kernel write.",
 		"sourceHuman": "human",
-		"sourceIncident": "incident"
+		"sourceIncident": "incident",
+		"liveHeading": "Idea board (live)",
+		"liveIntro": "The active project's candidate-truth Ideas, read live through the gateway (idea_list, above the product but below the freeze). An unreachable gateway or one with no store wired falls back to the demo board. Read-only: capture / grill / promotion ride the idea-intake MCP then the ChangeSet path, never this screen.",
+		"liveEmpty": "No idea in the active project.",
+		"liveTitle": "Read live from the gateway (idea_list)",
+		"demoTitle": "Gateway unreachable — showing the demo board",
+		"liveIdLabel": "id",
+		"liveStatusLabel": "status"
 	},
 	"captureIdea": {
 		"eyebrow": "Workbench/Ideas · project-scoped human capture (S64)",
@@ -1918,7 +1925,11 @@
 		"reasonStale": "stale",
 		"reasonOutOfScope": "out-of-scope",
 		"reasonUnapproved": "unapproved",
-		"reasonCosmetic": "cosmetic below threshold"
+		"reasonCosmetic": "cosmetic below threshold",
+		"liveHeading": "Compiled pack (live)",
+		"liveIntro": "The active project's minimal ContextPack for the checkout goal, compiled by the ContextRouter and read live through the gateway (context_pack_get, below the line). An unreachable gateway or one with no store wired falls back to the demo pack (the same pure compile() the Go router runs). Read-only: the pack always forbids /kernel/** and /mirror/** (the wall).",
+		"liveTitle": "Read live from the gateway (context_pack_get)",
+		"demoTitle": "Gateway unreachable — showing the demo pack"
 	},
 	"emittedTarget": {
 		"heading": "Target of the EMITTED app — Hono + functional TypeScript",
@@ -2305,7 +2316,11 @@
 		"kind_procedural": "procedural",
 		"verdict_allowed": "allowed",
 		"verdict_denied": "denied",
-		"footer": "Read-only. Memory lives in Postgres (pgvector); the cockpit renders verdicts, it never writes."
+		"footer": "Read-only. Memory lives in Postgres (pgvector); the cockpit renders verdicts, it never writes.",
+		"liveIntro": "The active project's brain MemoryItems (episodic / semantic / procedural + their firewall taint), read live through the gateway (memory_recall, below the line). An unreachable gateway or one with no store wired falls back to the demo memory. Read-only: a memory write rides the firewall ViaIdea, never ToKernel.",
+		"liveEmpty": "No MemoryItem in the active project's brain.",
+		"liveTitle": "Read live from the gateway (memory_recall)",
+		"demoTitle": "Gateway unreachable — showing the demo memory"
 	},
 	"check": {
 		"eyebrow": "AIDOS Runtime · KRDCompiler",

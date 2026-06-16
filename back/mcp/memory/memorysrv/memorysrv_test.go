@@ -1,4 +1,4 @@
-package main
+package memorysrv
 
 import (
 	"context"
@@ -6,6 +6,10 @@ import (
 
 	"github.com/steph-frtech/aidos/back/archive/brain/memory"
 )
+
+// embedderSeed is the fixed seed for the deterministic HashEmbedder (ADR 0025) — recall is
+// reproducible under it. The runtime would inject a real model instead.
+const embedderSeed uint64 = 31
 
 // TestMemoryMCP_WriteRecallGet exercises the three tools end-to-end through the MCP handlers,
 // backed by the deterministic MockStore (the injection seam — no DB needed). It proves the

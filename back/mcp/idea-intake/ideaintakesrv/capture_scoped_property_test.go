@@ -1,4 +1,4 @@
-package main
+package ideaintakesrv
 
 // S64 REPRODUCIBILITY MIRROR (rapid). reflects=mcp.idea-intake.capture-scoped-human ·
 // test_kind=property · liveness=live.

@@ -3,6 +3,12 @@ import { getTranslations } from "next-intl/server";
 import { ContextPackPanel } from "@/components/ContextPackPanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import type { ExclusionReason } from "@/lib/context-pack";
+import { liveContextPack } from "./actions";
+import { LiveContextPack } from "./LiveContextPack";
+
+// Read the live compiled ContextPack of the active project on every request (the S59 cutover):
+// the live pack is read through the gateway (context_pack_get), never baked into a static page.
+export const dynamic = "force-dynamic";
 
 // Determinism-first: the ContextRouter (the deterministic, LLM-free, RAG-free context compiler)
 // is a pure projection in lib/context-pack.ts (the twin of back/runtime/context.Compile), covered
@@ -33,6 +39,8 @@ export const metadata: Metadata = {
  */
 export default async function ContextPackPage() {
 	const t = await getTranslations("contextPack");
+	const tc = await getTranslations("common");
+	const live = await liveContextPack();
 
 	const reason: Record<ExclusionReason, string> = {
 		"cross-BC": t("reasonCrossBC"),
@@ -104,6 +112,28 @@ export default async function ContextPackPage() {
 
 				<div className="mt-10">
 					<ContextPackPanel labels={labels} />
+				</div>
+
+				{/* Live compiled pack — read through the gateway (context_pack_get), demo fallback */}
+				<div className="mt-10">
+					<LiveContextPack
+						view={live}
+						labels={{
+							heading: t("liveHeading"),
+							intro: t("liveIntro"),
+							live: tc("live"),
+							demo: tc("demo"),
+							liveTitle: t("liveTitle"),
+							demoTitle: t("demoTitle"),
+							goalLabel: t("goalLabel"),
+							branchLabel: t("branchLabel"),
+							affectedLayers: t("affectedLayers"),
+							allowedPaths: t("allowedPaths"),
+							forbiddenPaths: t("forbiddenPaths"),
+							stopCondition: t("stopConditionLabel"),
+							packHash: t("packHashLabel"),
+						}}
+					/>
 				</div>
 
 				{/* Worked example */}

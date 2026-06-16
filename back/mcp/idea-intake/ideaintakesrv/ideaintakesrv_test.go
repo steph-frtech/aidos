@@ -1,4 +1,4 @@
-package main
+package ideaintakesrv
 
 // End-to-end MCP smoke mirror: reflects=mcp.idea-intake, test_kind=integration,
 // liveness=live. Spins up a throwaway Postgres (Testcontainers), applies the S02 +
@@ -50,12 +50,12 @@ func startServer(t *testing.T) *server {
 		t.Fatalf("pgxpool: %v", err)
 	}
 	for _, f := range []string{
-		"../../migrations/kernel_records_baseline.sql",
-		"../../migrations/ideas_lifecycle_baseline.sql",
+		"../../../migrations/kernel_records_baseline.sql",
+		"../../../migrations/ideas_lifecycle_baseline.sql",
 		// S53/S54: the live schema gives ideas.idea its project_id scope column
 		// (the per-project inbox, S64). The store always reads it.
-		"../../migrations/projects_baseline.sql",
-		"../../migrations/project_scope_baseline.sql",
+		"../../../migrations/projects_baseline.sql",
+		"../../../migrations/project_scope_baseline.sql",
 	} {
 		mig, err := os.ReadFile(f)
 		if err != nil {

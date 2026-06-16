@@ -1699,7 +1699,14 @@
 		"provenanceLinkLabel": "provenance (retour vers l'idée)",
 		"staysHarvestedNote": "L'idée reste harvested — aucune écriture dans le noyau.",
 		"sourceHuman": "humain",
-		"sourceIncident": "incident"
+		"sourceIncident": "incident",
+		"liveHeading": "Tableau des idées (en direct)",
+		"liveIntro": "Les vérités-candidates (Idea) du projet actif, lues en direct par la passerelle (idea_list, au-dessus du produit mais sous le gel). La passerelle injoignable ou sans store branché retombe sur le tableau de démo. Lecture seule : capture / grill / promotion passent par le MCP idea-intake puis le ChangeSet, jamais par cet écran.",
+		"liveEmpty": "Aucune idée dans le projet actif.",
+		"liveTitle": "Lu en direct depuis la passerelle (idea_list)",
+		"demoTitle": "Passerelle injoignable — affichage du tableau de démo",
+		"liveIdLabel": "id",
+		"liveStatusLabel": "statut"
 	},
 	"captureIdea": {
 		"eyebrow": "Workbench/Ideas · capture humaine scopée projet (S64)",
@@ -1918,7 +1925,11 @@
 		"reasonStale": "périmé (stale)",
 		"reasonOutOfScope": "hors-scope",
 		"reasonUnapproved": "non approuvé",
-		"reasonCosmetic": "cosmétique sous le seuil"
+		"reasonCosmetic": "cosmétique sous le seuil",
+		"liveHeading": "Pack compilé (en direct)",
+		"liveIntro": "Le ContextPack minimal du goal checkout du projet actif, compilé par le ContextRouter et lu en direct par la passerelle (context_pack_get, en dessous de la ligne). La passerelle injoignable ou sans store branché retombe sur le pack de démo (le même compile() pur que tourne le routeur Go). Lecture seule : le pack interdit toujours /kernel/** et /mirror/** (le mur).",
+		"liveTitle": "Lu en direct depuis la passerelle (context_pack_get)",
+		"demoTitle": "Passerelle injoignable — affichage du pack de démo"
 	},
 	"emittedTarget": {
 		"heading": "Cible de l'app ÉMISE — Hono + TypeScript fonctionnel",
@@ -2305,7 +2316,11 @@
 		"kind_procedural": "procédural",
 		"verdict_allowed": "autorisée",
 		"verdict_denied": "refusée",
-		"footer": "Lecture seule. La mémoire vit dans Postgres (pgvector) ; le cockpit rend les verdicts, il n'écrit jamais."
+		"footer": "Lecture seule. La mémoire vit dans Postgres (pgvector) ; le cockpit rend les verdicts, il n'écrit jamais.",
+		"liveIntro": "Les MemoryItems du cerveau du projet actif (épisodique / sémantique / procédural + leur teinte de pare-feu), lus en direct par la passerelle (memory_recall, en dessous de la ligne). La passerelle injoignable ou sans store branché retombe sur la mémoire de démo. Lecture seule : une écriture en mémoire passe par le pare-feu ViaIdea, jamais ToKernel.",
+		"liveEmpty": "Aucun MemoryItem dans le cerveau du projet actif.",
+		"liveTitle": "Lu en direct depuis la passerelle (memory_recall)",
+		"demoTitle": "Passerelle injoignable — affichage de la mémoire de démo"
 	},
 	"check": {
 		"eyebrow": "AIDOS Runtime · KRDCompiler",

@@ -1,4 +1,4 @@
-package main
+package ideaintakesrv
 
 // convert.go — MK03 INGESTION DOOR. The `convert_to_markdown` MCP tool wires the MK02 DocConverter
 // port (back/runtime/markitdown, ADR 0039) to idea-intake's idea_capture: a real document

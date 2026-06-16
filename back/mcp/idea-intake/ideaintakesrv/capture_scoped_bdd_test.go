@@ -12,7 +12,7 @@
 // project_id is the S54 scope column; the lifecycle (draft) is pure ideas.Capture. The
 // wall (CLAUDE.md §2): the capture writes the `ideas` schema (staging above the line),
 // NEVER the kernel — the fenced agent role is refused a kernel write independently.
-package main
+package ideaintakesrv
 
 import (
 	"context"
@@ -68,10 +68,10 @@ func startScopedPostgres(t *testing.T) *pgxpool.Pool {
 	}
 	t.Cleanup(pool.Close)
 	for _, f := range []string{
-		"../../migrations/kernel_records_baseline.sql",
-		"../../migrations/ideas_lifecycle_baseline.sql",
-		"../../migrations/projects_baseline.sql",
-		"../../migrations/project_scope_baseline.sql",
+		"../../../migrations/kernel_records_baseline.sql",
+		"../../../migrations/ideas_lifecycle_baseline.sql",
+		"../../../migrations/projects_baseline.sql",
+		"../../../migrations/project_scope_baseline.sql",
 	} {
 		mig, err := os.ReadFile(f)
 		if err != nil {

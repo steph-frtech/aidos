@@ -1,4 +1,4 @@
-package main
+package ideaintakesrv
 
 // MK03 REPRODUCIBILITY MIRROR (RED-first, then GREEN). reflects=mcp.idea-intake.convert_to_markdown,
 // test_kind=property (rapid), liveness=live.

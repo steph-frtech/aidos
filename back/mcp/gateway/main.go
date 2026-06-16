@@ -36,16 +36,22 @@ import (
 	"os"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/steph-frtech/aidos/back/archive/brain/memory"
 	cs "github.com/steph-frtech/aidos/back/archive/changeset"
 	"github.com/steph-frtech/aidos/back/archive/contentstore"
 	"github.com/steph-frtech/aidos/back/archive/dag"
 	"github.com/steph-frtech/aidos/back/mcp/changeset/changesetsrv"
+	"github.com/steph-frtech/aidos/back/mcp/context/contextsrv"
 	"github.com/steph-frtech/aidos/back/mcp/dag/dagsrv"
+	ideaintakesrv "github.com/steph-frtech/aidos/back/mcp/idea-intake/ideaintakesrv"
+	"github.com/steph-frtech/aidos/back/mcp/memory/memorysrv"
 	"github.com/steph-frtech/aidos/back/mcp/project/projectsrv"
 	"github.com/steph-frtech/aidos/back/mcp/store/storesrv"
 	"github.com/steph-frtech/aidos/back/runtime/gateway"
 	"github.com/steph-frtech/aidos/back/runtime/gatewaydispatch"
+	"github.com/steph-frtech/aidos/back/runtime/markitdown"
 	"github.com/steph-frtech/aidos/back/runtime/projectwall"
 )
 
@@ -221,12 +227,15 @@ func serverDSN(fallbackEnv string) string {
 // → a builder that resolves its DSN (gateway-first, historic fallback) then opens the store
 // and returns its in-process *mcp.Server. A server ABSENT from this registry is left to the
 // StoreProvider's ErrServerNotDispatched (→ route_undispatched → demo), so wiring one server
-// at a time stays a STRICTLY ADDITIVE cutover (the 11 un-wired servers regress not at all).
-// Each builder is consulted LAZILY (sessionFor hits the factory only on the first call to that
+// at a time stays a STRICTLY ADDITIVE cutover (the un-wired servers regress not at all). Each
+// builder is consulted LAZILY (sessionFor hits the factory only on the first call to that
 // server), so a gateway with a DSN but no traffic for a given server never opens its pool.
 //
-// changeset carries a clock (created_at is a server instant); store/dag/project take the DSN
-// alone (their timestamps are client-supplied or content-addressed — no server clock).
+// changeset carries a clock (created_at is a server instant); store/dag/project/idea-intake
+// take the DSN alone (their timestamps are client-supplied or content-addressed — no server
+// clock). memory takes the DSN PLUS a deterministic embedder injected into its store (never an
+// LLM in the dispatch path — determinism-first). context is read-only/SANS DSN: it dispatches
+// over the mocked ContextGraph View regardless of any configured store.
 var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	"changeset": func(ctx context.Context) (*mcp.Server, error) {
 		store, err := cs.NewStore(ctx, serverDSN("AIDOS_CHANGESET_DSN"))
@@ -256,7 +265,49 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 		}
 		return projectsrv.NewServer(store), nil
 	},
+	// memory takes TWO things — a pgx pool (over the brain.memory_item schema) AND an
+	// Embedder injected INTO the store. The DSN alone does not derive the embedder; the
+	// gateway injects the DETERMINISTIC HashEmbedder (seed gatewayMemorySeed) so a dispatched
+	// memory_recall is reproducible — NEVER an LLM/model call in the dispatch path
+	// (determinism-first, CLAUDE.md §6/§8). The seed mirrors the standalone binary's
+	// embedderSeed (back/mcp/memory) so the gateway and the stdio binary recall identically.
+	// The store is below the waterline (SELECT+INSERT, append-only) — never above the wall.
+	"memory": func(ctx context.Context) (*mcp.Server, error) {
+		pool, err := pgxpool.New(ctx, serverDSN("AIDOS_ARCHIVE_DSN"))
+		if err != nil {
+			return nil, err
+		}
+		store := memory.NewPgxStore(pool, memory.NewHashEmbedder(gatewayMemorySeed))
+		return memorysrv.NewServer(store), nil
+	},
+	// context is READ-ONLY and SANS persistance: its only dep is the read-only ContextGraph
+	// View (today the deterministic ExampleView), there is NO DSN, no embedder, no clock. The
+	// builder ignores its ctx/DSN and returns the default server over the mocked view (the
+	// compile is a pure function, the pack-cache is session-local values). When the derived
+	// `context` schema lands, a DB-backed View is injected via contextsrv.NewServer; this
+	// builder swaps to it then — the tools and the wall are unchanged.
+	"context": func(context.Context) (*mcp.Server, error) {
+		return contextsrv.DefaultServer(), nil
+	},
+	// idea-intake takes TWO deps — the `ideas`-schema Store (pgxpool) AND the MK02 DocConverter
+	// port. The DSN opens the store; the converter is the in-process deterministic HTMLConverter
+	// (a value-type, the default reference adapter, ADR 0039) — never an LLM in the dispatch
+	// path. It carries the lifecycle grant only (INSERT/SELECT/UPDATE, never DELETE; no
+	// promote-to-kernel tool) — the wall holds (promotion is the /goal flow, CLAUDE.md §2).
+	"idea-intake": func(ctx context.Context) (*mcp.Server, error) {
+		store, err := ideaintakesrv.NewStore(ctx, serverDSN("AIDOS_IDEAS_DSN"))
+		if err != nil {
+			return nil, err
+		}
+		return ideaintakesrv.NewServer(store, markitdown.HTMLConverter{}), nil
+	},
 }
+
+// gatewayMemorySeed is the fixed seed the gateway injects into the dispatched memory store's
+// deterministic HashEmbedder (ADR 0025). It mirrors back/mcp/memory's embedderSeed so a
+// memory_recall dispatched through the gateway is byte-identical to the standalone binary's
+// (determinism-first: the dispatch path never calls a model — CLAUDE.md §6/§8).
+const gatewayMemorySeed uint64 = 31
 
 // gatewayDSNConfigured reports whether ANY DSN the dispatcher could use is set — the gateway's
 // own AIDOS_GATEWAY_DSN, or a historic per-server fallback. When nothing is configured the
@@ -267,6 +318,10 @@ func gatewayDSNConfigured() bool {
 	}
 	for _, fallback := range []string{
 		"AIDOS_CHANGESET_DSN", "AIDOS_ARCHIVE_DSN", "AIDOS_DAG_DSN", "AIDOS_PROJECTS_DSN",
+		// memory shares AIDOS_ARCHIVE_DSN (the brain schema is co-located); idea-intake adds
+		// its own. context is read-only/SANS DSN — it contributes no env (it dispatches over
+		// the mocked View regardless, so it never depends on a configured store).
+		"AIDOS_IDEAS_DSN",
 	} {
 		if os.Getenv(fallback) != "" {
 			return true
@@ -277,10 +332,11 @@ func gatewayDSNConfigured() bool {
 
 // buildDispatcher constructs the S59 Dispatcher when a DSN is configured, else nil (the wall
 // still holds for gateway_call — see (*server).call). The StoreProvider consults serverBuilders:
-// changeset · store · dag · project are wired; every OTHER server returns ErrServerNotDispatched,
-// so the front falls back to demo for the un-wired ones (strictly additive cutover, no
-// regression). Each backend store is opened LAZILY (on the first dispatch to that server), so a
-// gateway with a DSN but no traffic for a server never touches its Postgres pool.
+// changeset · store · dag · project · memory · context · idea-intake are wired; every OTHER
+// server returns ErrServerNotDispatched, so the front falls back to demo for the un-wired ones
+// (strictly additive cutover, no regression). Each backend store is opened LAZILY (on the first
+// dispatch to that server), so a gateway with a DSN but no traffic for a server never touches
+// its Postgres pool.
 func buildDispatcher() *gatewaydispatch.Dispatcher {
 	if !gatewayDSNConfigured() {
 		return nil

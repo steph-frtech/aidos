@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { IdeasPanel } from "@/components/IdeasPanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { liveIdeas } from "./actions";
+import { LiveIdeas } from "./LiveIdeas";
+
+// Read the live candidate-truth board of the active project on every request (the S59 cutover):
+// the live idea list is read through the gateway (idea_list), never baked into a static page.
+export const dynamic = "force-dynamic";
 
 // Determinism-first: the lifecycle + the promotion gate are pure projections in lib/ideas.ts (the
 // twin of back/kernel/ideas), covered by lib/ideas.test.ts (fast-check). This Server Component
@@ -28,6 +34,8 @@ export const metadata: Metadata = {
  */
 export default async function IdeasPage() {
 	const t = await getTranslations("ideas");
+	const tc = await getTranslations("common");
+	const live = await liveIdeas();
 
 	const labels = {
 		laneNames: {
@@ -96,6 +104,29 @@ export default async function IdeasPage() {
 
 				<div className="mt-10">
 					<IdeasPanel labels={labels} />
+				</div>
+
+				{/* Live idea board — read through the gateway (idea_list), demo fallback */}
+				<div className="mt-10">
+					<LiveIdeas
+						view={live}
+						labels={{
+							heading: t("liveHeading"),
+							intro: t("liveIntro"),
+							empty: t("liveEmpty"),
+							live: tc("live"),
+							demo: tc("demo"),
+							liveTitle: t("liveTitle"),
+							demoTitle: t("demoTitle"),
+							idLabel: t("liveIdLabel"),
+							statusLabel: t("liveStatusLabel"),
+							proposesLabel: t("proposesLabel"),
+							intentLabel: t("intentLabel"),
+							provenanceLabel: t("provenanceLabel"),
+							laneNames: labels.laneNames,
+							sourceNames: labels.sourceNames,
+						}}
+					/>
 				</div>
 
 				{/* Worked example */}
