@@ -699,7 +699,19 @@
 			"noTruth": "la couche {layer} (kind {kind}) n'a aucun miroir vivant de test_kind {testKind} : une vérité sans preuve.",
 			"orphan": "le miroir {mirror} reflète {target}, qui n'existe plus : un miroir orphelin, mort."
 		},
-		"wallNote": "Le mur (CLAUDE.md §2) : calculer la complétude lit miroirs ⋈ kernel (au-dessus de la ligne de flottaison) et n'écrit rien. Le verdict est en lecture seule ; toute écriture de vérité passerait par propose → ChangeSet → approbation, jamais depuis l'écran."
+		"wallNote": "Le mur (CLAUDE.md §2) : calculer la complétude lit miroirs ⋈ kernel (au-dessus de la ligne de flottaison) et n'écrit rien. Le verdict est en lecture seule ; toute écriture de vérité passerait par propose → ChangeSet → approbation, jamais depuis l'écran.",
+		"liveHeading": "Rejeu en direct des miroirs",
+		"liveIntro": "Le verdict de rejeu lu EN DIRECT via la passerelle (mirror_replay, du serveur mirror-runner) : par miroir vivant, son dernier statut enregistré (vert/rouge) et le verdict global du cliquet. Lecture seule (le mur) : mirror_replay n’écrit que le journal de runs append-only, jamais la vérité.",
+		"liveTitle": "Lu en direct via la passerelle (mirror_replay, serveur mirror-runner)",
+		"liveDemoTitle": "Rejeu de démo déterministe — la passerelle n’a rien renvoyé",
+		"liveVerdictLabel": "Verdict du cliquet",
+		"liveVerdictAllowed": "ALLOWED",
+		"liveVerdictRejected": "REJECTED",
+		"liveRunIdLabel": "run",
+		"liveResultsHeading": "Miroirs rejoués",
+		"liveNoResults": "Aucun miroir rejoué dans cette coupe.",
+		"liveGreen": "vert",
+		"liveRed": "rouge"
 	},
 	"sensors": {
 		"eyebrow": "Runtime AIDOS · Les sensors",
@@ -2210,7 +2222,14 @@
 		"scenarioBelow": "Score 40 % — sous la barre (bloque la phase)",
 		"scenarioAtBar": "Score 80 % — au niveau de la barre (passe)",
 		"scenarioWeakened": "Miroir affaibli — un mutant survit, score 75 % (injection de faute)",
-		"scenarioMissingThreshold": "Aucun seuil déclaré — le gate ne s'invente pas de barre"
+		"scenarioMissingThreshold": "Aucun seuil déclaré — le gate ne s'invente pas de barre",
+		"liveHeading": "Barre déclarée — lecture en direct",
+		"liveIntro": "La barre du score de mutation lue EN DIRECT dans la fitness via la passerelle (read_threshold, SELECT seul). L’agent est NOTÉ par elle, il ne la rédige jamais (le mur, §8). Si aucune barre n’est déclarée, le gate bloque avec MISSING_THRESHOLD.",
+		"liveTitle": "Lue en direct dans la fitness via la passerelle (read_threshold)",
+		"liveDemoTitle": "Barre de démo déterministe (0,80) — la passerelle n’a rien renvoyé",
+		"liveScopeLabel": "Scope",
+		"liveDeclaredYes": "déclarée dans la fitness",
+		"liveDeclaredNo": "non déclarée — MISSING_THRESHOLD"
 	},
 	"kernelDebt": {
 		"eyebrow": "Dette du noyau · /trim",
@@ -4445,7 +4464,13 @@
 		"archiveButton": "Archiver",
 		"restoreButton": "Restaurer",
 		"running": "Exécution…",
-		"footer": "S56 · l'Archive ne change pas (CLAUDE.md §2) : ce panel calcule le verdict d'espace de version via le jumeau déterministe <code>projectDag</code> (byte-identique au Go) ; enregistrer un nœud passe par le MCP <code>dag</code> sous le rôle privilégié, jamais par l'écran."
+		"footer": "S56 · l'Archive ne change pas (CLAUDE.md §2) : ce panel calcule le verdict d'espace de version via le jumeau déterministe <code>projectDag</code> (byte-identique au Go) ; enregistrer un nœud passe par le MCP <code>dag</code> sous le rôle privilégié, jamais par l'écran.",
+		"liveHeading": "Têtes courantes — lecture en direct",
+		"liveIntro": "Les têtes ACTUELLES de l’espace de versions lues EN DIRECT via la passerelle (dag_heads, serveur dag) : une ou plusieurs lignes parallèles (§125). Le jumeau déterministe ci-dessus (byte-identique à back/archive/projectdag) reste la démo action-capable ; cette section montre l’état réel du moteur. Lecture seule (le mur) : enregistrer un nœud passe par l’écrivain dag privilégié (S24), jamais l’écran.",
+		"liveTitle": "Lues en direct via la passerelle (dag_heads, serveur dag)",
+		"liveDemoTitle": "Têtes de démo déterministes (genèse) — la passerelle n’a rien renvoyé",
+		"liveHeadsHeading": "Têtes",
+		"liveNoHeads": "Aucune tête — l’espace de versions est vide."
 	},
 	"projectMembers": {
 		"eyebrow": "S62 · Adhésion & propriété",
@@ -4686,7 +4711,19 @@
 			"watchRed": "ROUGE — le miroir échoue contre du code absent (le « watch it fail » de KRD).",
 			"watchGreen": "VERT — le stub présent fait passer le miroir.",
 			"materializeRefused": "Matérialisation refusée — la source ne se parse pas ou la nature est inconnue."
-		}
+		},
+		"liveHeading": "Verdict de rejeu en direct (le moteur)",
+		"liveIntro": "À côté de la simulation autoré-puis-rougir, voici les verdicts RÉELS lus EN DIRECT dans le moteur via la passerelle (mirror_replay) : par miroir vivant, son dernier statut enregistré (vert/rouge) et le verdict global du cliquet. Le « watch it fail » de KRD, lu dans le journal de runs — pas simulé. Lecture seule (le mur).",
+		"liveTitle": "Lu en direct dans le moteur via la passerelle (mirror_replay)",
+		"liveDemoTitle": "Rejeu de démo déterministe — la passerelle n’a rien renvoyé",
+		"liveVerdictLabel": "Verdict du cliquet",
+		"liveVerdictAllowed": "ALLOWED",
+		"liveVerdictRejected": "REJECTED",
+		"liveRunIdLabel": "run",
+		"liveResultsHeading": "Miroirs rejoués",
+		"liveNoResults": "Aucun miroir rejoué dans cette coupe.",
+		"liveGreen": "vert",
+		"liveRed": "rouge"
 	},
 	"mirrorLibrary": {
 		"eyebrow": "AIDOS Mirror · S70",

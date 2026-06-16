@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { LiveMirrorReplay } from "@/components/LiveMirrorReplay";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
 import { natures } from "@/lib/shape-editor";
+import { liveReplay } from "./liveActions";
 import { MirrorWatchPanel } from "./MirrorWatchPanel";
 
 export const metadata: Metadata = {
@@ -28,6 +30,8 @@ export const dynamic = "force-dynamic";
 export default async function MirrorWatchPage() {
 	const ctx = await activeProjectContext();
 	const t = await getTranslations("mirrorWatch");
+	const tc = await getTranslations("common");
+	const replay = await liveReplay();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -70,6 +74,27 @@ export default async function MirrorWatchPage() {
 						natures={natures()}
 					/>
 				</div>
+
+				{/* Live replay verdict — read through the gateway (mirror_replay), demo fallback. */}
+				<LiveMirrorReplay
+					view={replay}
+					labels={{
+						heading: t("liveHeading"),
+						intro: t("liveIntro"),
+						live: tc("live"),
+						demo: tc("demo"),
+						liveTitle: t("liveTitle"),
+						demoTitle: t("liveDemoTitle"),
+						verdictLabel: t("liveVerdictLabel"),
+						verdictAllowed: t("liveVerdictAllowed"),
+						verdictRejected: t("liveVerdictRejected"),
+						runIdLabel: t("liveRunIdLabel"),
+						resultsHeading: t("liveResultsHeading"),
+						noResults: t("liveNoResults"),
+						green: t("liveGreen"),
+						red: t("liveRed"),
+					}}
+				/>
 
 				<footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
 					{t("footer")}

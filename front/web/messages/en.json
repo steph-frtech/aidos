@@ -699,7 +699,19 @@
 			"noTruth": "layer {layer} (kind {kind}) has no living mirror of test_kind {testKind}: a truth without a proof.",
 			"orphan": "mirror {mirror} reflects {target}, which no longer exists: an orphan mirror, dead."
 		},
-		"wallNote": "The wall (CLAUDE.md §2): computing completeness reads mirrors ⋈ kernel (above the waterline) and writes nothing. The verdict is read-only; any truth-write would go through propose → ChangeSet → approval, never from the screen."
+		"wallNote": "The wall (CLAUDE.md §2): computing completeness reads mirrors ⋈ kernel (above the waterline) and writes nothing. The verdict is read-only; any truth-write would go through propose → ChangeSet → approval, never from the screen.",
+		"liveHeading": "Live mirror replay",
+		"liveIntro": "The replay verdict read LIVE through the gateway (mirror_replay, mirror-runner server): per living mirror, its last recorded status (green/red) and the cliquet’s overall verdict. Read-only (the wall): mirror_replay writes only the append-only run-log, never truth.",
+		"liveTitle": "Read live through the gateway (mirror_replay, mirror-runner server)",
+		"liveDemoTitle": "Deterministic demo replay — the gateway returned nothing",
+		"liveVerdictLabel": "Cliquet verdict",
+		"liveVerdictAllowed": "ALLOWED",
+		"liveVerdictRejected": "REJECTED",
+		"liveRunIdLabel": "run",
+		"liveResultsHeading": "Replayed mirrors",
+		"liveNoResults": "No mirror replayed in this cut.",
+		"liveGreen": "green",
+		"liveRed": "red"
 	},
 	"sensors": {
 		"eyebrow": "AIDOS Runtime · Sensors",
@@ -2210,7 +2222,14 @@
 		"scenarioBelow": "Score 40% — below the bar (blocks the phase)",
 		"scenarioAtBar": "Score 80% — at the bar (passes)",
 		"scenarioWeakened": "Weakened mirror — a mutant survives, score 75% (fault injection)",
-		"scenarioMissingThreshold": "No declared threshold — the gate invents no bar"
+		"scenarioMissingThreshold": "No declared threshold — the gate invents no bar",
+		"liveHeading": "Declared bar — live read",
+		"liveIntro": "The mutation-score bar read LIVE from fitness through the gateway (read_threshold, SELECT-only). The agent is GRADED by it, it never authors it (the wall, §8). When no bar is declared the gate blocks with MISSING_THRESHOLD.",
+		"liveTitle": "Read live from fitness through the gateway (read_threshold)",
+		"liveDemoTitle": "Deterministic demo bar (0.80) — the gateway returned nothing",
+		"liveScopeLabel": "Scope",
+		"liveDeclaredYes": "declared in fitness",
+		"liveDeclaredNo": "not declared — MISSING_THRESHOLD"
 	},
 	"kernelDebt": {
 		"eyebrow": "Kernel debt · /trim",
@@ -4445,7 +4464,13 @@
 		"archiveButton": "Archive",
 		"restoreButton": "Restore",
 		"running": "Running…",
-		"footer": "S56 · the Archive is unchanged (CLAUDE.md §2): this panel computes the version-space verdict via the deterministic <code>projectDag</code> twin (byte-identical to Go); recording a node rides the <code>dag</code> MCP under the privileged role, never the screen."
+		"footer": "S56 · the Archive is unchanged (CLAUDE.md §2): this panel computes the version-space verdict via the deterministic <code>projectDag</code> twin (byte-identical to Go); recording a node rides the <code>dag</code> MCP under the privileged role, never the screen.",
+		"liveHeading": "Current heads — live read",
+		"liveIntro": "The version space’s CURRENT heads read LIVE through the gateway (dag_heads, dag server): one or several parallel lines (§125). The deterministic twin above (byte-identical to back/archive/projectdag) stays the action-capable demo; this section shows the engine’s real state. Read-only (the wall): recording a node rides the privileged dag writer (S24), never the screen.",
+		"liveTitle": "Read live through the gateway (dag_heads, dag server)",
+		"liveDemoTitle": "Deterministic demo heads (genesis) — the gateway returned nothing",
+		"liveHeadsHeading": "Heads",
+		"liveNoHeads": "No head — the version space is empty."
 	},
 	"projectMembers": {
 		"eyebrow": "S62 · Membership & ownership",
@@ -4686,7 +4711,19 @@
 			"watchRed": "RED — the mirror fails against absent code (the « watch it fail » of KRD).",
 			"watchGreen": "GREEN — the present stub makes the mirror pass.",
 			"materializeRefused": "Materialization refused — the source does not parse or the nature is unknown."
-		}
+		},
+		"liveHeading": "Live replay verdict (the engine)",
+		"liveIntro": "Alongside the author-then-redden simulation, here are the REAL verdicts read LIVE from the engine through the gateway (mirror_replay): per living mirror, its last recorded status (green/red) and the cliquet’s overall verdict. KRD’s “watch it fail”, read from the run-log — not simulated. Read-only (the wall).",
+		"liveTitle": "Read live from the engine through the gateway (mirror_replay)",
+		"liveDemoTitle": "Deterministic demo replay — the gateway returned nothing",
+		"liveVerdictLabel": "Cliquet verdict",
+		"liveVerdictAllowed": "ALLOWED",
+		"liveVerdictRejected": "REJECTED",
+		"liveRunIdLabel": "run",
+		"liveResultsHeading": "Replayed mirrors",
+		"liveNoResults": "No mirror replayed in this cut.",
+		"liveGreen": "green",
+		"liveRed": "red"
 	},
 	"mirrorLibrary": {
 		"eyebrow": "AIDOS Mirror · S70",

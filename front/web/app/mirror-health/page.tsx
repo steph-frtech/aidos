@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { LiveMirrorReplay } from "@/components/LiveMirrorReplay";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 // Determinism-first: the completeness law + the demo cut are a pure, declared
 // dataset in lib/mirror-health.ts (a port of the Go core
@@ -8,6 +9,11 @@ import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 // island computes the law over a declared cut via the computeHealth Server Action
 // — so /mirror-health computes exactly what the Go predicates compute. No drift.
 import { HealthRunner } from "./HealthRunner";
+import { liveReplay } from "./liveActions";
+
+// Read the live mirror replay verdict on every request (the S59 cutover): the verdict is
+// read through the gateway (mirror_replay, mirror-runner server), never baked into the page.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
 	title: "Santé du miroir — AIDOS Workbench",
@@ -29,6 +35,8 @@ export const metadata: Metadata = {
  */
 export default async function MirrorHealthPage() {
 	const t = await getTranslations("mirrorHealth");
+	const tc = await getTranslations("common");
+	const replay = await liveReplay();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -113,6 +121,27 @@ export default async function MirrorHealthPage() {
 
 				{/* The action-capable runner: compute the law over a declared cut. */}
 				<HealthRunner />
+
+				{/* Live mirror replay — read through the gateway (mirror_replay), demo fallback. */}
+				<LiveMirrorReplay
+					view={replay}
+					labels={{
+						heading: t("liveHeading"),
+						intro: t("liveIntro"),
+						live: tc("live"),
+						demo: tc("demo"),
+						liveTitle: t("liveTitle"),
+						demoTitle: t("liveDemoTitle"),
+						verdictLabel: t("liveVerdictLabel"),
+						verdictAllowed: t("liveVerdictAllowed"),
+						verdictRejected: t("liveVerdictRejected"),
+						runIdLabel: t("liveRunIdLabel"),
+						resultsHeading: t("liveResultsHeading"),
+						noResults: t("liveNoResults"),
+						green: t("liveGreen"),
+						red: t("liveRed"),
+					}}
+				/>
 
 				{/* The wall note: this panel computes, it never writes truth. */}
 				<p className="mt-8 max-w-2xl text-xs leading-relaxed text-muted-foreground">

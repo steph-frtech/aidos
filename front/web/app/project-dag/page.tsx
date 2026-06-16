@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { blockCodes } from "./actions";
+import { LiveHeads } from "./LiveHeads";
+import { liveHeads } from "./liveActions";
 import { ProjectDagPanel } from "./ProjectDagPanel";
 
 export const metadata: Metadata = {
@@ -25,6 +27,8 @@ export const dynamic = "force-dynamic";
 export default async function ProjectDagPage() {
 	const codes = await blockCodes();
 	const t = await getTranslations("projectDag");
+	const tc = await getTranslations("common");
+	const heads = await liveHeads();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -46,6 +50,21 @@ export default async function ProjectDagPage() {
 				<div className="mt-10">
 					<ProjectDagPanel codes={codes} />
 				</div>
+
+				{/* Live current heads — read through the gateway (dag_heads), demo fallback. */}
+				<LiveHeads
+					view={heads}
+					labels={{
+						heading: t("liveHeading"),
+						intro: t("liveIntro"),
+						live: tc("live"),
+						demo: tc("demo"),
+						liveTitle: t("liveTitle"),
+						demoTitle: t("liveDemoTitle"),
+						headsHeading: t("liveHeadsHeading"),
+						noHeads: t("liveNoHeads"),
+					}}
+				/>
 
 				<footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
 					{t.rich("footer", {

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { MutationScorePanel } from "@/components/MutationScorePanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { LiveThreshold } from "./LiveThreshold";
+import { liveThreshold } from "./liveActions";
 
 // Determinism-first: the mutation-gate verdict is computed by a PURE twin of
 // back/runtime/sensors/mutation.Gate (lib/mutation.ts), covered by fast-check
@@ -19,8 +21,14 @@ export const metadata: Metadata = {
 		"Le densimètre de tightness du noyau d'AIDOS (S40, KRD §19/§43/§59.8) : gremlins (Go) et StrykerJS (front) calculent un score de mutation post-intégration, comparé au seuil DÉCLARÉ lu en lecture seule dans la fitness. 40 % bloque, 80 % passe contre la barre à 0,80. Un mutant survivant = un trou à combler. Le seuil est au-dessus de la ligne : aucune boucle ne l'édite.",
 };
 
+// Read the live declared mutation-score bar on every request (the S59 cutover): the bar
+// is read through the gateway (read_threshold, SELECT-only on fitness), never baked in.
+export const dynamic = "force-dynamic";
+
 export default async function MutationScorePage() {
 	const t = await getTranslations("mutationScore");
+	const tc = await getTranslations("common");
+	const live = await liveThreshold();
 	const labels = {
 		scenarioLabel: t("scenarioLabel"),
 		verdictLabel: t("verdictLabel"),
@@ -79,6 +87,23 @@ export default async function MutationScorePage() {
 					</h2>
 					<MutationScorePanel labels={labels} />
 				</section>
+
+				{/* Live declared bar — read through the gateway (read_threshold), demo fallback. */}
+				<LiveThreshold
+					view={live}
+					labels={{
+						heading: t("liveHeading"),
+						intro: t("liveIntro"),
+						live: tc("live"),
+						demo: tc("demo"),
+						liveTitle: t("liveTitle"),
+						demoTitle: t("liveDemoTitle"),
+						scopeLabel: t("liveScopeLabel"),
+						thresholdLabel: t("thresholdLabel"),
+						declaredYes: t("liveDeclaredYes"),
+						declaredNo: t("liveDeclaredNo"),
+					}}
+				/>
 			</main>
 		</div>
 	);
