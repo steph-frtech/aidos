@@ -33,6 +33,8 @@ import (
 	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/steph-frtech/aidos/back/hooks/promotion-gate/gate"
+	"github.com/steph-frtech/aidos/back/runtime/blockreason"
 	"github.com/steph-frtech/aidos/back/runtime/gateway"
 	"github.com/steph-frtech/aidos/back/runtime/projectwall"
 )
@@ -47,6 +49,14 @@ var ErrServerNotDispatched = errors.New("gatewaydispatch: server not dispatched 
 // (ErrServerNotDispatched). It is distinct from gateway.OutcomeRoute so the caller can tell
 // "routed and executed" from "routed but not yet wired" and fall back deterministically.
 const OutcomeRouteUndispatched = "route_undispatched"
+
+// OutcomeRefusedPromotionGate is the dispatcher-only outcome for a /goal-flow kernel write
+// refused by the S27 promotion-gate (hooks/promotion-gate/gate): a write tagged
+// provenance=mirrored_idea that lacks a mirror_ref is blocked with NO_MIRROR_NO_KERNEL
+// BEFORE any dispatch. This gate sits ABOVE the wall — the wall already refuses the raw
+// kernel_write door (GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET); the promotion-gate ADDS the
+// "no mirror, no kernel" check on the legitimate idea → mirror → /goal promotion path.
+const OutcomeRefusedPromotionGate = "refused_promotion_gate"
 
 // StoreProvider builds the in-process backend *mcp.Server for a named MCP server (e.g.
 // "changeset"). It is the ONLY injection point: the dispatcher itself opens no store and
@@ -107,6 +117,21 @@ func New(reg *gateway.Registry, factory StoreProvider) *Dispatcher {
 // immediately and the backend is NEVER built or touched (the truth-write test pins this:
 // the factory is unreachable for kernel/mirror/fitness writes).
 func (d *Dispatcher) Call(ctx context.Context, scope projectwall.Scope, tool string, args map[string]any) (result map[string]any, br *gateway.BlockReason, outcome string, err error) {
+	// 0. PROMOTION-GATE — ABOVE the wall (S27, KRD §116/§119.1). It fires ONLY on the
+	// /goal-flow kernel-write shape (schema=kernel ∧ provenance=mirrored_idea, the injected
+	// promotion path). It DEFERS to the pure core gate.Evaluate (which defers to
+	// ideas.Promote) — it does not re-implement the predicate, no LLM enters (determinism-
+	// first, §6/§8). A mirror-less / non-harvested promotion is REFUSED with
+	// NO_MIRROR_NO_KERNEL BEFORE any dispatch — the backend is NEVER touched. A legitimate
+	// mirrored promotion PASSES to the wall (which still independently governs the raw
+	// kernel_write door): the gate ADDS a check, it widens nothing. A call without the
+	// /goal-flow shape is not the gate's concern (Evaluate allows a non-kernel schema).
+	if ev, ok := promotionGateEvent(tool, args); ok {
+		if dgate := gate.Evaluate(ev); dgate.Verdict == gate.VerdictDeny {
+			return nil, toGatewayBlockReason(dgate.BlockReason), OutcomeRefusedPromotionGate, nil
+		}
+	}
+
 	// 1. WALL FIRST — the pure router decides. The target's project is the active project
 	// (a same-project below-the-line call; a foreign active project is a scope refusal).
 	dec := d.reg.Route(gateway.Call{
@@ -234,4 +259,61 @@ func textOf(res *mcp.CallToolResult) string {
 		}
 	}
 	return "(no text content)"
+}
+
+// promotionGateEvent recognises the /goal-flow kernel-write shape in a call's args and, if
+// present, builds the promotion-gate Event the pure core evaluates. The gate fires ONLY when
+// BOTH schema=="kernel" AND provenance=="mirrored_idea" (ideas.ProvenanceMirroredIdea) — the
+// legitimate idea → mirror → /goal promotion path the /goal flow injects. Any other call
+// (no schema tag, a below-the-line op, a raw forged write with no provenance) returns ok=false
+// so the gate stays out of the way and the wall governs alone. PURE: a deterministic read of
+// the args map, no I/O, no clock, never panics. It reads only the INJECTED fields
+// (idea_status, idea_id, mirror_ref) — it never reaches into the mirrors schema (the wall, §2).
+func promotionGateEvent(tool string, args map[string]any) (gate.Event, bool) {
+	if str(args, "schema") != "kernel" {
+		return gate.Event{}, false
+	}
+	// ProvenanceMirroredIdea is the discriminator the memory-firewall also keys on (the
+	// legal Memory→Kernel-adjacent path); the promotion-gate owns the mirror-presence check.
+	if str(args, "provenance") != string(ideasProvenanceMirroredIdea) {
+		return gate.Event{}, false
+	}
+	return gate.Event{
+		Tool:       tool,
+		Schema:     "kernel",
+		IdeaStatus: str(args, "idea_status"),
+		IdeaID:     str(args, "idea_id"),
+		MirrorRef:  str(args, "mirror_ref"),
+	}, true
+}
+
+// ideasProvenanceMirroredIdea is the provenance discriminator of the legal idea → mirror →
+// /goal path (mirrored against archive/brain/firewall.ProvenanceMirroredIdea). A literal,
+// not an import of the firewall, to keep the dispatcher's dependency surface to the gate
+// core only — the value is pinned by the firewall's own property mirror.
+const ideasProvenanceMirroredIdea = "mirrored_idea"
+
+// str reads a string field from a decoded args object; missing or non-string yields "".
+// PURE, total.
+func str(args map[string]any, key string) string {
+	if v, ok := args[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// toGatewayBlockReason widens the promotion-gate's blockreason.BlockReason (the §44.5 shape)
+// into the gateway BlockReason the HTTP edge returns — the codes are identical, this only
+// adapts the type (the same pattern as fromProjectWall in the gateway package). Total: a nil
+// reason yields nil.
+func toGatewayBlockReason(b *blockreason.BlockReason) *gateway.BlockReason {
+	if b == nil {
+		return nil
+	}
+	return &gateway.BlockReason{
+		Code:        gateway.BlockCode(b.Code),
+		Severity:    string(b.Severity),
+		Explanation: b.Explanation,
+		HowToFix:    b.HowToFix,
+	}
 }

@@ -33,8 +33,26 @@ FILE="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .path // empty' 2
 SCHEMA="$(printf '%s' "$INPUT" | jq -r '.tool_input.schema // .schema // empty' 2>/dev/null)"
 REL="${FILE#"$PROJECT_DIR"/}"   # absolu → repo-relative ; no-op si déjà relatif
 
-# Réémet un événement normalisé à plat (schema gagne sur path dans le classifieur).
-NORM="$(jq -n --arg p "$REL" --arg s "$SCHEMA" '{path:$p, schema:$s}' 2>/dev/null)"
+# Câblage spike-confinement (S28/ADR 0023) : on PROPAGE les deux champs INJECTÉS par le
+# harnais / la MCP idea-intake — idea_status (le statut de l'idée qui pilote l'écriture,
+# « spiking » quand un /spike est actif) et gesture (« spike »|« harvest »). Le classifieur
+# Go fait tirer la garde spike-confinement AVANT le mur de zone (déterministe, défère au
+# cœur pur runtime/exploration). Absents (écriture ordinaire) ⇒ chaîne inchangée (additif).
+IDEA_STATUS="$(printf '%s' "$INPUT" | jq -r '.idea_status // .tool_input.idea_status // empty' 2>/dev/null)"
+GESTURE="$(printf '%s' "$INPUT" | jq -r '.gesture // .tool_input.gesture // empty' 2>/dev/null)"
+
+# Chemin SPIKE : la zone « /spike » est un préfixe ABSOLU repo-relatif (KRD §84), DISTINCT de
+# la normalisation du mur de zone (qui rend « back/kernel/ » repo-relatif SANS slash de tête).
+# On garde donc REL puis on RÉ-ÉPINGLE un slash de tête (`/spike/...`) — sans toucher `path`,
+# que le mur de zone lit tel quel. Vide si pas de fichier (un harvest pur vise un schema).
+SPIKE_PATH=""
+if [[ -n "$REL" ]]; then SPIKE_PATH="/${REL#/}"; fi
+
+# Réémet un événement normalisé à plat (schema gagne sur path dans le classifieur ; pour un
+# harvest, le schema gardé est la cible de gel kernel/mirrors/fitness ; spike_path porte le
+# chemin absolu-repo que la garde de confinement /spike inspecte).
+NORM="$(jq -n --arg p "$REL" --arg s "$SCHEMA" --arg is "$IDEA_STATUS" --arg g "$GESTURE" --arg sp "$SPIKE_PATH" \
+	'{path:$p, schema:$s, idea_status:$is, gesture:$g, spike_path:$sp}' 2>/dev/null)"
 
 OUT="$(printf '%s' "$NORM" | "$BIN" 2>/dev/null)"
 CODE=$?

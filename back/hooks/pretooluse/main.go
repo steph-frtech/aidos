@@ -19,6 +19,22 @@ type Event struct {
 	Schema string `json:"schema"`
 	// Actor is the role attempting the write (the agent, by construction here).
 	Actor string `json:"actor"`
+	// IdeaStatus is the INJECTED lifecycle status of the idea driving this write (e.g.
+	// "spiking"). The harness / the idea-intake MCP sets it when an idea is being probed;
+	// it is empty for an ordinary write. The spike-confinement gate confines writes only
+	// while it is "spiking" (KRD §84). The agent never reads this from the kernel — it is
+	// fed on the event (the wall, §2: no truth read).
+	IdeaStatus string `json:"idea_status"`
+	// Gesture is the exploration gesture performing the write — "spike" or "harvest" — when
+	// the call rides one (empty ⇒ an ordinary write; the bare zone wall handles it). A
+	// "harvest" gesture is gated for a direct kernel/mirror freeze (KRD §116/§118).
+	Gesture string `json:"gesture"`
+	// SpikePath is the RAW (un-normalised) write target the spike-confinement gate inspects.
+	// The spike zone "/spike" is an ABSOLUTE top-level disk prefix (KRD §84) — NOT a
+	// repo-relative path — so the shim must NOT strip its leading slash (the zone-wall
+	// normalisation that makes `back/kernel/` repo-relative would corrupt it). When set, the
+	// spike gate reads this; when empty it falls back to the normalised Path.
+	SpikePath string `json:"spike_path"`
 	// ToolInput is the Claude Code nested payload; file_path lives under it.
 	ToolInput struct {
 		FilePath string `json:"file_path"`
@@ -82,6 +98,20 @@ func Run(stdin io.Reader, stdout io.Writer) int {
 			},
 		})
 		return exitDeny
+	}
+
+	// SPIKE-CONFINEMENT GATE FIRST (wired here, S28/ADR 0023). When the harness injected a
+	// spiking idea status or an exploration gesture, the gate fires and decides with the
+	// gesture-specific actionable BlockReason (SPIKE_WRITE_ESCAPES_ZONE / HARVEST_CANNOT_FREEZE)
+	// — deferring to the pure exploration predicates (determinism-first). It is strictly
+	// ADDITIVE: when the event carries no spike context the gate declines (ok=false) and the
+	// bare zone wall decides exactly as before (anti-overwrite §9).
+	if sd, ok := EvaluateSpike(ev); ok {
+		if sd.Verdict == VerdictDeny {
+			writeBlock(stdout, sd.BlockReason)
+			return exitDeny
+		}
+		return exitAllow
 	}
 
 	d := Evaluate(ev)

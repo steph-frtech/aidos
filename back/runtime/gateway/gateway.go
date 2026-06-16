@@ -36,6 +36,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/steph-frtech/aidos/back/archive/brain/firewall"
+	"github.com/steph-frtech/aidos/back/runtime/blockreason"
 	"github.com/steph-frtech/aidos/back/runtime/projectwall"
 )
 
@@ -64,6 +66,13 @@ const (
 	// OutcomeUnknownTool means the tool is not in the closed registry (refused — the
 	// gateway exposes ONLY the registered surface, never an arbitrary passthrough).
 	OutcomeUnknownTool Outcome = "unknown_tool"
+	// OutcomeRefusedMemoryDeclareTruth means the S30 MemoryFirewall refused a truth-write
+	// whose INJECTED provenance is a raw MemoryItem (the direct Memory → Kernel shortcut,
+	// KRD §119.1). It is MORE SPECIFIC than OutcomeRefusedTruthWrite: the call would not
+	// just bypass the ChangeSet door, it would let a memory DECLARE truth. The gateway
+	// surfaces the actionable MEMORY_CANNOT_DECLARE_TRUTH reason (the memory → idea →
+	// mirror → /goal path), never the generic ChangeSet reason.
+	OutcomeRefusedMemoryDeclareTruth Outcome = "refused_memory_declare_truth"
 )
 
 // BlockCode is the stable, machine-readable code of a refusal (the §2 BlockReason
@@ -79,6 +88,11 @@ const (
 	CodeTruthWriteNeedsChangeset BlockCode = "GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET"
 	// CodeUnknownTool refuses a call to a tool the gateway does not expose.
 	CodeUnknownTool BlockCode = "GATEWAY_UNKNOWN_TOOL"
+	// CodeMemoryCannotDeclareTruth re-exports the S30 MemoryFirewall code: a truth-write
+	// whose injected provenance is a raw MemoryItem is refused at the gateway edge with
+	// the actionable memory → idea → mirror → /goal reason (the firewall pure decider owns
+	// the verdict; the gateway only widens its BlockReason to the gateway shape).
+	CodeMemoryCannotDeclareTruth = BlockCode(blockreason.CodeMemoryCannotDeclareTruth)
 )
 
 // BlockReason is the actionable refusal shape (CLAUDE.md §2: code, severity,
@@ -114,6 +128,14 @@ type Call struct {
 	Tool string `json:"tool"`
 	// Target is the project + claimed identity the call acts on (the wall dimension).
 	Target projectwall.Target `json:"target"`
+	// Provenance is the INJECTED provenance kind of a truth-write attempt — the predicate
+	// the S30 MemoryFirewall reads to refuse the direct Memory → Kernel shortcut (KRD
+	// §119.1). It is set by the HARNESS/gateway front, never by the caller's params (the
+	// firewall never reaches into the kernel/mirrors schemas to learn it — that would be a
+	// truth read). The zero value "" means "no provenance was injected": on a below-the-line
+	// call it is irrelevant; on a truth-write it is treated as unknown ⇒ fail closed. Carries
+	// firewall.ProvenanceKind values ("memory" | "mirrored_idea" | "").
+	Provenance string `json:"provenance,omitempty"`
 }
 
 // RouteDecision is the pure router output. On OutcomeRoute, Tool names the dispatch
@@ -172,8 +194,13 @@ func (r *Registry) Tools() []Tool {
 //  1. unknown tool      → refused (the gateway exposes only its closed surface);
 //  2. cross-project /   → refused with AGENT_CROSS_PROJECT_WRITE (scope FIRST, the
 //     forged identity      same predicate the RLS enforces — projectwall.Classify);
-//  3. truth-write       → refused with GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET (zone);
-//  4. below-the-line    → OutcomeRoute (dispatch to the handler — HTTP honours MCP).
+//  3. memory→truth      → refused with MEMORY_CANNOT_DECLARE_TRUTH when a truth-write
+//     shortcut (S30)       carries an INJECTED memory provenance (the S30 MemoryFirewall,
+//     a STRICTLY MORE SPECIFIC refusal than the generic zone gate —
+//     it names the memory → idea → mirror → /goal door, not just
+//     "use a ChangeSet"). Deferred to the pure firewall decider;
+//  4. truth-write       → refused with GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET (zone);
+//  5. below-the-line    → OutcomeRoute (dispatch to the handler — HTTP honours MCP).
 //
 // PURE: no clock, no rng, no I/O, no LLM. Same (registry, call) ⇒ same decision.
 func (r *Registry) Route(call Call) RouteDecision {
@@ -187,12 +214,46 @@ func (r *Registry) Route(call Call) RouteDecision {
 	if d := projectwall.Classify(call.Scope, call.Target); d.Verdict == projectwall.VerdictDeny {
 		return RouteDecision{Outcome: OutcomeRefusedScope, BlockReason: fromProjectWall(d.BlockReason)}
 	}
-	// ZONE second: a truth-write never goes direct — only via a ChangeSet.
+	// ZONE: a truth-write never goes direct. ADDITIVE S30 layer FIRST within the zone — if
+	// the harness INJECTED a memory provenance onto this truth-write, the MemoryFirewall
+	// owns a more specific refusal (a MemoryItem trying to DECLARE truth, not merely bypass
+	// the ChangeSet). DETERMINISM-FIRST (§6/§8): the gateway DEFERS to the pure decider
+	// firewall.CheckKernelWrite — it does not re-implement the verdict. The firewall is
+	// consulted ONLY when a provenance was injected (Provenance != ""), so every existing
+	// no-provenance caller keeps the generic GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET refusal
+	// unchanged (the wall ADDS a guardrail, removes none — §5 meta-loop).
 	if tool.Disposition == DispositionTruthWrite {
+		if call.Provenance != "" {
+			if br := firewall.CheckKernelWrite(firewall.ProvenanceKind(call.Provenance)); br != nil {
+				return RouteDecision{
+					Outcome:     OutcomeRefusedMemoryDeclareTruth,
+					BlockReason: fromFirewall(br),
+				}
+			}
+			// A mirrored-idea provenance passes THIS gate (CheckKernelWrite → nil): the
+			// firewall raises no false block on the legal path. The write STILL never goes
+			// direct — it falls through to the generic truth-write refusal below (truth
+			// moves only via a ChangeSet). The S30 layer narrows nothing for the legal path.
+		}
 		return RouteDecision{Outcome: OutcomeRefusedTruthWrite, BlockReason: truthWriteReason(tool)}
 	}
 	// Below the line: route it through.
 	return RouteDecision{Outcome: OutcomeRoute, Tool: &tool}
+}
+
+// fromFirewall widens the S30 firewall's blockreason.BlockReason into the gateway shape
+// (the code is identical; this only adapts the type so the HTTP edge speaks one schema).
+// Total.
+func fromFirewall(b *blockreason.BlockReason) *BlockReason {
+	if b == nil {
+		return nil
+	}
+	return &BlockReason{
+		Code:        BlockCode(b.Code),
+		Severity:    string(b.Severity),
+		Explanation: b.Explanation,
+		HowToFix:    b.HowToFix,
+	}
 }
 
 // fromProjectWall adapts the project-aware wall's BlockReason into the gateway shape

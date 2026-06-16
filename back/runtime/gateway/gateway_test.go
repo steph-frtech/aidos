@@ -1,6 +1,7 @@
 package gateway_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/steph-frtech/aidos/back/runtime/gateway"
@@ -133,6 +134,104 @@ func TestRouteRealityIngestToolsBelowLine(t *testing.T) {
 		if d.Tool == nil || d.Tool.Server != "reality-ingest" {
 			t.Fatalf("reality-ingest tool %q routed to the wrong server: %+v", tool, d.Tool)
 		}
+	}
+}
+
+// ── S30 MemoryFirewall, WIRED at the gateway (the kernel-write trigger) ──
+//
+// The gateway is the live PreToolUse seam for a truth-write attempt. When the harness
+// INJECTS a provenance onto a kernel_write, the gateway DEFERS to the S30 firewall pure
+// decider (firewall.CheckKernelWrite) BEFORE the generic truth-write refusal. These tests
+// prove the hook fires in BOTH senses at the WIRING point — the binary's own double-sense
+// is in back/hooks/memory-firewall/main_test.go; here we prove the gateway feeds it right.
+
+// RED (fault injection) — a kernel_write whose INJECTED provenance is a raw MemoryItem is
+// BLOCKED with the SPECIFIC MEMORY_CANNOT_DECLARE_TRUTH reason (a memory tried to declare
+// truth), not the generic ChangeSet refusal. This is the guarded property being violated:
+// the direct Memory → Kernel edge. If the wiring were absent this would fall through to the
+// generic truth-write refusal and the SPECIFIC code would never surface — the hook would be
+// dead at this seam.
+func TestRoute_MemoryProvenanceKernelWrite_BlockedAtGateway(t *testing.T) {
+	reg := gateway.DefaultRegistry()
+	d := reg.Route(gateway.Call{
+		Scope:      projectwall.Scope{Identity: "alice", ActiveProject: "proj-a"},
+		Tool:       "kernel_write",
+		Target:     projectwall.Target{ProjectID: "proj-a"},
+		Provenance: "memory", // INJECTED by the harness — the forbidden shortcut.
+	})
+	if d.Outcome != gateway.OutcomeRefusedMemoryDeclareTruth {
+		t.Fatalf("a memory-provenance kernel_write must be refused by the MemoryFirewall, got %v", d.Outcome)
+	}
+	if d.BlockReason == nil || d.BlockReason.Code != gateway.CodeMemoryCannotDeclareTruth {
+		t.Fatalf("expected MEMORY_CANNOT_DECLARE_TRUTH, got %+v", d.BlockReason)
+	}
+	joined := strings.Join(d.BlockReason.HowToFix, " | ")
+	if !strings.Contains(joined, "memory_to_contextpack_to_idea_to_mirror_to_goal_to_kernel") {
+		t.Errorf("the block reason must name the full legal flow, got %v", d.BlockReason.HowToFix)
+	}
+}
+
+// GREEN (the legal flow is NOT falsely blocked by S30) — a kernel_write whose injected
+// provenance is a properly-MIRRORED idea passes the MemoryFirewall gate (CheckKernelWrite →
+// nil): the firewall raises NO false block on the legal path. CRITICAL: this proves the
+// wiring does not break the legitimate flow. The write is STILL refused (truth never goes
+// direct — it needs a ChangeSet), but with the GENERIC reason, never the memory one. The
+// outcome is OutcomeRefusedTruthWrite, NOT OutcomeRefusedMemoryDeclareTruth.
+func TestRoute_MirroredIdeaProvenanceKernelWrite_NotFalselyBlockedByFirewall(t *testing.T) {
+	reg := gateway.DefaultRegistry()
+	d := reg.Route(gateway.Call{
+		Scope:      projectwall.Scope{Identity: "alice", ActiveProject: "proj-a"},
+		Tool:       "kernel_write",
+		Target:     projectwall.Target{ProjectID: "proj-a"},
+		Provenance: "mirrored_idea", // the S27 legal path — the firewall must not block it.
+	})
+	if d.Outcome == gateway.OutcomeRefusedMemoryDeclareTruth {
+		t.Fatalf("the MemoryFirewall must NOT block the mirrored-idea path — false block on the legal flow")
+	}
+	if d.Outcome != gateway.OutcomeRefusedTruthWrite {
+		t.Fatalf("a mirrored-idea kernel_write still needs a ChangeSet (generic truth-write refusal), got %v", d.Outcome)
+	}
+	if d.BlockReason == nil || d.BlockReason.Code != gateway.CodeTruthWriteNeedsChangeset {
+		t.Fatalf("expected GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET on the legal-provenance path, got %+v", d.BlockReason)
+	}
+}
+
+// FAIL-CLOSED — a kernel_write whose injected provenance is unknown ("?", unparseable) is
+// blocked by the firewall (CheckKernelWrite blocks anything that is not mirrored_idea). An
+// unverifiable truth-write does not pass (anti-passthrough, KRD §82).
+func TestRoute_UnknownProvenanceKernelWrite_FailsClosed(t *testing.T) {
+	reg := gateway.DefaultRegistry()
+	d := reg.Route(gateway.Call{
+		Scope:      projectwall.Scope{Identity: "alice", ActiveProject: "proj-a"},
+		Tool:       "kernel_write",
+		Target:     projectwall.Target{ProjectID: "proj-a"},
+		Provenance: "garbage-not-a-known-kind",
+	})
+	if d.Outcome != gateway.OutcomeRefusedMemoryDeclareTruth {
+		t.Fatalf("an unknown-provenance kernel_write must fail closed via the MemoryFirewall, got %v", d.Outcome)
+	}
+	if d.BlockReason == nil || d.BlockReason.Code != gateway.CodeMemoryCannotDeclareTruth {
+		t.Fatalf("expected MEMORY_CANNOT_DECLARE_TRUTH on fail-closed, got %+v", d.BlockReason)
+	}
+}
+
+// REGRESSION GUARD — a kernel_write with NO injected provenance (the zero value, every
+// pre-S30-wiring caller) keeps the UNCHANGED generic truth-write refusal. The S30 layer is
+// strictly ADDITIVE: it engages only when a provenance was injected, never widening or
+// narrowing the existing no-provenance path.
+func TestRoute_NoProvenanceKernelWrite_GenericTruthWriteRefusalUnchanged(t *testing.T) {
+	reg := gateway.DefaultRegistry()
+	d := reg.Route(gateway.Call{
+		Scope:  projectwall.Scope{Identity: "alice", ActiveProject: "proj-a"},
+		Tool:   "kernel_write",
+		Target: projectwall.Target{ProjectID: "proj-a"},
+		// Provenance omitted — zero value, no harness injection.
+	})
+	if d.Outcome != gateway.OutcomeRefusedTruthWrite {
+		t.Fatalf("a no-provenance kernel_write must keep the generic truth-write refusal, got %v", d.Outcome)
+	}
+	if d.BlockReason == nil || d.BlockReason.Code != gateway.CodeTruthWriteNeedsChangeset {
+		t.Fatalf("expected GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET, got %+v", d.BlockReason)
 	}
 }
 
