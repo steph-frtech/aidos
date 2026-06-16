@@ -317,7 +317,7 @@ func agreementOf(app string, byModel map[string]map[string]bool, modelKeys []str
 
 func printMarkdown(rep report) {
 	out := os.Stdout
-	fmt.Fprintln(out, "# AIDOS — bench multi-modèle (triturer AIDOS)\n")
+	fmt.Fprint(out, "# AIDOS — bench multi-modèle (triturer AIDOS)\n\n")
 
 	fmt.Fprintln(out, "## 1. Émetteur déterministe — « mêmes specs → même code »")
 	fmt.Fprintln(out, "| App | code émis byte-stable (émis 2×) | taille schéma | sha256 |")
