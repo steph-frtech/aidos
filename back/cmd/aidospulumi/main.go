@@ -205,6 +205,21 @@ type Materialised struct {
 	URL      string `json:"url"`
 	// Files maps the materialised filename → its content hash (the byte-stable proof).
 	Files map[string]string `json:"files"`
+	// CrudConformance is the HONEST list of CRUD capabilities (identity/validation/transitions/audit)
+	// the emitted per-project cell FAILS to declare — the Ashby harness (S82, ADR 0082) inspecting the
+	// emitted cell against the closed §48 CRUD topology (appdata.CrudConformance). An empty/absent slice
+	// means the emitted cell holds the topology's full required variety; a non-empty slice names exactly
+	// what is missing (e.g. ["transitions","audit"] for an entities-only deploy with no operations/worker).
+	// Surfaced so `aidospulumi up` reports the conformance of what it deploys, not just the file hashes.
+	CrudConformance []string `json:"crudConformance,omitempty"`
+	// CrudPresent / CrudRequired are the honest conformance RATIO of the emitted cell: how many of the
+	// CRUD topology's required capabilities it declares (CrudPresent) out of the full required variety
+	// (CrudRequired = len(harness.CrudCapabilities)). "2/4" for an entities-only deploy with no ops.
+	CrudPresent  int `json:"crudPresent,omitempty"`
+	CrudRequired int `json:"crudRequired,omitempty"`
+	// HarnessFragment is the content address of the CRUD harness fragment that judged the cell — pins
+	// WHICH harness version produced the verdict (the reproducibility mirror, ADR 0082 §21).
+	HarnessFragment string `json:"harnessFragment,omitempty"`
 }
 
 // defaultManifest returns the GOLD-proven topology for a project×env: the emitted app server

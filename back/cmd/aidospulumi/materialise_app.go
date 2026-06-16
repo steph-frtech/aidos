@@ -64,6 +64,18 @@ func MaterialiseApp(root, project, env, entitiesPath, seedPath, appName string) 
 		return Materialised{}, err
 	}
 	schema, entitiesJSON := ps.Schema, ps.EntitiesJSON
+
+	// CONFORMANCE OF THE EMITTED CELL (Ashby harness, S82 / ADR 0082). Before landing the artifacts, inspect
+	// the emitted CRUD cell against the closed §48 CRUD topology fragment: the deploy reports which CRUD
+	// capabilities (identity/validation/transitions/audit) the cell it is about to ship actually carries. A
+	// pure read of the emitted bundle (the wall §2) — it informs, it never blocks (the regulator surfaces the
+	// missing variety; the human owns whether an entities-only deploy is acceptable). Content-addressed by the
+	// fragment that judged it, so the verdict is reproducible.
+	variety := appdata.CrudVarietyOf(ps)
+	fragAddr, err := appdata.CrudFragmentAddress()
+	if err != nil {
+		return Materialised{}, fmt.Errorf("compute CRUD harness fragment address: %w", err)
+	}
 	if err := os.WriteFile(filepath.Join(dir, "schema.sql"), schema, 0o644); err != nil {
 		return Materialised{}, fmt.Errorf("write schema.sql: %w", err)
 	}
@@ -117,12 +129,16 @@ func MaterialiseApp(root, project, env, entitiesPath, seedPath, appName string) 
 	}
 
 	return Materialised{
-		Project: project,
-		Env:     env,
-		Stack:   stack,
-		Dir:     dir,
-		URL:     url,
-		Files:   files,
+		Project:         project,
+		Env:             env,
+		Stack:           stack,
+		Dir:             dir,
+		URL:             url,
+		Files:           files,
+		CrudConformance: variety.Missing,
+		CrudPresent:     variety.Present,
+		CrudRequired:    variety.Required,
+		HarnessFragment: fragAddr,
 	}, nil
 }
 
