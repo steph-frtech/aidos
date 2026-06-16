@@ -1,0 +1,40 @@
+---
+title: "DG04 · Le modèle derrière le port — un adapter, jamais une autorité"
+description: "DG04 (ROADMAP DiffusionGemma) : on branche un vrai modèle LLM en sidecar DERRIÈRE le port RequirementBench, via un ModelAdapter injectable. Deux adapters pour le bench différentiel — un fixtureModel déterministe (le miroir hermétique) et un ClaudeModel réel (claude --print --model claude-opus-4-8, deux lentilles de prompt = deux « modèles », fallback déterministe). La sortie LLM est TOUJOURS re-jugée par la fonction pure DG03 avant tout usage : le juge déterministe domine le modèle. Model-agnostic : le vrai DiffusionGemma se branchera comme un adapter de plus (dépendance infra honnête)."
+keywords: ["aidos", "krd", "DG04", "DiffusionGemma", "RequirementBench", "ModelAdapter", "bench différentiel", "fixtureModel", "ClaudeModel", "claude --print", "claude-opus-4-8", "deux lentilles", "fallback déterministe", "recompile seul", "le juge déterministe domine", "CompletenessReport invariant au modèle", "usedRealLLM", "model-agnostic", "ADR 0088", "ADR 0079", "ADR 0072", "le mur", "§2", "determinism-first", "§6", "§8", "exception gatée", "IA éteinte", "firewall.ViaIdea", "idée miroir goal"]
+---
+
+<Note>Cible Mintlify : `steps/concept/dg04-model-adapter`. Côté « Pour les futurs utilisateurs » — le concept. Pour l'intérieur, voir [Pour moi → DG04](/steps/internals/dg04-model-adapter).</Note>
+
+## L'idée en une phrase
+
+**On branche un vrai modèle LLM derrière le port `RequirementBench` — mais le modèle ne fait que *proposer* du texte ; c'est une fonction *pure* qui *juge* ce texte, et le juge déterministe domine le modèle.**
+
+## Le problème que DG04 résout
+
+DG02 a posé le **port** `RequirementBench` (la frontière) et son fallback déterministe « recompile seul ». DG03 a fait de la **métrique de complétude** une fonction pure : `match% = types de requirement présents / types attendus`, jamais un score de qualité, jamais un jugement LLM.
+
+Restait à **brancher un vrai modèle**. C'est DG04. Le risque évident : laisser le LLM décider de la complétude — un « LLM qui juge un LLM », exactement ce que le contrat AIDOS interdit (§8). DG04 le neutralise par construction : le modèle vit derrière un **`ModelAdapter`** qui ne sait faire qu'une chose, **proposer des candidates** ; la fonction pure DG03 re-juge **toujours** ces candidates avant tout usage.
+
+## Comment ça marche, vu de l'utilisateur
+
+1. **Un adapter injectable.** Un modèle = un `ModelAdapter{ Propose(spec) → candidates }`. On en branche zéro, un ou plusieurs derrière le même port.
+2. **Deux adapters livrés**, pour le **bench différentiel** :
+   - **`fixtureModel`** — déterministe, **sans réseau**. C'est le modèle du **miroir hermétique** : le test le rejoue 100× et obtient toujours le même rapport, sans jamais appeler le réseau.
+   - **`ClaudeModel`** — **réel** : il appelle `claude --print --model claude-opus-4-8` avec **deux lentilles de prompt** (une orientée UX « A », une orientée structure formelle « B ») — deux « modèles » pour le différentiel — plus une baseline « recompile seul ». Si le binaire est absent ou trop lent, il **retombe** sur le fallback déterministe et le signale **honnêtement** (`usedRealLLM=false`).
+3. **Le juge domine.** Quelle que soit la provenance du texte, c'est la fonction pure DG03 (`Metric`) qui le re-juge en un `CompletenessReport`. **Deux modèles différents qui émettent les mêmes sorties donnent le même rapport** — le rapport est *invariant à l'identité du modèle*.
+
+## Les quatre garanties (le miroir, rouge d'abord)
+
+- **(1) Le rapport est invariant à l'identité du modèle.** Le modèle propose, le juge compte ; changer de modèle sur les mêmes sorties ne change pas le rapport.
+- **(2) Modèle absent ⇒ fallback gouverné.** Un modèle indisponible (pas de poids, pas de GPU, binaire absent) ne produit **jamais** une erreur d'écran : on retombe sur le « recompile seul » et le rapport reste valide.
+- **(3) IA éteinte ⇒ le rejeu reste vert.** Avec le `fixtureModel`, le rapport re-jugé est reproductible 100×, sans réseau.
+- **(4) Le déterminisme du juge est intact.** Le rapport via l'adapter égale exactement la métrique pure sur les mêmes candidates : l'adapter n'ajoute rien que le juge ne re-dérive.
+
+## La note infra honnête (model-agnostic)
+
+Le **vrai DiffusionGemma** (architecture de génération par *diffusion*) demande des **poids et un GPU non garantis** dans cet environnement. DG04 ne s'arrête pas pour autant : l'adapter est **model-agnostic**. Le vrai DiffusionGemma se branchera comme **un `ModelAdapter` de plus**, derrière ce **même** port, re-jugé par cette **même** métrique pure. C'est une **dépendance infra documentée** — elle ne bloque pas l'étape, que le `fixtureModel` (hermétique) et le `ClaudeModel` (réel, prouvé `usedRealLLM=true`) suffisent à valider.
+
+## Le mur, toujours
+
+Le bench **propose** des trous de complétude (`MissingTypes`). Il **n'écrit aucune vérité** : ces trous rejoignent le kernel **uniquement** par la porte légale `idée → miroir → /goal` (via `firewall.ViaIdea`), jamais en passant. L'oracle déterministe de la loi de complétude reste **autoritaire** (ADR 0072) : le bench propose, il ne gouverne jamais.
