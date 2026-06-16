@@ -42,6 +42,12 @@ type ProjectServer struct {
 	EntitiesJSON []byte             // entities.json — the per-entity CRUD metadata (EmitProjectData, unchanged).
 	Server       *honoemit.Artifact // gen/<project>/server/server.ts — nil when no ops (CRUD-only).
 	Worker       *honoemit.Artifact // gen/<project>/server/worker.ts — nil when no ASYNC op.
+	// Conformance is the Ashby T1 verdict (runtime/harness, ADR 0082) over the emitted bundle —
+	// how many of the four CRUD invariants (identity/validation/transitions/audit) the cell holds
+	// vs the required variety, + the missing set. A REPORT (never a gate), the LIVE consumer that
+	// wires runtime/harness (the audit's single net dormant hole) into the deploy emit path. It
+	// changes no emitted bytes (Schema/EntitiesJSON/Server/Worker) — additivity preserved.
+	Conformance CrudVariety `json:"conformance"`
 }
 
 // EmitProjectServer is the per-project emitter that WIRES the operation projector into the emission path,
@@ -68,30 +74,29 @@ func EmitProjectServer(project string, entities []generators.EntitySource, ops [
 
 	ps := ProjectServer{Schema: schema, EntitiesJSON: entitiesJSON}
 
-	// (2) No ops → the CRUD-only path, byte-identical to EmitProjectData (additivity, zero regression).
-	if len(ops) == 0 {
-		return ps, nil
-	}
-
-	// (3) Ops present → ALSO emit the operation server (reuse honoemit.EmitServer, never a second
-	// projector). A malformed op is a typed BlockReason folded into an error (honesty, never a partial).
-	spec := honoemit.ServerSpec{Project: project, Ops: ops}
-	server, br := honoemit.EmitServer(spec)
-	if br != nil {
-		return ProjectServer{}, fmt.Errorf("appdata: emit server for project %q refused (%s): %s", project, br.Code, br.Explanation)
-	}
-	ps.Server = &server
-
-	// (4) The WORKER — only when at least one op is async (an async op gets a dispatcher, never a sync
-	// HTTP handler). Reuses honoemit.EmitWorker. An all-sync cut emits no worker (no dead bytes).
-	if hasAnyAsync(ops) {
-		worker, br := honoemit.EmitWorker(spec)
+	// (2) Ops present → ALSO emit the operation server (reuse honoemit.EmitServer, never a second
+	// projector) + the worker iff an op is async. No ops → CRUD-only, the data layer stays exactly
+	// what EmitProjectData renders (Server/Worker nil — additivity, zero regression).
+	if len(ops) > 0 {
+		spec := honoemit.ServerSpec{Project: project, Ops: ops}
+		server, br := honoemit.EmitServer(spec)
 		if br != nil {
-			return ProjectServer{}, fmt.Errorf("appdata: emit worker for project %q refused (%s): %s", project, br.Code, br.Explanation)
+			return ProjectServer{}, fmt.Errorf("appdata: emit server for project %q refused (%s): %s", project, br.Code, br.Explanation)
 		}
-		ps.Worker = &worker
+		ps.Server = &server
+		if hasAnyAsync(ops) {
+			worker, br := honoemit.EmitWorker(spec)
+			if br != nil {
+				return ProjectServer{}, fmt.Errorf("appdata: emit worker for project %q refused (%s): %s", project, br.Code, br.Explanation)
+			}
+			ps.Worker = &worker
+		}
 	}
 
+	// (3) Ashby T1 CONFORMANCE — the live consumer of runtime/harness (ADR 0082), computed over the
+	// FINAL bundle (after Server/Worker). A pure report; it sets only the Conformance field, never
+	// a mounted byte. This is what makes the harness reachable from the deploy emit path.
+	ps.Conformance = CrudVarietyOf(ps)
 	return ps, nil
 }
 
