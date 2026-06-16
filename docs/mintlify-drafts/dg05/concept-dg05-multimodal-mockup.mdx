@@ -1,0 +1,41 @@
+---
+title: "DG05 · La maquette derrière le port — image-mockup → view-specs, re-jugée par la métrique pure"
+description: "DG05 (ROADMAP DiffusionGemma) : un volet MULTIMODAL branché DERRIÈRE LE MÊME port RequirementBench, via un MockupAdapter injectable — l'analogue modality-agnostic du ModelAdapter DG04. Là où markitdown fait doc→markdown (la frontière d'ingestion, ADR 0039), DG05 fait image-mockup→view-specs candidates. La maquette est une représentation EN DONNÉE (zones/champs/actions), PAS une vraie image binaire ; le vrai modèle vision est une dépendance infra documentée. La sortie est TOUJOURS re-jugée par la fonction pure DG03 (complétude sur les types de zone/champ/action) : le juge déterministe domine la modalité. Multimodal absent ⇒ le sujet reste utilisable sur le différentiel texte seul (DG04). Aucune écriture de vérité : les candidates passent par firewall.ViaIdea → idée → /goal, jamais ToKernel."
+keywords: ["aidos", "krd", "DG05", "DiffusionGemma", "multimodal", "RequirementBench", "MockupAdapter", "mockup", "maquette", "view-specs", "spec-écran", "image-mockup vers view-specs", "markitdown", "frontière d'ingestion", "ADR 0039", "modality-agnostic", "FixtureMockupModel", "lecture littérale", "lentille vision", "état vide", "types de zone champ action", "le juge déterministe domine la modalité", "complétude mesurée par DG03", "fallback déterministe", "différentiel texte seul", "DG04", "BenchMockup", "usedRealLLM", "dépendance infra", "ADR 0088", "ADR 0079", "ADR 0072", "le mur", "§2", "determinism-first", "§6", "§8", "exception gatée", "IA éteinte", "firewall.ViaIdea", "idée miroir goal"]
+---
+
+<Note>Cible Mintlify : `steps/concept/dg05-multimodal-mockup`. Côté « Pour les futurs utilisateurs » — le concept. Pour l'intérieur, voir [Pour moi → DG05](/steps/internals/dg05-multimodal-mockup).</Note>
+
+## L'idée en une phrase
+
+**On lit une maquette d'écran comme une source de *spec-écran* candidate — mais la maquette ne fait que *proposer* du texte ; c'est la même fonction *pure* DG03 qui *juge* sa complétude, et le juge déterministe domine la modalité.**
+
+## Le problème que DG05 résout
+
+AIDOS sait déjà ingérer un **document** : `markitdown` est la frontière **doc → markdown** (ADR 0039), la porte par laquelle une spec écrite devient une idée candidate. DG04 sait comparer plusieurs lentilles **texte → requirements**. Mais une grande partie du besoin d'un produit arrive sous forme de **maquette** : un écran dessiné, des zones, des champs, des boutons.
+
+DG05 ajoute cette frontière manquante : **image-mockup → view-specs candidates**. Là où markitdown fait doc→markdown et où DG04 fait texte→requirements, DG05 fait **maquette → spec-écran**, et mesure sa **complétude** sur les **types de zone, de champ et d'action** que la maquette couvre.
+
+## Comment ça marche, vu de l'utilisateur
+
+1. **Une maquette EN DONNÉE.** Une maquette n'est pas un PNG ici : c'est une **représentation déclarée** — un `Mockup{ Zones[] }`, chaque zone portant son rôle (`header`, `list`, `detail`, `form`, `footer`), ses champs (`display`/`input`) et ses actions (`primary`/`secondary`). C'est de la **donnée**, donnée à une fonction pure. Le vrai modèle vision (qui lirait un vrai PNG) est une **dépendance infra documentée**, branchée plus tard comme un adapter de plus.
+2. **Un adapter injectable, l'analogue de DG04.** Une « modalité » = un `MockupAdapter{ ProposeViewSpecs(mockup) → candidates }`. C'est le frère multimodal du `ModelAdapter` de DG04 : DG04 mappe `Spec → candidates`, DG05 mappe `Mockup → candidates`. Les deux nourrissent **le même juge pur**.
+3. **Deux lectures, le différentiel.** L'adapter `FixtureMockupModel` (déterministe, sans réseau) produit deux candidates :
+   - une **lecture littérale** « single » : ce qu'un recompile déterministe de la maquette projette — exactement les zones/champs/actions dessinés ;
+   - une **lentille « vision »** : elle infère en plus les facettes transversales qu'une lecture littérale rate — l'**état vide** d'une liste, l'effet de **succès/erreur** des boutons.
+4. **Le juge domine.** Quelle que soit la modalité, c'est la fonction pure DG03 (`Metric`) qui re-juge les candidates en un rapport de complétude. **Deux adapters différents émettant les mêmes sorties donnent le même rapport** — le rapport est *invariant à la modalité*.
+
+## Les garanties (le miroir, rouge d'abord)
+
+- **(1) Complétude mesurée par DG03.** Une maquette-fixture produit des view-specs candidates dont la complétude est la **même** métrique pure que partout ailleurs, sur les **types de zone/champ/action**. La lecture-vision couvre pleinement les attendus de la maquette ; la lecture littérale rate exactement les facettes transversales (l'état vide, les effets de succès/erreur) — le **surplus** que le volet multimodal révèle.
+- **(2) Aucune écriture de vérité.** Les trous de complétude proposés rejoignent le kernel **uniquement** par `firewall.ViaIdea` → idée draft → miroir → `/goal`, **jamais** `ToKernel`. Une idée candidate n'est pas une vérité.
+- **(3) Multimodal absent ⇒ le sujet reste utilisable sur le différentiel texte seul.** Un adapter vision indisponible ne produit **jamais** une erreur d'écran : on retombe sur la lecture littérale déterministe, et le différentiel **texte** de DG04 reste pleinement utilisable. Les deux volets sont indépendants.
+- **(4) Le juge déterministe domine.** Le rapport via l'adapter égale exactement la métrique pure sur les mêmes candidates ; la maquette n'ajoute rien que le juge ne re-dérive ; IA éteinte, le rejeu reste vert (100× sans réseau).
+
+## La note infra honnête (modality-agnostic)
+
+Le **vrai modèle vision** (un Gemma-vision / DiffusionGemma-multimodal qui lirait un vrai PNG) demande des **poids et un GPU non garantis** dans cet environnement. DG05 ne s'arrête pas pour autant : l'adapter est **modality-agnostic**. Le vrai modèle vision se branchera comme **un `MockupAdapter` de plus**, derrière ce **même** port, re-jugé par cette **même** métrique pure. C'est une **dépendance infra documentée** — elle ne bloque pas l'étape : le `FixtureMockupModel` (hermétique, la maquette en donnée) suffit à prouver le contrat.
+
+## Le mur, toujours
+
+Le volet multimodal **propose** des view-specs candidates et des trous de complétude. Il **n'écrit aucune vérité** : ces propositions rejoignent le kernel **uniquement** par la porte légale `idée → miroir → /goal` (via `firewall.ViaIdea`), jamais en passant. L'oracle déterministe de la loi de complétude reste **autoritaire** (ADR 0072) : le volet multimodal propose, il ne gouverne jamais.
