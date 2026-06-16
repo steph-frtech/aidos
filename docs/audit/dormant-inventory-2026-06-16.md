@@ -96,3 +96,20 @@ ATTENTION: deadcode ne voit pas la reachability HTTP (gateway dispatch) ni les t
   2 exp /  3 tot  runtime/stackemit  → Targets, InterpreterSidecar
   2 exp /  2 tot  runtime/workspace  → Workspace.CanObserve, Workspace.CanReachTruthStore
 ```
+
+## SYNTHÈSE ACTIONNABLE (trace déterministe paquet-par-paquet)
+
+**Bilan honnête : sur 753 « injoignables », il n'y a PAS 753 trous.**
+- **~684 twin-by-design** — le front (front/web/lib, 284 twins TS) réimplémente + pilote le moteur en prod (ADR 0072) ; le Go dort en autorité testée. PAS un trou.
+- **8 reached-via-gateway** — les serveurs MCP de `serverBuilders` dispatchés via `gateway_call` (transport in-process invisible à deadcode). PAS un trou.
+- **~44 by-design** — enum-validators (IsKnownX), Serialize/Canonicalize, Example* fixtures, spike dp19, variantes-riches de hooks.
+- **~16 funcs / 3 capacités genuine-gap**, dont **2 vrais câblages manquants** :
+
+### Les 2 VRAIS trous
+1. **`runtime/harness` (Ashby T1)** — templates conformant-CRUD (ConformantCrudCell, CrudFragment, Topologies…). **0 consommateur** (ni Go, ni twin, ni route, ni emitter). Le seul trou net. **HIGH.** Câbler : outil MCP `harness_fragment` OU attacher `ConformantCrudCell` comme miroir de conformité aux cellules CRUD émises.
+2. **`hooks/postkernelchange`** — le red-wave fan-out auto sur changement kernel. Le hook **n'est pas enregistré** dans settings.json → l'auto-fire ne se déclenche jamais (le calcul existe en twin red-wave.ts). **MEDIUM.** Câbler : enregistrer + compiler le binaire (comme ADR 0075 pour wall/done-gate).
+
+### Faux trou (correction d'une erreur précédente)
+3. **`honoemit.EmitDesktopChild`/`EmitMobileChild`** — **doublon mort**, PAS une capacité manquante. Le déploiement émet DÉJÀ les 3 enfants (web/mobile/desktop) : `runFound → FoundProject → recompileFamilies(AllFamilies())` (found.go:185-214, via `ReproduceWithCapitalised`). Les fonctions `Emit{Desktop,Mobile}Child` bares sont un doublon à /trim. **LOW (rangement).**
+
+> Reste réel côté desktop : la SOURCE Electron est émise, mais **aucun chemin pour la VOIR** (pas de build+run+stream du GUI). C'est le « voir Electron » à câbler (CDP screencast, le webVNC faisable).
