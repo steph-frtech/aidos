@@ -111,3 +111,86 @@ func TestEvolveRun_SelfPlayDeterministicFallback(t *testing.T) {
 		t.Fatalf("self-play fallback not deterministic: %+v vs %+v", outA, outB)
 	}
 }
+
+// EG04: the evolve_coverage tool is the capability door (ADR 0009) over the EG04 generators.
+// It measures, per generator (novelty | poet | mome), the gate-passing niche coverage on a cell
+// vs the deterministic baseline — the SAME frozen gate, the generators only change WHAT is
+// proposed. It surfaces the EG04 win: novelty/poet/mome cover ≥ the deterministic baseline (and,
+// on this under-covering seed/budget, STRICTLY more). HERMETIC: search strategies, no network.
+func TestEvolveCoverage_GeneratorsWidenVsBaseline(t *testing.T) {
+	s := newServer()
+	in := coverageInput{
+		Cell:                    "createOrder",
+		Niches:                  []string{"createOrder/baseline", "createOrder/discount", "createOrder/bulk", "createOrder/giftcard", "createOrder/subscription", "createOrder/backorder"},
+		AuthorityApprovedNiches: []string{"createOrder/baseline", "createOrder/discount", "createOrder/bulk", "createOrder/giftcard"},
+		OutOfSampleThreshold:    0.55,
+		Budget:                  5,
+		Seed:                    1,
+	}
+	_, out, err := s.evolveCoverage(context.Background(), nil, in)
+	if err != nil {
+		t.Fatalf("evolve_coverage: %v", err)
+	}
+	if out.Baseline <= 0 {
+		t.Fatalf("baseline coverage should be positive: %+v", out)
+	}
+	if len(out.Generators) != 3 {
+		t.Fatalf("expected 3 generators (novelty,poet,mome), got %d: %+v", len(out.Generators), out.Generators)
+	}
+	for _, g := range out.Generators {
+		if g.Coverage < out.Baseline {
+			t.Fatalf("generator %q regressed coverage: %d < baseline %d", g.Name, g.Coverage, out.Baseline)
+		}
+		if g.WritesTruth {
+			t.Fatalf("coverage report claims a truth write for %q — the wall is breached: %+v", g.Name, g)
+		}
+		// on this under-covering seed/budget, every named generator strictly widens.
+		if g.Coverage <= out.Baseline {
+			t.Fatalf("generator %q did not strictly widen on the under-covering fixture: %d ≤ %d", g.Name, g.Coverage, out.Baseline)
+		}
+	}
+}
+
+// EG04: evolve_coverage is DETERMINISTIC — same (cell, niches, budget, seed) → same report.
+func TestEvolveCoverage_Deterministic(t *testing.T) {
+	s := newServer()
+	in := coverageInput{
+		Cell:                    "createOrder",
+		Niches:                  []string{"createOrder/baseline", "createOrder/discount", "createOrder/bulk", "createOrder/giftcard"},
+		AuthorityApprovedNiches: []string{"createOrder/baseline", "createOrder/discount", "createOrder/bulk", "createOrder/giftcard"},
+		OutOfSampleThreshold:    0.55,
+		Budget:                  5,
+		Seed:                    1,
+	}
+	_, a, _ := s.evolveCoverage(context.Background(), nil, in)
+	_, b, _ := s.evolveCoverage(context.Background(), nil, in)
+	if a.Baseline != b.Baseline || len(a.Generators) != len(b.Generators) {
+		t.Fatalf("evolve_coverage not deterministic: %+v vs %+v", a, b)
+	}
+	for i := range a.Generators {
+		if a.Generators[i] != b.Generators[i] {
+			t.Fatalf("evolve_coverage generator %d not deterministic: %+v vs %+v", i, a.Generators[i], b.Generators[i])
+		}
+	}
+}
+
+// EG04: evolve_run accepts a generator selector and the chosen generator runs through the SAME
+// frozen seam — the run still emits ONLY can_write (the wall holds whichever generator is armed).
+func TestEvolveRun_GeneratorStillConfined(t *testing.T) {
+	for _, gen := range []string{"novelty", "poet", "mome"} {
+		s := newServer()
+		_, out, err := s.evolveRun(context.Background(), nil, runInput{Cell: "createOrder", Budget: 8, Seed: 7, Generator: gen})
+		if err != nil {
+			t.Fatalf("evolve_run (generator %q): %v", gen, err)
+		}
+		if len(out.Emitted) == 0 {
+			t.Fatalf("generator %q evolve_run emitted nothing", gen)
+		}
+		for _, w := range out.Emitted {
+			_, c, _ := s.evolveConfine(context.Background(), nil, confineInput{Path: w.Path})
+			if c.Verdict != "allowed" {
+				t.Fatalf("generator %q emitted a non-confined write %q (%q)", gen, w.Path, c.Verdict)
+			}
+		}
+	}
+}
