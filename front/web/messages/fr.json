@@ -1259,6 +1259,14 @@
 		"howToFixLabel": "how_to_fix",
 		"exampleHeading": "Exemple filé (KRD §98)",
 		"exampleBody": "L'enveloppe « add order discount » réunit un spec_delta (add Order.discount) et son mirror_delta (le fixture Order.discount). L'appliquer donne APPLIED avec applied_at. Retirer le mirror_delta la rend incomplète — un monstre — et le commit-gate la bloque avec INCOMPLETE_CHANGESET (how_to_fix : add_mirror_for_spec_delta). L'éditer une fois APPLIED est bloqué avec APPLIED_IS_IMMUTABLE. La reverter ajoute un nouveau DRAFT inverse (cs-B, reverts cs-A) dont l'apply ultérieur estampille cs-A REVERTED — sans jamais la détruire.",
+		"liveHeading": "Journal des enveloppes (en direct)",
+		"liveIntro": "Le journal append-only des ChangeSets du projet actif, lu en direct par la passerelle (changeset_list, en dessous de la ligne). La passerelle injoignable ou sans store branché retombe sur l'exemple de démo.",
+		"liveEmpty": "Aucune enveloppe dans le journal du projet actif.",
+		"liveTitle": "Lu en direct depuis la passerelle (changeset_list)",
+		"demoTitle": "Passerelle injoignable — affichage de l'exemple de démo",
+		"liveIdLabel": "id",
+		"liveLabelLabel": "libellé",
+		"liveStatusLabel": "statut",
 		"footer": "Projection en lecture seule de <code>back/archive/changeset</code> — un véritable apply/revert passe par le MCP changeset / le commit-gate (propose → ChangeSet → approbation, le mur) ; une enveloppe APPLIED est immuable et un revert est append-only."
 	},
 	"semanticDiff": {
@@ -1354,6 +1362,11 @@
 		"eventRebranched": "Rebranched — nouvelle ligne depuis l'ancêtre (la ligne abandonnée reste)",
 		"exampleHeading": "Exemple filé (KRD §120)",
 		"exampleBody": "Le DAG canonique : un tronc de vérité humaine v0 → v1 → v2 (au-dessus) et une variante évolutive w1 depuis v1 (en dessous). Brancher depuis v1 ouvre une tête parallèle, les deux lignes vivantes (§125). Checkout de v1 ramène la tête en arrière — v2 et w1 demeurent (ajout-seul). Rebrancher depuis v1 ouvre une nouvelle ligne v2a, accessible depuis v0, tandis que la ligne abandonnée v2 reste dans le DAG (LE critère done).",
+		"liveHeading": "Têtes du DAG (en direct)",
+		"liveIntro": "Les têtes courantes du DAG de versions du projet actif, lues en direct par la passerelle (dag_heads, en dessous de la ligne). La passerelle injoignable ou sans store branché retombe sur les têtes de démo.",
+		"liveEmpty": "Aucune tête dans le DAG du projet actif.",
+		"liveTitle": "Lu en direct depuis la passerelle (dag_heads)",
+		"demoTitle": "Passerelle injoignable — affichage des têtes de démo",
 		"footer": "Projection en lecture seule de back/archive/dag — les trois mouvements §121 sont des fonctions pures ; l'enregistrement des nœuds/arêtes dag.node/dag.edge passe par le rôle aidos via le MCP dag (le mur). Le DAG est append-only : une ligne abandonnée n'est jamais détruite."
 	},
 	"semanticMerge": {

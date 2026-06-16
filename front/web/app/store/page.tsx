@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
-import { snapshot } from "@/lib/store-data";
+import { panelScope } from "@/lib/panelScope";
+import { snapshot, snapshotViaGateway } from "@/lib/store-data";
 import { StoreActions } from "./StoreActions";
 import { StorePanel } from "./StorePanel";
 import { StoreTeach } from "./StoreTeach";
@@ -28,7 +29,12 @@ export const dynamic = "force-dynamic";
  * design tokens; bilingual via next-intl (ADR 0011).
  */
 export default async function StorePage() {
-	const snap = await snapshot();
+	// S59 cutover: read the store LIVE through the gateway first (store_history + store_get
+	// via the passerelle). On any gateway miss, fall back to the direct content-store read
+	// (which itself falls back to the demo fixture) — so the panel is never blank.
+	const scope = await panelScope();
+	const viaGateway = await snapshotViaGateway(scope);
+	const snap = viaGateway.source === "live" ? viaGateway : await snapshot();
 	const t = await getTranslations("store");
 	const tc = await getTranslations("common");
 

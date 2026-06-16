@@ -38,7 +38,12 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	cs "github.com/steph-frtech/aidos/back/archive/changeset"
+	"github.com/steph-frtech/aidos/back/archive/contentstore"
+	"github.com/steph-frtech/aidos/back/archive/dag"
 	"github.com/steph-frtech/aidos/back/mcp/changeset/changesetsrv"
+	"github.com/steph-frtech/aidos/back/mcp/dag/dagsrv"
+	"github.com/steph-frtech/aidos/back/mcp/project/projectsrv"
+	"github.com/steph-frtech/aidos/back/mcp/store/storesrv"
 	"github.com/steph-frtech/aidos/back/runtime/gateway"
 	"github.com/steph-frtech/aidos/back/runtime/gatewaydispatch"
 	"github.com/steph-frtech/aidos/back/runtime/projectwall"
@@ -199,36 +204,93 @@ func newMCPServer(dispatch *gatewaydispatch.Dispatcher) *mcp.Server {
 	return srv
 }
 
-// changesetDSN resolves the DSN the dispatcher's changeset backend opens: AIDOS_GATEWAY_DSN
-// first (the gateway's own writer DSN), falling back to AIDOS_CHANGESET_DSN (the standalone
-// changeset server's DSN) so a single deployment can configure either.
-func changesetDSN() string {
+// serverDSN resolves the DSN a dispatched backend opens: AIDOS_GATEWAY_DSN first (the
+// gateway's own writer DSN — one DSN configures the whole front door), falling back to the
+// server's historic standalone DSN env so a single deployment can configure either. The
+// gateway DSN, when set, is shared by every wired backend (they are co-located schemas in the
+// one truth-store); the per-server fallback keeps a server reachable when only its own env is
+// set (the standalone-deployment path).
+func serverDSN(fallbackEnv string) string {
 	if dsn := os.Getenv("AIDOS_GATEWAY_DSN"); dsn != "" {
 		return dsn
 	}
-	return os.Getenv("AIDOS_CHANGESET_DSN")
+	return os.Getenv(fallbackEnv)
 }
 
-// buildDispatcher constructs the S59 Dispatcher when a DSN is configured, else nil (the wall
-// still holds for gateway_call — see (*server).call). The StoreProvider wires ONLY the
-// changeset backend in this tranche; every other server returns ErrServerNotDispatched, so
-// the front falls back to demo for the un-wired ones (strictly additive cutover, no
-// regression). The changeset store is opened LAZILY (on the first changeset_* dispatch), so
-// a gateway with a DSN but no changeset traffic never touches Postgres.
-func buildDispatcher() *gatewaydispatch.Dispatcher {
-	dsn := changesetDSN()
-	if dsn == "" {
-		return nil
-	}
-	factory := func(ctx context.Context, srv string) (*mcp.Server, error) {
-		if srv != "changeset" {
-			return nil, gatewaydispatch.ErrServerNotDispatched
-		}
-		store, err := cs.NewStore(ctx, dsn)
+// serverBuilders is the REGISTRE of below-the-line backends the dispatcher wires: server name
+// → a builder that resolves its DSN (gateway-first, historic fallback) then opens the store
+// and returns its in-process *mcp.Server. A server ABSENT from this registry is left to the
+// StoreProvider's ErrServerNotDispatched (→ route_undispatched → demo), so wiring one server
+// at a time stays a STRICTLY ADDITIVE cutover (the 11 un-wired servers regress not at all).
+// Each builder is consulted LAZILY (sessionFor hits the factory only on the first call to that
+// server), so a gateway with a DSN but no traffic for a given server never opens its pool.
+//
+// changeset carries a clock (created_at is a server instant); store/dag/project take the DSN
+// alone (their timestamps are client-supplied or content-addressed — no server clock).
+var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
+	"changeset": func(ctx context.Context) (*mcp.Server, error) {
+		store, err := cs.NewStore(ctx, serverDSN("AIDOS_CHANGESET_DSN"))
 		if err != nil {
 			return nil, err
 		}
 		return changesetsrv.NewServer(store, time.Now), nil
+	},
+	"store": func(ctx context.Context) (*mcp.Server, error) {
+		store, err := contentstore.New(ctx, serverDSN("AIDOS_ARCHIVE_DSN"))
+		if err != nil {
+			return nil, err
+		}
+		return storesrv.NewServer(store), nil
+	},
+	"dag": func(ctx context.Context) (*mcp.Server, error) {
+		store, err := dag.NewStore(ctx, serverDSN("AIDOS_DAG_DSN"))
+		if err != nil {
+			return nil, err
+		}
+		return dagsrv.NewServer(store), nil
+	},
+	"project": func(ctx context.Context) (*mcp.Server, error) {
+		store, err := projectsrv.NewStore(ctx, serverDSN("AIDOS_PROJECTS_DSN"))
+		if err != nil {
+			return nil, err
+		}
+		return projectsrv.NewServer(store), nil
+	},
+}
+
+// gatewayDSNConfigured reports whether ANY DSN the dispatcher could use is set — the gateway's
+// own AIDOS_GATEWAY_DSN, or a historic per-server fallback. When nothing is configured the
+// dispatcher is nil and gateway_call enforces the wall directly (see (*server).call).
+func gatewayDSNConfigured() bool {
+	if os.Getenv("AIDOS_GATEWAY_DSN") != "" {
+		return true
+	}
+	for _, fallback := range []string{
+		"AIDOS_CHANGESET_DSN", "AIDOS_ARCHIVE_DSN", "AIDOS_DAG_DSN", "AIDOS_PROJECTS_DSN",
+	} {
+		if os.Getenv(fallback) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// buildDispatcher constructs the S59 Dispatcher when a DSN is configured, else nil (the wall
+// still holds for gateway_call — see (*server).call). The StoreProvider consults serverBuilders:
+// changeset · store · dag · project are wired; every OTHER server returns ErrServerNotDispatched,
+// so the front falls back to demo for the un-wired ones (strictly additive cutover, no
+// regression). Each backend store is opened LAZILY (on the first dispatch to that server), so a
+// gateway with a DSN but no traffic for a server never touches its Postgres pool.
+func buildDispatcher() *gatewaydispatch.Dispatcher {
+	if !gatewayDSNConfigured() {
+		return nil
+	}
+	factory := func(ctx context.Context, srv string) (*mcp.Server, error) {
+		build, ok := serverBuilders[srv]
+		if !ok {
+			return nil, gatewaydispatch.ErrServerNotDispatched
+		}
+		return build(ctx)
 	}
 	return gatewaydispatch.New(gateway.DefaultRegistry(), factory)
 }

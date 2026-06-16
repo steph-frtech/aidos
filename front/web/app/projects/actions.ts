@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import postgres from "postgres";
+import { arr, type Decoder, isObject, readVia, str } from "@/lib/gateway-sdk";
+import { panelScope } from "@/lib/panelScope";
 import {
 	canCreate,
 	canonicalBody,
@@ -72,8 +74,72 @@ function rootNodeIdLabel(p: Project): string {
 	return `project:${p.slug}@${p.id}`;
 }
 
+// project_list → { projects:[{id,slug,name,owner_ref,created_at,lifecycle,root_node_id}] },
+// decoded ONCE through the gateway SDK (never double-typed). The S59 cutover read path.
+const projectWireDecoder: Decoder<Project & { rootNodeId: string }> = (raw) => {
+	if (!isObject(raw)) return null;
+	const id = str(raw.id);
+	const slug = str(raw.slug);
+	const name = str(raw.name);
+	const ownerRef = str(raw.owner_ref);
+	const createdAt = str(raw.created_at);
+	const lifecycle = str(raw.lifecycle);
+	const rootNodeId = str(raw.root_node_id);
+	if (
+		id === null ||
+		slug === null ||
+		name === null ||
+		ownerRef === null ||
+		createdAt === null ||
+		lifecycle === null ||
+		rootNodeId === null
+	) {
+		return null;
+	}
+	return {
+		id,
+		slug,
+		name,
+		ownerRef,
+		createdAt,
+		lifecycle: lifecycle as Lifecycle,
+		rootNodeId,
+	};
+};
+const projectListDecoder: Decoder<{
+	projects: (Project & { rootNodeId: string })[];
+}> = (raw) => {
+	if (!isObject(raw)) return null;
+	const projects = arr(projectWireDecoder)(raw.projects);
+	if (projects === null) return null;
+	return { projects };
+};
+
+/**
+ * snapshotViaGateway reads the active project's head projects through the S58 gateway
+ * (project_list, below the line) — the S59 cutover read path. On ANY miss (no endpoint,
+ * transport error, malformed / undispatched / refused answer, or an empty live list) it
+ * returns null so the caller falls back to the direct content-store read. THE WALL (§2):
+ * a read only.
+ */
+async function snapshotViaGateway(): Promise<ProjectSnapshot | null> {
+	const scope = await panelScope();
+	const { data, source } = await readVia(
+		scope,
+		"project_list",
+		{},
+		projectListDecoder,
+		{ projects: [] },
+	);
+	if (source !== "live" || data.projects.length === 0) return null;
+	return { source: "live", projects: data.projects };
+}
+
 /** snapshot reads the live head projects, falling back to the demo deterministically. */
 export async function snapshot(): Promise<ProjectSnapshot> {
+	// S59 cutover: read LIVE through the gateway first (project_list via the passerelle).
+	const viaGateway = await snapshotViaGateway();
+	if (viaGateway) return viaGateway;
 	const c = client();
 	if (!c) {
 		return {

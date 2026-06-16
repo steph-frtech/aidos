@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { VersionDagPanel } from "@/components/VersionDagPanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { liveHeads } from "./actions";
+import { LiveHeads } from "./LiveHeads";
+
+// Read the live DAG heads of the active project on every request (the S59 cutover): the
+// heads are read through the gateway (dag_heads), never baked into a static page.
+export const dynamic = "force-dynamic";
 
 // Determinism-first: the three §121 moves are pure projections in lib/version-dag.ts (mirroring
 // back/archive/dag), covered by lib/version-dag.test.ts (fast-check). This Server Component renders
@@ -31,6 +37,8 @@ export const metadata: Metadata = {
  */
 export default async function VersionDagPage() {
 	const t = await getTranslations("versionDag");
+	const tc = await getTranslations("common");
+	const live = await liveHeads();
 
 	const labels = {
 		branchLabel: t("branchLabel"),
@@ -94,6 +102,22 @@ export default async function VersionDagPage() {
 
 				<div className="mt-10">
 					<VersionDagPanel labels={labels} />
+				</div>
+
+				{/* Live DAG heads — read through the gateway (dag_heads), demo fallback */}
+				<div className="mt-10">
+					<LiveHeads
+						view={live}
+						labels={{
+							heading: t("liveHeading"),
+							intro: t("liveIntro"),
+							empty: t("liveEmpty"),
+							live: tc("live"),
+							demo: tc("demo"),
+							liveTitle: t("liveTitle"),
+							demoTitle: t("demoTitle"),
+						}}
+					/>
 				</div>
 
 				{/* Worked example */}

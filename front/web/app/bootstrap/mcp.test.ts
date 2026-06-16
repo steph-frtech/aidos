@@ -35,14 +35,20 @@ import {
 
 const SCOPE: Scope = { identity: "workbench-human", activeProject: "proj-a" };
 
-/** Un stub fetch qui renvoie une enveloppe JSON-RPC avec le structuredContent donné. */
+/**
+ * Un stub fetch qui renvoie une enveloppe JSON-RPC. La passerelle répond à gateway_call par
+ * { outcome:"route", result } ; callGateway dé-enveloppe `.result` vers l'appelant — donc le
+ * `content` ici (la sortie réelle de l'outil bootstrap) chevauche sous result.
+ */
 function okFetch(content: unknown): typeof fetch {
 	return (async () =>
 		new Response(
 			JSON.stringify({
 				jsonrpc: "2.0",
 				id: 1,
-				result: { structuredContent: content },
+				result: {
+					structuredContent: { outcome: "route", result: content },
+				},
 			}),
 			{ status: 200, headers: { "content-type": "application/json" } },
 		)) as unknown as typeof fetch;

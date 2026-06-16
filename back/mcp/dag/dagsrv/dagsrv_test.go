@@ -1,4 +1,4 @@
-package main
+package dagsrv
 
 // Activation + fault-injection test for the `dag` MCP server (ADR 0009: a scaffold is activated
 // at the step that needs it, with a working server and a fault-injection test).
@@ -56,9 +56,9 @@ func startServer(t *testing.T) (*server, *pgxpool.Pool) {
 	}
 	t.Cleanup(pool.Close)
 	for _, f := range []string{
-		"../../migrations/kernel_records_baseline.sql",
-		"../../migrations/dag_stable_phase_baseline.sql",
-		"../../migrations/dag_node_edge_baseline.sql",
+		"../../../migrations/kernel_records_baseline.sql",
+		"../../../migrations/dag_stable_phase_baseline.sql",
+		"../../../migrations/dag_node_edge_baseline.sql",
 	} {
 		mig, err := os.ReadFile(f)
 		if err != nil {

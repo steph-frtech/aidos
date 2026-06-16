@@ -1,4 +1,4 @@
-package main
+package storesrv
 
 import (
 	"context"
@@ -46,7 +46,7 @@ func startStore(t *testing.T) *server {
 		t.Fatalf("pgxpool: %v", err)
 	}
 	defer pool.Close()
-	migSQL, err := os.ReadFile("../../migrations/archive_baseline.sql")
+	migSQL, err := os.ReadFile("../../../migrations/archive_baseline.sql")
 	if err != nil {
 		t.Fatalf("read migration: %v", err)
 	}

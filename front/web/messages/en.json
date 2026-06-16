@@ -1259,6 +1259,14 @@
 		"howToFixLabel": "how_to_fix",
 		"exampleHeading": "Worked example (KRD §98)",
 		"exampleBody": "The « add order discount » envelope bundles a spec_delta (add Order.discount) with its mirror_delta (the Order.discount fixture). Applying it is APPLIED with applied_at. Dropping the mirror_delta makes it incomplete — a monster — and the commit-gate blocks it with INCOMPLETE_CHANGESET (how_to_fix: add_mirror_for_spec_delta). Editing it once APPLIED is blocked with APPLIED_IS_IMMUTABLE. Reverting it appends a new DRAFT inverse (cs-B, reverts cs-A) whose later apply stamps cs-A REVERTED — without ever destroying it.",
+		"liveHeading": "Envelope journal (live)",
+		"liveIntro": "The active project's append-only ChangeSet journal, read live through the gateway (changeset_list, below the line). An unreachable gateway, or one with no store wired, falls back to the demo example.",
+		"liveEmpty": "No envelope in the active project's journal.",
+		"liveTitle": "Read live from the gateway (changeset_list)",
+		"demoTitle": "Gateway unreachable — showing the demo example",
+		"liveIdLabel": "id",
+		"liveLabelLabel": "label",
+		"liveStatusLabel": "status",
 		"footer": "Read-only projection of <code>back/archive/changeset</code> — a real apply/revert goes through the changeset MCP / the commit-gate (propose → ChangeSet → approval, the wall); an APPLIED envelope is immutable and a revert is append-only."
 	},
 	"semanticDiff": {
@@ -1354,6 +1362,11 @@
 		"eventRebranched": "Rebranched — a new line off the ancestor (the abandoned line stays)",
 		"exampleHeading": "Worked example (KRD §120)",
 		"exampleBody": "The canonical DAG: a human-truth trunk v0 → v1 → v2 (above) and an evolutionary variant w1 off v1 (below). Branching off v1 opens a parallel head, both lines live (§125). Checking out v1 moves the head back — v2 and w1 remain (append-only). Rebranching off v1 opens a new line v2a, reachable from v0, while the abandoned line v2 stays in the DAG (THE done case).",
+		"liveHeading": "DAG heads (live)",
+		"liveIntro": "The active project's current version-DAG heads, read live through the gateway (dag_heads, below the line). An unreachable gateway, or one with no store wired, falls back to the demo heads.",
+		"liveEmpty": "No head in the active project's DAG.",
+		"liveTitle": "Read live from the gateway (dag_heads)",
+		"demoTitle": "Gateway unreachable — showing the demo heads",
 		"footer": "Read-only projection of back/archive/dag — the three §121 moves are pure functions; recording dag.node/dag.edge goes via the aidos writer role through the dag MCP (the wall). The DAG is append-only: an abandoned line is never destroyed."
 	},
 	"semanticMerge": {

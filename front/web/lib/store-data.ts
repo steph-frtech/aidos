@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import postgres from "postgres";
+import { arr, type Decoder, isObject, readVia, str } from "./gateway-sdk";
+import type { Scope } from "./projectWall";
 
 /**
  * Read-only projection of the Archive content store for the /store Workbench
@@ -141,4 +143,90 @@ export async function snapshot(): Promise<StoreSnapshot> {
 		);
 		return demoSnapshot();
 	}
+}
+
+// ── The S59 gateway-backed read path (store_history + store_get via the passerelle) ──
+
+/** The default head key the panel reconstructs through the gateway (the demo lineage). */
+export const DEFAULT_HEAD_KEY = "doc";
+
+interface MoveWire {
+	key: string;
+	hash: string;
+	parentHash: string | null;
+}
+
+// store_history → { moves:[{key,hash,parent_hash}] }, decoded ONCE (never double-typed).
+const moveDecoder: Decoder<MoveWire> = (raw) => {
+	if (!isObject(raw)) return null;
+	const key = str(raw.key);
+	const hash = str(raw.hash);
+	if (key === null || hash === null) return null;
+	const parentHash =
+		typeof raw.parent_hash === "string" ? raw.parent_hash : null;
+	return { key, hash, parentHash };
+};
+const historyDecoder: Decoder<{ moves: MoveWire[] }> = (raw) => {
+	if (!isObject(raw)) return null;
+	const moves = arr(moveDecoder)(raw.moves);
+	if (moves === null) return null;
+	return { moves };
+};
+
+// store_get → { data_base64 } (the object bytes), decoded ONCE.
+const getDecoder: Decoder<{ dataBase64: string }> = (raw) => {
+	if (!isObject(raw)) return null;
+	const dataBase64 = str(raw.data_base64);
+	if (dataBase64 === null) return null;
+	return { dataBase64 };
+};
+
+/**
+ * snapshotViaGateway reconstructs the /store snapshot for the active project's default head
+ * key through the S58 gateway (store_history for the head's lineage, store_get per hash for
+ * the object bytes) — the S59 cutover read path. On ANY miss (no endpoint, transport error,
+ * malformed / undispatched / refused answer, or an empty live lineage) it returns the
+ * deterministic demo fixture tagged `source:"demo"`. THE WALL (§2): a read only.
+ */
+export async function snapshotViaGateway(
+	scope: Scope,
+	key: string = DEFAULT_HEAD_KEY,
+): Promise<StoreSnapshot> {
+	const demo = demoSnapshot();
+	const hist = await readVia(scope, "store_history", { key }, historyDecoder, {
+		moves: [],
+	});
+	if (hist.source !== "live" || hist.data.moves.length === 0) return demo;
+
+	const history: Record<string, HeadMove[]> = { [key]: [] };
+	const objects: ContentObject[] = [];
+	const seen = new Set<string>();
+	for (const m of hist.data.moves) {
+		history[key].push({
+			key: m.key,
+			hash: m.hash,
+			parentHash: m.parentHash,
+			// The gateway move carries no instant; the content lineage is what matters here.
+			createdAt: "",
+		});
+		if (seen.has(m.hash)) continue;
+		seen.add(m.hash);
+		const obj = await readVia(
+			scope,
+			"store_get",
+			{ hash: m.hash },
+			getDecoder,
+			{ dataBase64: "" },
+		);
+		if (obj.source !== "live") return demo;
+		const body = Buffer.from(obj.data.dataBase64, "base64").toString("utf8");
+		objects.push({ hash: m.hash, byteSize: Buffer.byteLength(body), body });
+	}
+	const headHash = hist.data.moves[hist.data.moves.length - 1].hash;
+	return {
+		objects,
+		heads: [{ key, hash: headHash }],
+		history,
+		source: "live",
+	};
 }

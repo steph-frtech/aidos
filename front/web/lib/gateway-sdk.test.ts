@@ -9,6 +9,12 @@
  *      (gateway) is unreachable — a malformed JSON, a transport error, or no endpoint all
  *      deterministically yield the demo fixture tagged `source:"demo"`; a well-formed
  *      payload yields `source:"live"`. Same input → same verdict, zero LLM.
+ *   3. THE gateway_call ENVELOPE — every backend read is wrapped as a `tools/call` on the
+ *      passerelle's `gateway_call` tool (params.name = "gateway_call", with the real tool +
+ *      args nested under arguments.tool/.args + the scope keyed on (identity, active_project)).
+ *      callGateway unwraps the server's callOutput: only outcome === "route" surfaces a
+ *      dispatched backend result (source:"live"); any other outcome (route_undispatched when no
+ *      store is wired, refused_* / unknown_tool) is UNAVAILABLE → deterministic demo fallback.
  */
 
 import fc from "fast-check";
@@ -42,17 +48,42 @@ const snapDecoder: Decoder<{ items: { id: string; n: number }[] }> = (raw) => {
 type Snap = Decoded<typeof snapDecoder>;
 const DEMO: Snap = { items: [{ id: "demo", n: 0 }] };
 
-// A fetch stub: returns a JSON-RPC envelope with the given structuredContent.
+// A fetch stub: returns a JSON-RPC envelope whose structuredContent is the gateway_call
+// callOutput { outcome:"route", result }. callGateway unwraps `.result` to the caller, so the
+// `content` here is the BACKEND tool's real payload (what the panel decoder sees).
 function okFetch(content: unknown): typeof fetch {
+	return rawFetch({ outcome: "route", result: content });
+}
+
+// rawFetch returns a JSON-RPC envelope with an arbitrary structuredContent — used to drive the
+// gateway_call envelope outcomes directly (route / route_undispatched / refused_*).
+function rawFetch(structuredContent: unknown): typeof fetch {
 	return (async () =>
 		new Response(
 			JSON.stringify({
 				jsonrpc: "2.0",
 				id: 1,
-				result: { structuredContent: content },
+				result: { structuredContent },
 			}),
 			{ status: 200, headers: { "content-type": "application/json" } },
 		)) as unknown as typeof fetch;
+}
+
+// captureFetch records the POST body it is given (to assert the wire envelope shape), then
+// answers with a routed result. The recorded request lets us prove params.name === "gateway_call"
+// and that the real tool + scope ride nested under arguments.
+function captureFetch(sink: { body: unknown }, content: unknown): typeof fetch {
+	return (async (_url: string, init: { body: string }) => {
+		sink.body = JSON.parse(init.body);
+		return new Response(
+			JSON.stringify({
+				jsonrpc: "2.0",
+				id: 1,
+				result: { structuredContent: { outcome: "route", result: content } },
+			}),
+			{ status: 200, headers: { "content-type": "application/json" } },
+		);
+	}) as unknown as typeof fetch;
 }
 
 describe("gateway-sdk — never double-typed", () => {
@@ -169,5 +200,71 @@ describe("gateway-sdk — readVia falls back deterministically when the DB is un
 			fetchImpl: f,
 		});
 		expect(a).toEqual(b);
+	});
+});
+
+describe("gateway-sdk — the gateway_call envelope (S59 cutover)", () => {
+	const scope = { identity: "alice", activeProject: "proj-a" };
+
+	it("wraps every backend read as a tools/call on gateway_call (real tool nested)", async () => {
+		const sink: { body: unknown } = { body: null };
+		await callGateway(
+			scope,
+			"store_get",
+			{ key: "doc" },
+			"http://gw",
+			captureFetch(sink, { items: [] }),
+		);
+		// The wire tool is gateway_call — NOT the backend tool name.
+		expect(sink.body).toMatchObject({
+			method: "tools/call",
+			params: {
+				name: "gateway_call",
+				arguments: {
+					// the scope is keyed on (identity, active_project) — the Go callInput shape.
+					scope: { identity: "alice", active_project: "proj-a" },
+					tool: "store_get",
+					args: { key: "doc" },
+				},
+			},
+		});
+	});
+
+	it("outcome 'route' unwraps the backend result → ok:true, content = result", async () => {
+		const r = await callGateway(
+			scope,
+			"store_get",
+			{},
+			"http://gw",
+			rawFetch({ outcome: "route", result: { items: [{ id: "x", n: 1 }] } }),
+		);
+		expect(r).toEqual({ ok: true, content: { items: [{ id: "x", n: 1 }] } });
+	});
+
+	it("outcome 'route_undispatched' (no store wired) → unavailable → demo", async () => {
+		const r = await readVia(scope, "store_get", {}, snapDecoder, DEMO, {
+			endpoint: "http://gw",
+			fetchImpl: rawFetch({ outcome: "route_undispatched" }),
+		});
+		expect(r).toEqual({ data: DEMO, source: "demo" });
+	});
+
+	it("a refused outcome (refused_truth_write) → unavailable → demo", async () => {
+		const r = await readVia(scope, "store_get", {}, snapDecoder, DEMO, {
+			endpoint: "http://gw",
+			fetchImpl: rawFetch({
+				outcome: "refused_truth_write",
+				block_reason: { code: "GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET" },
+			}),
+		});
+		expect(r).toEqual({ data: DEMO, source: "demo" });
+	});
+
+	it("a non-object structuredContent envelope → unavailable → demo", async () => {
+		const r = await readVia(scope, "store_get", {}, snapDecoder, DEMO, {
+			endpoint: "http://gw",
+			fetchImpl: rawFetch("not-an-object"),
+		});
+		expect(r).toEqual({ data: DEMO, source: "demo" });
 	});
 });

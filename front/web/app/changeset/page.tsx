@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { ChangeSetPanel } from "@/components/ChangeSetPanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { liveEnvelopes } from "./actions";
+import { LiveEnvelopes } from "./LiveEnvelopes";
+
+// Read the live ChangeSet journal of the active project on every request (the S59 cutover):
+// the live envelope list is read through the gateway, never baked into a static page.
+export const dynamic = "force-dynamic";
 
 // Determinism-first: the ChangeSet lifecycle (open/apply/edit/revert) is a pure projection in
 // lib/changeset.ts (mirroring back/archive/changeset), covered by lib/changeset.test.ts (fast-check).
@@ -33,6 +39,8 @@ export const metadata: Metadata = {
  */
 export default async function ChangeSetPage() {
 	const t = await getTranslations("changeset");
+	const tc = await getTranslations("common");
+	const live = await liveEnvelopes();
 
 	const labels = {
 		envelopeHeading: t("envelopeHeading"),
@@ -107,6 +115,27 @@ export default async function ChangeSetPage() {
 
 				<div className="mt-10">
 					<ChangeSetPanel labels={labels} />
+				</div>
+
+				{/* Live ChangeSet journal — read through the gateway (changeset_list), demo fallback */}
+				<div className="mt-10">
+					<LiveEnvelopes
+						view={live}
+						labels={{
+							heading: t("liveHeading"),
+							intro: t("liveIntro"),
+							empty: t("liveEmpty"),
+							live: tc("live"),
+							demo: tc("demo"),
+							liveTitle: t("liveTitle"),
+							demoTitle: t("demoTitle"),
+							idLabel: t("liveIdLabel"),
+							labelLabel: t("liveLabelLabel"),
+							statusLabel: t("liveStatusLabel"),
+							parentPhaseLabel: t("parentPhaseLabel"),
+							revertsLabel: t("revertsLabel"),
+						}}
+					/>
 				</div>
 
 				{/* Worked example */}

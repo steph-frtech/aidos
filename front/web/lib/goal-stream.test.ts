@@ -137,12 +137,16 @@ describe("S60 — streamGoal deterministic fallback + live", () => {
 	});
 
 	it("returns source:live on a well-formed payload", async () => {
+		// The passerelle answers gateway_call with { outcome:"route", result }; callGateway
+		// unwraps `.result` to the decoder. The backend tool's real payload rides under result.
 		const live: typeof fetch = async () =>
 			new Response(
 				JSON.stringify({
 					jsonrpc: "2.0",
 					id: 1,
-					result: { structuredContent: wellFormed },
+					result: {
+						structuredContent: { outcome: "route", result: wellFormed },
+					},
 				}),
 				{ status: 200, headers: { "content-type": "application/json" } },
 			);

@@ -103,9 +103,28 @@ export function gatewayEndpoint(): string | null {
  * the only impure surface of this module. Returns {ok:false} on any transport failure or
  * non-2xx — the caller then falls back to the demo fixture (deterministic, never throws).
  *
- * The gateway applies the wall server-side; an unknown tool here is rejected client-side
- * first (the closed registry, lib/gateway) so we never send a call the gateway can only
- * refuse — the SDK is faithful to the same closed surface as the router.
+ * ── THE gateway_call ENVELOPE (S59 cutover) ──────────────────────────────────────────
+ * The passerelle exposes ONLY its own surface tools (gateway_route/tools/servers and
+ * gateway_call) — NOT each fronted backend tool. So a backend read (changeset_list,
+ * store_history, dag_heads, project_list, …) is NOT a `tools/call` on that tool name; it is
+ * a `tools/call` on `gateway_call` with the real tool nested in the arguments:
+ *
+ *   params.name = "gateway_call"
+ *   params.arguments = { scope:{identity, active_project}, tool, args }
+ *
+ * The server routes (the wall FIRST) THEN dispatches, answering with a `callOutput`:
+ *   { outcome, result?, block_reason? }
+ *
+ * callGateway UNWRAPS that outcome so its public contract is UNCHANGED for callers:
+ *   - outcome === "route"  → ok:true, content = the backend tool's real result;
+ *   - any OTHER outcome (route_undispatched when no store is wired; refused_truth_write /
+ *     refused_scope / unknown_tool) → ok:false → the decoder falls back to demo. The seam
+ *     is the source; an unavailable / refused backend deterministically yields the demo
+ *     projection (ADR 0074: no silent broken-live, an honest source:"demo").
+ *
+ * The gateway applies the wall server-side; an unknown INNER tool is also rejected
+ * client-side first (the closed registry, lib/gateway) so we never wrap a call the gateway
+ * can only refuse — the SDK is faithful to the same closed surface as the router.
  */
 export async function callGateway(
 	scope: Scope,
@@ -115,7 +134,7 @@ export async function callGateway(
 	fetchImpl: typeof fetch = fetch,
 ): Promise<GatewayCallResult> {
 	if (!endpoint) return { ok: false, error: "no_endpoint" };
-	// Faithful to the closed registry: never send an unexposed tool name.
+	// Faithful to the closed registry: never wrap an unexposed inner tool name.
 	if (!lookup(tool)) return { ok: false, error: "unknown_tool" };
 	try {
 		const res = await fetchImpl(endpoint, {
@@ -131,7 +150,19 @@ export async function callGateway(
 				jsonrpc: "2.0",
 				id: 1,
 				method: "tools/call",
-				params: { name: tool, arguments: { scope, ...args } },
+				// The ONLY tool the passerelle exposes for a backend op is gateway_call; the
+				// real tool + its args ride NESTED, with the scope keyed on (identity, project).
+				params: {
+					name: "gateway_call",
+					arguments: {
+						scope: {
+							identity: scope.identity,
+							active_project: scope.activeProject,
+						},
+						tool,
+						args,
+					},
+				},
 			}),
 		});
 		if (!res.ok) return { ok: false, error: `http_${res.status}` };
@@ -140,8 +171,17 @@ export async function callGateway(
 		const result = body.result;
 		if (!isObject(result)) return { ok: false, error: "malformed_result" };
 		if (result.isError === true) return { ok: false, error: "tool_error" };
-		// The MCP CallToolResult carries the tool's typed output in structuredContent.
-		return { ok: true, content: result.structuredContent };
+		// The MCP CallToolResult carries gateway_call's callOutput in structuredContent.
+		const out = result.structuredContent;
+		if (!isObject(out)) return { ok: false, error: "malformed_result" };
+		// The wall + dispatch verdict: only "route" carries a dispatched backend result.
+		// Anything else (route_undispatched / refused_* / unknown_tool) is UNAVAILABLE →
+		// the caller's decoder falls back to the demo projection (source:"demo").
+		if (out.outcome !== "route") {
+			return { ok: false, error: `outcome_${str(out.outcome) ?? "unknown"}` };
+		}
+		// Unwrap: hand the caller the backend tool's real typed output, not the envelope.
+		return { ok: true, content: out.result };
 	} catch (err) {
 		return { ok: false, error: (err as Error).message };
 	}
