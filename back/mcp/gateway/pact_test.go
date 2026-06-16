@@ -72,7 +72,7 @@ func gatewayContract() []pactInteraction {
 // verifies EACH contract interaction: the structured result's field set matches exactly
 // and any pinned scalar field matches. A mismatch FAILS (the honesty assertion).
 func TestPactProviderVerification(t *testing.T) {
-	httpSrv := httptest.NewServer(httpHandler())
+	httpSrv := httptest.NewServer(httpHandler(nil))
 	defer httpSrv.Close()
 	cli := mcp.NewClient(&mcp.Implementation{Name: "pact-consumer", Version: "v0"}, nil)
 	cs, err := cli.Connect(context.Background(), &mcp.StreamableClientTransport{Endpoint: httpSrv.URL}, nil)

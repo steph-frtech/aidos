@@ -19,6 +19,12 @@ GW_BIN="$REPO/.deploy-pulumi/aidos-gateway"
 WEB_PORT="${AIDOS_WEB_PORT:-3000}"
 GW_LOG="${AIDOS_GATEWAY_LOG:-/tmp/aidos-gateway.log}"
 WEB_LOG="${AIDOS_WEB_LOG:-/tmp/aidos-next-start.log}"
+# AIDOS_GATEWAY_DSN — the writer DSN the S59 dispatcher opens (lazily) to EXECUTE routed
+# below-the-line calls (changeset_open → a real row in changesets.changeset, etc.). Without
+# it the gateway runs dispatch=false (pure routing only, every panel stays on its twin). We
+# default it to the same Postgres connection string the front + sink use (.env.local), so a
+# standard `workbench-up` brings the dispatcher LIVE. The wall is enforced regardless.
+GW_DSN="${AIDOS_GATEWAY_DSN:-$(grep -oE 'POSTGRES_CONNECTION_STRING=.*' "$REPO/front/web/.env.local" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"')}"
 
 wait_port() { # $1=port $2=max_seconds
 	for _ in $(seq 1 "${2:-10}"); do ss -ltn 2>/dev/null | grep -q ":$1 " && return 0; sleep 1; done; return 1
@@ -41,7 +47,7 @@ else
 	echo "▶ gateway: (re)launch on $GW_ADDR"
 	pkill -f 'aidos-gateway' 2>/dev/null || true
 	wait_free "$GW_PORT" 15 || echo "  (port $GW_PORT still held; relying on SO_REUSEADDR)"
-	setsid nohup env AIDOS_GATEWAY_HTTP_ADDR="$GW_ADDR" "$GW_BIN" >"$GW_LOG" 2>&1 < /dev/null &
+	setsid nohup env AIDOS_GATEWAY_HTTP_ADDR="$GW_ADDR" AIDOS_GATEWAY_DSN="$GW_DSN" "$GW_BIN" >"$GW_LOG" 2>&1 < /dev/null &
 	disown 2>/dev/null || true
 	# generous wait: the previous listener may linger in the task-runner's reap window.
 	if wait_port "$GW_PORT" 30; then echo "✓ gateway UP on $GW_ADDR"; else echo "✗ gateway NOT UP — log:"; cat "$GW_LOG"; exit 1; fi

@@ -1,4 +1,4 @@
-package main
+package changesetsrv
 
 // End-to-end MCP smoke mirror: reflects=mcp.changeset, test_kind=integration, liveness=live.
 //
@@ -8,6 +8,12 @@ package main
 //   open (DRAFT) → apply complete (APPLIED, applied_at set) → revert (NEW DRAFT inverse, source
 //   stays APPLIED) → apply inverse (APPLIED) → discard a fresh DRAFT (removed). Plus the
 //   incomplete-apply block (INCOMPLETE_CHANGESET).
+//
+// This mirror moved here verbatim from the old package-main binary when the handlers were extracted
+// into this library (S59): it tests the SAME handlers, now reusable by both the stdio binary and the
+// gateway dispatcher. Only the migration paths shifted (two dirs deeper) and the test is now an
+// in-package test (package changesetsrv) so it drives the unexported handlers directly — exactly what
+// it tested before.
 
 import (
 	"context"
@@ -49,8 +55,8 @@ func startServer(t *testing.T) *server {
 		t.Fatalf("pgxpool: %v", err)
 	}
 	for _, f := range []string{
-		"../../migrations/kernel_records_baseline.sql",
-		"../../migrations/changesets_lifecycle_baseline.sql",
+		"../../../migrations/kernel_records_baseline.sql",
+		"../../../migrations/changesets_lifecycle_baseline.sql",
 	} {
 		mig, err := os.ReadFile(f)
 		if err != nil {

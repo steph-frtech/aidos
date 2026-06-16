@@ -16,13 +16,15 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/steph-frtech/aidos/back/runtime/gateway"
+	"github.com/steph-frtech/aidos/back/runtime/gatewaydispatch"
 )
 
 func connectInMemory(t *testing.T) *mcp.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 	clientT, serverT := mcp.NewInMemoryTransports()
-	srv := newMCPServer()
+	srv := newMCPServer(nil)
 	ss, err := srv.Connect(ctx, serverT, nil)
 	if err != nil {
 		t.Fatalf("server connect: %v", err)
@@ -37,10 +39,14 @@ func connectInMemory(t *testing.T) *mcp.ClientSession {
 	return cs
 }
 
-func connectHTTP(t *testing.T) *mcp.ClientSession {
+func connectHTTP(t *testing.T) *mcp.ClientSession { return connectHTTPWithDispatch(t, nil) }
+
+// connectHTTPWithDispatch mounts the gateway over a real httptest server with an OPTIONAL
+// dispatcher (nil = meta-tools only) and returns a connected HTTP client session.
+func connectHTTPWithDispatch(t *testing.T, d *gatewaydispatch.Dispatcher) *mcp.ClientSession {
 	t.Helper()
 	ctx := context.Background()
-	httpSrv := httptest.NewServer(httpHandler())
+	httpSrv := httptest.NewServer(httpHandler(d))
 	t.Cleanup(httpSrv.Close)
 	cli := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "v0"}, nil)
 	cs, err := cli.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: httpSrv.URL}, nil)
@@ -143,7 +149,75 @@ func TestTransport_ToolsAndServersOverHTTP(t *testing.T) {
 		t.Fatalf("gateway_servers: %v", err)
 	}
 	servers := decode[serversOutput](t, sr, "gateway_servers")
-	if len(servers.Servers) != 14 {
-		t.Fatalf("expected the 14 fronted MCP servers, got %d", len(servers.Servers))
+	// Assert against the canonical closed list (gateway.GatewayServers) rather than a
+	// hardcoded count, so registering a new fronted server (e.g. reality-ingest, ADR 0081)
+	// keeps the HTTP plane honouring the MCP plane without re-staling this number.
+	if want := len(gateway.GatewayServers()); len(servers.Servers) != want {
+		t.Fatalf("expected the %d fronted MCP servers, got %d", want, len(servers.Servers))
+	}
+}
+
+// fakeChangesetDispatcher wires a Dispatcher whose only backend is the deterministic
+// in-memory fake changeset server (newFakeChangesetServer, gateway_call_test.go).
+func fakeChangesetDispatcher() *gatewaydispatch.Dispatcher {
+	return gatewaydispatch.New(gateway.DefaultRegistry(), func(_ context.Context, srv string) (*mcp.Server, error) {
+		if srv != "changeset" {
+			return nil, gatewaydispatch.ErrServerNotDispatched
+		}
+		return newFakeChangesetServer(), nil
+	})
+}
+
+// TestTransport_GatewayCallExecutesOverHTTP is the S59 SCAR MIRROR: it drives gateway_call
+// with an args:OBJECT payload over the REAL HTTP transport (StreamableHTTPHandler), proving
+// the announced input schema ACCEPTS an object and the routed below-the-line changeset_open
+// reaches its backend and returns a structured result. A byte-array-typed Args field (the
+// regression the in-Go unit test could not catch) makes the transport REJECT this object at
+// input validation before the handler — this test goes red on exactly that.
+func TestTransport_GatewayCallExecutesOverHTTP(t *testing.T) {
+	d := fakeChangesetDispatcher()
+	t.Cleanup(d.Close)
+	cs := connectHTTPWithDispatch(t, d)
+
+	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "gateway_call",
+		Arguments: callInput{
+			Scope: scopeIn{Identity: "alice", ActiveProject: "proj-a"},
+			Tool:  "changeset_open",
+			Args:  map[string]any{"label": "add order discount", "parent_phase": "p"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool gateway_call over HTTP: %v", err)
+	}
+	out := decode[callOutput](t, res, "gateway_call")
+	if out.Outcome != "route" {
+		t.Fatalf("gateway_call over HTTP outcome = %q, want route (the args:object reached the backend)", out.Outcome)
+	}
+	if out.Result == nil || out.Result["id"] != "cs-deadbeef" || out.Result["status"] != "DRAFT" {
+		t.Fatalf("gateway_call over HTTP result = %+v, want the fake's deterministic envelope", out.Result)
+	}
+}
+
+// TestTransport_GatewayCallWallOverHTTP proves the wall refuses a truth-write through the
+// gateway_call EXECUTE door over HTTP (not just the route-only meta-tool).
+func TestTransport_GatewayCallWallOverHTTP(t *testing.T) {
+	d := fakeChangesetDispatcher()
+	t.Cleanup(d.Close)
+	cs := connectHTTPWithDispatch(t, d)
+
+	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "gateway_call",
+		Arguments: callInput{Scope: scopeIn{Identity: "alice", ActiveProject: "proj-a"}, Tool: "kernel_write"},
+	})
+	if err != nil {
+		t.Fatalf("CallTool gateway_call kernel_write over HTTP: %v", err)
+	}
+	out := decode[callOutput](t, res, "gateway_call")
+	if out.Outcome != "refused_truth_write" {
+		t.Fatalf("truth-write through gateway_call not refused over HTTP: %s", out.Outcome)
+	}
+	if out.BlockReason == nil || out.BlockReason.Code != "GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET" {
+		t.Fatalf("missing GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET: %+v", out.BlockReason)
 	}
 }

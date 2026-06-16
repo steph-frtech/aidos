@@ -34,9 +34,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	cs "github.com/steph-frtech/aidos/back/archive/changeset"
+	"github.com/steph-frtech/aidos/back/mcp/changeset/changesetsrv"
 	"github.com/steph-frtech/aidos/back/runtime/gateway"
+	"github.com/steph-frtech/aidos/back/runtime/gatewaydispatch"
 	"github.com/steph-frtech/aidos/back/runtime/projectwall"
 )
 
@@ -87,8 +91,26 @@ type serversOutput struct {
 	Servers []string `json:"servers"`
 }
 
+// ── gateway_call I/O (S59: route THEN dispatch the routed below-the-line op) ──
+
+type callInput struct {
+	Scope scopeIn        `json:"scope"`
+	Tool  string         `json:"tool" jsonschema:"the MCP tool name to route then dispatch (e.g. changeset_open)"`
+	Args  map[string]any `json:"args,omitempty" jsonschema:"the backend tool arguments as an object (the router never interprets them; an object — NOT a byte-array — so the real HTTP transport accepts it, the S59 scar)"`
+}
+
+type callOutput struct {
+	Outcome     string          `json:"outcome"`
+	Result      map[string]any  `json:"result,omitempty"`
+	BlockReason *blockReasonOut `json:"block_reason,omitempty"`
+}
+
 type server struct {
 	reg *gateway.Registry
+	// dispatch executes a routed below-the-line call against an in-process backend (S59).
+	// nil when no DSN is configured: gateway_call still applies the wall via reg.Route, but
+	// a routed below-line call returns route_undispatched (the caller falls back to demo).
+	dispatch *gatewaydispatch.Dispatcher
 }
 
 func toToolOut(t gateway.Tool) toolOut {
@@ -129,13 +151,86 @@ func (s *server) servers(_ context.Context, _ *mcp.CallToolRequest, _ emptyInput
 	return nil, serversOutput{Servers: gateway.GatewayServers()}, nil
 }
 
-func newMCPServer() *mcp.Server {
-	s := &server{reg: gateway.DefaultRegistry()}
+// call is the S59 EXECUTE door: it routes a (scope, tool, args) call THEN dispatches the
+// routed below-the-line op to its owning backend in-process, returning the backend's
+// structured result. THE WALL ALWAYS APPLIES FIRST (CLAUDE.md §2):
+//
+//   - a truth-write (kernel_write/mirror_write/fitness_write/stack.engrave_manifest) is
+//     refused with GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET — the backend is NEVER touched, with
+//     OR without a Dispatcher configured;
+//   - a cross-project / forged call is refused (AGENT_CROSS_PROJECT_WRITE); an unknown tool
+//     is refused — same router, same codes as gateway_route.
+//
+// When no Dispatcher is configured (no DSN), the wall is STILL enforced (reg.Route directly):
+// a truth-write is refused, and a routed below-line call returns route_undispatched so the
+// front falls back to its demo/twin projection (no regression, ADR 0074). A routed below-line
+// call with a Dispatcher reaches the backend and returns its result.
+func (s *server) call(ctx context.Context, _ *mcp.CallToolRequest, in callInput) (*mcp.CallToolResult, callOutput, error) {
+	scope := projectwall.Scope{Identity: in.Scope.Identity, ActiveProject: in.Scope.ActiveProject}
+
+	// No Dispatcher: enforce the wall directly via the pure router. A non-route outcome is
+	// refused (truth-write / scope / unknown); a route becomes route_undispatched (demo).
+	if s.dispatch == nil {
+		d := s.reg.Route(gateway.Call{Scope: scope, Tool: in.Tool, Target: projectwall.Target{ProjectID: scope.ActiveProject}})
+		if d.Outcome != gateway.OutcomeRoute {
+			return nil, callOutput{Outcome: string(d.Outcome), BlockReason: toBlockOut(d.BlockReason)}, nil
+		}
+		return nil, callOutput{Outcome: gatewaydispatch.OutcomeRouteUndispatched}, nil
+	}
+
+	// Dispatcher present: it routes (the wall) THEN dispatches. A refusal carries no result.
+	result, br, outcome, err := s.dispatch.Call(ctx, scope, in.Tool, in.Args)
+	if err != nil {
+		return nil, callOutput{}, err
+	}
+	return nil, callOutput{Outcome: outcome, Result: result, BlockReason: toBlockOut(br)}, nil
+}
+
+// newMCPServer builds the gateway MCP server. The dispatcher is OPTIONAL (nil = no DSN): the
+// three meta-tools (gateway_route/tools/servers) are unchanged and pure; gateway_call applies
+// the wall either way (via the dispatcher's router, or — when nil — reg.Route directly).
+func newMCPServer(dispatch *gatewaydispatch.Dispatcher) *mcp.Server {
+	s := &server{reg: gateway.DefaultRegistry(), dispatch: dispatch}
 	srv := mcp.NewServer(&mcp.Implementation{Name: "aidos-gateway", Version: "v0.1.0"}, nil)
 	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_route", Description: "The server-side wall routing decision for a (scope, tool, target) call: route a below-the-line op, refuse a cross-project/forged call (AGENT_CROSS_PROJECT_WRITE), or refuse a truth-write (GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET). Pure, deterministic — zero LLM."}, s.route)
 	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_tools", Description: "The CLOSED set of MCP tools the gateway exposes (name · owning server · wall disposition), sorted. Pure."}, s.tools)
 	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_servers", Description: "The 14 MCP servers the gateway fronts (store · mirror-runner · changeset · dag · idea-intake · memory · context · evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project · provision — the DP13 stack/bootstrap/profile tools)."}, s.servers)
+	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_call", Description: "Route THEN dispatch a (scope, tool, args) call to its owning backend in-process (S59). The wall applies FIRST: a truth-write is refused (GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET), a cross-project/forged call is refused (AGENT_CROSS_PROJECT_WRITE), an unknown tool is refused. A routed below-the-line call returns the backend's structured result; without a configured store it returns route_undispatched (the caller falls back to demo)."}, s.call)
 	return srv
+}
+
+// changesetDSN resolves the DSN the dispatcher's changeset backend opens: AIDOS_GATEWAY_DSN
+// first (the gateway's own writer DSN), falling back to AIDOS_CHANGESET_DSN (the standalone
+// changeset server's DSN) so a single deployment can configure either.
+func changesetDSN() string {
+	if dsn := os.Getenv("AIDOS_GATEWAY_DSN"); dsn != "" {
+		return dsn
+	}
+	return os.Getenv("AIDOS_CHANGESET_DSN")
+}
+
+// buildDispatcher constructs the S59 Dispatcher when a DSN is configured, else nil (the wall
+// still holds for gateway_call — see (*server).call). The StoreProvider wires ONLY the
+// changeset backend in this tranche; every other server returns ErrServerNotDispatched, so
+// the front falls back to demo for the un-wired ones (strictly additive cutover, no
+// regression). The changeset store is opened LAZILY (on the first changeset_* dispatch), so
+// a gateway with a DSN but no changeset traffic never touches Postgres.
+func buildDispatcher() *gatewaydispatch.Dispatcher {
+	dsn := changesetDSN()
+	if dsn == "" {
+		return nil
+	}
+	factory := func(ctx context.Context, srv string) (*mcp.Server, error) {
+		if srv != "changeset" {
+			return nil, gatewaydispatch.ErrServerNotDispatched
+		}
+		store, err := cs.NewStore(ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+		return changesetsrv.NewServer(store, time.Now), nil
+	}
+	return gatewaydispatch.New(gateway.DefaultRegistry(), factory)
 }
 
 // httpHandler builds the MCP-over-HTTP handler: the SAME server served over JSON-RPC/
@@ -152,21 +247,25 @@ func newMCPServer() *mcp.Server {
 // one-shot call AND the full handshake (the SDK clients in pact/transport tests), so the
 // HTTP still honours the MCP. Idempotent reads only; truth-writes never reach here (the
 // wall refuses them server-side before any dispatch).
-func httpHandler() http.Handler {
-	srv := newMCPServer()
+func httpHandler(dispatch *gatewaydispatch.Dispatcher) http.Handler {
+	srv := newMCPServer(dispatch)
 	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv }, &mcp.StreamableHTTPOptions{JSONResponse: true, Stateless: true})
 }
 
 func main() {
 	ctx := context.Background()
+	dispatch := buildDispatcher() // nil when no DSN — gateway_call still enforces the wall.
+	if dispatch != nil {
+		defer dispatch.Close()
+	}
 	if addr := os.Getenv("AIDOS_GATEWAY_HTTP_ADDR"); addr != "" {
-		log.Printf("gateway: serving MCP-over-HTTP on %s", addr)
-		if err := http.ListenAndServe(addr, httpHandler()); err != nil {
+		log.Printf("gateway: serving MCP-over-HTTP on %s (dispatch=%t)", addr, dispatch != nil)
+		if err := http.ListenAndServe(addr, httpHandler(dispatch)); err != nil {
 			log.Fatalf("gateway: http: %v", err)
 		}
 		return
 	}
-	if err := newMCPServer().Run(ctx, &mcp.StdioTransport{}); err != nil {
+	if err := newMCPServer(dispatch).Run(ctx, &mcp.StdioTransport{}); err != nil {
 		log.Fatalf("gateway: run: %v", err)
 	}
 }

@@ -62,6 +62,7 @@ next-env.d.ts
 /back/context
 /back/dag
 /back/evolve
+/back/gateway
 /back/goal-check
 /back/headroom
 /back/idea-intake
@@ -131,3 +132,6 @@ back/aidosdatafragments
 # rapid property-test failure repro artifacts (never committed)
 *.fail
 testdata/rapid/
+
+# ephemeral workflow run-scripts (orchestration artifacts, not product code)
+.claude/workflows/scripts/
