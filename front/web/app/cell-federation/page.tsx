@@ -3,6 +3,8 @@ import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
 import { CellFederationPanel } from "./CellFederationPanel";
+import { LivePact } from "./LivePact";
+import { livePact } from "./liveActions";
 
 export const metadata: Metadata = {
 	title: "Fédération de cellules (bounded contexts) — AIDOS Workbench",
@@ -26,6 +28,7 @@ export const dynamic = "force-dynamic";
 export default async function CellFederationPage() {
 	const ctx = await activeProjectContext();
 	const t = await getTranslations("cellFederation");
+	const pactView = await livePact();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -65,6 +68,25 @@ export default async function CellFederationPage() {
 				<div className="mt-10">
 					<CellFederationPanel activeProjectId={ctx.activeId} />
 				</div>
+
+				{/* The LIVE contract verification, read cheaply through the gateway (pact_verify). */}
+				<LivePact
+					view={pactView}
+					labels={{
+						heading: t("live.heading"),
+						intro: t("live.intro"),
+						pass: t("live.pass"),
+						fail: t("live.fail"),
+						operationLabel: t("live.operationLabel"),
+						routeLabel: t("live.routeLabel"),
+						interactionsHeading: t("live.interactionsHeading"),
+						noInteractions: t("live.noInteractions"),
+						live: t("live.live"),
+						demo: t("live.demo"),
+						liveTitle: t("live.liveTitle"),
+						demoTitle: t("live.demoTitle"),
+					}}
+				/>
 			</main>
 		</div>
 	);

@@ -1,4 +1,4 @@
-package main
+package backtestersrv
 
 import (
 	"context"
@@ -46,7 +46,7 @@ func TestBacktest_Get(t *testing.T) {
 }
 
 func TestBacktesterRegistersTools(t *testing.T) {
-	if newMCPServer(newServer()) == nil {
+	if NewServer() == nil {
 		t.Fatal("nil MCP server")
 	}
 }

@@ -9,6 +9,8 @@ import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 // Action — so /mirrors computes exactly what the Go runner computes. One decision,
 // no drift.
 import { MIRROR_INVENTORY } from "@/lib/mirrors";
+import { LiveRatchet } from "./LiveRatchet";
+import { liveRatchet } from "./liveActions";
 import { RatchetRunner } from "./RatchetRunner";
 
 export const metadata: Metadata = {
@@ -32,6 +34,7 @@ export const metadata: Metadata = {
  */
 export default async function MirrorsPage() {
 	const t = await getTranslations("mirrors");
+	const ratchetView = await liveRatchet();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -99,6 +102,24 @@ export default async function MirrorsPage() {
 					</h2>
 					<RatchetRunner inventory={MIRROR_INVENTORY} />
 				</section>
+
+				{/* The LIVE ratchet verdict, read cheaply through the gateway (ratchet_check). */}
+				<LiveRatchet
+					view={ratchetView}
+					labels={{
+						heading: t("live.heading"),
+						intro: t("live.intro"),
+						allowed: t("live.allowed"),
+						rejected: t("live.rejected"),
+						regressedHeading: t("live.regressedHeading"),
+						noRegression: t("live.noRegression"),
+						runIdLabel: t("live.runIdLabel"),
+						live: t("live.live"),
+						demo: t("live.demo"),
+						liveTitle: t("live.liveTitle"),
+						demoTitle: t("live.demoTitle"),
+					}}
+				/>
 
 				<footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
 					{t.rich("footer", {

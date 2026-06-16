@@ -624,6 +624,19 @@
 			"regressedHeading": "Regressed mirrors"
 		},
 		"inventoryHeading": "Mirror inventory",
+		"live": {
+			"heading": "Ratchet verdict (live)",
+			"intro": "The active project's CURRENT merge verdict, read live through the gateway (ratchet_check, below the line). It is a CHEAP read: the replay compares against the last recorded status (the S05 BaselineReplayer), no test subprocess is launched from the screen. An unreachable gateway or one with no wired store falls back to the demo verdict.",
+			"allowed": "ALLOWED — no regression",
+			"rejected": "REJECTED — regression detected",
+			"regressedHeading": "Regressed mirrors",
+			"noRegression": "No baseline-green mirror regressed.",
+			"runIdLabel": "run:",
+			"live": "LIVE · gateway",
+			"demo": "demo data",
+			"liveTitle": "Read live from the gateway (ratchet_check)",
+			"demoTitle": "Gateway unreachable — showing the demo verdict"
+		},
 		"footer": "Enforced capability: <code>back/mcp/mirror-runner</code> (replay + run-log) + <code>back/hooks/ci-ratchet</code> (merge gate) — projected here by <code>lib/mirrors.ts</code>."
 	},
 	"mirrorHealth": {
@@ -5828,7 +5841,21 @@
 		"accessRefused": "access REFUSED",
 		"howToFixLabel": "How to fix",
 		"working": "Working…",
-		"blockedHeading": "Refused"
+		"blockedHeading": "Refused",
+		"live": {
+			"heading": "Contract verification (live)",
+			"intro": "The provider verification of a cell's PUBLIC contract for the canonical operation (createOrder), read live through the gateway (pact_verify, below the line). It is a CHEAP read: the emitted handler is stood up IN-PROCESS (net/http/httptest, ADR 0026) and the field set is asserted — no Postgres, no subprocess, no Ruby daemon. An unreachable gateway or one with no wired store falls back to the demo verdict.",
+			"pass": "HONOURED — every interaction respects the contract",
+			"fail": "NOT HONOURED — an interaction violates the contract",
+			"operationLabel": "operation:",
+			"routeLabel": "route:",
+			"interactionsHeading": "Verified interactions",
+			"noInteractions": "No verified interaction (unknown operation — no contract to verify).",
+			"live": "LIVE · gateway",
+			"demo": "demo data",
+			"liveTitle": "Read live from the gateway (pact_verify)",
+			"demoTitle": "Gateway unreachable — showing the demo verdict"
+		}
 	},
 	"contextMap": {
 		"eyebrow": "S101 · Context-Map & inter-cell contracts",
@@ -6090,7 +6117,21 @@
 		"noneKilled": "none",
 		"promoteHeading": "Promotion verdict",
 		"wroteTruth": "WROTE A TRUTH (forbidden)",
-		"noTruthWrite": "writes no truth (PROPOSAL)"
+		"noTruthWrite": "writes no truth (PROPOSAL)",
+		"live": {
+			"heading": "Out-of-sample evaluation (live)",
+			"intro": "A variant's RECORDED out-of-sample evaluation, read live through the gateway (backtest_get, below the line). It is a CHEAP read: it reads an already-recorded verdict from the evaluation store — no market feed, no replay. The HEAVY op backtest_out_of_sample (the EVALUATE behind the data-feed seam) is NOT triggered from the screen. An unreachable gateway or one with no wired store falls back to the demo evaluation.",
+			"green": "GREEN — above the out-of-sample bar",
+			"red": "RED — below the out-of-sample bar",
+			"notEvaluated": "not evaluated — no recorded verdict",
+			"variantLabel": "variant:",
+			"scoreLabel": "out-of-sample score",
+			"barLabel": "bar (§87)",
+			"live": "LIVE · gateway",
+			"demo": "demo data",
+			"liveTitle": "Read live from the gateway (backtest_get)",
+			"demoTitle": "Gateway unreachable — showing the demo evaluation"
+		}
 	},
 	"truthApproval": {
 		"eyebrow": "S110 · Multi-human truth approval + concurrency",

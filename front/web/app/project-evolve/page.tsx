@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { LiveBacktest } from "./LiveBacktest";
+import { liveBacktest } from "./liveActions";
 import { ProjectEvolvePanel } from "./ProjectEvolvePanel";
 
 export const metadata: Metadata = {
@@ -26,6 +28,7 @@ export const metadata: Metadata = {
  */
 export default async function ProjectEvolvePage() {
 	const t = await getTranslations("projectEvolve");
+	const backtestView = await liveBacktest();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -52,6 +55,25 @@ export default async function ProjectEvolvePage() {
 				<div className="mt-10">
 					<ProjectEvolvePanel />
 				</div>
+
+				{/* The LIVE out-of-sample evaluation, read cheaply through the gateway (backtest_get). */}
+				<LiveBacktest
+					view={backtestView}
+					labels={{
+						heading: t("live.heading"),
+						intro: t("live.intro"),
+						green: t("live.green"),
+						red: t("live.red"),
+						notEvaluated: t("live.notEvaluated"),
+						variantLabel: t("live.variantLabel"),
+						scoreLabel: t("live.scoreLabel"),
+						barLabel: t("live.barLabel"),
+						live: t("live.live"),
+						demo: t("live.demo"),
+						liveTitle: t("live.liveTitle"),
+						demoTitle: t("live.demoTitle"),
+					}}
+				/>
 			</main>
 		</div>
 	);

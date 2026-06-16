@@ -624,6 +624,19 @@
 			"regressedHeading": "Miroirs régressés"
 		},
 		"inventoryHeading": "Inventaire des miroirs",
+		"live": {
+			"heading": "Verdict du cliquet (en direct)",
+			"intro": "Le verdict de fusion COURANT du projet actif, lu en direct par la passerelle (ratchet_check, en dessous de la ligne). C'est une LECTURE bon marché : le rejeu compare au dernier statut enregistré (BaselineReplayer S05), aucun sous-process de test n'est lancé depuis l'écran. La passerelle injoignable ou sans store branché retombe sur le verdict de démo.",
+			"allowed": "ALLOWED — aucune régression",
+			"rejected": "REJECTED — régression détectée",
+			"regressedHeading": "Miroirs régressés",
+			"noRegression": "Aucun miroir vert à la base n'a régressé.",
+			"runIdLabel": "run :",
+			"live": "EN DIRECT · passerelle",
+			"demo": "données de démo",
+			"liveTitle": "Lu en direct depuis la passerelle (ratchet_check)",
+			"demoTitle": "Passerelle injoignable — affichage du verdict de démo"
+		},
 		"footer": "Capacité enforcée : <code>back/mcp/mirror-runner</code> (rejeu + journal) + <code>back/hooks/ci-ratchet</code> (porte de fusion) — projetée ici par <code>lib/mirrors.ts</code>."
 	},
 	"mirrorHealth": {
@@ -5828,7 +5841,21 @@
 		"accessRefused": "accès REFUSÉ",
 		"howToFixLabel": "Comment corriger",
 		"working": "En cours…",
-		"blockedHeading": "Refusé"
+		"blockedHeading": "Refusé",
+		"live": {
+			"heading": "Vérification de contrat (en direct)",
+			"intro": "La vérification provider du contrat PUBLIC d'une cellule pour l'opération canonique (createOrder), lue en direct par la passerelle (pact_verify, en dessous de la ligne). C'est une LECTURE bon marché : le handler émis est dressé EN PROCESS (net/http/httptest, ADR 0026) et le set de champs est asserté — aucun Postgres, aucun sous-process, aucun démon Ruby. La passerelle injoignable ou sans store branché retombe sur le verdict de démo.",
+			"pass": "HONORÉ — chaque interaction respecte le contrat",
+			"fail": "NON HONORÉ — une interaction viole le contrat",
+			"operationLabel": "opération :",
+			"routeLabel": "route :",
+			"interactionsHeading": "Interactions vérifiées",
+			"noInteractions": "Aucune interaction vérifiée (opération inconnue — aucun contrat à vérifier).",
+			"live": "EN DIRECT · passerelle",
+			"demo": "données de démo",
+			"liveTitle": "Lu en direct depuis la passerelle (pact_verify)",
+			"demoTitle": "Passerelle injoignable — affichage du verdict de démo"
+		}
 	},
 	"contextMap": {
 		"eyebrow": "S101 · Context-Map & contrats inter-cellules",
@@ -6090,7 +6117,21 @@
 		"noneKilled": "aucune",
 		"promoteHeading": "Verdict de promotion",
 		"wroteTruth": "A ÉCRIT UNE VÉRITÉ (interdit)",
-		"noTruthWrite": "n'écrit aucune vérité (PROPOSITION)"
+		"noTruthWrite": "n'écrit aucune vérité (PROPOSITION)",
+		"live": {
+			"heading": "Évaluation out-of-sample (en direct)",
+			"intro": "L'évaluation out-of-sample ENREGISTRÉE d'une variante, lue en direct par la passerelle (backtest_get, en dessous de la ligne). C'est une LECTURE bon marché : on lit un verdict déjà enregistré dans le magasin d'évaluations — aucun flux de marché, aucun rejeu. L'op LOURDE backtest_out_of_sample (l'ÉVALUATION derrière la couture du flux de données) n'est PAS déclenchée depuis l'écran. La passerelle injoignable ou sans store branché retombe sur l'évaluation de démo.",
+			"green": "VERT — au-dessus de la barre out-of-sample",
+			"red": "ROUGE — sous la barre out-of-sample",
+			"notEvaluated": "non évaluée — aucun verdict enregistré",
+			"variantLabel": "variante :",
+			"scoreLabel": "score out-of-sample",
+			"barLabel": "barre (§87)",
+			"live": "EN DIRECT · passerelle",
+			"demo": "données de démo",
+			"liveTitle": "Lu en direct depuis la passerelle (backtest_get)",
+			"demoTitle": "Passerelle injoignable — affichage de l'évaluation de démo"
+		}
 	},
 	"truthApproval": {
 		"eyebrow": "S110 · Approbation vérité multi-humains + concurrence",

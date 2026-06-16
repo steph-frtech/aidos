@@ -1,4 +1,4 @@
-package main
+package pactverifiersrv
 
 // pact-verifier MCP tests + fault injection (S36). The server's pact_verify op must:
 //   - PASS on createOrder (THE done criterion: the createOrder route passes its contract test);
@@ -59,8 +59,8 @@ func TestPactVerify_FaultInjection_DroppedFieldFails(t *testing.T) {
 	}
 }
 
-func TestNewMCPServerRegistersTool(t *testing.T) {
-	if newMCPServer() == nil {
-		t.Fatal("newMCPServer returned nil")
+func TestNewServerRegistersTool(t *testing.T) {
+	if NewServer() == nil {
+		t.Fatal("NewServer returned nil")
 	}
 }

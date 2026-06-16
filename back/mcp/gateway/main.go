@@ -42,12 +42,16 @@ import (
 	cs "github.com/steph-frtech/aidos/back/archive/changeset"
 	"github.com/steph-frtech/aidos/back/archive/contentstore"
 	"github.com/steph-frtech/aidos/back/archive/dag"
+	"github.com/steph-frtech/aidos/back/mcp/backtester/backtestersrv"
 	"github.com/steph-frtech/aidos/back/mcp/changeset/changesetsrv"
 	"github.com/steph-frtech/aidos/back/mcp/context/contextsrv"
 	"github.com/steph-frtech/aidos/back/mcp/dag/dagsrv"
 	"github.com/steph-frtech/aidos/back/mcp/evolve/evolvesrv"
 	ideaintakesrv "github.com/steph-frtech/aidos/back/mcp/idea-intake/ideaintakesrv"
 	"github.com/steph-frtech/aidos/back/mcp/memory/memorysrv"
+	"github.com/steph-frtech/aidos/back/mcp/mirror-runner/mirrorrunnersrv"
+	"github.com/steph-frtech/aidos/back/mcp/mutation-runner/mutationrunnersrv"
+	pactverifiersrv "github.com/steph-frtech/aidos/back/mcp/pact-verifier/pactverifiersrv"
 	"github.com/steph-frtech/aidos/back/mcp/project/projectsrv"
 	"github.com/steph-frtech/aidos/back/mcp/provision/provisionsrv"
 	realityingestsrv "github.com/steph-frtech/aidos/back/mcp/reality-ingest/realityingestsrv"
@@ -357,6 +361,51 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	"provision": func(context.Context) (*mcp.Server, error) {
 		return provisionsrv.NewServer(), nil
 	},
+	// ── cert-runners: only the CHEAP-READ tools are dispatched synchronously (S59). ──
+	// A gateway_call is a SYNCHRONOUS one-shot HTTP POST: a tool that LAUNCHES a long
+	// process (a real godog/gremlins/pact subprocess, a walk-forward replay) must NOT be a
+	// blocking dispatch — it is async/CI-by-design. Each cert-runner below stays wired so its
+	// CHEAP read is reachable; its HEAVY tool stays EXPOSED by the server (the standalone
+	// binary + CI use it) but the front simply does not dispatch it synchronously.
+	//
+	// mirror-runner is DSN-backed (AIDOS_ARCHIVE_DSN): a read-only `mirrors`-schema source +
+	// the append-only runtime.mirror_runs run-log. At S05 the Replayer is the pure
+	// BaselineReplayer (last-recorded-status comparison reader — NO test subprocess), so BOTH
+	// ratchet_check and mirror_replay are cheap reads today; S06+ tightening the replay seam to
+	// a real per-test_kind runner would make replaying heavy (the runner stays exposed; the
+	// front would stop dispatching it synchronously). The builder reuses the SAME wiring as the
+	// standalone binary (mirrorrunnersrv.NewRatchet) — no twin.
+	"mirror-runner": func(ctx context.Context) (*mcp.Server, error) {
+		r, err := mirrorrunnersrv.NewRatchet(ctx, serverDSN("AIDOS_ARCHIVE_DSN"))
+		if err != nil {
+			return nil, err
+		}
+		return mirrorrunnersrv.NewServer(r), nil
+	},
+	// pact-verifier is DEP-FREE (like context/evolve/provision): pact_verify stands the emitted
+	// handler up IN-PROCESS (net/http/httptest, ADR 0026) and asserts the field set — a CHEAP
+	// pure verification, no Postgres, no subprocess, no Ruby daemon. The builder ignores its ctx
+	// and returns the default server; it dispatches identically whatever DSN is set.
+	"pact-verifier": func(context.Context) (*mcp.Server, error) {
+		return pactverifiersrv.NewServer(), nil
+	},
+	// backtester is DEP-FREE: backtest_get is a CHEAP READ over the in-memory evaluation store
+	// (no market feed, no subprocess). backtest_out_of_sample stays exposed (the gate + the
+	// standalone binary use it) but is the EVALUATE op behind the data-feed seam — the front
+	// dispatches only the deterministic read (backtest_get). The builder ignores its ctx and
+	// returns the default server, like context/evolve/provision.
+	"backtester": func(context.Context) (*mcp.Server, error) {
+		return backtestersrv.NewServer(), nil
+	},
+	// mutation-runner — read_threshold is the CHEAP dispatched read (SELECT-only on fitness,
+	// the declared mutation-score bar the /mutation-score panel shows live). run_mutation stays
+	// exposed (the standalone binary + CI use it) but is HEAVY (gremlins/Stryker subprocess,
+	// minutes) — async/CI by design, never dispatched synchronously from a screen. Built over
+	// AIDOS_RUNTIME_DSN (falls back to AIDOS_GATEWAY_DSN); the pgx threshold read is the wall's
+	// SELECT-only fitness grade, never an authored bar.
+	"mutation-runner": func(ctx context.Context) (*mcp.Server, error) {
+		return mutationrunnersrv.NewFromDSN(ctx, serverDSN("AIDOS_RUNTIME_DSN"))
+	},
 }
 
 // gatewayMemorySeed is the fixed seed the gateway injects into the dispatched memory store's
@@ -396,11 +445,20 @@ func gatewayDSNConfigured() bool {
 // buildDispatcher constructs the S59 Dispatcher when a DSN is configured, else nil (the wall
 // still holds for gateway_call — see (*server).call). The StoreProvider consults serverBuilders:
 // changeset · store · dag · project · memory · context · idea-intake · telemetry-reader · evolve ·
-// reality-ingest · provision are wired; every OTHER server returns ErrServerNotDispatched, so the
-// front falls back to demo for the un-wired ones
-// (strictly additive cutover, no regression). Each backend store is opened LAZILY (on the first
-// dispatch to that server), so a gateway with a DSN but no traffic for a server never touches
-// its Postgres pool.
+// reality-ingest · provision · mirror-runner · pact-verifier · backtester are wired; every OTHER
+// server returns ErrServerNotDispatched, so the front falls back to demo for the un-wired ones
+// (strictly additive cutover, no regression).
+//
+// mutation-runner is DELIBERATELY left UN-WIRED (route_undispatched → demo). Its dominant tool
+// run_mutation shells out to gremlins/Stryker — a LONG subprocess that must NOT block a
+// synchronous one-shot gateway_call (async/CI-by-design, KRD §19 the pipeline drawer). Its one
+// cheap read (read_threshold, a SELECT on the fitness bar) needs AIDOS_RUNTIME_DSN and is
+// exercised through the standalone binary / CI, not the synchronous front door — so wiring it
+// would only expose the heavy subprocess for no synchronous-read gain. It stays exposed by its
+// own server; the front does not dispatch it (the audit's `document-async-only`).
+//
+// Each backend store is opened LAZILY (on the first dispatch to that server), so a gateway with
+// a DSN but no traffic for a server never touches its Postgres pool.
 func buildDispatcher() *gatewaydispatch.Dispatcher {
 	if !gatewayDSNConfigured() {
 		return nil
