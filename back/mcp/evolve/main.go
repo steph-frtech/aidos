@@ -36,6 +36,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -137,18 +138,64 @@ func (s *store) list() []string {
 type server struct {
 	store   *store
 	sampler evolve.Sampler
+	// selfPlay arms the EG03 self-play Proposer behind the frozen seam (the gated LLM
+	// exception, §6). When false (the default), the deterministic sampler is the sole producer.
+	selfPlay bool
+	// proposer is the INJECTED self-play Proposer used when selfPlay is armed. Production
+	// injects ClaudeProposer (real CLI + deterministic fallback); the hermetic tests inject
+	// FixtureProposer so they never touch the network. Nil ⇒ self-play disabled.
+	proposer evolve.Proposer
 }
 
 // deterministicSampler is the injected, pure sampler used when no real generator is
 // wired: it returns a stable parent + a green-evidence variant keyed off the cell.
-// The real self-play / AlphaEvolve generator lives behind this seam.
+// The real self-play / AlphaEvolve generator (EG03) lives behind this seam — see
+// selfPlaySamplerFor below, which plugs evolve.NewSelfPlaySampler (the self-play
+// Proposer) into this exact seam. The wall (CLAUDE.md §2) is unchanged either way:
+// the sampler only PROPOSES; the deterministic Promote gate disposes.
 func deterministicSampler(cell string, seed int64) (string, evolve.Variant, evolve.Evidence) {
 	return "parent-" + cell, evolve.Variant{ID: "var-" + cell, Niche: cell + "/baseline"},
 		evolve.Evidence{Mirror: evolve.MirrorGreen, OutOfSample: evolve.OutOfSampleGreen, AuthorityApproved: false, Fitness: 0.5}
 }
 
+// defaultCellFor builds a minimal, HONEST Cell view for a cell id when the self-play
+// sampler is wired: a single declared+approved baseline niche (the loop never invents a
+// niche the cell does not declare). A real deployment reads the cell's declared niches
+// from the kernel projection; here the MCP keeps the conservative baseline so the seam is
+// exercisable without a DB.
+func defaultCellFor(cellID string) evolve.Cell {
+	niche := cellID + "/baseline"
+	return evolve.Cell{
+		ID:                      cellID,
+		Niches:                  []string{niche},
+		AuthorityApprovedNiches: []string{niche},
+		OutOfSampleThreshold:    0.55,
+	}
+}
+
+// selfPlaySamplerFor is the EG03 wiring: it plugs the INJECTED self-play Proposer into the
+// frozen Sampler seam for the given cell. The IA is confined to PROPOSING; the deterministic
+// promotion-gate re-judges every variant. In production the proposer is ClaudeProposer (the
+// REAL CLI generator WITH a deterministic FixtureProposer fallback); the hermetic tests inject
+// FixtureProposer directly so they NEVER touch the network.
+func selfPlaySamplerFor(cellID string, budget int, proposer evolve.Proposer) evolve.Sampler {
+	return evolve.NewSelfPlaySampler(defaultCellFor(cellID), proposer, budget)
+}
+
+// selfPlayEnabled reports whether the real self-play generator is wired (env-gated, so the
+// default + the hermetic tests stay on the deterministic sampler). AIDOS_EVOLVE_SELFPLAY=1
+// arms the EG03 generator behind the seam (the gated LLM exception, §6).
+func selfPlayEnabled() bool { return os.Getenv("AIDOS_EVOLVE_SELFPLAY") == "1" }
+
 func (s *server) evolveRun(_ context.Context, _ *mcp.CallToolRequest, in runInput) (*mcp.CallToolResult, runOutput, error) {
-	run := evolve.Evolve(in.Cell, in.Budget, in.Seed, s.sampler)
+	// The sampler is the frozen seam (EG02). By default it is the deterministic fallback;
+	// when self-play is armed (EG03), a per-cell self-play Proposer is plugged in — the IA
+	// proposes, the deterministic Promote gate disposes. The harness is invariant to which.
+	sampler := s.sampler
+	if s.selfPlay && s.proposer != nil {
+		sampler = selfPlaySamplerFor(in.Cell, in.Budget, s.proposer)
+	}
+	run := evolve.Evolve(in.Cell, in.Budget, in.Seed, sampler)
 	runID := "run-" + run.Variant.ID
 	s.store.put(runID, run)
 
@@ -226,8 +273,22 @@ func newServer() *server {
 	return &server{store: newStore(), sampler: deterministicSampler}
 }
 
+// newServerWithSelfPlay builds a server with the EG03 self-play generator armed behind the
+// frozen seam, injecting the given Proposer (production: ClaudeProposer = real CLI +
+// deterministic fallback; tests: FixtureProposer = hermetic). The deterministic sampler
+// remains the fallback authority (used when the Proposer yields nothing).
+func newServerWithSelfPlay(proposer evolve.Proposer) *server {
+	return &server{store: newStore(), sampler: deterministicSampler, selfPlay: true, proposer: proposer}
+}
+
 func main() {
-	srv := newMCPServer(newServer())
+	s := newServer()
+	if selfPlayEnabled() {
+		// Production arms the REAL self-play generator (the gated LLM exception, §6): the
+		// claude CLI with a deterministic FixtureProposer fallback.
+		s = newServerWithSelfPlay(evolve.ClaudeProposer)
+	}
+	srv := newMCPServer(s)
 	if err := srv.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatalf("evolve: run: %v", err)
 	}
