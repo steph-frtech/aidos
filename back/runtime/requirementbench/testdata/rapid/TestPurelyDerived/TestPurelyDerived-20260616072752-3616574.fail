@@ -1,0 +1,103 @@
+# 2026/06/16 07:27:52.662944 [TestPurelyDerived] [rapid] draw expect:view.goal: false
+# 2026/06/16 07:27:52.662949 [TestPurelyDerived] [rapid] draw expect:view.zone: false
+# 2026/06/16 07:27:52.662951 [TestPurelyDerived] [rapid] draw expect:view.displayed: false
+# 2026/06/16 07:27:52.662952 [TestPurelyDerived] [rapid] draw expect:view.empty_state: false
+# 2026/06/16 07:27:52.662953 [TestPurelyDerived] [rapid] draw expect:control.exists: false
+# 2026/06/16 07:27:52.662954 [TestPurelyDerived] [rapid] draw expect:control.visible_when: false
+# 2026/06/16 07:27:52.662954 [TestPurelyDerived] [rapid] draw expect:control.enabled_when: false
+# 2026/06/16 07:27:52.662955 [TestPurelyDerived] [rapid] draw expect:control.triggers: false
+# 2026/06/16 07:27:52.662956 [TestPurelyDerived] [rapid] draw expect:action.invoke: false
+# 2026/06/16 07:27:52.662957 [TestPurelyDerived] [rapid] draw expect:action.on_success: false
+# 2026/06/16 07:27:52.662958 [TestPurelyDerived] [rapid] draw expect:action.on_error: false
+# 2026/06/16 07:27:52.662959 [TestPurelyDerived] [rapid] draw expect:operation.exists: false
+# 2026/06/16 07:27:52.662959 [TestPurelyDerived] [rapid] draw expect:operation.event: false
+# 2026/06/16 07:27:52.662960 [TestPurelyDerived] [rapid] draw expect:operation.guard: false
+# 2026/06/16 07:27:52.662961 [TestPurelyDerived] [rapid] draw expect:entity.exists: false
+# 2026/06/16 07:27:52.662961 [TestPurelyDerived] [rapid] draw expect:entity.field: false
+# 2026/06/16 07:27:52.662963 [TestPurelyDerived] [rapid] draw expect:entity.relation: false
+# 2026/06/16 07:27:52.662963 [TestPurelyDerived] [rapid] draw expect:invariant.forall: false
+# 2026/06/16 07:27:52.662964 [TestPurelyDerived] [rapid] draw expect:policy.authz: false
+# 2026/06/16 07:27:52.662965 [TestPurelyDerived] [rapid] draw expect:budget.perf_sec: false
+# 2026/06/16 07:27:52.662966 [TestPurelyDerived] [rapid] draw expect:case.error: false
+# 2026/06/16 07:27:52.662966 [TestPurelyDerived] [rapid] draw expect:case.edge: false
+# 2026/06/16 07:27:52.662971 [TestPurelyDerived] [rapid] draw specID: "a"
+# 2026/06/16 07:27:52.662974 [TestPurelyDerived] [rapid] draw nCandidates: 1
+# 2026/06/16 07:27:52.662980 [TestPurelyDerived] [rapid] draw single:has:view.goal: false
+# 2026/06/16 07:27:52.662981 [TestPurelyDerived] [rapid] draw single:has:view.zone: false
+# 2026/06/16 07:27:52.662982 [TestPurelyDerived] [rapid] draw single:has:view.displayed: false
+# 2026/06/16 07:27:52.662982 [TestPurelyDerived] [rapid] draw single:has:view.empty_state: false
+# 2026/06/16 07:27:52.662983 [TestPurelyDerived] [rapid] draw single:has:control.exists: false
+# 2026/06/16 07:27:52.662984 [TestPurelyDerived] [rapid] draw single:has:control.visible_when: false
+# 2026/06/16 07:27:52.662984 [TestPurelyDerived] [rapid] draw single:has:control.enabled_when: false
+# 2026/06/16 07:27:52.662985 [TestPurelyDerived] [rapid] draw single:has:control.triggers: false
+# 2026/06/16 07:27:52.662986 [TestPurelyDerived] [rapid] draw single:has:action.invoke: false
+# 2026/06/16 07:27:52.662987 [TestPurelyDerived] [rapid] draw single:has:action.on_success: false
+# 2026/06/16 07:27:52.662987 [TestPurelyDerived] [rapid] draw single:has:action.on_error: false
+# 2026/06/16 07:27:52.662989 [TestPurelyDerived] [rapid] draw single:has:operation.exists: false
+# 2026/06/16 07:27:52.662990 [TestPurelyDerived] [rapid] draw single:has:operation.event: false
+# 2026/06/16 07:27:52.662990 [TestPurelyDerived] [rapid] draw single:has:operation.guard: false
+# 2026/06/16 07:27:52.662991 [TestPurelyDerived] [rapid] draw single:has:entity.exists: false
+# 2026/06/16 07:27:52.662992 [TestPurelyDerived] [rapid] draw single:has:entity.field: false
+# 2026/06/16 07:27:52.662993 [TestPurelyDerived] [rapid] draw single:has:entity.relation: false
+# 2026/06/16 07:27:52.662993 [TestPurelyDerived] [rapid] draw single:has:invariant.forall: false
+# 2026/06/16 07:27:52.662994 [TestPurelyDerived] [rapid] draw single:has:policy.authz: false
+# 2026/06/16 07:27:52.662995 [TestPurelyDerived] [rapid] draw single:has:budget.perf_sec: false
+# 2026/06/16 07:27:52.662995 [TestPurelyDerived] [rapid] draw single:has:case.error: false
+# 2026/06/16 07:27:52.662996 [TestPurelyDerived] [rapid] draw single:has:case.edge: true
+# 2026/06/16 07:27:52.663039 [TestPurelyDerived] PresentTypes not the union of Extract:
+#  got=[]
+#  want=[case.edge]
+# 
+v0.4.8#10772454386708161660
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
