@@ -88,6 +88,8 @@ const FORCE_PREFIX: Record<IntentKind, string> = {
 	interroger: "montre ",
 	ouvrir: "ouvre ",
 	adapter: "adapte ",
+	lancer_bench: "lance le bench de complétude sur la spec ",
+	explorer_evolution: "explore l'évolution de la cellule ",
 };
 
 /**
@@ -324,6 +326,8 @@ export function BuilderClient({
 		interroger: t.intentInterroger,
 		ouvrir: t.intentOuvrir,
 		adapter: t.intentAdapter,
+		lancer_bench: t.intentLancerBench,
+		explorer_evolution: t.intentExplorerEvolution,
 	};
 	const tabLabel: Record<TabId, string> = {
 		arbre: t.tabArbre,

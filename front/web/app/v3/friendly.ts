@@ -23,6 +23,8 @@ export const FRIENDLY_TEMPLATES: Record<BuilderEvent["kind"], string> = {
 	impact_calcule: "tplImpactCalcule",
 	ecran_ouvert: "tplEcranOuvert",
 	ecran_adapte: "tplEcranAdapte",
+	bench_lance: "tplBenchLance",
+	evolution_exploree: "tplEvolutionExploree",
 	etat_lu: "tplEtatLu",
 	refus: "tplRefus",
 };

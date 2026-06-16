@@ -34,6 +34,8 @@ const INTENT_LABEL_KEYS: Record<IntentKind, string> = {
 	interroger: "intentInterroger",
 	ouvrir: "intentOuvrir",
 	adapter: "intentAdapter",
+	lancer_bench: "intentLancerBench",
+	explorer_evolution: "intentExplorerEvolution",
 };
 
 /** Replie les accents + la casse — « écran » et « Ecran » se trouvent pareil. */

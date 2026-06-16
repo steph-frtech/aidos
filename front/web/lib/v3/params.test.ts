@@ -94,9 +94,9 @@ describe("paramCatalog — le catalogue des paramètres déclarés (twin pur)", 
 		expect(ids.length).toBeGreaterThanOrEqual(16);
 	});
 
-	it("CHAT — les 10 intentions du jeu clos, chacune avec sa phrase canonique", () => {
+	it("CHAT — les 12 intentions du jeu clos, chacune avec sa phrase canonique", () => {
 		const s = byId(paramCatalog(), "chat");
-		expect(INTENT_KINDS).toHaveLength(10);
+		expect(INTENT_KINDS).toHaveLength(12);
 		expect(s.rows).toHaveLength(INTENT_KINDS.length);
 		for (const k of INTENT_KINDS) {
 			const row = s.rows.find((r) => r.label === k);

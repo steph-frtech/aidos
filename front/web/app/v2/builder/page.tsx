@@ -54,6 +54,8 @@ const KEYS = [
 	"intentImpacter",
 	"intentInterroger",
 	"intentOuvrir",
+	"intentLancerBench",
+	"intentExplorerEvolution",
 	"openScreen",
 	"tabArbre",
 	"tabApp",

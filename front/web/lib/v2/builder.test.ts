@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	applyIntent,
 	type BuilderState,
+	CANONICAL_ACTIONS,
 	classifyIntent,
 	codeDeltaFor,
 	ENV_LADDER,
@@ -32,7 +33,7 @@ import { SCREENS } from "./screens";
 const S = (): BuilderState => initBuilderState();
 
 describe("la grammaire d'intentions — un jeu CLOS, déclaré", () => {
-	it("le jeu des intentions est déclaré et clos (le cycle de vie ENTIER d'une appli + la navigation totale)", () => {
+	it("le jeu des intentions est déclaré et clos (le cycle de vie ENTIER d'une appli + la navigation totale + les capacités lancées)", () => {
 		expect(INTENT_KINDS).toEqual([
 			"capturer_idee",
 			"greffer",
@@ -44,6 +45,10 @@ describe("la grammaire d'intentions — un jeu CLOS, déclaré", () => {
 			"interroger",
 			"ouvrir",
 			"adapter",
+			// LES CAPACITÉS LANCÉES — le bench de complétude + l'exploration d'évolution :
+			// un bouton de cockpit ENVOIE le geste au chat, le réducteur le ROUTE vers son port.
+			"lancer_bench",
+			"explorer_evolution",
 		]);
 	});
 
@@ -79,6 +84,116 @@ describe("la grammaire d'intentions — un jeu CLOS, déclaré", () => {
 	it("un texte sans AUCUNE accroche est INCOMPRIS (status incomprise, jamais une invention)", () => {
 		const u = understand(S(), "zzz qqq www");
 		expect(u.status).toBe("incomprise");
+	});
+});
+
+// ── LA LOI DE COUVERTURE DES ACTIONS (§1/§5 « pas de monstre » généralisée) ────
+//
+// Le REGISTRE CANONIQUE (CANONICAL_ACTIONS) liste CHAQUE action que l'OS expose : un
+// bouton de cockpit qui ENVOIE un geste au chat, les gestes de cycle de vie. La loi :
+// ∀ action exposée, sa phrase canonique s'ACCROCHE à un type de réponse (≠ le fallthrough
+// « incomprise »). Une action exposée sans réponse est un MONSTRE — l'inverse d'un miroir
+// orphelin. C'est CE registre qui PILOTE le miroir : il itère le registre, jamais une liste
+// codée à part (un nouvel écran qui envoie un geste s'ajoute au registre → la loi le couvre).
+
+describe("LA LOI DE COUVERTURE DES ACTIONS — 100 % des actions de l'OS sont COMPRISES", () => {
+	it("le registre canonique est clos et non vide (chaque action exposée y figure)", () => {
+		expect(CANONICAL_ACTIONS.length).toBeGreaterThan(0);
+		// Chaque action vise un intent DU JEU CLOS (jamais un kind inventé).
+		for (const a of CANONICAL_ACTIONS) expect(INTENT_KINDS).toContain(a.expect);
+		// Les identifiants sont uniques (pas deux fois la même action).
+		const ids = CANONICAL_ACTIONS.map((a) => a.id);
+		expect(new Set(ids).size).toBe(ids.length);
+	});
+
+	it("∀ action canonique : understand(phrase) est COMPRISE et s'accroche au BON type de réponse — JAMAIS « incomprise »", () => {
+		const st = initBuilderState([
+			// L'écran « idea » est dans le registre V2 ; rien d'autre à injecter.
+		]);
+		for (const a of CANONICAL_ACTIONS) {
+			const u = understand(st, a.phrase);
+			expect(u.status, `action ${a.id} : « ${a.phrase} » → ${u.status}`).toBe(
+				"comprise",
+			);
+			expect(u.status).not.toBe("incomprise");
+			expect(u.attente, `action ${a.id} doit s'accrocher à ${a.expect}`).toBe(
+				a.expect,
+			);
+		}
+	});
+
+	it("∀ action canonique : applyIntent ne produit JAMAIS un événement de refus (l'action est exécutée/routée)", () => {
+		// Chaque action est jouée sur un état PRÉPARÉ pour elle (les actions du cycle de vie
+		// exigent un substrat — une idée capturée, un kernel promu…). Le registre garantit la
+		// COMPRÉHENSION ; ce test garantit qu'aucune action canonique ne RETOMBE en refus.
+		const base = applyIntent(
+			S(),
+			"capture l'idée : au checkout, débiter le compte une seule fois",
+		).state;
+		const withK = applyIntent(base, "promeus la dernière idée").state;
+		// L'état le plus riche (idée + kernel) satisfait les pré-requis de toutes les actions
+		// SAUF la promotion (qui consomme « la dernière idée ») — jouée sur l'état à idée seule.
+		for (const a of CANONICAL_ACTIONS) {
+			const st = a.expect === "promouvoir" ? base : withK;
+			const r = applyIntent(st, a.phrase);
+			const refus = r.events.find((e) => e.kind === "refus");
+			expect(
+				refus,
+				`action ${a.id} : « ${a.phrase} » a été REFUSÉE : ${refus?.detail ?? ""}`,
+			).toBeUndefined();
+		}
+	});
+
+	it("BENCH DE COMPLÉTUDE : « lance le bench de complétude sur la spec createOrder » → bench_lance vers /v3/bench (jamais incomprise)", () => {
+		const r = applyIntent(
+			S(),
+			"lance le bench de complétude sur la spec createOrder",
+		);
+		const ev = r.events.find((e) => e.kind === "bench_lance");
+		expect(ev, "le bench doit être lancé/routé").toBeDefined();
+		expect(ev?.ref).toBe("/v3/bench#createOrder");
+		// AUCUN refus, AUCUNE écriture-vérité, AUCUNE mutation d'état (un run below-the-line).
+		expect(r.events.some((e) => e.kind === "refus")).toBe(false);
+		expect(r.state.kernels).toHaveLength(0);
+		expect(r.state.ideas).toHaveLength(0);
+		expect(r.impacts).toHaveLength(0);
+	});
+
+	it("EXPLORATION D'ÉVOLUTION : « explore l'évolution de la cellule X par self-play » → evolution_exploree vers /v3/evolve (jamais incomprise)", () => {
+		const r = applyIntent(
+			S(),
+			"explore l'évolution de la cellule debit-du-compte par self-play",
+		);
+		const ev = r.events.find((e) => e.kind === "evolution_exploree");
+		expect(ev, "l'exploration doit être lancée/routée").toBeDefined();
+		expect(ev?.ref).toBe("/v3/evolve#debit-du-compte");
+		expect(r.events.some((e) => e.kind === "refus")).toBe(false);
+		expect(r.state.kernels).toHaveLength(0);
+		expect(r.impacts).toHaveLength(0);
+	});
+
+	it("∀ action canonique : aucune n'écrit la vérité (le MUR tient — bench/évolution PROPOSENT, ne gravent pas)", () => {
+		const withK = (() => {
+			const a = applyIntent(
+				S(),
+				"capture l'idée : au checkout, débiter une seule fois",
+			).state;
+			return applyIntent(a, "promeus la dernière idée").state;
+		})();
+		for (const a of CANONICAL_ACTIONS) {
+			const r = applyIntent(withK, a.phrase);
+			for (const k of r.state.kernels) expect(k.wroteKernel).toBe(false);
+			for (const i of r.state.ideas) expect(i.hasMirror).toBe(false);
+			// les capacités lancées ne mutent RIEN sauf le journal (append-only §9) : un run
+			// below-the-line projeté — l'arbre, les idées, les kernels, les envs sont intacts.
+			if (a.expect === "lancer_bench" || a.expect === "explorer_evolution") {
+				expect(r.state.tree).toEqual(withK.tree);
+				expect(r.state.ideas).toEqual(withK.ideas);
+				expect(r.state.kernels).toEqual(withK.kernels);
+				expect(r.state.envs).toEqual(withK.envs);
+				expect(r.impacts).toEqual([]);
+			}
+		}
 	});
 });
 

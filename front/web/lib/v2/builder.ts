@@ -66,8 +66,94 @@ export const INTENT_KINDS = [
 	"interroger",
 	"ouvrir",
 	"adapter",
+	// LES CAPACITÉS LANCÉES (DG06/ADR 0088 ; ADR 0046 EvolutionSandbox) — un geste de
+	// cockpit ENVOIE au chat « lance le bench… » / « explore l'évolution… » ; le réducteur
+	// les ROUTE vers leur port (RequirementBench, EvolutionSandbox) below-the-line. Sans ces
+	// deux kinds, l'action exposée tombait en « incomprise » (un MONSTRE — la loi de couverture
+	// §1/§5 généralisée : aucune action exposée sans type de réponse). Voir CANONICAL_ACTIONS.
+	"lancer_bench",
+	"explorer_evolution",
 ] as const;
 export type IntentKind = (typeof INTENT_KINDS)[number];
+
+/**
+ * LE REGISTRE CANONIQUE DES ACTIONS DE L'OS — déclaré, clos (la LOI DE COUVERTURE des
+ * actions, §1/§5 « pas de monstre » généralisée). CHAQUE action que l'OS expose (un bouton
+ * de cockpit qui ENVOIE un geste au chat via send(), les gestes de cycle de vie) figure ici
+ * avec SA phrase canonique et le type de réponse (l'intent) auquel elle DOIT s'accrocher.
+ *
+ * C'est CE registre qui PILOTE le miroir de complétude (builder.test.ts) : ∀ action du
+ * registre, understand(phrase).attente === expect ∧ status === "comprise" — JAMAIS le
+ * fallthrough « incomprise ». Une action exposée par un écran et absente d'ici (ou retombant
+ * en « incomprise ») est un MONSTRE — l'inverse d'un miroir orphelin. DÉCLARÉ, jamais appris.
+ *
+ * NOTE : les phrases portent des arguments concrets (un id de spec, un chemin, un titre
+ * d'écran réels) — le classement lexical ne dépend QUE des verbes/indices déclarés, pas des
+ * arguments ; le registre les fige pour que le miroir rejoue exactement ce que les écrans
+ * envoient (BenchClient, EvolveClient, ParcoursClient, EnvsClient, ParamsClient, DesignClient).
+ */
+export interface CanonicalAction {
+	/** L'identifiant stable de l'action (la source/écran qui l'expose). */
+	readonly id: string;
+	/** La phrase canonique EXACTE qu'un écran envoie au chat (avec un argument exemple). */
+	readonly phrase: string;
+	/** Le type de réponse (l'intent) auquel l'action DOIT s'accrocher — jamais le fallthrough. */
+	readonly expect: IntentKind;
+}
+
+export const CANONICAL_ACTIONS: readonly CanonicalAction[] = [
+	// — Cycle de vie d'une appli (lab/chat) —
+	{
+		id: "capture-idee",
+		phrase: "capture l'idée : au checkout, débiter le compte une seule fois",
+		expect: "capturer_idee",
+	},
+	{
+		id: "greffe",
+		phrase: "greffe les remboursements sous app/paiement",
+		expect: "greffer",
+	},
+	{ id: "promotion", phrase: "promeus la dernière idée", expect: "promouvoir" },
+	{ id: "generation", phrase: "génère l'application", expect: "generer" },
+	// — EnvsClient : le bouton « Déployer en <env> » —
+	{
+		id: "envs-deploy",
+		phrase: "déploie l'application en dev",
+		expect: "deployer",
+	},
+	{ id: "delta", phrase: "montre le delta depuis la prod", expect: "delta" },
+	// — ParcoursClient : le bouton « Calculer l'impact » —
+	{
+		id: "parcours-impact",
+		phrase: "quel impact si je modifie app/paiement",
+		expect: "impacter",
+	},
+	{
+		id: "interrogation",
+		phrase: "montre-moi l'état du projet",
+		expect: "interroger",
+	},
+	// — Navigation totale du Workbench —
+	{ id: "ouvrir-ecran", phrase: "ouvre l'écran idee", expect: "ouvrir" },
+	// — DesignClient : le bouton « Appliquer » (styling below-the-line, tokens ADR 0010) —
+	{
+		id: "design-adapte",
+		phrase: "adapte la section heros : text=primary radius=lg",
+		expect: "adapter",
+	},
+	// — BenchClient : le bouton « Lancer le bench » (RequirementBench, DG06/ADR 0088) —
+	{
+		id: "bench-completude",
+		phrase: "lance le bench de complétude sur la spec createOrder",
+		expect: "lancer_bench",
+	},
+	// — EvolveClient : le bouton « Explorer » (EvolutionSandbox, ADR 0046) —
+	{
+		id: "evolve-exploration",
+		phrase: "explore l'évolution de la cellule debit-du-compte par self-play",
+		expect: "explorer_evolution",
+	},
+] as const;
 
 /**
  * L'ÉCHELLE D'ENVIRONNEMENTS — DÉCLARÉE, close, ORDONNÉE (le cliquet généralisé) :
@@ -114,6 +200,9 @@ export interface BuilderEvent {
 		| "delta_calcule"
 		| "ecran_ouvert"
 		| "ecran_adapte"
+		// LES CAPACITÉS LANCÉES (below-the-line — un run de port projeté, jamais une vérité) :
+		| "bench_lance"
+		| "evolution_exploree"
 		| "refus";
 	readonly detail: string;
 	/** La référence content-adressée touchée (chemin, id d'idée, version, route…). */
@@ -259,6 +348,36 @@ const LEXICONS: Record<
 		strong: ["adapte", "adapter", "style", "styler", "couleur", "design"],
 		weak: ["token", "radius", "fond", "marge", "espacement", "theme"],
 	},
+	// LE BENCH DE COMPLÉTUDE (RequirementBench, DG06/ADR 0088) — « lance le bench de
+	// complétude sur la spec <id> » : verbes forts `bench`/`complétude`, indices faibles
+	// (spec/requirement…) ; `lance` seul reste faible (il sert aussi à d'autres lancements).
+	lancer_bench: {
+		strong: ["bench", "benchmarque", "completude", "complete"],
+		weak: [
+			"lance",
+			"lancer",
+			"spec",
+			"specification",
+			"requirement",
+			"couverture",
+		],
+	},
+	// L'EXPLORATION D'ÉVOLUTION (EvolutionSandbox, ADR 0046) — « explore l'évolution de la
+	// cellule <id> par <sampler> » : verbes forts `explore`/`évolution`/`cellule`, indices
+	// faibles (variant/sampler/self-play…). Le run reste en quarantaine (le sandbox), jamais
+	// une promotion (idée → miroir → /goal pour une variante à verser).
+	explorer_evolution: {
+		strong: ["explore", "explorer", "evolution", "evolue", "cellule"],
+		weak: [
+			"variant",
+			"variante",
+			"sampler",
+			"play",
+			"niche",
+			"quarantaine",
+			"sandbox",
+		],
+	},
 };
 
 /**
@@ -393,6 +512,27 @@ function parseGraft(
 	const p = placeIntent(tree, text);
 	if (p.nodeId === "") return null;
 	return { label: verb[1].trim(), parentPath: p.path };
+}
+
+/**
+ * Le RÉFÉRENT cité après un mot-clé d'ancrage (« sur la spec X », « de la cellule Y ») —
+ * le premier token (≥1 char, tirets autorisés) qui suit un ancrage. Le MATCH est plié
+ * (accents/casse) pour trouver l'ancre, mais le référent est repris VERBATIM du texte
+ * d'origine (la casse est préservée : « createOrder » reste « createOrder », jamais
+ * « createorder »). PURE & TOTALE & fail-closed : aucun ancrage / aucun token → null.
+ */
+function refAfter(text: string, anchors: readonly string[]): string | null {
+	const folded = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+	for (const anchor of anchors) {
+		// Capture l'AMORCE (anchor + espaces) séparément du référent → l'index de fin de
+		// l'amorce dans le texte plié = l'index de début du référent dans l'original (le
+		// pliage NFD+lowercase est 1:1 sur ce vocabulaire latin, aucun décalage d'index).
+		const m = folded.match(new RegExp(`(${anchor}\\s+)[a-z0-9][a-z0-9-]*`));
+		if (m === null || m.index === undefined) continue;
+		const start = m.index + m[1].length;
+		return text.slice(start).match(/^[A-Za-z0-9][A-Za-z0-9-]*/)?.[0] ?? null;
+	}
+	return null;
 }
 
 /** L'APP PROJETÉE depuis les kernels proposés — une PROJECTION pure, jamais stockée. */
@@ -960,6 +1100,48 @@ export function applyIntent(state: BuilderState, text: string): ApplyResult {
 				],
 				// L'IMPACT est below-the-line (composes) — la coordonnée re-stylée, pas une vérité.
 				[{ cible: a.ref, type: "composes" }],
+			);
+		}
+
+		case "lancer_bench": {
+			// LE BENCH DE COMPLÉTUDE (RequirementBench, DG06/ADR 0088) : le chat ROUTE vers le
+			// port — un RUN PROJETÉ, hermétique, below-the-line (l'IA reste côté Go derrière le
+			// port ; le réducteur ne fait que pointer la capacité + sa spec). AUCUNE mutation
+			// d'état, AUCUNE écriture-vérité : les types manquants que le bench remonte restent
+			// des PROPOSITIONS (idea → mirror → /goal), jamais gravées ici. La cible (l'id de spec)
+			// est citée VERBATIM ; absente → on lance quand même (l'écran porte la spec canonique).
+			const spec = refAfter(text, ["spec", "specification", "specs"]);
+			const cible = spec ?? "createOrder";
+			return finish(
+				state,
+				[
+					{
+						kind: "bench_lance",
+						detail: `bench de complétude lancé sur la spec « ${cible} » — voir /v3/bench (RequirementBench, port DG06) ; les types manquants sont des propositions, jamais une vérité écrite`,
+						ref: `/v3/bench#${cible}`,
+					},
+				],
+				[],
+			);
+		}
+
+		case "explorer_evolution": {
+			// L'EXPLORATION D'ÉVOLUTION (EvolutionSandbox, ADR 0046) : le chat ROUTE vers le port —
+			// un run de self-play/QD EN QUARANTAINE, below-the-line (une variante n'écrit JAMAIS le
+			// kernel ; au mieux une branche/idée). AUCUNE mutation d'état, AUCUNE écriture-vérité :
+			// verser une variante reste idée → miroir → /goal. La cellule visée est citée VERBATIM.
+			const cell = refAfter(text, ["cellule", "cell", "cellues"]);
+			const cible = cell ?? "la cellule canonique";
+			return finish(
+				state,
+				[
+					{
+						kind: "evolution_exploree",
+						detail: `exploration d'évolution lancée sur « ${cible} » — voir /v3/evolve (EvolutionSandbox en quarantaine, ADR 0046) ; verser une variante reste idée → miroir → /goal`,
+						ref: `/v3/evolve#${cible}`,
+					},
+				],
+				[],
 			);
 		}
 	}

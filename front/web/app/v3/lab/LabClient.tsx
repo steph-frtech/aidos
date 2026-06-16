@@ -41,6 +41,8 @@ const INTENT_LABELS: Record<IntentKind, string> = {
 	interroger: "intentInterroger",
 	ouvrir: "intentOuvrir",
 	adapter: "intentAdapter",
+	lancer_bench: "intentLancerBench",
+	explorer_evolution: "intentExplorerEvolution",
 };
 
 /** Le verbe FORT canonique par intention — le préfixe de désambiguïsation (motif /v2/builder). */
@@ -55,6 +57,8 @@ const FORCE_PREFIX: Record<IntentKind, string> = {
 	interroger: "montre ",
 	ouvrir: "ouvre ",
 	adapter: "adapte ",
+	lancer_bench: "lance le bench de complétude sur la spec ",
+	explorer_evolution: "explore l'évolution de la cellule ",
 };
 
 /**

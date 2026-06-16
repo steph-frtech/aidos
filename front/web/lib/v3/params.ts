@@ -76,6 +76,8 @@ export const CANONICAL_PHRASES: Record<IntentKind, string> = {
 	interroger: "montre-moi l'état du projet",
 	ouvrir: "ouvre l'écran <nom>",
 	adapter: "adapte <coord> : <property>=<token>",
+	lancer_bench: "lance le bench de complétude sur la spec <id>",
+	explorer_evolution: "explore l'évolution de la cellule <id> par <sampler>",
 };
 
 /** Le libellé déclaré par forme de preuve (la forme technique reste la valeur). */
