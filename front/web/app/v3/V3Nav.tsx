@@ -3,6 +3,7 @@
 import {
 	ChevronDown,
 	Code,
+	Dna,
 	FileCode2,
 	FolderOpen,
 	History,
@@ -45,6 +46,7 @@ export const ENTRIES = [
 	{ route: "/v3/parametrage", key: "navParams", Icon: Settings },
 	{ route: "/v3/design", key: "navDesign", Icon: PenTool },
 	{ route: "/v3/emetteurs", key: "navEmetteurs", Icon: FileCode2 },
+	{ route: "/v3/evolve", key: "navEvolve", Icon: Dna },
 ] as const;
 
 export function V3Nav() {
