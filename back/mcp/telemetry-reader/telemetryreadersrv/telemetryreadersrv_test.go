@@ -1,4 +1,4 @@
-package main
+package telemetryreadersrv
 
 import (
 	"context"
@@ -157,7 +157,7 @@ func TestLearn_UnpinnedProposesIsOpenQuestion(t *testing.T) {
 // The server registers exactly four tools and NO incident_to_kernel door.
 func TestNoIncidentToKernelTool(t *testing.T) {
 	s, _, _ := newTestServer()
-	srv := newMCPServer(s)
+	srv := NewServer(s.incidents, s.telemetry, s.ideas)
 	if srv == nil {
 		t.Fatal("server must build")
 	}

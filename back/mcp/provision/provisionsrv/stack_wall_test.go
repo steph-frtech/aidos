@@ -14,7 +14,7 @@
 //     any emission (the SAME projectwall predicate the RLS enforces, never forked).
 //   - BELOW-THE-LINE ACTS DIRECT: a same-project, same-identity projection emits.
 //   - PURE ROUTING: same request ⇒ byte-identical response (reproducibility).
-package main
+package provisionsrv
 
 import (
 	"testing"

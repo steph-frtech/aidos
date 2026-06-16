@@ -45,10 +45,14 @@ import (
 	"github.com/steph-frtech/aidos/back/mcp/changeset/changesetsrv"
 	"github.com/steph-frtech/aidos/back/mcp/context/contextsrv"
 	"github.com/steph-frtech/aidos/back/mcp/dag/dagsrv"
+	"github.com/steph-frtech/aidos/back/mcp/evolve/evolvesrv"
 	ideaintakesrv "github.com/steph-frtech/aidos/back/mcp/idea-intake/ideaintakesrv"
 	"github.com/steph-frtech/aidos/back/mcp/memory/memorysrv"
 	"github.com/steph-frtech/aidos/back/mcp/project/projectsrv"
+	"github.com/steph-frtech/aidos/back/mcp/provision/provisionsrv"
+	realityingestsrv "github.com/steph-frtech/aidos/back/mcp/reality-ingest/realityingestsrv"
 	"github.com/steph-frtech/aidos/back/mcp/store/storesrv"
+	"github.com/steph-frtech/aidos/back/mcp/telemetry-reader/telemetryreadersrv"
 	"github.com/steph-frtech/aidos/back/runtime/gateway"
 	"github.com/steph-frtech/aidos/back/runtime/gatewaydispatch"
 	"github.com/steph-frtech/aidos/back/runtime/markitdown"
@@ -301,6 +305,58 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 		}
 		return ideaintakesrv.NewServer(store, markitdown.HTMLConverter{}), nil
 	},
+	// telemetry-reader takes THREE persistence seams — the incidents.* store (observe/list/
+	// learn, BELOW the wall), the telemetry.* SELECT-only landing (read-only on reality), and
+	// the S27 ideas.* capture door (the only outward edge, a DRAFT idea — never the kernel).
+	// All three are co-located schemas in the one truth-store, so the gateway DSN configures
+	// the whole reader; serverDSN falls back to each historic per-schema env (incidents/
+	// telemetry keep their own; ideas reuses AIDOS_IDEAS_DSN, the SAME env idea-intake reads,
+	// so the two servers capture into one ideas schema). There is NO clock and NO embedder —
+	// every decision defers to the pure reality.* engine, no LLM in the dispatch path
+	// (determinism-first, CLAUDE.md §6/§8). incident_learn writes a DRAFT idea via S27,
+	// never the kernel — the wall holds (promotion is the /goal flow).
+	"telemetry-reader": func(ctx context.Context) (*mcp.Server, error) {
+		inc, err := telemetryreadersrv.NewIncidentStore(ctx, serverDSN("AIDOS_INCIDENTS_DSN"))
+		if err != nil {
+			return nil, err
+		}
+		tel, err := telemetryreadersrv.NewTelemetryStore(ctx, serverDSN("AIDOS_TELEMETRY_DSN"))
+		if err != nil {
+			return nil, err
+		}
+		ideaStore, err := telemetryreadersrv.NewIdeaCaptureStore(ctx, serverDSN("AIDOS_IDEAS_DSN"))
+		if err != nil {
+			return nil, err
+		}
+		return telemetryreadersrv.NewServer(inc, tel, ideaStore), nil
+	},
+	// evolve is SANS DSN and SANS LLM: its only state is an in-memory run store and its only
+	// "search" is the pure deterministic sampler (evolvesrv.NewServer). The self-play generator
+	// (EG03, the gated LLM exception §6) is NEVER armed here — the dispatch path stays
+	// deterministic (CLAUDE.md §6/§8). evolve writes ONLY branches/reports/ideas via Confine,
+	// never the kernel/mirrors/authority/fitness (the wall, §2). The builder ignores its ctx and
+	// returns the default server — like `context`, it dispatches identically whatever DSN is set.
+	"evolve": func(context.Context) (*mcp.Server, error) {
+		return evolvesrv.NewServer(), nil
+	},
+	// reality-ingest is READ-ONLY on the kernel and SANS persistance — the S106 runtime is a set
+	// of PURE functions (detect_divergence/ingest_divergence/render_idea_text), no store, no DSN,
+	// no clock, no embedder. Like `context`, the builder ignores its ctx and returns the default
+	// server. Every tool returns a VALUE whose WroteKernel is false; the only edge is a DRAFT idea
+	// (provenance=incident) and the direct Reality→Kernel edge is always refused — the wall holds
+	// with no GRANT at all (the prod→kernel on-ramp goes idea → mirror → /goal, §2).
+	"reality-ingest": func(context.Context) (*mcp.Server, error) {
+		return realityingestsrv.NewServer(), nil
+	},
+	// provision is DEP-FREE: every tool (the 5 stack.* DP13 + plan/images S89) projects PURELY
+	// over the StackManifest AST + the observed host state carried IN the request — no DSN, no
+	// store, no clock, no embedder. Below-the-line projections only; the fenced
+	// stack.engrave_manifest is a DispositionTruthWrite, refused by the router BEFORE any dispatch
+	// (GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET) — the wall holds (§2). The builder ignores its ctx and
+	// returns the default server, like `context`.
+	"provision": func(context.Context) (*mcp.Server, error) {
+		return provisionsrv.NewServer(), nil
+	},
 }
 
 // gatewayMemorySeed is the fixed seed the gateway injects into the dispatched memory store's
@@ -322,6 +378,13 @@ func gatewayDSNConfigured() bool {
 		// its own. context is read-only/SANS DSN — it contributes no env (it dispatches over
 		// the mocked View regardless, so it never depends on a configured store).
 		"AIDOS_IDEAS_DSN",
+		// telemetry-reader's own schemas (incidents observe/learn + the telemetry SELECT-only
+		// landing); it shares AIDOS_IDEAS_DSN for the S27 capture door (counted above).
+		"AIDOS_INCIDENTS_DSN", "AIDOS_TELEMETRY_DSN",
+		// evolve · reality-ingest · provision are DEP-FREE (like context): no DSN, no store —
+		// they dispatch over in-memory/pure state regardless of any configured store, so they
+		// contribute NO env here (a gateway with one of THEM as its only wired server still has
+		// no DSN to open; they are reachable the moment any DSN arms the dispatcher).
 	} {
 		if os.Getenv(fallback) != "" {
 			return true
@@ -332,8 +395,9 @@ func gatewayDSNConfigured() bool {
 
 // buildDispatcher constructs the S59 Dispatcher when a DSN is configured, else nil (the wall
 // still holds for gateway_call — see (*server).call). The StoreProvider consults serverBuilders:
-// changeset · store · dag · project · memory · context · idea-intake are wired; every OTHER
-// server returns ErrServerNotDispatched, so the front falls back to demo for the un-wired ones
+// changeset · store · dag · project · memory · context · idea-intake · telemetry-reader · evolve ·
+// reality-ingest · provision are wired; every OTHER server returns ErrServerNotDispatched, so the
+// front falls back to demo for the un-wired ones
 // (strictly additive cutover, no regression). Each backend store is opened LAZILY (on the first
 // dispatch to that server), so a gateway with a DSN but no traffic for a server never touches
 // its Postgres pool.

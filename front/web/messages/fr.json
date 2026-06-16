@@ -2263,7 +2263,13 @@
 		"notPromotableNote": "La promotion est une PROPOSITION : même les trois conditions réunies ne figent rien. Le gel passe par le /goal humain (mirror_green ∧ out_of_sample_green ∧ authority_approval). Un candidat au miroir rouge n'est jamais promu, quel que soit son score — le Juge est le miroir, jamais le score.",
 		"runActiveLabel": "Boucle /evolve",
 		"runStartLabel": "Ouvrir la boucle /evolve",
-		"runStopLabel": "Fermer la boucle /evolve"
+		"runStopLabel": "Fermer la boucle /evolve",
+		"liveHeading": "EvolutionRuns enregistrés — en direct",
+		"liveIntro": "Les EvolutionRuns enregistrés du projet actif, lus en direct par la passerelle (evolve_run_list, serveur evolve). /evolve tourne en quarantaine et n'écrit que branches/reports/ideas ; une promotion est une PROPOSITION que le /goal humain gèle — jamais une écriture de vérité depuis cet écran.",
+		"liveEmpty": "Aucun EvolutionRun enregistré pour le projet actif.",
+		"liveTitle": "Lecture en direct des EvolutionRuns enregistrés via la passerelle (evolve_run_list).",
+		"demoTitle": "Aucune source en direct jointe : liste de démonstration déterministe.",
+		"liveRunIdLabel": "run"
 	},
 	"incidentsToIdeas": {
 		"eyebrow": "Runtime — boucle externe (boucle ③)",
@@ -2300,7 +2306,14 @@
 		"howToFixLabel": "Comment débloquer",
 		"exampleHeading": "Exemple travaillé — out-of-stock pendant le paiement (#1043)",
 		"exampleBody": "createOrder échoue 30% du temps : un article passe out-of-stock entre l'ajout au panier et le paiement — aucune fixture ne couvrait ce cas (le noyau était faux par omission). /learn transforme l'incident en idée DRAFT portant incident:#1043 verbatim, proposes=operation (le signal pinne l'opération), sans miroir et sans gel ; l'incident est tracé en retour par idea_id. L'arête Incident → Kernel reste bloquée (REALITY_CANNOT_DECLARE_TRUTH). L'incident #2099 (budget de latence) ne pinne aucune couche → OpenQuestion, jamais une couche devinée. Le gel en vérité reste le miroir + /goal + approbation de l'humain.",
-		"footer": "RealityMirror (S43) — la réalité injecte des IDÉES, jamais des vérités. La seule arête sortante est → idea-intake (S27) ; le gel dans /kernel est le miroir + /goal + approbation de l'humain, jamais cet écran (le mur)."
+		"footer": "RealityMirror (S43) — la réalité injecte des IDÉES, jamais des vérités. La seule arête sortante est → idea-intake (S27) ; le gel dans /kernel est le miroir + /goal + approbation de l'humain, jamais cet écran (le mur).",
+		"liveHeading": "Tableau des incidents — en direct",
+		"liveIntro": "Les incidents observés du projet actif, lus en direct par la passerelle (incident_list, telemetry-reader). Un incident est de la RÉALITÉ : pas de version, pas de miroir. La seule arête sortante reste /learn → une idée DRAFT — jamais une écriture de vérité depuis cet écran.",
+		"liveEmpty": "Aucun incident observé pour le projet actif.",
+		"liveTitle": "Lecture en direct du tableau des incidents via la passerelle (incident_list).",
+		"demoTitle": "Aucune source en direct jointe : tableau de démonstration déterministe.",
+		"liveRefLabel": "réf.",
+		"liveIdeaLabel": "idée"
 	},
 	"brain": {
 		"eyebrow": "Cerveau · mémoire & graphe de contexte",
@@ -5459,7 +5472,17 @@
 		"sidecarsLabel": "Sidecars",
 		"ddlLabel": "DDL émis (même émetteur Atlas)",
 		"resourceLabel": "Resource Pulumi (DP15)",
-		"contentAddressLabel": "Adresse de contenu"
+		"contentAddressLabel": "Adresse de contenu",
+		"liveHeading": "Plan du datastore — en direct",
+		"liveIntro": "Le plan calculé en direct par la passerelle (plan, provision) sur une spec de démonstration fixe (entité Order, décision S88 go). Le backend en direct planifie à l'identique du jumeau (lib/provision). LE MUR : planifier n'écrit AUCUNE vérité — le Plan est un record ; l'écriture du StackManifest est refusée avant tout dispatch.",
+		"liveTargetLabel": "cible",
+		"liveImageLabel": "image",
+		"liveDatabaseLabel": "base",
+		"liveNamespaceLabel": "namespace",
+		"liveReasonsLabel": "Raisons (déterministes)",
+		"liveTitle": "Lecture en direct du planificateur via la passerelle (plan).",
+		"demoTitle": "Aucune source en direct jointe : plan de démonstration déterministe.",
+		"liveNoTruthWrite": "Aucune écriture de vérité : le Plan est un record ; le gel du StackManifest passe par idée → miroir → /goal → ChangeSet."
 	},
 	"apiSurface": {
 		"eyebrow": "S90 · surface API émise",
@@ -5929,7 +5952,18 @@
 		"routes": "Par route",
 		"logFeed": "Logs",
 		"errorFeed": "Error feed",
-		"fingerprint": "Empreinte (déterministe)"
+		"fingerprint": "Empreinte (déterministe)",
+		"liveHeading": "Télémétrie OpenTelemetry — en direct",
+		"liveIntro": "Les spans et métriques OpenTelemetry du projet actif posés dans Postgres, lus en direct par la passerelle (telemetry_query, telemetry-reader, SELECT seul). LE MUR : l'observabilité d'exploitation est une couche de RENDU, jamais un on-ramp Kernel (le RealityMirror / E12 reste le seul on-ramp). Lecture seule.",
+		"liveEmpty": "Aucun signal OpenTelemetry posé pour le projet actif.",
+		"liveTitle": "Lecture en direct des spans/métriques via la passerelle (telemetry_query).",
+		"demoTitle": "Aucune source en direct jointe : télémétrie de démonstration déterministe.",
+		"liveSpansHeading": "Spans",
+		"liveMetricsHeading": "Métriques",
+		"liveNameLabel": "nom",
+		"liveStatusLabel": "statut",
+		"liveTraceLabel": "trace",
+		"liveValueLabel": "valeur"
 	},
 	"federation": {
 		"eyebrow": "S103 · Fédération transverse",
@@ -6022,7 +6056,20 @@
 		"ideaHeading": "L'idée draft · texte template déterministe",
 		"ideaTemplateNote": "Le texte est une PROJECTION TEMPLATE sur le record de divergence (même record → texte byte-identique), jamais un résumé LLM.",
 		"nextStep": "Prochaine étape : l'humain grille cette idée (S107/S65), puis /goal décide — idée → miroir → /goal → approbation.",
-		"footer": "LE MUR (§2) : la réalité n'écrit AUCUNE vérité — le draft est une valeur (wroteKernel=false ; l'arête directe Reality→Kernel est toujours refusée, REALITY_CANNOT_DECLARE_TRUTH). Déterministe (§6/§8) : détection ET rédaction = code, même entrée → même sortie, aucun LLM."
+		"footer": "LE MUR (§2) : la réalité n'écrit AUCUNE vérité — le draft est une valeur (wroteKernel=false ; l'arête directe Reality→Kernel est toujours refusée, REALITY_CANNOT_DECLARE_TRUTH). Déterministe (§6/§8) : détection ET rédaction = code, même entrée → même sortie, aucun LLM.",
+		"liveHeading": "Détecteur de divergence — en direct",
+		"liveIntro": "Le verdict du détecteur DÉTERMINISTE exécuté en direct par la passerelle (detect_divergence, reality-ingest) sur le rapport canonique « rupture de stock » (createOrder échoue 30 %) face à la promesse du miroir. Le backend en direct confirme la même comparaison que le jumeau. LE MUR : detect_divergence renvoie une VALEUR (wroteKernel=false), l'arête directe Reality→Kernel est toujours refusée.",
+		"liveDivergedYes": "divergence détectée",
+		"liveDivergedNo": "dans la promesse",
+		"liveOperationLabel": "opération",
+		"liveKindLabel": "nature",
+		"liveMirrorRefLabel": "miroir",
+		"liveObservedLabel": "observé",
+		"liveExpectedLabel": "attendu",
+		"liveCallsLabel": "appels",
+		"liveTitle": "Lecture en direct du détecteur via la passerelle (detect_divergence).",
+		"demoTitle": "Aucune source en direct jointe : enregistrement de démonstration déterministe.",
+		"liveNoKernelWrite": "Aucune écriture de noyau : la divergence est une valeur ; la seule porte reste idée → miroir → /goal → approbation."
 	},
 	"projectEvolve": {
 		"eyebrow": "S108 · Boucle médiane par projet",

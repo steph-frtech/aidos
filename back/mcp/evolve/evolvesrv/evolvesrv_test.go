@@ -1,4 +1,4 @@
-package main
+package evolvesrv
 
 import (
 	"context"

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
+import { LiveDivergence } from "./LiveDivergence";
+import { liveDetect } from "./liveActions";
 import { RealityIngestPanel } from "./RealityIngestPanel";
 
 export const metadata: Metadata = {
@@ -30,6 +32,8 @@ export const dynamic = "force-dynamic";
 export default async function RealityIngestPage() {
 	const ctx = await activeProjectContext();
 	const t = await getTranslations("realityIngest");
+	const tc = await getTranslations("common");
+	const live = await liveDetect();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -69,6 +73,28 @@ export default async function RealityIngestPage() {
 				<div className="mt-10">
 					<RealityIngestPanel activeProjectId={ctx.activeId} />
 				</div>
+
+				{/* Live divergence detector — read through the gateway (detect_divergence), demo fallback */}
+				<LiveDivergence
+					view={live}
+					labels={{
+						heading: t("liveHeading"),
+						intro: t("liveIntro"),
+						live: tc("live"),
+						demo: tc("demo"),
+						liveTitle: t("liveTitle"),
+						demoTitle: t("demoTitle"),
+						divergedYes: t("liveDivergedYes"),
+						divergedNo: t("liveDivergedNo"),
+						operationLabel: t("liveOperationLabel"),
+						kindLabel: t("liveKindLabel"),
+						mirrorRefLabel: t("liveMirrorRefLabel"),
+						observedLabel: t("liveObservedLabel"),
+						expectedLabel: t("liveExpectedLabel"),
+						callsLabel: t("liveCallsLabel"),
+						noKernelWrite: t("liveNoKernelWrite"),
+					}}
+				/>
 
 				<footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
 					{t("footer")}

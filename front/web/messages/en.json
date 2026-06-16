@@ -2263,7 +2263,13 @@
 		"notPromotableNote": "A promotion is a PROPOSAL: even all three conditions freeze nothing. The freeze goes through the human /goal (mirror_green ∧ out_of_sample_green ∧ authority_approval). A red-mirror candidate is never promoted, whatever its score — the Judge is the mirror, never the score.",
 		"runActiveLabel": "/evolve run",
 		"runStartLabel": "Open the /evolve run",
-		"runStopLabel": "Close the /evolve run"
+		"runStopLabel": "Close the /evolve run",
+		"liveHeading": "Recorded EvolutionRuns — live",
+		"liveIntro": "The active project's recorded EvolutionRuns, read live through the gateway (evolve_run_list, evolve server). /evolve runs in quarantine and writes only branches/reports/ideas; a promotion is a PROPOSAL the human /goal freezes — never a truth-write from this screen.",
+		"liveEmpty": "No EvolutionRun recorded for the active project.",
+		"liveTitle": "Live read of the recorded EvolutionRuns through the gateway (evolve_run_list).",
+		"demoTitle": "No live source attached: deterministic demo list.",
+		"liveRunIdLabel": "run"
 	},
 	"incidentsToIdeas": {
 		"eyebrow": "Runtime — external loop (loop ③)",
@@ -2300,7 +2306,14 @@
 		"howToFixLabel": "How to fix",
 		"exampleHeading": "Worked example — out-of-stock during checkout (#1043)",
 		"exampleBody": "createOrder fails 30% of the time: an item goes out-of-stock between add-to-cart and pay — no fixture covered this case (the kernel was false by omission). /learn turns the incident into a DRAFT idea carrying incident:#1043 verbatim, proposes=operation (the signal pins the operation), with no mirror and no freeze; the incident is traced back via idea_id. The Incident → Kernel edge stays blocked (REALITY_CANNOT_DECLARE_TRUTH). Incident #2099 (latency budget) pins no layer → OpenQuestion, never a guessed layer. Freezing into truth is still the human's mirror + /goal + approval.",
-		"footer": "RealityMirror (S43) — reality injects IDEAS, never truths. The only outward edge is → idea-intake (S27); the freeze into /kernel is the human's mirror + /goal + approval, never this screen (the wall)."
+		"footer": "RealityMirror (S43) — reality injects IDEAS, never truths. The only outward edge is → idea-intake (S27); the freeze into /kernel is the human's mirror + /goal + approval, never this screen (the wall).",
+		"liveHeading": "Incidents board — live",
+		"liveIntro": "The active project's observed incidents, read live through the gateway (incident_list, telemetry-reader). An incident is REALITY: no version, no mirror. The only outward edge stays /learn → a DRAFT idea — never a truth-write from this screen.",
+		"liveEmpty": "No incident observed for the active project.",
+		"liveTitle": "Live read of the incidents board through the gateway (incident_list).",
+		"demoTitle": "No live source attached: deterministic demo board.",
+		"liveRefLabel": "ref.",
+		"liveIdeaLabel": "idea"
 	},
 	"brain": {
 		"eyebrow": "Brain · memory & context graph",
@@ -5459,7 +5472,17 @@
 		"sidecarsLabel": "Sidecars",
 		"ddlLabel": "Emitted DDL (same Atlas emitter)",
 		"resourceLabel": "Pulumi resource (DP15)",
-		"contentAddressLabel": "Content address"
+		"contentAddressLabel": "Content address",
+		"liveHeading": "Datastore plan — live",
+		"liveIntro": "The plan computed live through the gateway (plan, provision) over a fixed demo spec (Order entity, S88 go decision). The live backend plans byte-identically to the twin (lib/provision). THE WALL: planning WRITES NO truth — the Plan is a record; the StackManifest write is refused before any dispatch.",
+		"liveTargetLabel": "target",
+		"liveImageLabel": "image",
+		"liveDatabaseLabel": "database",
+		"liveNamespaceLabel": "namespace",
+		"liveReasonsLabel": "Reasons (deterministic)",
+		"liveTitle": "Live read of the planner through the gateway (plan).",
+		"demoTitle": "No live source attached: deterministic demo plan.",
+		"liveNoTruthWrite": "No truth write: the Plan is a record; the StackManifest freeze goes through idea → mirror → /goal → ChangeSet."
 	},
 	"apiSurface": {
 		"eyebrow": "S90 · emitted API surface",
@@ -5929,7 +5952,18 @@
 		"routes": "By route",
 		"logFeed": "Logs",
 		"errorFeed": "Error feed",
-		"fingerprint": "Fingerprint (deterministic)"
+		"fingerprint": "Fingerprint (deterministic)",
+		"liveHeading": "OpenTelemetry — live",
+		"liveIntro": "The active project's OpenTelemetry spans and metrics landed in Postgres, read live through the gateway (telemetry_query, telemetry-reader, SELECT-only). THE WALL: ops observability is a RENDER layer, never a kernel on-ramp (the RealityMirror / E12 stays the single on-ramp). Read-only.",
+		"liveEmpty": "No OpenTelemetry signal landed for the active project.",
+		"liveTitle": "Live read of the spans/metrics through the gateway (telemetry_query).",
+		"demoTitle": "No live source attached: deterministic demo telemetry.",
+		"liveSpansHeading": "Spans",
+		"liveMetricsHeading": "Metrics",
+		"liveNameLabel": "name",
+		"liveStatusLabel": "status",
+		"liveTraceLabel": "trace",
+		"liveValueLabel": "value"
 	},
 	"federation": {
 		"eyebrow": "S103 · Cross-cell federation",
@@ -6022,7 +6056,20 @@
 		"ideaHeading": "The draft idea · deterministic template text",
 		"ideaTemplateNote": "The text is a TEMPLATE projection over the divergence record (same record → byte-identical text), never an LLM summary.",
 		"nextStep": "Next step: the human grills this idea (S107/S65), then /goal decides — idea → mirror → /goal → approval.",
-		"footer": "THE WALL (§2): reality WRITES NO truth — the draft is a value (wroteKernel=false; the direct Reality→Kernel edge is always refused, REALITY_CANNOT_DECLARE_TRUTH). Deterministic (§6/§8): detection AND rédaction = code, same input → same output, no LLM."
+		"footer": "THE WALL (§2): reality WRITES NO truth — the draft is a value (wroteKernel=false; the direct Reality→Kernel edge is always refused, REALITY_CANNOT_DECLARE_TRUTH). Deterministic (§6/§8): detection AND rédaction = code, same input → same output, no LLM.",
+		"liveHeading": "Divergence detector — live",
+		"liveIntro": "The DETERMINISTIC detector's verdict run live through the gateway (detect_divergence, reality-ingest) over the canonical out-of-stock report (createOrder fails 30%) against the mirror's promise. The live backend confirms the same comparison as the twin. THE WALL: detect_divergence returns a VALUE (wroteKernel=false); the direct Reality→Kernel edge is always refused.",
+		"liveDivergedYes": "divergence detected",
+		"liveDivergedNo": "within promise",
+		"liveOperationLabel": "operation",
+		"liveKindLabel": "kind",
+		"liveMirrorRefLabel": "mirror",
+		"liveObservedLabel": "observed",
+		"liveExpectedLabel": "expected",
+		"liveCallsLabel": "calls",
+		"liveTitle": "Live read of the detector through the gateway (detect_divergence).",
+		"demoTitle": "No live source attached: deterministic demo record.",
+		"liveNoKernelWrite": "No kernel write: the divergence is a value; the only door stays idea → mirror → /goal → approval."
 	},
 	"projectEvolve": {
 		"eyebrow": "S108 · Per-project medium loop",

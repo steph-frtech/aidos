@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { EvolutionSandboxPanel } from "@/components/EvolutionSandboxPanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { liveRuns } from "./actions";
+import { LiveRuns } from "./LiveRuns";
+
+// Read the live recorded EvolutionRuns of the active project on every request (the S59
+// cutover): the run-id list is read through the gateway (evolve_run_list), never baked in.
+export const dynamic = "force-dynamic";
 
 // Determinism-first: the quarantine write ledger + the promotion gate are computed by
 // a PURE twin of back/runtime/evolve.Confine + Promote (lib/evolution-sandbox.ts),
@@ -23,6 +29,8 @@ export const metadata: Metadata = {
 
 export default async function EvolutionSandboxPage() {
 	const t = await getTranslations("evolutionSandbox");
+	const tc = await getTranslations("common");
+	const live = await liveRuns();
 	const labels = {
 		ledgerTitle: t("ledgerTitle"),
 		ledgerAllowed: t("ledgerAllowed"),
@@ -77,6 +85,21 @@ export default async function EvolutionSandboxPage() {
 				</h2>
 
 				<EvolutionSandboxPanel labels={labels} />
+
+				{/* Recorded EvolutionRuns — read through the gateway (evolve_run_list), demo fallback */}
+				<LiveRuns
+					view={live}
+					labels={{
+						heading: t("liveHeading"),
+						intro: t("liveIntro"),
+						empty: t("liveEmpty"),
+						live: tc("live"),
+						demo: tc("demo"),
+						liveTitle: t("liveTitle"),
+						demoTitle: t("demoTitle"),
+						runIdLabel: t("liveRunIdLabel"),
+					}}
+				/>
 			</main>
 		</div>
 	);

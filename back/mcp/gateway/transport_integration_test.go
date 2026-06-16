@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/steph-frtech/aidos/back/mcp/telemetry-reader/telemetryreadersrv"
 	"github.com/steph-frtech/aidos/back/runtime/gateway"
 	"github.com/steph-frtech/aidos/back/runtime/gatewaydispatch"
 )
@@ -196,6 +197,60 @@ func TestTransport_GatewayCallExecutesOverHTTP(t *testing.T) {
 	}
 	if out.Result == nil || out.Result["id"] != "cs-deadbeef" || out.Result["status"] != "DRAFT" {
 		t.Fatalf("gateway_call over HTTP result = %+v, want the fake's deterministic envelope", out.Result)
+	}
+}
+
+// fakeTelemetryServer exposes a telemetry_query returning a span whose Attributes is a JSON
+// OBJECT (the real telemetry shape). Used to guard the output-schema byte-array regression.
+func fakeTelemetryServer() *mcp.Server {
+	srv := mcp.NewServer(&mcp.Implementation{Name: "fake-telemetry", Version: "v0"}, nil)
+	mcp.AddTool(srv, &mcp.Tool{Name: "telemetry_query", Description: "fake spans with object attributes"},
+		func(_ context.Context, _ *mcp.CallToolRequest, _ map[string]any) (*mcp.CallToolResult, telemetryreadersrv.TelemetryReport, error) {
+			return nil, telemetryreadersrv.TelemetryReport{
+				Spans: []telemetryreadersrv.SpanRow{{
+					TraceID: "t1", SpanID: "s1", Name: "GET /", Status: "ok",
+					Attributes: map[string]any{"http.host": "x.example", "http.method": "GET"},
+				}},
+			}, nil
+		})
+	return srv
+}
+
+// TestTransport_TelemetryQueryObjectAttrsOverHTTP is the output-side S59 scar mirror: a span
+// whose attributes is a JSON OBJECT must survive the gateway's OUTPUT-schema validation over
+// the real HTTP transport. A json.RawMessage Attributes field (the regression) reflects as a
+// byte-array output schema and the gateway rejects every real span with isError → the front
+// silently falls back to demo. This goes red on exactly that.
+func TestTransport_TelemetryQueryObjectAttrsOverHTTP(t *testing.T) {
+	d := gatewaydispatch.New(gateway.DefaultRegistry(), func(_ context.Context, srv string) (*mcp.Server, error) {
+		if srv != "telemetry-reader" {
+			return nil, gatewaydispatch.ErrServerNotDispatched
+		}
+		return fakeTelemetryServer(), nil
+	})
+	t.Cleanup(d.Close)
+	cs := connectHTTPWithDispatch(t, d)
+
+	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "gateway_call",
+		Arguments: callInput{
+			Scope: scopeIn{Identity: "alice", ActiveProject: "proj-a"},
+			Tool:  "telemetry_query", Args: map[string]any{},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool telemetry_query over HTTP: %v", err)
+	}
+	if res.IsError {
+		t.Fatalf("telemetry_query with object attributes rejected by output validation over HTTP: %+v", res.Content)
+	}
+	out := decode[callOutput](t, res, "gateway_call")
+	if out.Outcome != "route" {
+		t.Fatalf("telemetry_query outcome = %q, want route (object attributes survived the output schema)", out.Outcome)
+	}
+	spans, ok := out.Result["spans"].([]any)
+	if !ok || len(spans) != 1 {
+		t.Fatalf("expected 1 span in result, got %+v", out.Result["spans"])
 	}
 }
 

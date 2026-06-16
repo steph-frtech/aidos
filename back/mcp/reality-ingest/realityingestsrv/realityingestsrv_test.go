@@ -1,4 +1,4 @@
-package main
+package realityingestsrv
 
 import (
 	"context"
@@ -86,8 +86,8 @@ func TestHealthyReportTool_NoIdea(t *testing.T) {
 	}
 }
 
-func TestNewMCPServer(t *testing.T) {
-	if newMCPServer() == nil {
+func TestNewServer(t *testing.T) {
+	if NewServer() == nil {
 		t.Fatal("server must build")
 	}
 }

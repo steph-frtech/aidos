@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
+import { LiveTelemetry } from "./LiveTelemetry";
+import { liveTelemetry } from "./liveActions";
 import { OpsObservabilityPanel } from "./OpsObservabilityPanel";
 
 export const metadata: Metadata = {
@@ -30,6 +32,8 @@ export const dynamic = "force-dynamic";
 export default async function OpsObservabilityPage() {
 	const ctx = await activeProjectContext();
 	const t = await getTranslations("opsObservability");
+	const tc = await getTranslations("common");
+	const live = await liveTelemetry();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -56,6 +60,26 @@ export default async function OpsObservabilityPage() {
 				<div className="mt-10">
 					<OpsObservabilityPanel activeProjectId={ctx.activeId} />
 				</div>
+
+				{/* Live OpenTelemetry — read through the gateway (telemetry_query), demo fallback */}
+				<LiveTelemetry
+					view={live}
+					labels={{
+						heading: t("liveHeading"),
+						intro: t("liveIntro"),
+						empty: t("liveEmpty"),
+						live: tc("live"),
+						demo: tc("demo"),
+						liveTitle: t("liveTitle"),
+						demoTitle: t("demoTitle"),
+						spansHeading: t("liveSpansHeading"),
+						metricsHeading: t("liveMetricsHeading"),
+						nameLabel: t("liveNameLabel"),
+						statusLabel: t("liveStatusLabel"),
+						traceLabel: t("liveTraceLabel"),
+						valueLabel: t("liveValueLabel"),
+					}}
+				/>
 			</main>
 		</div>
 	);

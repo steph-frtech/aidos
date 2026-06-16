@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
+import { LivePlan } from "./LivePlan";
+import { livePlan } from "./liveActions";
 import { ProvisionPanel } from "./ProvisionPanel";
 
 export const metadata: Metadata = {
@@ -29,6 +31,8 @@ export const dynamic = "force-dynamic";
 export default async function ProvisionPage() {
 	const ctx = await activeProjectContext();
 	const t = await getTranslations("provision");
+	const tc = await getTranslations("common");
+	const live = await livePlan();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -68,6 +72,25 @@ export default async function ProvisionPage() {
 				<div className="mt-10">
 					<ProvisionPanel activeProjectId={ctx.activeId} />
 				</div>
+
+				{/* Live datastore plan — read through the gateway (plan), demo fallback */}
+				<LivePlan
+					view={live}
+					labels={{
+						heading: t("liveHeading"),
+						intro: t("liveIntro"),
+						live: tc("live"),
+						demo: tc("demo"),
+						liveTitle: t("liveTitle"),
+						demoTitle: t("demoTitle"),
+						targetLabel: t("liveTargetLabel"),
+						imageLabel: t("liveImageLabel"),
+						databaseLabel: t("liveDatabaseLabel"),
+						namespaceLabel: t("liveNamespaceLabel"),
+						reasonsLabel: t("liveReasonsLabel"),
+						noTruthWrite: t("liveNoTruthWrite"),
+					}}
+				/>
 			</main>
 		</div>
 	);

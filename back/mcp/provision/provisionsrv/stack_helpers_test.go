@@ -2,7 +2,7 @@
 // They invoke the handler functions DIRECTLY (no transport), so the wall and the
 // determinism property mirrors test the handler logic itself, not the wire. Written
 // alongside the RED mirrors (the handlers do not exist yet → compile fail).
-package main
+package provisionsrv
 
 import (
 	"context"

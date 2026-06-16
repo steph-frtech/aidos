@@ -12,7 +12,7 @@
 //
 // THE WALL (CLAUDE.md §2): nothing here writes truth; the stack.* tools project, and
 // the fenced stack.engrave_manifest is REFUSED (GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET).
-package main
+package provisionsrv
 
 import (
 	"context"
@@ -167,7 +167,7 @@ func verifyContract(t *testing.T, cs *mcp.ClientSession, plane string) {
 // SDK's StreamableHTTPHandler in-process and verifies every contract interaction (the
 // HTTP plane honours the MCP plane — the gateway fronts these tools over HTTP).
 func TestStackPactProviderVerification_HTTP(t *testing.T) {
-	httpSrv := httptest.NewServer(httpHandler())
+	httpSrv := httptest.NewServer(HTTPHandler())
 	defer httpSrv.Close()
 	cli := mcp.NewClient(&mcp.Implementation{Name: "pact-consumer", Version: "v0"}, nil)
 	cs, err := cli.Connect(context.Background(), &mcp.StreamableClientTransport{Endpoint: httpSrv.URL}, nil)
@@ -183,7 +183,7 @@ func TestStackPactProviderVerification_HTTP(t *testing.T) {
 func TestStackPactProviderVerification_InMemory(t *testing.T) {
 	ctx := context.Background()
 	clientT, serverT := mcp.NewInMemoryTransports()
-	srv := newMCPServer()
+	srv := NewServer()
 	ss, err := srv.Connect(ctx, serverT, nil)
 	if err != nil {
 		t.Fatalf("server connect: %v", err)

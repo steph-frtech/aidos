@@ -9,7 +9,7 @@
 // plan-as-data: DP13 routes/projects, the REAL docker run stays gated like DP10/DP12).
 //
 // THE WALL (CLAUDE.md §2): the call is in-scope, below-the-line; it writes no truth.
-package main
+package provisionsrv
 
 import (
 	"context"
@@ -35,7 +35,7 @@ func connectStackServer(t *testing.T) (*mcp.ClientSession, func()) {
 	t.Helper()
 	c := context.Background()
 	clientT, serverT := mcp.NewInMemoryTransports()
-	srv := newMCPServer()
+	srv := NewServer()
 	ss, err := srv.Connect(c, serverT, nil)
 	if err != nil {
 		t.Fatalf("server connect: %v", err)

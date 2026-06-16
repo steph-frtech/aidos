@@ -2,6 +2,13 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { IncidentsToIdeasPanel } from "@/components/IncidentsToIdeasPanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { liveIncidents } from "./actions";
+import { LiveIncidents } from "./LiveIncidents";
+
+// Read the live incidents board of the active project on every request (the S59 cutover):
+// the live incident list is read through the gateway (incident_list), never baked into a
+// static page.
+export const dynamic = "force-dynamic";
 
 // Determinism-first: the RealityMirror (the always-blocked Incident → Kernel gate, the external
 // loop, the conservative proposes inference) is a pure projection in lib/reality.ts (the twin of
@@ -34,6 +41,8 @@ export const metadata: Metadata = {
  */
 export default async function IncidentsToIdeasPage() {
 	const t = await getTranslations("incidentsToIdeas");
+	const tc = await getTranslations("common");
+	const live = await liveIncidents();
 
 	const labels = {
 		flowHeading: t("flowHeading"),
@@ -104,6 +113,30 @@ export default async function IncidentsToIdeasPage() {
 
 				<div className="mt-10">
 					<IncidentsToIdeasPanel labels={labels} />
+				</div>
+
+				{/* Live incidents board — read through the gateway (incident_list), demo fallback */}
+				<div className="mt-10">
+					<LiveIncidents
+						view={live}
+						labels={{
+							heading: t("liveHeading"),
+							intro: t("liveIntro"),
+							empty: t("liveEmpty"),
+							live: tc("live"),
+							demo: tc("demo"),
+							liveTitle: t("liveTitle"),
+							demoTitle: t("demoTitle"),
+							refLabel: t("liveRefLabel"),
+							operationLabel: t("operationLabel"),
+							errorLabel: t("errorLabel"),
+							recurrenceLabel: t("recurrenceLabel"),
+							causeSketchLabel: t("causeSketchLabel"),
+							taintLabel: t("taintLabel"),
+							ideaLabel: t("liveIdeaLabel"),
+							notTruthMarker: t("notTruthMarker"),
+						}}
+					/>
 				</div>
 
 				{/* Worked example */}
