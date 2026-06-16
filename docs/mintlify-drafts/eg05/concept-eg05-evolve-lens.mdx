@@ -1,0 +1,42 @@
+---
+title: "EG05 · La section « Générateur d'évolution » du Workbench"
+description: "EG05 (ROADMAP evolve-generator) : la lentille v3 /v3/evolve qui rend, sur une cellule, les variantes que le générateur propose — par auto-jeu (self-play, seedé) ou par le sampler déterministe (le repli figé du seam) — avec leur niche et le VERDICT DE GATE (promue → niche gagnée ; refusée → motif : miroir rouge · out-of-sample rouge · autorité non approuvée). Les niches gagnées + la couverture rendent visible le gain EG04 : le self-play out-couvre le déterministe. Projection PURE par le twin lib/v3/evolve-view, byte-cohérent avec le Go back/runtime/evolve, miroir fast-check. Themed (ADR 0010) + bilingue (ADR 0011, FR d'abord). Le bouton exécute via send (ui-completeness §6/§7). Le mur §2 : lit, projette, propose ; n'écrit aucune vérité."
+keywords: ["aidos", "krd", "EG05", "générateur d'évolution", "evolution generator", "/v3/evolve", "lentille v3", "EvolveClient", "twin", "evolve-view", "variantes", "self-play", "auto-jeu", "sampler déterministe", "FallbackSampler", "niche", "verdict de gate", "promue", "refusée", "miroir rouge", "out-of-sample", "autorité", "niches gagnées", "couverture", "NicheCoverage", "le gain EG04", "byte-cohérent", "fast-check", "miroir de reproductibilité", "déterminisme-first", "§6", "§8", "le juge déterministe", "anti-Goodhart", "ui-completeness", "send", "ADR 0010", "ADR 0011", "FR d'abord", "le mur", "§2", "firewall.ViaIdea", "idée miroir goal", "ADR 0089"]
+---
+
+<Note>Cible Mintlify : `steps/concept/eg05-evolve-lens`. Côté « Pour les futurs utilisateurs » — le concept. Pour l'intérieur, voir [Pour moi → EG05](/steps/internals/eg05-evolve-lens).</Note>
+
+## L'idée en une phrase
+
+**Une section du Workbench montre, à l'écran, les variantes que le générateur d'évolution propose et le verdict que le miroir déterministe leur rend — promue (niche gagnée) ou refusée, avec son motif — sans jamais écrire une vérité.**
+
+## Le problème que EG05 résout
+
+EG01–EG04 ont construit le **producteur de variantes** côté moteur (Go) : le seam `Sampler` (EG02), le **self-play Proposer** (EG03), et les générateurs **Novelty-Search / POET / MOME** (EG04) — tous derrière le même seam, tous re-jugés par le **promotion-gate déterministe**. Mais tout cela vivait **sans écran**. Une capacité sans écran est *headless* — le contrat AIDOS l'interdit (§6/§7).
+
+EG05 donne à cette capacité sa **lentille** : `/v3/evolve`, dans la session v3 partagée. On y **voit** ce que le générateur fait, et surtout **pourquoi le gate accepte ou refuse** chaque variante.
+
+## Comment ça marche, vu de l'utilisateur
+
+1. **On choisit un générateur.** Deux boutons : **Auto-jeu (self-play)** — il explore les niches déclarées de la cellule (seedé, donc reproductible) — ou **Déterministe** — le repli figé du seam, une seule proposition baseline.
+2. **On voit les variantes proposées.** Une table, une ligne par variante : sa **niche**, sa **force de mutation**, et trois colonnes de verdict — **miroir** (vert/rouge), **out-of-sample** (vert/rouge), **autorité** (approuvée ou non).
+3. **On voit le verdict de gate.** Un badge par variante : **Promue** (les trois conditions vertes) ou **Refusée**, avec, au survol, le **motif** exact :
+   - *miroir rouge* — la mutation casse la fidélité (jamais promue, quel que soit son score) ;
+   - *out-of-sample rouge* — le seul signal honnête (§87) n'est pas franchi ;
+   - *autorité non approuvée* — l'IA propose, l'humain gèle.
+4. **On voit les niches gagnées + la couverture.** C'est le **gain EG04 rendu visible** : sur la cellule canonique, l'auto-jeu gagne **2 niches** ; le déterministe en gagne **0** (sa baseline n'est pas approuvée par l'autorité).
+5. **Le bouton agit.** « Lancer une exploration » **envoie un geste canonique au chat** (le tour repasse par le réducteur, la loi) — il n'est jamais headless.
+
+## Pourquoi l'écran ne ment jamais (le miroir déterministe)
+
+L'écran ne *recalcule* rien à sa façon. Tout ce qu'il affiche vient d'un **twin pur** (`lib/v3/evolve-view`) qui rejoue **exactement** les mêmes dérivations que le moteur Go (`back/runtime/evolve`) : le même PRNG seedé, le même seuil de cassure du miroir (0.85), la même lecture out-of-sample (§87), le même **gate à trois conditions**. Le Go reste **la référence** ; le twin est **byte-cohérent** avec lui — un **miroir fast-check** le prouve (les mutations seedées de la cellule canonique sont *exactement* celles du `FixtureProposer` Go, graine 42).
+
+Conséquence : **une variante au miroir rouge n'est jamais promue à l'écran**, quel que soit son score — comme dans le moteur. Le **générateur propose ; le miroir déterministe dispose** (anti-Goodhart, §8).
+
+## L'hermétisme (aucune IA, aucun réseau)
+
+La lentille rejoue un **run canonique seedé** : aucun appel réseau, aucune IA. Le vrai self-play LLM (`ClaudeProposer`) reste **côté Go, derrière le seam** — il ne descend jamais dans l'écran. Le Playwright e2e éteint d'ailleurs la bascule « IA conversationnelle » : le jeu est **hermétique par construction**, le sampler déterministe/seedé est le seul jeu.
+
+## Le mur, toujours
+
+La lentille **lit** et **projette**, et son seul geste d'écriture est un **message de chat** (`send`) — qui repasse par le réducteur, jamais une écriture de vérité. Une **promotion** est une **proposition** : le gel reste le **`/goal` humain**, via `idée → miroir → approbation` (la porte `firewall.ViaIdea`). Aucune écriture `kernel/mirrors/fitness`, jamais (§2).
