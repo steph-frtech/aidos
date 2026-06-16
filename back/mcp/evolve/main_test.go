@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"testing"
+
+	"github.com/steph-frtech/aidos/back/runtime/evolve"
 )
 
 // MCP behaviour mirror: the evolve server DEFERS to the pure evolve engine. These
@@ -74,5 +76,38 @@ func TestEvolveProposePromotion_RedMirrorRefused(t *testing.T) {
 func TestEvolveServerRegistersTools(t *testing.T) {
 	if newMCPServer(newServer()) == nil {
 		t.Fatal("nil MCP server")
+	}
+}
+
+// EG03: the self-play sampler is wired behind the SAME frozen seam. The test injects the
+// deterministic FixtureProposer (HERMETIC — it never touches the network; the real
+// ClaudeProposer is wired only in main()). The run still emits ONLY can_write writes (the
+// wall holds whichever sampler is armed).
+func TestEvolveRun_SelfPlayStillConfined(t *testing.T) {
+	s := newServerWithSelfPlay(evolve.FixtureProposer)
+	_, out, err := s.evolveRun(context.Background(), nil, runInput{Cell: "createOrder", Budget: 8, Seed: 7})
+	if err != nil {
+		t.Fatalf("evolve_run (self-play): %v", err)
+	}
+	if len(out.Emitted) == 0 {
+		t.Fatal("self-play evolve_run emitted nothing")
+	}
+	for _, w := range out.Emitted {
+		_, c, _ := s.evolveConfine(context.Background(), nil, confineInput{Path: w.Path})
+		if c.Verdict != "allowed" {
+			t.Fatalf("self-play emitted a non-confined write %q (%q) — the loop must never govern", w.Path, c.Verdict)
+		}
+	}
+}
+
+// EG03: the self-play run (FixtureProposer-backed) is DETERMINISTIC for the same (cell,
+// seed) — the reproducibility mirror over the MCP wiring. Hermetic: no network.
+func TestEvolveRun_SelfPlayDeterministicFallback(t *testing.T) {
+	a := newServerWithSelfPlay(evolve.FixtureProposer)
+	b := newServerWithSelfPlay(evolve.FixtureProposer)
+	_, outA, _ := a.evolveRun(context.Background(), nil, runInput{Cell: "createOrder", Budget: 8, Seed: 7})
+	_, outB, _ := b.evolveRun(context.Background(), nil, runInput{Cell: "createOrder", Budget: 8, Seed: 7})
+	if outA.Variant != outB.Variant || outA.Niche != outB.Niche || len(outA.Emitted) != len(outB.Emitted) {
+		t.Fatalf("self-play fallback not deterministic: %+v vs %+v", outA, outB)
 	}
 }
