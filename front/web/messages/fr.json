@@ -4131,6 +4131,18 @@
 		"validateToolsLabel": "Validate",
 		"noEmitNote": "Rung NoEmit : la capture ajoute le nœud et seede les ancres SANS émettre d'Idea (pas de cast silencieux).",
 		"pending": "En attente d'une action.",
+		"stateCta": "Lire l'état du graphe (en direct)",
+		"stateHeading": "besoin_graph_state — l'état RLS du projet actif (en direct via la passerelle)",
+		"enterableLabel": "Niveau ouvrable (EL07) :",
+		"rowCountLabel": "Nœuds persistés :",
+		"doneLabel": "Besoin résolu ?",
+		"doneYes": "oui",
+		"doneNo": "non",
+		"graphCompleteLabel": "— (graphe complet)",
+		"sourceLive": "en direct",
+		"sourceDemo": "démo",
+		"sourceLiveTitle": "Lu en direct par le moteur Go via la passerelle (besoin_graph_state, RLS du projet actif)",
+		"sourceDemoTitle": "Passerelle injoignable — affichage de l'état de démo (jumeau déterministe, projet vierge)",
 		"footer": "EL15 — la porte capacité : besoin_graph_state, besoin_level_schema, les besoin_capture_* et besoin_validate_*/besoin_classify sont DÉTERMINISTES ; aucun LLM n'entre dans le serveur (le code est l'autorité). Une capture sur un rung qui MAPPE émet une Idea via la porte légale idea_capture ; un rung NoEmit (journey/view/invariant) n'émet RIEN. ABOVE le mur : le serveur n'a aucun GRANT sur kernel/mirrors/fitness — l'écriture kernel est toujours refusée (WroteKernel reste false). Les projets sont isolés par RLS (S55). Le jumeau TypeScript (lib/besoin-intake.ts) est byte-équivalent au MCP Go (back/mcp/besoin-intake/main.go)."
 	},
 	"emitIdeas": {

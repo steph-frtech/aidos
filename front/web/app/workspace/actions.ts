@@ -1,12 +1,22 @@
 "use server";
 
+import { readVia } from "@/lib/gateway-sdk";
+import { panelScope } from "@/lib/panelScope";
 import {
 	canAccess,
-	checkResources,
 	helloWorldRelPath,
-	type Limits,
-	provision,
+	type ProvisionRequest,
+	type ResourceUsage,
 } from "@/lib/workspace";
+import {
+	DEMO_LIMITS,
+	demoCheckResources,
+	demoWorkspace,
+	gatewayCanAccessArgs,
+	gatewayCheckResourcesArgs,
+	gatewayProvisionArgs,
+} from "@/lib/workspace-data";
+import { accessDecoder, resourceDecoder, workspaceDecoder } from "./live";
 
 /**
  * Server Actions for the /workspace Workbench panel (S82 — « Bac à sable par projet »).
@@ -18,18 +28,23 @@ import {
  * ACCESS-CHECK (cross-project isolation — SANDBOX_ESCAPE), RESOURCE-CHECK (anti noisy-neighbor —
  * SANDBOX_RESOURCE_LIMIT kills a runaway).
  *
+ * THE FLIP (ADR 0092 — the Go engine is the SINGLE live source). Every control now reads the LIVE
+ * descriptor/verdict from the Go workspace MCP server through the passerelle (`readVia(scope,
+ * "workspace_provision" | "workspace_can_access" | "workspace_check_resources", …)`, the dispatched
+ * below-the-line reads), with the twin `lib/workspace` compute preserved ONLY as the deterministic
+ * demo fallback (`lib/workspace-data`, tagged `source:"live"|"demo"`). The actions NO LONGER call the
+ * twin functions client-side. The `readVia` frontier import keeps the T5 cliquet GREEN (the twin sits
+ * behind the demo fallback, never as the live source).
+ *
  * THE WALL (§2/§7): every action WRITES NOTHING. Provision/access/resource are PURE dry-run value
- * computations (the deterministic twin lib/workspace, the byte-twin of the Go package); the truth-store
- * is OUTSIDE every workspace root (reaching it is exactly a SANDBOX_ESCAPE). Determinism-first
- * (§6/§8): the verdicts are code, never an LLM.
+ * computations; the truth-store is OUTSIDE every workspace root (reaching it is exactly a
+ * SANDBOX_ESCAPE). Determinism-first (§6/§8): a malformed / undispatched / refused answer yields the
+ * deterministic demo verdict; the verdicts are code, never an LLM.
  */
 
-const DEFAULT_LIMITS: Limits = {
-	max_memory_mb: 512,
-	max_cpu_millis: 2000,
-	max_wall_seconds: 60,
-	max_disk_mb: 1024,
-};
+function requestFor(projectId: string, vcs = "git"): ProvisionRequest {
+	return { projectId, vcs, limits: DEMO_LIMITS };
+}
 
 export interface ProvisionView {
 	ok: boolean;
@@ -41,12 +56,14 @@ export interface ProvisionView {
 	vcs?: string;
 	helloRelPath?: string;
 	helloGreen?: boolean;
+	source?: "live" | "demo";
 }
 
 /**
  * provisionAction — the PROVISION control (CLAUDE.md §7 ui-completeness): the user names a project,
- * and the action provisions its isolated workspace (ADR 0001 zones, private git/jj worktree, declared
- * caps) and confirms a confined hello-world builds green inside. WRITES NOTHING (the wall).
+ * and the action reads its isolated workspace descriptor LIVE from the Go engine through the passerelle
+ * (the twin demoWorkspace is the deterministic fallback) and confirms a confined hello-world builds
+ * green inside. WRITES NOTHING (the wall — provisioning is a dry-run value, WroteKernel always false).
  */
 export async function provisionAction(
 	_prev: ProvisionView,
@@ -60,7 +77,15 @@ export async function provisionAction(
 		};
 	}
 	const vcs = String(formData.get("vcs") ?? "git").trim() || "git";
-	const ws = provision({ projectId, vcs, limits: DEFAULT_LIMITS });
+	const req = requestFor(projectId, vcs);
+	const scope = await panelScope();
+	const { data: ws, source } = await readVia(
+		scope,
+		"workspace_provision",
+		gatewayProvisionArgs(req),
+		workspaceDecoder,
+		demoWorkspace(req),
+	);
 	const rel = helloWorldRelPath();
 	return {
 		ok: true,
@@ -70,7 +95,10 @@ export async function provisionAction(
 		zones: ws.zones,
 		vcs: ws.repo.vcs,
 		helloRelPath: rel,
+		// the hello-world is confined iff it lives under the workspace root — a deterministic
+		// verdict over the (live or demo) root.
 		helloGreen: canAccess(ws, `${ws.root}/${rel}`).allowed,
+		source,
 	};
 }
 
@@ -81,12 +109,14 @@ export interface AccessView {
 	blockCode?: string;
 	target?: string;
 	root?: string;
+	source?: "live" | "demo";
 }
 
 /**
  * accessAction — the ACCESS-CHECK control: given a project and a target path, the cross-project
- * isolation verdict. A path under another project's root, or the truth-store, is refused with
- * SANDBOX_ESCAPE. WRITES NOTHING (the wall).
+ * isolation verdict read LIVE from the Go engine (the twin demoAccess is the deterministic fallback).
+ * A path under another project's root, or the truth-store, is refused with SANDBOX_ESCAPE. WRITES
+ * NOTHING (the wall).
  */
 export async function accessAction(
 	_prev: AccessView,
@@ -97,14 +127,22 @@ export async function accessAction(
 	if (!projectId || !target) {
 		return { ok: true, error: "id projet et chemin cible requis" };
 	}
-	const ws = provision({ projectId, vcs: "git", limits: DEFAULT_LIMITS });
-	const d = canAccess(ws, target);
+	const req = requestFor(projectId);
+	const scope = await panelScope();
+	const { data, source } = await readVia(
+		scope,
+		"workspace_can_access",
+		gatewayCanAccessArgs(target, req),
+		accessDecoder,
+		canAccess(demoWorkspace(req), target),
+	);
 	return {
 		ok: true,
-		allowed: d.allowed,
-		blockCode: d.blockCode,
+		allowed: data.allowed,
+		blockCode: data.blockCode,
 		target,
-		root: ws.root,
+		root: demoWorkspace(req).root,
+		source,
 	};
 }
 
@@ -114,11 +152,13 @@ export interface ResourceView {
 	killed?: boolean;
 	reason?: string;
 	blockCode?: string;
+	source?: "live" | "demo";
 }
 
 /**
  * resourceAction — the RESOURCE-CHECK control (anti noisy-neighbor): given a project and a sampled
- * usage, the kill verdict against the declared caps. A runaway (CPU/mem/disk/wall over a positive cap)
+ * usage, the kill verdict against the declared caps read LIVE from the Go engine (the twin
+ * demoCheckResources is the deterministic fallback). A runaway (CPU/mem/disk/wall over a positive cap)
  * is killed with SANDBOX_RESOURCE_LIMIT. WRITES NOTHING (the wall).
  */
 export async function resourceAction(
@@ -130,17 +170,26 @@ export async function resourceAction(
 		return { ok: true, error: "id projet requis" };
 	}
 	const num = (k: string) => Number(formData.get(k) ?? 0) || 0;
-	const ws = provision({ projectId, vcs: "git", limits: DEFAULT_LIMITS });
-	const v = checkResources(ws, {
+	const usage: ResourceUsage = {
 		memory_mb: num("memoryMB"),
 		cpu_millis: num("cpuMillis"),
 		wall_seconds: num("wallSeconds"),
 		disk_mb: num("diskMB"),
-	});
+	};
+	const req = requestFor(projectId);
+	const scope = await panelScope();
+	const { data, source } = await readVia(
+		scope,
+		"workspace_check_resources",
+		gatewayCheckResourcesArgs(usage, req),
+		resourceDecoder,
+		demoCheckResources(usage),
+	);
 	return {
 		ok: true,
-		killed: v.killed,
-		reason: v.reason,
-		blockCode: v.blockCode,
+		killed: data.killed,
+		reason: data.reason,
+		blockCode: data.blockCode,
+		source,
 	};
 }

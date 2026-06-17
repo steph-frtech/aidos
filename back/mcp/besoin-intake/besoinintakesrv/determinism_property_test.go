@@ -1,4 +1,4 @@
-package main
+package besoinintakesrv
 
 // determinism_property_test.go — the reproducibility mirror (CLAUDE.md §6 determinism-first):
 // reflects=mcp.besoin-intake (the pure projection layer), test_kind=property, liveness=live. It pins

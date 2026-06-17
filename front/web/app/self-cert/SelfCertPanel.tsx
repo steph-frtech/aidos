@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { SENSOR_KINDS } from "@/lib/self-cert";
+import { SENSOR_KINDS } from "@/lib/self-cert-data";
 import { type CertifyResult, certifyDiffAction } from "./actions";
 
 /**

@@ -61,7 +61,7 @@ export interface RouteDecision {
 	blockReason?: GatewayBlockReason;
 }
 
-/** The 14 MCP servers the gateway fronts — byte-identical to Go GatewayServers(). */
+/** The 34 MCP servers the gateway fronts — byte-identical to Go GatewayServers(). */
 export const GATEWAY_SERVERS: readonly string[] = [
 	"store",
 	"mirror-runner",
@@ -182,6 +182,36 @@ export const GATEWAY_SERVERS: readonly string[] = [
 	// the /templates panel; the TS twin (lib/templates.ts) becomes the demo fallback only. Without
 	// this entry route(templates_instantiate) resolves to unknown_tool then demo (a hollow flip).
 	"templates",
+	// ── ADR 0092 batch-4A servers (the Go engine is the SINGLE live source). ──
+	// 31st — `besoin-intake` (EL15) — the SINGLE capability door over the BesoinGraph (the NEED store
+	// ABOVE the wall, §2 — DISTINCT from the truth-store). The ONLY DSN-backed batch-4A server: its
+	// `besoin` Store is RLS-scoped to `project` (the SET LOCAL `aidos.project` GUC, S55 — project A's rows
+	// are invisible to a B-scoped session), the IdeaStore reuses the `ideas` schema (EL05). The read/
+	// validate tools are pure projections; the capture/emit tools append a DRAFT idea (WroteKernel always
+	// false). The dispatched besoin_graph_state/level_schema/list/capture_*/validate_level/classify/
+	// emit_ideas/red_backlog/capitalise are the LIVE path for the /besoin-intake panel; the TS twin
+	// (lib/besoin-intake.ts) becomes the demo fallback only (lib/besoin-intake-data). Without this entry
+	// route(besoin_graph_state)→unknown_tool→demo (the flip would be hollow — the cliquet's blind spot).
+	"besoin-intake",
+	// 32nd — `self-cert` (S84) — the build-loop self-certification battery read server: the dispatched,
+	// dep-free selfcert_certify/gate/kinds (PURE folds of a per-sensor verdict set — the judge is the
+	// deterministic mirror, never the LLM; a missing sensor is RED, anti-passthrough; WroteKernel always
+	// false) is the LIVE path for the /self-cert panel; the TS twin (lib/self-cert.ts) becomes the demo
+	// fallback only (lib/self-cert-data). Without this entry route(selfcert_certify)→unknown_tool→demo.
+	"self-cert",
+	// 33rd — `app-auth` (S80) — the emitted app's auth & roles behavior-macro read server: the dispatched,
+	// dep-free app_auth_expand/check_access/attach (check_access is a PURE role→operation lookup NEVER an
+	// LLM; attach PREVIEWS or LANDS via an APPROVED ChangeSet — WroteKernel always false, the wall: propose
+	// → approve) is the LIVE path for the /app-auth panel; the TS twin (lib/app-auth.ts) becomes the demo
+	// fallback only (lib/app-auth-data). Without this entry route(app_auth_check_access)→unknown_tool→demo.
+	"app-auth",
+	// 34th — `workspace` (S82) — the isolated per-project sandbox read server: the dispatched, dep-free
+	// workspace_provision/can_access/check_resources/build_hello (PURE — provisioning is a DRY-RUN
+	// descriptor WroteKernel always false; can_access refuses a path under another project or the
+	// truth-store with SANDBOX_ESCAPE) is the LIVE path for the /workspace panel; the TS twin
+	// (lib/workspace.ts) becomes the demo fallback only (lib/workspace-data). Without this entry
+	// route(workspace_can_access)→unknown_tool→demo (the flip would be hollow — the cliquet's blind spot).
+	"workspace",
 ];
 
 /** defaultTools mirrors Go DefaultTools() — the closed exposed surface. */
@@ -413,6 +443,61 @@ export function defaultTools(): Tool[] {
 			"templates_get",
 			"templates_instantiate",
 			"templates_fork",
+		]),
+		// ── ADR 0092 batch-4A servers (the Go engine is the SINGLE live source). ──
+		// `besoin-intake` (EL15) — the SINGLE capability door over the BesoinGraph (the NEED store ABOVE the
+		// wall, §2). The read/validate tools are pure projections; the capture/emit tools append a DRAFT idea
+		// via the legal idea_capture door (EL05/EL16) — WroteKernel always false (a kernel write is refused by
+		// GRANT; the besoin Store is RLS-scoped to `project`, S55). The body fields are an OBJECT (map), NOT a
+		// json.RawMessage byte-array, so the real HTTP args:{object} payload survives the round-trip (the S59
+		// scar avoided). Byte-faithful to the Go registry (registry.go:besoin-intake). The LIVE path for the
+		// /besoin-intake panel; without it route(besoin_graph_state)→unknown_tool→demo (a hollow flip).
+		...below("besoin-intake", [
+			"besoin_graph_state",
+			"besoin_level_schema",
+			"besoin_list",
+			"besoin_capture_product",
+			"besoin_capture_journey",
+			"besoin_capture_view",
+			"besoin_capture_control",
+			"besoin_capture_action",
+			"besoin_capture_operation",
+			"besoin_capture_entity",
+			"besoin_capture_invariant",
+			"besoin_validate_level",
+			"besoin_classify",
+			"besoin_emit_ideas",
+			"besoin_red_backlog",
+			"besoin_capitalise",
+		]),
+		// `self-cert` (S84) — selfcert_certify/gate/kinds: the deterministic SENSOR BATTERY that gates every
+		// diff the build-loop takes. PURE folds (the judge is the mirror, never the LLM; a missing sensor is
+		// RED — anti-passthrough; WroteKernel always false). The LIVE path for the /self-cert panel; without
+		// it route(selfcert_certify)→unknown_tool→demo. Byte-faithful to the Go registry (registry.go:self-cert).
+		...below("self-cert", [
+			"selfcert_certify",
+			"selfcert_gate",
+			"selfcert_kinds",
+		]),
+		// `app-auth` (S80) — app_auth_expand/check_access/attach: the emitted app's auth & roles subsystem.
+		// check_access is a PURE role→operation lookup (NEVER an LLM); attach PREVIEWS or LANDS via an APPROVED
+		// ChangeSet (the wall: propose → approve — WroteKernel always false). The LIVE path for the /app-auth
+		// panel; without it route(app_auth_check_access)→unknown_tool→demo. Byte-faithful (registry.go:app-auth).
+		...below("app-auth", [
+			"app_auth_expand",
+			"app_auth_check_access",
+			"app_auth_attach",
+		]),
+		// `workspace` (S82) — workspace_provision/can_access/check_resources/build_hello: the isolated
+		// per-project sandbox. PURE — provisioning is a DRY-RUN descriptor (WroteKernel always false);
+		// can_access refuses a path under another project or the truth-store with SANDBOX_ESCAPE (the
+		// truth-store is OUTSIDE every workspace root, the wall). The LIVE path for the /workspace panel;
+		// without it route(workspace_can_access)→unknown_tool→demo. Byte-faithful (registry.go:workspace).
+		...below("workspace", [
+			"workspace_provision",
+			"workspace_can_access",
+			"workspace_check_resources",
+			"workspace_build_hello",
 		]),
 		// The fenced truth-zone write namespace (§2) — refused with a ChangeSet hint.
 		{ name: "kernel_write", server: "kernel", disposition: "truth_write" },

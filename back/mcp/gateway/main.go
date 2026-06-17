@@ -42,10 +42,12 @@ import (
 	cs "github.com/steph-frtech/aidos/back/archive/changeset"
 	"github.com/steph-frtech/aidos/back/archive/contentstore"
 	"github.com/steph-frtech/aidos/back/archive/dag"
+	appauthsrv "github.com/steph-frtech/aidos/back/mcp/app-auth/appauthsrv"
 	archfitnesssrv "github.com/steph-frtech/aidos/back/mcp/arch-fitness/archfitnesssrv"
 	"github.com/steph-frtech/aidos/back/mcp/autonomy/autonomysrv"
 	"github.com/steph-frtech/aidos/back/mcp/backtester/backtestersrv"
 	"github.com/steph-frtech/aidos/back/mcp/behaviors/behaviorssrv"
+	besoinintakesrv "github.com/steph-frtech/aidos/back/mcp/besoin-intake/besoinintakesrv"
 	"github.com/steph-frtech/aidos/back/mcp/billing/billingsrv"
 	buildconsolesrv "github.com/steph-frtech/aidos/back/mcp/build-console/buildconsolesrv"
 	buildloopsrv "github.com/steph-frtech/aidos/back/mcp/build-loop/buildloopsrv"
@@ -68,10 +70,12 @@ import (
 	"github.com/steph-frtech/aidos/back/mcp/project/projectsrv"
 	"github.com/steph-frtech/aidos/back/mcp/provision/provisionsrv"
 	realityingestsrv "github.com/steph-frtech/aidos/back/mcp/reality-ingest/realityingestsrv"
+	selfcertsrv "github.com/steph-frtech/aidos/back/mcp/self-cert/selfcertsrv"
 	"github.com/steph-frtech/aidos/back/mcp/store/storesrv"
 	"github.com/steph-frtech/aidos/back/mcp/telemetry-reader/telemetryreadersrv"
 	"github.com/steph-frtech/aidos/back/mcp/templates/templatessrv"
 	whytreesrv "github.com/steph-frtech/aidos/back/mcp/why-tree/whytreesrv"
+	workspacesrv "github.com/steph-frtech/aidos/back/mcp/workspace/workspacesrv"
 	"github.com/steph-frtech/aidos/back/runtime/gateway"
 	"github.com/steph-frtech/aidos/back/runtime/gatewaydispatch"
 	"github.com/steph-frtech/aidos/back/runtime/markitdown"
@@ -560,6 +564,49 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	"templates": func(context.Context) (*mcp.Server, error) {
 		return templatessrv.NewServer(), nil
 	},
+	// ── ADR 0092 batch-4A RLS-scoped + stateless servers (the Go engine is the SINGLE live source). ──
+	// besoin-intake (EL15) is the ONLY DSN-backed one in this batch — a DUAL store, RLS-scoped. It opens
+	// TWO seams over one DSN: the `besoin` need-graph Store (SCOPED to `project` via the SET LOCAL
+	// `aidos.project` GUC, S55 — project A's rows are invisible to a B-scoped session) AND the `ideas`
+	// reuse IdeaStore (the legal EL05 emission door). Like telemetry-reader, the two are co-located schemas
+	// in the one truth-store: serverDSN resolves AIDOS_BESOIN_DSN for the besoin store and AIDOS_IDEAS_DSN
+	// for the ideas reuse door (the SAME env idea-intake reads, so emitted Ideas land in one ideas schema).
+	// NO clock, NO embedder, NO LLM in the dispatch path (determinism-first §6/§8): every routing/verdict is
+	// the pure besoin.* engine. The capture/emit tools append a DRAFT idea (WroteKernel ALWAYS false; a
+	// kernel write is refused by GRANT — the wall, §2). Promotion stays the /goal flow (S64).
+	"besoin-intake": func(ctx context.Context) (*mcp.Server, error) {
+		store, err := besoinintakesrv.NewStore(ctx, serverDSN("AIDOS_BESOIN_DSN"))
+		if err != nil {
+			return nil, err
+		}
+		ideaStore, err := besoinintakesrv.NewIdeaStore(ctx, serverDSN("AIDOS_IDEAS_DSN"))
+		if err != nil {
+			return nil, err
+		}
+		return besoinintakesrv.NewServer(store, ideaStore), nil
+	},
+	// self-cert (S84) is DEP-FREE (like context/evolve/provision): the three tools (certify/gate/kinds) are
+	// PURE folds of a per-sensor verdict set — no DSN, no store, no clock, no embedder, no LLM. The judge is
+	// the deterministic mirror (anti-passthrough: a missing sensor is RED); WroteKernel is always false. The
+	// builder ignores its ctx and returns the default server; it dispatches identically whatever DSN is set.
+	"self-cert": func(context.Context) (*mcp.Server, error) {
+		return selfcertsrv.NewServer(), nil
+	},
+	// app-auth (S80) is DEP-FREE + STATELESS: expand/check_access/attach are PURE functions over the emitted
+	// app's auth subsystem. check_access is a pure role→operation lookup (NEVER an LLM); attach PREVIEWS or
+	// LANDS via an APPROVED ChangeSet (changeset.Apply, a value computation — WroteKernel ALWAYS false, the
+	// kernel freeze is the aidos CLI's job, like behaviors_attach). The builder ignores its ctx (no DSN).
+	"app-auth": func(context.Context) (*mcp.Server, error) {
+		return appauthsrv.NewServer(), nil
+	},
+	// workspace (S82) is DEP-FREE + STATELESS: provision/can_access/check_resources/build_hello are PURE
+	// functions of their input. provisioning is a DRY-RUN descriptor (WroteKernel ALWAYS false); can_access
+	// is the cross-project isolation verdict (a path under another project or the truth-store is refused with
+	// SANDBOX_ESCAPE — the truth-store is OUTSIDE every workspace root, the wall §2). The builder ignores its
+	// ctx (no DSN); it dispatches identically whatever DSN is set.
+	"workspace": func(context.Context) (*mcp.Server, error) {
+		return workspacesrv.NewServer(), nil
+	},
 }
 
 // gatewayMemorySeed is the fixed seed the gateway injects into the dispatched memory store's
@@ -584,6 +631,11 @@ func gatewayDSNConfigured() bool {
 		// telemetry-reader's own schemas (incidents observe/learn + the telemetry SELECT-only
 		// landing); it shares AIDOS_IDEAS_DSN for the S27 capture door (counted above).
 		"AIDOS_INCIDENTS_DSN", "AIDOS_TELEMETRY_DSN",
+		// besoin-intake's own `besoin` need-graph schema (RLS-scoped, batch-4A); it shares
+		// AIDOS_IDEAS_DSN for the EL05 idea-capture reuse door (counted above). self-cert ·
+		// app-auth · workspace are DEP-FREE (like context): no DSN, no store — they contribute
+		// NO env here (they are reachable the moment any DSN arms the dispatcher).
+		"AIDOS_BESOIN_DSN",
 		// evolve · reality-ingest · provision are DEP-FREE (like context): no DSN, no store —
 		// they dispatch over in-memory/pure state regardless of any configured store, so they
 		// contribute NO env here (a gateway with one of THEM as its only wired server still has

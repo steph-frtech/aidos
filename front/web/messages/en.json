@@ -4131,6 +4131,18 @@
 		"validateToolsLabel": "Validate",
 		"noEmitNote": "NoEmit rung: the capture appends the node and seeds anchors WITHOUT emitting an Idea (no silent cast).",
 		"pending": "Awaiting an action.",
+		"stateCta": "Read the graph state (live)",
+		"stateHeading": "besoin_graph_state — the active project's RLS state (live via the passerelle)",
+		"enterableLabel": "Enterable level (EL07):",
+		"rowCountLabel": "Persisted nodes:",
+		"doneLabel": "Need resolved?",
+		"doneYes": "yes",
+		"doneNo": "no",
+		"graphCompleteLabel": "— (graph complete)",
+		"sourceLive": "live",
+		"sourceDemo": "demo",
+		"sourceLiveTitle": "Read live by the Go engine via the passerelle (besoin_graph_state, the active project's RLS)",
+		"sourceDemoTitle": "Passerelle unreachable — showing the demo state (deterministic twin, a fresh project)",
 		"footer": "EL15 — the capability door: besoin_graph_state, besoin_level_schema, the besoin_capture_* and besoin_validate_*/besoin_classify are DETERMINISTIC; no LLM enters the server (the code is the authority). A capture on a MAPPING rung emits an Idea via the legal idea_capture door; a NoEmit rung (journey/view/invariant) emits NOTHING. ABOVE the wall: the server has no GRANT on kernel/mirrors/fitness — a kernel write is always refused (WroteKernel stays false). Projects are isolated by RLS (S55). The TypeScript twin (lib/besoin-intake.ts) is byte-equivalent to the Go MCP (back/mcp/besoin-intake/main.go)."
 	},
 	"emitIdeas": {

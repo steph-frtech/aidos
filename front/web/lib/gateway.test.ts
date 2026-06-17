@@ -163,4 +163,33 @@ describe("gateway registry completeness", () => {
 		expect(d.outcome).toBe("refused_truth_write");
 		expect(d.blockReason?.code).toBe(CODE_TRUTH_WRITE_NEEDS_CHANGESET);
 	});
+
+	// ── ADR 0092 batch-4A: the besoin-intake door's read/validate/capture tools resolve ──
+	// The /besoin-intake panel reads LIVE via the passerelle — without the lookup resolving the flip
+	// would be HOLLOW (route(besoin_graph_state)→unknown_tool→demo, the cliquet's blind spot). These
+	// are ALL below-the-line: the read/validate tools are pure projections; the capture/emit tools
+	// append a DRAFT idea via the legal idea_capture door (WroteKernel always false — a kernel write is
+	// refused by GRANT). The besoin Store is RLS-scoped to `project` (S55) — the scope routes the GUC.
+	it("fronts the besoin-intake server (the 31st) — every door tool routes below the line", () => {
+		expect(GATEWAY_SERVERS).toContain("besoin-intake");
+		for (const tool of [
+			"besoin_graph_state",
+			"besoin_level_schema",
+			"besoin_list",
+			"besoin_validate_level",
+			"besoin_classify",
+			"besoin_red_backlog",
+			"besoin_capture_product",
+			"besoin_capture_invariant",
+			"besoin_emit_ideas",
+			"besoin_capitalise",
+		]) {
+			const d = route({ identity: "alice", activeProject: "proj-a" }, tool, {
+				projectId: "proj-a",
+			});
+			expect(d.outcome).toBe("route");
+			expect(d.tool?.server).toBe("besoin-intake");
+			expect(d.tool?.disposition).toBe("below_line");
+		}
+	});
 });

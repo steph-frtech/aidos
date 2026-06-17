@@ -1,6 +1,6 @@
-package main
+package besoinintakesrv
 
-// main_test.go — the EL15 capability-door mirror: reflects=mcp.besoin-intake, test_kind=integration,
+// besoinintakesrv_test.go — the EL15 capability-door mirror: reflects=mcp.besoin-intake, test_kind=integration,
 // liveness=live. It spins up a throwaway Postgres (Testcontainers), applies the kernel-records + ideas +
 // besoin migrations, and drives the besoin-intake door end-to-end through the REAL stores, proving every
 // done-criterion of the ROADMAP EL15 row:
@@ -87,9 +87,9 @@ func startPostgres(t *testing.T) harness {
 	t.Cleanup(owner.Close)
 
 	for _, f := range []string{
-		"../../migrations/kernel_records_baseline.sql",
-		"../../migrations/ideas_lifecycle_baseline.sql",
-		"../../migrations/besoin_graph_baseline.sql",
+		"../../../migrations/kernel_records_baseline.sql",
+		"../../../migrations/ideas_lifecycle_baseline.sql",
+		"../../../migrations/besoin_graph_baseline.sql",
 	} {
 		mig, err := os.ReadFile(f)
 		if err != nil {
@@ -130,7 +130,7 @@ func newAgentServer(t *testing.T, h harness) *server {
 		t.Fatalf("agent pgxpool: %v", err)
 	}
 	t.Cleanup(pool.Close)
-	return &server{store: NewStoreFromPool(pool), ideas: newIdeaStoreFromPool(pool)}
+	return &server{store: NewStoreFromPool(pool), ideas: NewIdeaStoreFromPool(pool)}
 }
 
 // completeMeta is the metaInput that makes a node verifiable (records rather than routing to /spike).

@@ -196,6 +196,42 @@ func DefaultTools() []Tool {
 	// dispatched here — so the S59 byte-array scar is avoided by construction).
 	t = append(t, below("templates", "templates_list", "templates_get", "templates_instantiate", "templates_fork")...)
 
+	// ── ADR 0092 batch-4A RLS-scoped + stateless servers (the Go engine is the SINGLE live source). ──
+	// 31. besoin-intake (EL15) — the SINGLE capability door over the BesoinGraph (the NEED store ABOVE the
+	// wall, §2 — DISTINCT from the truth-store, not an exception). The READ/VALIDATE tools (graph_state/
+	// level_schema/list/validate_level/classify/red_backlog/capitalise) are pure projections; the CAPTURE/
+	// EMIT tools append a DRAFT idea via the legal idea_capture door (EL05/EL16) — WroteKernel ALWAYS false
+	// (the agent role has NO kernel grant; a kernel write is refused by GRANT). ALL BELOW THE LINE: the
+	// besoin Store is RLS-scoped to `project` (the SET LOCAL `aidos.project` GUC, S55 — project A's rows are
+	// invisible to a B-scoped session), the IdeaStore reuses the `ideas` schema. Every I/O is a scalar
+	// object (the body fields are map[string]any — NOT a json.RawMessage byte-array — so the real HTTP
+	// args:{object} payload survives the round-trip; the S59 scar is avoided by construction). Promotion
+	// stays the /goal flow (S64) — there is no idea_promote_to_kernel tool.
+	t = append(t, below("besoin-intake",
+		"besoin_graph_state", "besoin_level_schema", "besoin_list",
+		"besoin_capture_product", "besoin_capture_journey", "besoin_capture_view", "besoin_capture_control",
+		"besoin_capture_action", "besoin_capture_operation", "besoin_capture_entity", "besoin_capture_invariant",
+		"besoin_validate_level", "besoin_classify", "besoin_emit_ideas", "besoin_red_backlog", "besoin_capitalise")...)
+	// 32. self-cert (S84) — selfcert_certify/gate/kinds: the deterministic SENSOR BATTERY that gates every
+	// diff the build-loop takes. ALL BELOW THE LINE: pure computation that FOLDS the per-sensor verdicts into
+	// the gated battery (green iff every sensor passes; a missing sensor is RED — anti-passthrough). The
+	// judge is the deterministic mirror, never the LLM; WroteKernel is always false (no truth-write tool).
+	// Every I/O is a scalar object (no json.RawMessage body — the S59 scar avoided by construction).
+	t = append(t, below("self-cert", "selfcert_certify", "selfcert_gate", "selfcert_kinds")...)
+	// 33. app-auth (S80) — app_auth_expand/check_access/attach: the auth & roles subsystem of the EMITTED
+	// app. expand is a dry-run EXPAND (writes nothing); check_access is the emitted app's RUNTIME authz gate
+	// (a pure role→operation lookup, NEVER an LLM); attach PREVIEWS or LANDS via an APPROVED ChangeSet (the
+	// wall: propose → approve — WroteKernel ALWAYS false; the kernel freeze is the aidos CLI's job, like
+	// behaviors_attach). ALL BELOW THE LINE: pure, stateless, every I/O a scalar object (no json.RawMessage).
+	t = append(t, below("app-auth", "app_auth_expand", "app_auth_check_access", "app_auth_attach")...)
+	// 34. workspace (S82) — workspace_provision/can_access/check_resources/build_hello: the isolated
+	// per-project sandbox. ALL BELOW THE LINE: pure, stateless, DEP-FREE (no DSN, no store) — provisioning is
+	// a DRY-RUN descriptor (WroteKernel ALWAYS false), can_access is the cross-project isolation verdict (a
+	// path under another project or the truth-store is refused with SANDBOX_ESCAPE — the truth-store is
+	// OUTSIDE every workspace root), check_resources the anti-noisy-neighbor kill check. Every I/O is a
+	// scalar object (no json.RawMessage body — the S59 scar avoided by construction).
+	t = append(t, below("workspace", "workspace_provision", "workspace_can_access", "workspace_check_resources", "workspace_build_hello")...)
+
 	// THE FENCED TRUTH-ZONE WRITE NAMESPACE (§2). Not a real tool of any server — the
 	// door a caller might craft to move truth directly. Registered as TruthWrite so the
 	// gateway refuses it with a ChangeSet-pointing BlockReason (server-side wall).
@@ -212,7 +248,7 @@ func DefaultTools() []Tool {
 	return t
 }
 
-// GatewayServers is the closed list of the 27 MCP servers the gateway exposes (display
+// GatewayServers is the closed list of the 34 MCP servers the gateway exposes (display
 // + the completeness assertion: every named server has ≥1 exposed tool). Ordered. The
 // 14th — `provision` — is ACTIVATED at DP13 (the scaffold the gateway now fronts:
 // every provisioning op is an MCP tool, ADR 0009; a scaffold the gateway never fronts
@@ -228,6 +264,14 @@ func DefaultTools() []Tool {
 // false). The 28th–30th — billing · dsl-editor · templates — are the ADR 0092 batch-3
 // servers (same shape: dep-free pure reads, every I/O a scalar object — dsl-editor wraps its
 // Body/Canonical as OBJECT schemas to dodge the S59 RawMessage scar; WroteKernel always false).
+// The 31st–34th — besoin-intake · self-cert · app-auth · workspace — are the ADR 0092 batch-4A
+// servers. besoin-intake is the ONLY DSN-backed one: an RLS-scoped DUAL store (the `besoin` need
+// graph scoped to `project` via the SET LOCAL `aidos.project` GUC, S55, + the `ideas` reuse door,
+// EL05) — its capture/emit tools append a DRAFT idea (WroteKernel always false), its read/validate
+// tools are pure projections. self-cert · app-auth · workspace are dep-free/stateless pure reads
+// (app_auth_attach lands via an APPROVED ChangeSet, WroteKernel false; workspace provisioning is a
+// dry-run descriptor). Every I/O is a scalar object — the besoin body fields are map[string]any (NOT
+// a json.RawMessage byte-array), so the S59 RawMessage scar is avoided by construction.
 // truth-approval is DELIBERATELY NOT fronted: its three tools (truth_propose/approve/
 // apply_concurrent) DECIDE/GATE a truth-write and return the apply envelope — they ARE the
 // propose → ChangeSet → approval door, never a below-the-line read, so the /truth-approval panel
@@ -241,5 +285,6 @@ func GatewayServers() []string {
 		"why-tree", "goal-piloting", "federation", "learn", "conscience", "arch-fitness",
 		"cost-meter", "build-console", "build-loop", "kernel-garden", "autonomy", "behaviors",
 		"billing", "dsl-editor", "templates",
+		"besoin-intake", "self-cert", "app-auth", "workspace",
 	}
 }

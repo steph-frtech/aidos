@@ -2,7 +2,7 @@
 // tests drive the tool handlers directly (no transport) and assert the deterministic verdicts:
 // provisioning is dry-run (WroteKernel false), cross-project access is refused with SANDBOX_ESCAPE,
 // a runaway is killed with SANDBOX_RESOURCE_LIMIT, a confined hello-world is green.
-package main
+package workspacesrv
 
 import (
 	"context"
@@ -108,7 +108,7 @@ func TestBuildHelloTool_GreenInside(t *testing.T) {
 }
 
 func TestNewMCPServer_Registers(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("server must be constructed")
 	}
 }

@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { BesoinIntakePanel } from "@/components/BesoinIntakePanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import {
+	captureProjections,
+	grammarLevels,
+	readTools,
+	validateTools,
+} from "./actions";
 
 // Determinism-first: EL15 is the besoin-intake MCP — the capability door over the BesoinGraph (Go MCP
 // SDK, ADR 0009). Its read/state/schema decisions are PURE functions of the grammar + the EL05 mapping;
@@ -28,11 +34,30 @@ export const metadata: Metadata = {
 export default async function BesoinIntakePage() {
 	const t = await getTranslations("besoinIntake");
 
+	// The closed-grammar surfaces (levels + tool inventory + capture projections) are computed by the
+	// deterministic twin SERVER-SIDE (behind the actions.ts readVia frontier — the T5 cliquet stays
+	// green; the page never value-imports the twin). The live RLS-scoped graph-state is read by the
+	// panel's stateAction on demand.
+	const [levels, captures, reads, validates] = await Promise.all([
+		grammarLevels(),
+		captureProjections(),
+		readTools(),
+		validateTools(),
+	]);
+
 	const labels = {
+		stateCta: t("stateCta"),
 		schemaCta: t("schemaCta"),
 		projectCta: t("projectCta"),
 		resetCta: t("resetCta"),
 		levelLabel: t("levelLabel"),
+		stateHeading: t("stateHeading"),
+		enterableLabel: t("enterableLabel"),
+		rowCountLabel: t("rowCountLabel"),
+		doneLabel: t("doneLabel"),
+		doneYes: t("doneYes"),
+		doneNo: t("doneNo"),
+		graphCompleteLabel: t("graphCompleteLabel"),
 		schemaHeading: t("schemaHeading"),
 		requiredFieldsLabel: t("requiredFieldsLabel"),
 		mappingLabel: t("mappingLabel"),
@@ -49,6 +74,10 @@ export default async function BesoinIntakePage() {
 		validateToolsLabel: t("validateToolsLabel"),
 		noEmitNote: t("noEmitNote"),
 		pending: t("pending"),
+		sourceLive: t("sourceLive"),
+		sourceDemo: t("sourceDemo"),
+		sourceLiveTitle: t("sourceLiveTitle"),
+		sourceDemoTitle: t("sourceDemoTitle"),
 	};
 
 	return (
@@ -87,7 +116,13 @@ export default async function BesoinIntakePage() {
 				</section>
 
 				<div className="mt-10">
-					<BesoinIntakePanel labels={labels} />
+					<BesoinIntakePanel
+						labels={labels}
+						levels={levels}
+						captureProjections={captures}
+						readTools={reads}
+						validateTools={validates}
+					/>
 				</div>
 
 				<footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">

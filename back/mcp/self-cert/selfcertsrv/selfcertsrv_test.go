@@ -1,4 +1,4 @@
-package main
+package selfcertsrv
 
 import (
 	"context"
@@ -116,7 +116,7 @@ func TestKindsToolClosedSet(t *testing.T) {
 }
 
 func TestServerBuildsAndRegisters(t *testing.T) {
-	if newMCPServer() == nil {
-		t.Fatal("newMCPServer returned nil")
+	if NewServer() == nil {
+		t.Fatal("NewServer returned nil")
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package besoinintakesrv
 
 import (
 	"context"
@@ -33,7 +33,8 @@ func NewStore(ctx context.Context, dsn string) (*Store, error) {
 	return &Store{pool: pool}, nil
 }
 
-// NewStoreFromPool wraps an existing pool (used by the test harness).
+// NewStoreFromPool wraps an existing pool (used by the test harness + the dispatcher when a pool is
+// already opened).
 func NewStoreFromPool(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
 // Close releases the pool.
