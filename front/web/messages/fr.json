@@ -1152,6 +1152,8 @@
 		"redWaveNote": "Ce miroir, figé au /goal, bumpe le hash de la racine et déclenche une vague de rouge ciblée (la liste de travail).",
 		"refusedLabel": "Refusé",
 		"bodyLabel": "Corps kernel.link de l'arbre (content-adressé)",
+		"sourceLive": "live — moteur Go (passerelle)",
+		"sourceDemo": "démo — repli déterministe",
 		"caseIncident": "Incident → arbre → miroir racine (checkout-accept, racine add_total_col)",
 		"caseNoMirror": "Sans miroir terminal — REFUSÉ (WHYTREE_NO_MIRROR)",
 		"caseNotReproduced": "Cause non reproduite (Order) — REFUSÉ (anti-confabulation)",
@@ -1698,7 +1700,11 @@
 			"openRefused": "Ouverture refusée.",
 			"ideaEmpty": "Donnez d'abord l'idée source."
 		},
-		"footer": "KRD §56–§59/§63 ① · l'écran PROPOSE un ChangeSet DRAFT, n'écrit JAMAIS le Kernel · acteur réel via S63 (jamais un placeholder) · set rouge LIVE · Stop NON-GAMEABLE : set rouge→vert ∧ vert antérieur intact ∧ mutation ≥ seuil ∧ aucun monstre."
+		"footer": "KRD §56–§59/§63 ① · l'écran PROPOSE un ChangeSet DRAFT, n'écrit JAMAIS le Kernel · acteur réel via S63 (jamais un placeholder) · set rouge LIVE · Stop NON-GAMEABLE : set rouge→vert ∧ vert antérieur intact ∧ mutation ≥ seuil ∧ aucun monstre.",
+		"sourceLive": "en direct",
+		"sourceDemo": "démo",
+		"sourceLiveTitle": "Lu en direct par le moteur Go via la passerelle (outils goal_pilot_open / goal_pilot_close)",
+		"sourceDemoTitle": "Passerelle injoignable — affichage du jumeau de démo déterministe"
 	},
 	"ideas": {
 		"eyebrow": "Cycle de vie des idées",
@@ -6129,7 +6135,11 @@
 		"contractsHeading": "Contrats inter-cellules (S101)",
 		"honored": "honoré",
 		"broken": "cassé",
-		"footer": "LE MUR (§2) : le cockpit COMPOSE + RENDU — il n'écrit AUCUNE vérité ; le baseline structurel bouge via un ChangeSet (S102), l'INSERT par cellule est le travail du hook S22 sous la ligne d'eau. Déterministe (§6/§8) : même entrée → snapshot byte-identique, aucun LLM."
+		"footer": "LE MUR (§2) : le cockpit COMPOSE + RENDU — il n'écrit AUCUNE vérité ; le baseline structurel bouge via un ChangeSet (S102), l'INSERT par cellule est le travail du hook S22 sous la ligne d'eau. Déterministe (§6/§8) : même entrée → snapshot byte-identique, aucun LLM.",
+		"sourceLive": "en direct",
+		"sourceDemo": "démo",
+		"sourceLiveTitle": "Vague rouge lue en direct par le moteur Go via la passerelle (outil fan_out)",
+		"sourceDemoTitle": "Passerelle injoignable — affichage de la vague de démo (jumeau déterministe)"
 	},
 	"realityIngest": {
 		"eyebrow": "S106 · Boucle de réalité",
@@ -6352,6 +6362,8 @@
 		"tutorialBody": "Fermez la boucle : sur l'incident out-of-stock de createOrder, attachez le miroir approuvé « out-of-stock-during-checkout ». Le hash de l'opération createOrder BUMP (l'adresse avant ≠ après), et une vague de rouge ciblée (mirror-first) devient la liste de travail. Cochez « re-réflexion » : re-attacher un miroir DÉJÀ reflété → AUCUN bump, une wave VIDE (une re-réflexion cosmétique n'est pas une nouvelle dent). LE MUR : la boucle n'écrit AUCUNE vérité, et l'arête directe Reality→Kernel est toujours refusée.",
 		"activeProjectLabel": "Projet actif",
 		"noProject": "aucun",
+		"sourceLive": "live · moteur Go",
+		"sourceDemo": "démo · repli",
 		"working": "En cours…",
 		"closeHeading": "Fermer la boucle /learn",
 		"closeBody": "Attache le miroir humain-approuvé à son opération/policy ; le hash de contenu change (fonction PURE records.Hash, jamais un LLM) et une vague de rouge ciblée (mirror-first) devient la liste de travail. WroteKernel=false ; l'humain rédige le miroir au /goal — rien n'apprend sa propre fitness.",
@@ -6531,6 +6543,8 @@
 		"advisoryN": "{n} advisory",
 		"deterministicYes": "même entrée → même rapport (2×)",
 		"deterministicNo": "NON DÉTERMINISTE",
+		"sourceLive": "live · moteur Go",
+		"sourceDemo": "démo · repli déterministe",
 		"pairsHeading": "Paires réconciliées (verdicts sourcés)",
 		"cardsHeading": "Decision cards (§FKE-31)",
 		"noCards": "Aucune divergence — aucune decision card (kernel aligné).",

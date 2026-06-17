@@ -169,67 +169,18 @@ export function assembleSnapshot(
 }
 
 // ── demo fixtures (the §50 canonical cockpit the panel boots with) ──
-
-/** The canonical two-cell federation: order green + payment green, one honored contract. */
-export const DEMO_PROJECT: CellProject = {
-	id: "shop",
-	nodes: [
-		{ id: "order-op", cell: "order", kind: "layer" },
-		{ id: "order-mirror", cell: "order", kind: "mirror" },
-		{ id: "order-contract", cell: "order", kind: "contract", public: true },
-		{ id: "payment-op", cell: "payment", kind: "layer" },
-		{ id: "payment-mirror", cell: "payment", kind: "mirror" },
-		{ id: "payment-contract", cell: "payment", kind: "contract", public: true },
-	],
-	ratchets: { order: "green", payment: "green" },
-};
-
-export const DEMO_FEDERATION: CellFederation = {
-	contracts: [{ a: "order", b: "payment", honored: true }],
-};
-
-/** The baseline dep-graph cut (one honored inter-cell edge → structural HELD against itself). */
-export const DEMO_DEP_GRAPH: DepGraph = {
-	project: "shop",
-	cells: { order: 3, payment: 3 },
-	edges: [
-		{
-			from: "order-contract",
-			fromCell: "order",
-			to: "payment-contract",
-			toCell: "payment",
-		},
-	],
-	honored: [{ a: "order", b: "payment" }],
-};
-
-/** The §50 transverse red wave: a global policy reddens ONLY payment; order stays green & ships. */
-export const DEMO_WAVE: FanOutSpec = {
-	policyWaveId: "wave-pii-1",
-	cells: [
-		{ cell: "order", violates: false },
-		{ cell: "payment", violates: true },
-	],
-};
-
-/** A candidate cut that ADDS an un-contracted inter-cell edge → a structural regression (BROKEN). */
-export const DEMO_REGRESSED_GRAPH: DepGraph = {
-	project: "shop",
-	cells: { order: 3, payment: 3 },
-	edges: [
-		{
-			from: "order-contract",
-			fromCell: "order",
-			to: "payment-contract",
-			toCell: "payment",
-		},
-		// a NEW un-contracted dependency: order-op → payment-op (boundary violation).
-		{
-			from: "order-op",
-			fromCell: "order",
-			to: "payment-op",
-			toCell: "payment",
-		},
-	],
-	honored: [{ a: "order", b: "payment" }],
-};
+//
+// The DEMO_* fixtures moved to lib/federation-cockpit-data.ts (the S59 demo-fallback sibling, ADR
+// 0092 — the witness that makes the T5 cliquet recognise this module as a twin). They are
+// re-exported here so existing importers (the reproducibility mirror, the panel) keep their import
+// path; the data file is the single declaration.
+export {
+	DEMO_DEP_GRAPH,
+	DEMO_FEDERATION,
+	DEMO_NO_WAVE,
+	DEMO_PROJECT,
+	DEMO_REGRESSED_GRAPH,
+	DEMO_WAVE,
+	demoWave,
+	gatewayFanOutArgs,
+} from "./federation-cockpit-data";

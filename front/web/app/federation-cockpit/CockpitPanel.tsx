@@ -65,9 +65,37 @@ export function CockpitPanel({
 
 			{/* ── The cockpit control: assemble + toggles ── */}
 			<section className="space-y-4 rounded-xl border border-border bg-card p-5">
-				<h2 className="text-sm font-semibold tracking-tight text-foreground">
-					{t("assembleHeading")}
-				</h2>
+				<div className="flex flex-wrap items-center justify-between gap-2">
+					<h2 className="text-sm font-semibold tracking-tight text-foreground">
+						{t("assembleHeading")}
+					</h2>
+					{view.ok && view.source ? (
+						<span
+							data-testid="cockpit-source"
+							data-source={view.source}
+							className={
+								view.source === "live"
+									? "inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+									: "inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
+							}
+							title={
+								view.source === "live"
+									? t("sourceLiveTitle")
+									: t("sourceDemoTitle")
+							}
+						>
+							<span
+								aria-hidden="true"
+								className={
+									view.source === "live"
+										? "size-1.5 rounded-full bg-primary"
+										: "size-1.5 rounded-full bg-muted-foreground"
+								}
+							/>
+							{view.source === "live" ? t("sourceLive") : t("sourceDemo")}
+						</span>
+					) : null}
+				</div>
 				<p className="text-sm leading-relaxed text-muted-foreground">
 					{t("assembleBody")}
 				</p>

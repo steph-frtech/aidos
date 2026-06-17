@@ -1152,6 +1152,8 @@
 		"redWaveNote": "This mirror, frozen at /goal, bumps the root's hash and triggers a targeted red wave (the worklist).",
 		"refusedLabel": "Refused",
 		"bodyLabel": "Tree's kernel.link body (content-addressed)",
+		"sourceLive": "live — Go engine (gateway)",
+		"sourceDemo": "demo — deterministic fallback",
 		"caseIncident": "Incident → tree → root mirror (checkout-accept, root add_total_col)",
 		"caseNoMirror": "No terminal mirror — REFUSED (WHYTREE_NO_MIRROR)",
 		"caseNotReproduced": "Non-reproduced cause (Order) — REFUSED (anti-confabulation)",
@@ -1698,7 +1700,11 @@
 			"openRefused": "Open refused.",
 			"ideaEmpty": "Give the source idea first."
 		},
-		"footer": "KRD §56–§59/§63 ① · the screen PROPOSES a DRAFT ChangeSet, NEVER writes the Kernel · real actor via S63 (never a placeholder) · LIVE red set · NON-GAMEABLE Stop: red set→green ∧ prior green intact ∧ mutation ≥ floor ∧ no monster."
+		"footer": "KRD §56–§59/§63 ① · the screen PROPOSES a DRAFT ChangeSet, NEVER writes the Kernel · real actor via S63 (never a placeholder) · LIVE red set · NON-GAMEABLE Stop: red set→green ∧ prior green intact ∧ mutation ≥ floor ∧ no monster.",
+		"sourceLive": "live",
+		"sourceDemo": "demo",
+		"sourceLiveTitle": "Read live from the Go engine via the gateway (goal_pilot_open / goal_pilot_close tools)",
+		"sourceDemoTitle": "Gateway unreachable — showing the deterministic demo twin"
 	},
 	"ideas": {
 		"eyebrow": "Ideas lifecycle",
@@ -6129,7 +6135,11 @@
 		"contractsHeading": "Inter-cell contracts (S101)",
 		"honored": "honored",
 		"broken": "broken",
-		"footer": "THE WALL (§2): the cockpit COMPOSES + RENDERS — it WRITES NO truth; the structural baseline moves via a ChangeSet (S102), the per-cell INSERT is the S22 hook's job below the waterline. Deterministic (§6/§8): same input → byte-identical snapshot, no LLM."
+		"footer": "THE WALL (§2): the cockpit COMPOSES + RENDERS — it WRITES NO truth; the structural baseline moves via a ChangeSet (S102), the per-cell INSERT is the S22 hook's job below the waterline. Deterministic (§6/§8): same input → byte-identical snapshot, no LLM.",
+		"sourceLive": "live",
+		"sourceDemo": "demo",
+		"sourceLiveTitle": "Red-wave read live by the Go engine via the passerelle (the fan_out tool)",
+		"sourceDemoTitle": "Passerelle unreachable — showing the demo wave (deterministic twin)"
 	},
 	"realityIngest": {
 		"eyebrow": "S106 · Reality loop",
@@ -6352,6 +6362,8 @@
 		"tutorialBody": "Close the loop: on the createOrder out-of-stock incident, attach the approved mirror 'out-of-stock-during-checkout'. The createOrder operation's hash BUMPS (before ≠ after), and a targeted red wave (mirror-first) becomes the worklist. Check 're-reflect': re-attaching an ALREADY-reflected mirror → NO bump, an EMPTY wave (a cosmetic re-reflection is not a new tooth). THE WALL: the loop writes NO truth, and the direct Reality→Kernel edge is always refused.",
 		"activeProjectLabel": "Active project",
 		"noProject": "none",
+		"sourceLive": "live · Go engine",
+		"sourceDemo": "demo · fallback",
 		"working": "Working…",
 		"closeHeading": "Close the /learn loop",
 		"closeBody": "Attaches the human-approved mirror to its operation/policy; the content hash changes (PURE records.Hash, never an LLM) and a targeted red wave (mirror-first) becomes the worklist. WroteKernel=false; the human authors the mirror at /goal — nothing learns its own fitness.",
@@ -6531,6 +6543,8 @@
 		"advisoryN": "{n} advisory",
 		"deterministicYes": "same input → same report (2×)",
 		"deterministicNo": "NON-DETERMINISTIC",
+		"sourceLive": "live · Go engine",
+		"sourceDemo": "demo · deterministic fallback",
 		"pairsHeading": "Reconciled pairs (sourced verdicts)",
 		"cardsHeading": "Decision cards (§FKE-31)",
 		"noCards": "No divergence — no decision card (kernel aligned).",

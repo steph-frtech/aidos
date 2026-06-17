@@ -1,3 +1,4 @@
+import type { Source } from "@/lib/gateway-sdk";
 import type { Outcome } from "@/lib/learn";
 
 /**
@@ -8,10 +9,14 @@ import type { Outcome } from "@/lib/learn";
  * `moved` distinguishes a real new tooth (the operation/policy hash bumped, a targeted red wave
  * became the worklist) from a no-op re-reflection (no bump, an empty wave — a cosmetic
  * re-reflection is not a tooth).
+ *
+ * `source` (S59 cutover, ADR 0092) tells the panel whether the outcome came from the LIVE Go learn
+ * engine through the passerelle (`"live"`) or the deterministic demo fallback (`"demo"`).
  */
 export interface LearnView {
 	ok: boolean;
 	outcome?: Outcome;
+	source?: Source;
 	error?: string;
 }
 

@@ -30,6 +30,9 @@
  * The Go engines (realityingest, learn, projectevolve) are AUTHORITATIVE on the wire.
  */
 
+import type { Outcome as LearnOutcome } from "./learn";
+// S59 (ADR 0092): the live /learn loop is the Go engine's; the pure compute + fixtures live in the
+// demo-fallback module (lib/learn-data), reused here for the cockpit's own demo composition.
 import {
 	closeLoop,
 	DEMO_EDGES,
@@ -37,8 +40,7 @@ import {
 	DEMO_INCIDENT_REF,
 	DEMO_MIRROR,
 	DEMO_TARGET,
-	type Outcome as LearnOutcome,
-} from "./learn";
+} from "./learn-data";
 import {
 	type FixedMirror,
 	niches,

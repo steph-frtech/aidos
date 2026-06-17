@@ -1,40 +1,33 @@
 /**
- * Goal piloting — the Workbench /goal-piloting source (AIDOS step S66).
+ * Goal piloting — the Workbench /goal-piloting CONTRACT TYPES (AIDOS step S66).
  *
  * S66 (ROADMAP-app-builder, KRD §56–§59, §63 ①): the UI-piloted /goal. A human PORTEUR
  * D'AUTORITÉ (S63) opens a goal from a grilled idea — the engine PROPOSES a DRAFT ChangeSet
  * (spec_delta + mirror_delta atomically) and computes the LIVE red set; the close gate is the
  * NON-GAMEABLE stop (red set→green ∧ prior intact ∧ mutation ≥ floor ∧ no monster).
  *
- * This module is the DECLARED TWIN of the Go package back/runtime/goalpiloting — the SAME two
- * gates in the SAME order, DEFERRING to the SAME owners:
- *   - the ACTOR gate REUSES lib/authority-binding (requireRealActor — the twin of S63), so a
- *     placeholder/agent is refused PLACEHOLDER_ACTOR exactly as the Go engine refuses it;
- *   - the CLOSE gate REUSES lib/goal (isClosed / closeBlockReason — the twin of S29's
- *     non-gameable stop), so the four-condition verdict on screen matches the Go engine.
- * One semantics, no drift. The reproducibility mirror lib/goal-piloting.test.ts (fast-check) pins it.
+ * S59 CUTOVER (ADR 0092 — the Go engine is the SINGLE live source). This module USED to be the
+ * DECLARED TWIN of the Go package back/runtime/goalpiloting — it re-implemented the actor gate, the
+ * open, the close gate and the red-set sort in TS, and the panel read it as the live source. Those
+ * READ functions are GONE: the goal-open, the non-gameable close and the red-set sort are now read
+ * LIVE from the Go goal-piloting MCP server through the passerelle
+ * (app/goal-piloting/actions.ts → readVia(scope, "goal_pilot_open" / "goal_pilot_close", …),
+ * decoded by app/goal-piloting/live.ts). The demo fallback is the inert fixture lib/goal-piloting-data.
  *
- * THE WALL (CLAUDE.md §2/§7): every function here returns VALUES — pilotOpenGoal returns a
- * DRAFT ChangeSet PROPOSAL, never APPLIED; pilotCloseGoal is a pure predicate, it never stamps
- * CLOSED. The screen PROPOSES a ChangeSet, never writes the Kernel. Persistence of the proposed
- * ChangeSet rides the changeset door (S20) under human approval — the aidos CLI role, never the agent.
+ * WHAT REMAINS HERE (no twin logic): the CONTRACT TYPES the decoder fills + the panel renders
+ * (PilotBlock, Delta, PilotOpenInput, PilotResult, and the re-exported RealActor / Budgets / Goal /
+ * StopInput), plus the two canonical FR refusal constants (IDEA_WITHOUT_MIRROR / NO_RED_SET) the Go
+ * engine returns verbatim — they document the contract the openDecoder maps, never a second
+ * computation. The PLACEHOLDER_ACTOR / GOAL_STILL_RED refusals now come from the Go engine, decoded
+ * by live.ts (no TS re-implementation).
  *
- * DETERMINISM-FIRST (CLAUDE.md §6/§8): pure, total, deterministic; no clock, no rng, no I/O; no
- * agent-confidence is ever an input — "done" is computed, never declared.
+ * THE WALL (CLAUDE.md §2/§7): the live tools PROPOSE (a DRAFT ChangeSet) and VERDICT (the
+ * non-gameable close) — they never APPLY a ChangeSet nor stamp CLOSED; the screen writes no Kernel.
+ *
+ * DETERMINISM-FIRST (CLAUDE.md §6/§8): no logic lives here anymore — the Go engine is authoritative;
+ * the decoder (live.ts) is the only pure projection of its wire contract; "done" is computed by the
+ * Go non-gameable stop, never declared.
  */
-
-import {
-	type BlockReason as ActorBlockReason,
-	type RealActor,
-	requireRealActor,
-} from "./authority-binding";
-import {
-	type Budgets,
-	GOAL_STILL_RED,
-	type Goal,
-	isClosed,
-	type StopInput,
-} from "./goal";
 
 export type { RealActor } from "./authority-binding";
 export type { Budgets, Goal, StopInput } from "./goal";
@@ -53,7 +46,7 @@ export interface Delta {
 	target: string;
 }
 
-/** The pure input to pilotOpenGoal (twin of goalpiloting.OpenInput, screen-facing subset). */
+/** The screen-facing open input shape (twin of goalpiloting.OpenInput, the projected subset). */
 export interface PilotOpenInput {
 	ideaId: string;
 	specDelta: Delta;
@@ -62,16 +55,19 @@ export interface PilotOpenInput {
 	parentPhase: string;
 	/** The LIVE red set the engine derived (S22 Impact) — the worklist. Non-empty for a real goal. */
 	redSet: string[];
-	budgets: Budgets;
+	budgets: import("./goal").Budgets;
 }
 
 /** What the screen receives when an authority-bearing human opens a goal (twin of PilotResult). */
 export interface PilotResult {
-	actor: RealActor;
-	goal: Goal;
+	actor: import("./authority-binding").RealActor;
+	goal: import("./goal").Goal;
 }
 
-/** The canonical IDEA_WITHOUT_MIRROR refusal (twin of blockreason.For, FR prose). */
+/**
+ * The canonical IDEA_WITHOUT_MIRROR refusal (the Go blockreason.For prose). KEPT as the documented
+ * contract the openDecoder maps a refusal onto — NOT a second computation (the Go engine returns it).
+ */
 export const IDEA_WITHOUT_MIRROR: PilotBlock = {
 	code: "IDEA_WITHOUT_MIRROR",
 	severity: "blocking",
@@ -83,7 +79,10 @@ export const IDEA_WITHOUT_MIRROR: PilotBlock = {
 	],
 };
 
-/** The canonical NO_RED_SET refusal (a green test is not a goal, §56). */
+/**
+ * The canonical NO_RED_SET refusal (a green test is not a goal, §56). KEPT as the documented
+ * contract the openDecoder maps a refusal onto — NOT a second computation (the Go engine returns it).
+ */
 export const NO_RED_SET: PilotBlock = {
 	code: "NO_RED_SET",
 	severity: "blocking",
@@ -94,75 +93,3 @@ export const NO_RED_SET: PilotBlock = {
 		"verify the red wave : vérifiez que le miroir reflète une source dont la tête a bougé (S22).",
 	],
 };
-
-/** The PLACEHOLDER_ACTOR refusal mapped from the S63 actor gate into the PilotBlock shape. */
-function fromActorBlock(b: ActorBlockReason): PilotBlock {
-	return {
-		code: b.code,
-		severity: b.severity,
-		explanation: b.explanation,
-		howToFix: b.howToFix,
-	};
-}
-
-/**
- * pilotOpenGoal — the S66 UI-piloted goal-open (twin of goalpiloting.PilotOpenGoal). It runs
- * TWO gates in order:
- *   1) the ACTOR gate (S63): a real human, never a placeholder/agent — else PLACEHOLDER_ACTOR;
- *   2) the OPEN (S29): a mirror-less idea is refused IDEA_WITHOUT_MIRROR; an empty red set is
- *      refused NO_RED_SET; otherwise an OPEN goal carrying a DRAFT ChangeSet PROPOSAL + the
- *      LIVE red set.
- * It WRITES NOTHING — the goal it returns carries a DRAFT (proposed) ChangeSet, never APPLIED.
- * Returns the PilotResult on success, or a PilotBlock refusal. Pure.
- */
-export function pilotOpenGoal(
-	actor: RealActor,
-	input: PilotOpenInput,
-): { result: PilotResult | null; block: PilotBlock | null } {
-	// (1) The actor gate — never a goal for nobody (the wall).
-	const actorBlock = requireRealActor(actor);
-	if (actorBlock !== null) {
-		return { result: null, block: fromActorBlock(actorBlock) };
-	}
-	// (2a) A mirror-less idea is a vœu — refused before anything is opened.
-	if (input.mirrorDelta === undefined) {
-		return { result: null, block: IDEA_WITHOUT_MIRROR };
-	}
-	// (2b) An empty red set is not a goal.
-	if (input.redSet.length === 0) {
-		return { result: null, block: NO_RED_SET };
-	}
-	// (2c) The OPEN — a DRAFT ChangeSet proposal + the live red set, status OPEN.
-	const goal: Goal = {
-		id: `goal:${input.ideaId}`,
-		ideaRef: input.ideaId,
-		changeSetRef: `cs:${input.ideaId}`,
-		changeSetStatus: "DRAFT",
-		redSet: liveRedSet(input.redSet),
-		status: "OPEN",
-		budgets: input.budgets,
-	};
-	return { result: { actor, goal }, block: null };
-}
-
-/**
- * pilotCloseGoal — the S66 UI-piloted close attempt (twin of goalpiloting.PilotCloseGoal). It
- * DEFERS to S29's non-gameable stop: the GOAL_STILL_RED refusal while any of the four conditions
- * fails, null when closeable. It NEVER stamps CLOSED. Pure; no agent-confidence input.
- */
-export function pilotCloseGoal(
-	redSet: string[],
-	input: StopInput,
-): PilotBlock | null {
-	return isClosed(redSet, input) ? null : GOAL_STILL_RED;
-}
-
-/** canClose — whether the four-condition stop holds (the live close indicator). Defers to isClosed. */
-export function canClose(redSet: string[], input: StopInput): boolean {
-	return isClosed(redSet, input);
-}
-
-/** liveRedSet — the worklist in stable sorted order (twin of goal.RedSetSorted). Pure. */
-export function liveRedSet(redSet: string[]): string[] {
-	return [...redSet].sort();
-}

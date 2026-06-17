@@ -1,4 +1,5 @@
 import type { CockpitSnapshot } from "@/lib/federation-cockpit";
+import type { Source } from "@/lib/gateway-sdk";
 
 /**
  * View models for the /federation-cockpit panel (S105 — cockpit de fédération, §50). Kept OUT
@@ -8,6 +9,8 @@ import type { CockpitSnapshot } from "@/lib/federation-cockpit";
 export interface CockpitView {
 	ok: boolean;
 	snapshot?: CockpitSnapshot;
+	/** whether the red-wave fan-out came from the live Go engine or the demo fallback (ADR 0092). */
+	source?: Source;
 	error?: string;
 }
 

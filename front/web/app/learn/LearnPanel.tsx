@@ -60,6 +60,18 @@ export function LearnPanel({
 				>
 					{activeProjectId ?? t("noProject")}
 				</span>
+				{view.source ? (
+					<span
+						data-testid="source-badge"
+						className={`inline-flex items-center rounded-full px-2.5 py-0.5 font-mono ${
+							view.source === "live"
+								? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+								: "bg-muted text-muted-foreground"
+						}`}
+					>
+						{view.source === "live" ? t("sourceLive") : t("sourceDemo")}
+					</span>
+				) : null}
 			</div>
 
 			{/* ── The loop-closure control: close + re-reflect toggle ── */}

@@ -1,26 +1,39 @@
 "use client";
 
-import { useState } from "react";
-import { build, serializeBody } from "@/lib/why-tree";
-import { WHY_TREE_CASES, type WhyTreeCase } from "@/lib/why-tree-data";
+import { useActionState } from "react";
+import {
+	type BuildView,
+	buildAction,
+	EMPTY_BUILD_VIEW,
+} from "@/app/why-tree/actions";
+import { WHY_TREE_CASES } from "@/lib/why-tree-data";
 
 /**
  * WhyTreePanel — the action-capable /why-tree panel (FK13, the `/why` gesture). It lets the human
  * PICK one of the canonical scenarios (an incident → tree → terminal mirror, or one of the three
  * refusals) and RUN the build (the "/why" action, executable from the screen — not a static
- * display): it calls the same pure `build` the Go whytree.Build computes, then renders the WhyTree
- * (ordered REPRODUCED candidate causes, the ROOT cause, the terminal anti-recurrence mirror), OR
- * the closed refusal (WHYTREE_NO_MIRROR / WHYTREE_CAUSE_NOT_REPRODUCED / CAUSED_BY_CYCLE).
+ * display): it submits the `buildAction` Server Action, which reads the LIVE WhyTree from the Go
+ * why-tree MCP server through the passerelle (`readVia(scope, "build", …)`, the dispatched
+ * below-the-line read), then renders the WhyTree (ordered REPRODUCED candidate causes, the ROOT
+ * cause, the terminal anti-recurrence mirror), OR the closed refusal (WHYTREE_NO_MIRROR /
+ * WHYTREE_CAUSE_NOT_REPRODUCED / CAUSED_BY_CYCLE). A `source` badge tells the operator whether the
+ * snapshot is "live" (the Go engine) or "demo" (the deterministic fallback).
+ *
+ * S59 CUTOVER (ADR 0092 — the Go engine is the SINGLE live source). The panel NO LONGER computes
+ * the tree from the TS twin (lib/why-tree.build) — that computation moved BEHIND the gateway, with
+ * the twin preserved only as the demo fallback inside the Server Action. This component imports
+ * lib/why-tree as TYPES ONLY (no runtime twin logic), so the T5 cliquet (twin-as-live-fitness)
+ * stays GREEN — the live read happens through the readVia frontier in actions.ts.
  *
  * THE DONE CRITERIA, visible & executable: building the incident scenario shows the tree rooted at
  * add_total_col with its terminal mirror (root → /learn → red wave); the no-mirror scenario is
  * REFUSED WHYTREE_NO_MIRROR; the non-reproduced scenario is REFUSED (anti-confabulation); the
  * cyclic scenario is REFUSED CAUSED_BY_CYCLE with no partial tree.
  *
- * READ-ONLY (CLAUDE.md §7 ui-completeness, the wall): the action computes + projects the tree; it
+ * READ-ONLY (CLAUDE.md §7 ui-completeness, the wall): the action reads + projects the tree; it
  * NEVER writes truth — freezing the terminal anti-recurrence mirror goes via propose → /learn →
- * /goal → approval. The build is RENDERED, never re-implemented here. Themed on ADR 0010 tokens;
- * bilingual via next-intl (ADR 0011) — strings are passed in as labels.
+ * /goal → approval. Themed on ADR 0010 tokens; bilingual via next-intl (ADR 0011) — strings are
+ * passed in as labels.
  */
 
 interface Labels {
@@ -37,30 +50,31 @@ interface Labels {
 	redWaveNote: string;
 	refusedLabel: string;
 	bodyLabel: string;
+	sourceLive: string;
+	sourceDemo: string;
 	caseNames: Record<string, string>;
 	errorNames: Record<string, string>;
 }
 
 export function WhyTreePanel({ labels }: { labels: Labels }) {
-	const [selectedId, setSelectedId] = useState<string>("");
-
-	const chosen: WhyTreeCase | null =
-		WHY_TREE_CASES.find((c) => c.id === selectedId) ?? null;
-	const result = chosen ? build(chosen.input) : null;
-	const body = result?.ok ? serializeBody(result.tree) : "";
+	const [view, formAction] = useActionState<BuildView, FormData>(
+		buildAction,
+		EMPTY_BUILD_VIEW,
+	);
+	const result = view.result;
 
 	return (
 		<div className="space-y-6">
-			{/* The action: pick a scenario, run /why */}
-			<div className="flex flex-wrap items-end gap-3">
+			{/* The action: pick a scenario, run /why (a real form submit to the Server Action) */}
+			<form action={formAction} className="flex flex-wrap items-end gap-3">
 				<label className="flex flex-col gap-1.5 text-sm">
 					<span className="font-medium text-foreground">
 						{labels.pickLabel}
 					</span>
 					<select
+						name="caseId"
 						aria-label={labels.pickLabel}
-						value={selectedId}
-						onChange={(ev) => setSelectedId(ev.target.value)}
+						defaultValue={view.caseId}
 						className="min-w-72 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
 					>
 						<option value="">{labels.awaiting}</option>
@@ -71,12 +85,28 @@ export function WhyTreePanel({ labels }: { labels: Labels }) {
 						))}
 					</select>
 				</label>
-				<span className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white">
+				<button
+					type="submit"
+					className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+				>
 					{labels.buildLabel}
-				</span>
-			</div>
+				</button>
+				{view.ok ? (
+					<span
+						data-testid="source-badge"
+						data-source={view.source}
+						className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+							view.source === "live"
+								? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+								: "bg-muted text-muted-foreground"
+						}`}
+					>
+						{view.source === "live" ? labels.sourceLive : labels.sourceDemo}
+					</span>
+				) : null}
+			</form>
 
-			{chosen && result ? (
+			{view.ok && result ? (
 				<section
 					aria-label="why-tree"
 					data-testid="why-tree"
@@ -87,13 +117,13 @@ export function WhyTreePanel({ labels }: { labels: Labels }) {
 							{labels.symptomLabel}:{" "}
 						</span>
 						<code className="rounded bg-muted px-1.5 py-0.5 text-xs text-red-600 dark:text-red-400">
-							{chosen.input.symptom}
+							{view.symptom}
 						</code>
 						<span className="ml-3 font-medium text-foreground">
 							{labels.provenanceLabel}:{" "}
 						</span>
 						<code className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-							{chosen.input.provenance}
+							{view.provenance}
 						</code>
 					</p>
 
@@ -190,7 +220,7 @@ export function WhyTreePanel({ labels }: { labels: Labels }) {
 									data-testid="tree-body"
 									className="overflow-x-auto rounded-md bg-muted p-3 text-xs text-foreground"
 								>
-									{body}
+									{view.body}
 								</pre>
 							</div>
 						</>

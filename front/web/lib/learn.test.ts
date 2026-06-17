@@ -1,7 +1,9 @@
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
+// S59 (ADR 0092): the pure compute + fixtures moved to lib/learn-data (the demo fallback); the
+// contract types + the wall code stay in lib/learn (the live read shape the decoder fills).
+import { type ApprovedMirror, type Target, WALL_CODE } from "./learn";
 import {
-	type ApprovedMirror,
 	bumpHash,
 	closeLoop,
 	DEMO_EDGES,
@@ -9,10 +11,8 @@ import {
 	DEMO_INCIDENT_REF,
 	DEMO_MIRROR,
 	DEMO_TARGET,
-	type Target,
 	targetedWave,
-	WALL_CODE,
-} from "./learn";
+} from "./learn-data";
 
 /**
  * S107 REPRODUCIBILITY MIRROR (fast-check) — the deterministic-able capabilities the `/learn`

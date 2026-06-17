@@ -222,6 +222,17 @@ export function ConsciencePanel() {
 								? t("deterministicYes")
 								: t("deterministicNo")}
 						</span>
+						<span
+							data-testid="source-badge"
+							data-source={state.source ?? "demo"}
+							className={
+								state.source === "live"
+									? "inline-flex items-center rounded-full bg-blue-500/15 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300"
+									: "inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+							}
+						>
+							{state.source === "live" ? t("sourceLive") : t("sourceDemo")}
+						</span>
 					</div>
 
 					<div className="space-y-3">

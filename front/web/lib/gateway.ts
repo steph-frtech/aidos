@@ -79,6 +79,36 @@ export const GATEWAY_SERVERS: readonly string[] = [
 	// 14th — `provision` — ACTIVATED at DP13: the DP13 stack/bootstrap/profile tools
 	// (re-emit/project/resolve over the StackManifest AST + the observed host state).
 	"provision",
+	// 16th — `why-tree` — the FK13 /why read server (ADR 0092 kill-twins batch): the
+	// dispatched, dep-free graph-walk `build` (+ serialize/kinds) is the LIVE path for the
+	// /why-tree panel; the TS twin (lib/why-tree.build) becomes the demo fallback only.
+	"why-tree",
+	// 17th — `goal-piloting` — the S66 UI-piloted /goal read server (ADR 0092 kill-twins
+	// batch): the dispatched, dep-free `goal_pilot_open` (+ goal_pilot_close /
+	// goal_live_red_set) is the LIVE path for the /goal-piloting panel; the TS twin
+	// (lib/goal-piloting.pilotOpenGoal / liveRedSet) becomes the demo fallback only.
+	"goal-piloting",
+	// 18th — `federation` — the S103/§51 cross-cell composition read server (ADR 0092 kill-twins
+	// batch): the dispatched, dep-free `fan_out` (+ saga_over_cells / temporal_over_cells) is the
+	// LIVE path for the /federation-cockpit panel's red-wave overlay; the TS twin (the wave hard-
+	// coded in lib/federation-cockpit) becomes the demo fallback only (lib/federation-cockpit-data).
+	"federation",
+	// 19th — `learn` — the S107/E12 /learn loop-closure read server (ADR 0092 kill-twins
+	// batch): the dispatched, dep-free bump_hash/targeted_wave/close_loop (READ-ONLY on the
+	// kernel, WroteKernel always false) is the LIVE path for the /learn panel; the TS twin
+	// (lib/learn closeLoop) becomes the demo fallback only (lib/learn-data).
+	"learn",
+	// 20th — `conscience` — the FK09 /conscience read server (ADR 0092 kill-twins batch): the
+	// dispatched, dep-free reconcile/decision_cards (aggregate over sourced verdicts, READ-ONLY)
+	// is the LIVE path for the /conscience panel; the TS twin (lib/conscience.reconcile) becomes
+	// the demo fallback only (lib/conscience-data).
+	"conscience",
+	// 21st — `arch-fitness` — the S102 ratchet read server (ADR 0092 kill-twins batch): the
+	// dispatched, dep-free measure/ratchet/gate (graph analysis, READ-ONLY) is the LIVE path for
+	// the /arch-fitness panel; the TS twin (lib/arch-fitness.measure) becomes the demo fallback
+	// only (lib/arch-fitness-data). Without this entry route(measure)→unknown_tool→demo (the flip
+	// would be hollow — the cliquet's readVia-frontier blind spot).
+	"arch-fitness",
 ];
 
 /** defaultTools mirrors Go DefaultTools() — the closed exposed surface. */
@@ -168,6 +198,51 @@ export function defaultTools(): Tool[] {
 			"stack.resolve_ports",
 			"stack.print_urls",
 		]),
+		// 16. why-tree — FK13 /why (the 5-whys redressed): build a content-addressed WhyTree
+		// from a red symptom, serialize it to its kernel.link body, read the link-kind
+		// discriminator. ALL BELOW THE LINE: three PURE graph-walks whose output is a VALUE
+		// (a tree / a record / a discriminator); freezing the terminal mirror is /goal, never
+		// these tools (WroteKernel always false — the wall). Byte-faithful to the Go registry
+		// (back/runtime/gateway/registry.go:97).
+		...below("why-tree", ["build", "serialize", "kinds"]),
+		// 17. goal-piloting — S66 the UI-piloted /goal: open a goal (a DRAFT ChangeSet PROPOSAL
+		// by id/status + the LIVE red set), the NON-GAMEABLE close gate (closeable? — red→green
+		// ∧ prior intact ∧ mutation ≥ floor ∧ no monster), the LIVE red-set worklist in stable
+		// sorted order. ALL BELOW THE LINE: each tool returns a VALUE (a proposal / a verdict /
+		// a sorted list) — opening a goal PROPOSES a DRAFT ChangeSet (it never APPLIES it) and
+		// closing never stamps CLOSED (the wall; WroteKernel always false). Byte-faithful to the
+		// Go registry (back/runtime/gateway/registry.go:103).
+		...below("goal-piloting", [
+			"goal_pilot_open",
+			"goal_pilot_close",
+			"goal_live_red_set",
+		]),
+		// 18. federation — S103/§51 cross-cell composition: run the canonical saga over two real
+		// contracted cells (saga_over_cells), fan a global policy out to a RedWorkQueue per cell
+		// (fan_out), evaluate a temporal deadline across cells (temporal_over_cells). ALL BELOW THE
+		// LINE: three PURE compositions returning the per-cell waves as VALUES — the actual INSERT
+		// into runtime.red_work_queue is the S22 hook's job below the waterline, never these tools
+		// (writes nothing — the wall; WroteKernel always false). Byte-faithful to the Go registry
+		// (back/runtime/gateway/registry.go:109).
+		...below("federation", [
+			"saga_over_cells",
+			"fan_out",
+			"temporal_over_cells",
+		]),
+		// 19. learn — S107/E12 /learn loop-closure: the hash bump an approved mirror causes on
+		// its operation/policy target (bump_hash), the targeted red wave it seeds (targeted_wave),
+		// the full incident→wave loop (close_loop). ALL BELOW THE LINE: READ-ONLY on the kernel —
+		// every tool's WroteKernel is false; the loop never authors the approved mirror (the human's
+		// /goal does) and the direct Reality→Kernel edge is always refused (the wall). The
+		// dispatch-safe Target carries spec_body as an object (the S59 RawMessage-scar guard lives
+		// in learnsrv). Byte-faithful to the Go registry (back/runtime/gateway/registry.go:116).
+		...below("learn", ["bump_hash", "targeted_wave", "close_loop"]),
+		// `conscience` (FK09) — reconcile/decision_cards aggregate sourced verdicts (READ-ONLY,
+		// no kernel write). The LIVE path for the /conscience panel; mirrors the Go registry.
+		...below("conscience", ["reconcile", "decision_cards"]),
+		// `arch-fitness` (S102) — measure/ratchet/gate are READ-ONLY graph analysis (no write).
+		// The LIVE path for the /arch-fitness panel; without it route(measure)→unknown_tool→demo.
+		...below("arch-fitness", ["measure", "ratchet", "gate"]),
 		// The fenced truth-zone write namespace (§2) — refused with a ChangeSet hint.
 		{ name: "kernel_write", server: "kernel", disposition: "truth_write" },
 		{ name: "mirror_write", server: "mirrors", disposition: "truth_write" },

@@ -48,6 +48,8 @@ export default async function WhyTreePage() {
 		redWaveNote: t("redWaveNote"),
 		refusedLabel: t("refusedLabel"),
 		bodyLabel: t("bodyLabel"),
+		sourceLive: t("sourceLive"),
+		sourceDemo: t("sourceDemo"),
 		caseNames: {
 			caseIncident: t("caseIncident"),
 			caseNoMirror: t("caseNoMirror"),

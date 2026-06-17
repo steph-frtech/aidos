@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+import type { Source } from "@/lib/gateway-sdk";
 import {
 	type CloseResult,
 	checkCloseAction,
@@ -46,6 +47,39 @@ function Submit({ label, testid }: { label: string; testid: string }) {
 		>
 			{pending ? t("working") : label}
 		</button>
+	);
+}
+
+/**
+ * SourceBadge surfaces whether the displayed proposal / verdict came from the LIVE Go engine via the
+ * passerelle (source:"live") or the deterministic demo twin fallback (source:"demo") — the ADR 0092
+ * "twins must die" witness on screen.
+ */
+function SourceBadge({ source }: { source?: Source }) {
+	const t = useTranslations("goalPiloting");
+	if (!source) return null;
+	const live = source === "live";
+	return (
+		<span
+			data-testid="source-badge"
+			data-source={source}
+			title={live ? t("sourceLiveTitle") : t("sourceDemoTitle")}
+			className={
+				live
+					? "inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+					: "inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
+			}
+		>
+			<span
+				aria-hidden="true"
+				className={
+					live
+						? "size-1.5 rounded-full bg-primary"
+						: "size-1.5 rounded-full bg-muted-foreground"
+				}
+			/>
+			{live ? t("sourceLive") : t("sourceDemo")}
+		</span>
 	);
 }
 
@@ -97,9 +131,14 @@ export function GoalPilotingPanel({
 				data-testid="propose-form"
 				className="space-y-4 rounded-xl border border-border bg-card p-5"
 			>
-				<h2 className="text-sm font-semibold tracking-tight text-foreground">
-					{t("proposeHeading")}
-				</h2>
+				<div className="flex items-center justify-between gap-2">
+					<h2 className="text-sm font-semibold tracking-tight text-foreground">
+						{t("proposeHeading")}
+					</h2>
+					{propose.ok || propose.messageKey === "openRefused" ? (
+						<SourceBadge source={propose.source} />
+					) : null}
+				</div>
 				<div className="grid gap-4 sm:grid-cols-2">
 					<label className="block space-y-1.5">
 						<span className="text-xs font-medium text-muted-foreground">
@@ -253,9 +292,12 @@ export function GoalPilotingPanel({
 				data-testid="close-form"
 				className="space-y-4 rounded-xl border border-border bg-card p-5"
 			>
-				<h2 className="text-sm font-semibold tracking-tight text-foreground">
-					{t("closeHeading")}
-				</h2>
+				<div className="flex items-center justify-between gap-2">
+					<h2 className="text-sm font-semibold tracking-tight text-foreground">
+						{t("closeHeading")}
+					</h2>
+					{close.ok ? <SourceBadge source={close.source} /> : null}
+				</div>
 				<input
 					type="hidden"
 					name="redSet"
