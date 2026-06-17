@@ -39,7 +39,9 @@ import { catalogueDecoder, starterDecoder } from "./live";
  * read tools.
  */
 
-export type { StarterView, TemplateSummary };
+// NB: a "use server" module may export ONLY async server functions — never types/values
+// (Turbopack RSC rejects a type re-export). Consumers import StarterView/TemplateSummary
+// from @/lib/templates-data directly.
 
 /** listTemplates — the curated catalogue, for the picker. LIVE read; the twin is the demo fallback. */
 export async function listTemplates(): Promise<TemplateSummary[]> {

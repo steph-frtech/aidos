@@ -3,12 +3,8 @@
 import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import {
-	forkAction,
-	instantiateAction,
-	type StarterView,
-	type TemplateSummary,
-} from "./actions";
+import type { StarterView, TemplateSummary } from "@/lib/templates-data";
+import { forkAction, instantiateAction } from "./actions";
 
 /**
  * TemplatesPanel makes the /templates route action-capable (ui-completeness law, CLAUDE.md §7): the
