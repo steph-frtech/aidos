@@ -16,6 +16,7 @@ import {
 	type Target,
 } from "@/lib/v2/emetteurs";
 import { useV3Session } from "../V3Session";
+import { DesktopPreview } from "./DesktopPreview";
 
 /**
  * /v3/emetteurs — LA LENTILLE ÉMETTEURS (la 10e, le portage de /v2/emetteurs) :
@@ -486,6 +487,9 @@ export function EmetteursClient() {
 			<p className="text-[11px] leading-relaxed text-muted-foreground">
 				{t.emetteursDeterminismNote}
 			</p>
+
+			{/* APERÇU DESKTOP (Electron) — la capacité « voir Electron » (ADR 0093), additif */}
+			<DesktopPreview />
 		</div>
 	);
 }

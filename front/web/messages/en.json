@@ -7847,7 +7847,20 @@
 		"benchKind_policy_authz": "policy.authz",
 		"benchKind_budget_perf_sec": "budget.perf_sec",
 		"benchKind_case_error": "case.error",
-		"benchKind_case_edge": "case.edge"
+		"benchKind_case_edge": "case.edge",
+		"emetteursDesktopTitle": "Desktop preview (Electron)",
+		"emetteursDesktopIntro": "The engine emits the Electron desktop child, boots it headless (Xvfb) and captures its window. Nothing is re-emitted here — the engine is the source.",
+		"emetteursDesktopChildren": "Emitted children",
+		"emetteursDesktopChildrenError": "Children unavailable",
+		"emetteursDesktopLoading": "Loading emitted children…",
+		"emetteursDesktopMaster": "Master",
+		"emetteursDesktopArtifacts": "artifacts",
+		"emetteursDesktopCapture": "Capture the window",
+		"emetteursDesktopCapturing": "Capturing…",
+		"emetteursDesktopFrameAlt": "Capture of the emitted Electron desktop window",
+		"emetteursDesktopFrameHint": "Live capture of the Electron window, from the emitted master.",
+		"emetteursDesktopUnavailable": "Live preview unavailable",
+		"emetteursDesktopBundleTree": "Emitted desktop bundle files"
 	},
 	"v3operation": {
 		"title": "Operation authoring",

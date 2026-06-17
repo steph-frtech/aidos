@@ -7847,7 +7847,20 @@
 		"benchKind_policy_authz": "politique.authz",
 		"benchKind_budget_perf_sec": "budget.perf-séc",
 		"benchKind_case_error": "cas.erreur",
-		"benchKind_case_edge": "cas.limite"
+		"benchKind_case_edge": "cas.limite",
+		"emetteursDesktopTitle": "Aperçu Bureau (Electron)",
+		"emetteursDesktopIntro": "Le moteur émet l'enfant Bureau Electron, le démarre sans affichage (Xvfb) et capture sa fenêtre. Rien n'est réécrit ici — le moteur est la source.",
+		"emetteursDesktopChildren": "Enfants émis",
+		"emetteursDesktopChildrenError": "Enfants indisponibles",
+		"emetteursDesktopLoading": "Chargement des enfants émis…",
+		"emetteursDesktopMaster": "Maître",
+		"emetteursDesktopArtifacts": "artefacts",
+		"emetteursDesktopCapture": "Capturer la fenêtre",
+		"emetteursDesktopCapturing": "Capture en cours…",
+		"emetteursDesktopFrameAlt": "Capture de la fenêtre Bureau Electron émise",
+		"emetteursDesktopFrameHint": "Capture en direct de la fenêtre Electron, du master émis.",
+		"emetteursDesktopUnavailable": "Aperçu en direct indisponible",
+		"emetteursDesktopBundleTree": "Fichiers du bundle Bureau émis"
 	},
 	"v3operation": {
 		"title": "Autoring d'opération",

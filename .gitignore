@@ -136,3 +136,6 @@ testdata/rapid/
 # ephemeral workflow run-scripts (orchestration artifacts, not product code)
 .claude/workflows/scripts/
 back/runtime/desktoppreview/.toolchain/
+
+# built helper binaries (rebuilt at deploy; never committed)
+back/bin/
