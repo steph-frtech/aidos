@@ -24,6 +24,7 @@ package desktoppreviewsrv
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -98,23 +99,33 @@ func demoMaster() (honoemit.MasterView, *struct{ Explanation string }) {
 }
 
 func desktopChildren(_ context.Context, _ *mcp.CallToolRequest, _ childrenInput) (*mcp.CallToolResult, childrenOutput, error) {
+	out, err := demoChildren()
+	if err != nil {
+		return nil, childrenOutput{}, err
+	}
+	return nil, out, nil
+}
+
+// demoChildren emits the demo master's three distinct children and returns their identities. The
+// single source the desktop_children tool AND DemoChildrenJSON (the CLI mode) share — no twin. PURE.
+func demoChildren() (childrenOutput, error) {
 	m, ferr := demoMaster()
 	if ferr != nil {
-		return nil, childrenOutput{}, fmt.Errorf("emit demo master: %s", ferr.Explanation)
+		return childrenOutput{}, fmt.Errorf("emit demo master: %s", ferr.Explanation)
 	}
 	web, br := honoemit.EmitWebChild(masterSpec())
 	if br != nil {
-		return nil, childrenOutput{}, fmt.Errorf("emit web child: %s", br.Explanation)
+		return childrenOutput{}, fmt.Errorf("emit web child: %s", br.Explanation)
 	}
 	mob, br := honoemit.EmitMobileChild(m)
 	if br != nil {
-		return nil, childrenOutput{}, fmt.Errorf("emit mobile child: %s", br.Explanation)
+		return childrenOutput{}, fmt.Errorf("emit mobile child: %s", br.Explanation)
 	}
 	desk, br := honoemit.EmitDesktopChild(m)
 	if br != nil {
-		return nil, childrenOutput{}, fmt.Errorf("emit desktop child: %s", br.Explanation)
+		return childrenOutput{}, fmt.Errorf("emit desktop child: %s", br.Explanation)
 	}
-	out := childrenOutput{
+	return childrenOutput{
 		Project:    "shop",
 		MasterHash: m.Hash(),
 		Children: []childRef{
@@ -122,8 +133,21 @@ func desktopChildren(_ context.Context, _ *mcp.CallToolRequest, _ childrenInput)
 			{Target: "mobile-app", ParentID: mob.ParentID, Artifacts: artifactPaths(mob.Artifacts)},
 			{Target: "desktop-app", ParentID: desk.ParentID, Artifacts: artifactPaths(desk.Artifacts)},
 		},
+	}, nil
+}
+
+// DemoChildrenJSON returns the demo master's three children as indented JSON — the CLI -children mode
+// the Workbench route handler spawns to populate the "3 enfants" view from the engine (no twin). PURE.
+func DemoChildrenJSON() (string, error) {
+	out, err := demoChildren()
+	if err != nil {
+		return "", err
 	}
-	return nil, out, nil
+	b, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 func desktopBundle(_ context.Context, _ *mcp.CallToolRequest, _ childrenInput) (*mcp.CallToolResult, bundleOutput, error) {

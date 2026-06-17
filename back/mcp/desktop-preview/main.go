@@ -30,8 +30,12 @@ import (
 
 func main() {
 	capture := flag.String("capture", "", "one-shot: capture a desktop frame to this JPEG path, then exit")
+	children := flag.Bool("children", false, "one-shot: print the master's 3 emitted children (web/mobile/desktop) as JSON, then exit")
 	flag.Parse()
 
+	if *children {
+		os.Exit(runChildren())
+	}
 	if *capture != "" {
 		os.Exit(runCapture(*capture))
 	}
@@ -41,6 +45,19 @@ func main() {
 	if err := srv.Run(ctx, &mcp.StdioTransport{}); err != nil {
 		log.Fatal(fmt.Errorf("desktop-preview: run: %w", err))
 	}
+}
+
+// runChildren prints the demo master's three emitted children (web/mobile/desktop) — their content
+// addresses, targets and artifact paths — as JSON to stdout. The Workbench route handler spawns this
+// to populate the "3 enfants" view from the engine (no twin), without a gateway edit. PURE.
+func runChildren() int {
+	out, err := desktoppreviewsrv.DemoChildrenJSON()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "children: %v\n", err)
+		return 1
+	}
+	fmt.Println(out)
+	return 0
 }
 
 // runCapture boots the demo desktop child and writes one frame to out. Exit 0 on a real frame, 3
