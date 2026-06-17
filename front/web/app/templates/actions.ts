@@ -1,14 +1,16 @@
 "use server";
 
+import { readVia } from "@/lib/gateway-sdk";
+import { panelScope } from "@/lib/panelScope";
+import type { TemplateId } from "@/lib/templates";
 import {
-	curated,
-	fork,
-	instantiate,
-	pieceCount,
-	type StarterProject,
-	sortedNames,
-	type TemplateId,
-} from "@/lib/templates";
+	demoCatalogue,
+	demoFork,
+	demoInstantiate,
+	type StarterView,
+	type TemplateSummary,
+} from "@/lib/templates-data";
+import { catalogueDecoder, starterDecoder } from "./live";
 
 /**
  * Server Actions for the /templates Workbench panel (S81 — « Catalogue de templates / starters
@@ -20,75 +22,44 @@ import {
  * a stable phase. Two action-capable controls: INSTANTIATE (duplicate-from-template → a deterministic
  * GREEN starter) and FORK (fork at a stable phase).
  *
- * THE WALL (§2/§7): every action WRITES NOTHING. Instantiate/fork are DRY-RUN value computations (the
- * deterministic twin lib/templates, the byte-twin of the Go package); landing the starter's truths
- * goes via the legal door (propose → ChangeSet → approval), never a direct kernel write. The
- * starter-project ROW (a duplicate-from-template) would be written below the line by the project/DAG
- * store path (S56). Determinism-first (§6/§8): WHAT a template contains is the DECLARED catalogue,
- * never an LLM.
+ * THE FLIP (ADR 0092 — the Go engine is the SINGLE live source). `listTemplates` / `instantiateAction`
+ * / `forkAction` now read the LIVE catalogue + starter from the Go templates MCP server through the
+ * passerelle (`readVia(scope, "templates_list" | "templates_instantiate" | "templates_fork", …)`, the
+ * dispatched below-the-line reads), with the twin `lib/templates.curated()/instantiate()/fork()`
+ * preserved ONLY as the deterministic demo fallback (`lib/templates-data`, tagged `source:"live"|"demo"`).
+ * The `readVia` frontier import keeps the T5 cliquet GREEN (the twin sits behind the demo fallback,
+ * never as the live source); without the new `lib/templates-data` sibling the cliquet was BLIND to
+ * `lib/templates` and the un-flipped inline twin-read slipped through unguarded.
+ *
+ * DETERMINISM-FIRST (CLAUDE.md §6/§8): the decoders + the demo fallback (the same pure twin compute the
+ * Go engine reproduces — byte-identical content-addressed starterId) are pure; a malformed /
+ * undispatched / refused answer yields the demo catalogue / starter. THE WALL (§2/§7): every action
+ * WRITES NOTHING — instantiate/fork are DRY-RUN value computations (wrote_kernel always false); landing
+ * the starter's truths goes via the legal door (templates.Propose → ChangeSet → approval), never these
+ * read tools.
  */
 
-export interface TemplateSummary {
-	id: TemplateId;
-	labelFr: string;
-	labelEn: string;
-	bundleId: string;
-	entities: number;
-	relations: number;
-	operations: number;
-	mirrors: number;
-	uiSources: number;
-	behaviors: string[];
-}
+export type { StarterView, TemplateSummary };
 
-/** listTemplates — the curated catalogue, for the picker. PURE, read-only. */
+/** listTemplates — the curated catalogue, for the picker. LIVE read; the twin is the demo fallback. */
 export async function listTemplates(): Promise<TemplateSummary[]> {
-	return curated().map((b) => ({
-		id: b.id,
-		labelFr: b.labels.fr ?? "",
-		labelEn: b.labels.en ?? "",
-		bundleId: b.bundle_id,
-		entities: b.entities.length,
-		relations: b.relations.length,
-		operations: b.operations.length,
-		mirrors: b.mirrors.length,
-		uiSources: b.ui_sources.length,
-		behaviors: b.behaviors,
-	}));
-}
-
-export interface StarterView {
-	ok: boolean;
-	error?: string;
-	template?: string;
-	target?: string;
-	pieces?: string[];
-	pieceCount?: number;
-	hasAppAuth?: boolean;
-	starterId?: string;
-	forked?: boolean;
-	parentPhase?: string;
-}
-
-function toView(sp: StarterProject, parentPhase?: string): StarterView {
-	return {
-		ok: true,
-		template: sp.template,
-		target: sp.target,
-		pieces: sortedNames(sp),
-		pieceCount: pieceCount(sp),
-		hasAppAuth: sp.auth !== undefined,
-		starterId: sp.starter_id,
-		forked: parentPhase !== undefined,
-		parentPhase,
-	};
+	const scope = await panelScope();
+	const { data } = await readVia(
+		scope,
+		"templates_list",
+		{},
+		catalogueDecoder,
+		demoCatalogue(),
+	);
+	return data;
 }
 
 /**
  * instantiateAction — the duplicate-from-template control (CLAUDE.md §7 ui-completeness): the user
  * picks a curated template + a target slug, and the action INSTANTIATES it into a deterministic GREEN
- * starter (the bundle's entities/relations/operations/mirrors/UI + the app-auth subsystem). It WRITES
- * NOTHING beyond the dry-run value (the wall). An empty target / unknown id is a verbatim error.
+ * starter (the bundle's entities/relations/operations/mirrors/UI + the app-auth subsystem) via the LIVE
+ * Go templates server, the twin demoInstantiate() as the deterministic fallback. It WRITES NOTHING
+ * beyond the dry-run value (the wall). An empty target / unknown id is a verbatim error.
  */
 export async function instantiateAction(
 	_prev: StarterView,
@@ -104,21 +75,23 @@ export async function instantiateAction(
 			error: "slug cible vide (l'honnêteté : jamais une app devinée)",
 		};
 	}
-	try {
-		return toView(instantiate(id, target));
-	} catch (e) {
-		return {
-			ok: true,
-			error: e instanceof Error ? e.message : String(e),
-			target,
-		};
-	}
+	const scope = await panelScope();
+	const { data } = await readVia(
+		scope,
+		"templates_instantiate",
+		{ id, target },
+		starterDecoder,
+		demoInstantiate(id, target),
+	);
+	return data;
 }
 
 /**
  * forkAction — the "fork this app" control: re-instantiate a starter for a NEW slug from a stable
- * PHASE (content-addressed). The fork is a deterministic copy; the same phase → the same starterId,
- * a different phase → a different one. WRITES NOTHING (the wall).
+ * PHASE (content-addressed). The fork is a deterministic copy via the LIVE Go templates server; the
+ * twin demoFork() is the deterministic fallback. The Go instantiateOutput does not echo the parent
+ * phase, so the panel layers `forked`/`parentPhase` on top of the live starter shape (the same phase
+ * → the same starterId, a different phase → a different one). WRITES NOTHING (the wall).
  */
 export async function forkAction(
 	_prev: StarterView,
@@ -135,13 +108,16 @@ export async function forkAction(
 			error: "slug cible vide (l'honnêteté : jamais une app devinée)",
 		};
 	}
-	try {
-		return toView(fork(id, target, parentPhase), parentPhase || "(genèse)");
-	} catch (e) {
-		return {
-			ok: true,
-			error: e instanceof Error ? e.message : String(e),
-			target,
-		};
-	}
+	const scope = await panelScope();
+	const { data } = await readVia(
+		scope,
+		"templates_fork",
+		{ id, target, parent_phase: parentPhase },
+		starterDecoder,
+		demoFork(id, target, parentPhase),
+	);
+	if (!data.ok || data.error) return data;
+	// The Go fork output is shape-identical to instantiate (no parent_phase echo); the panel marks the
+	// fork + carries the phase for display (the demo fallback already does this).
+	return { ...data, forked: true, parentPhase: parentPhase || "(genèse)" };
 }

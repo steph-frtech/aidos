@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { BillingPanel } from "@/components/BillingPanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { plansAction } from "./actions";
 
 // S114 — PLANS, MÉTRAGE DÉTERMINISTE & QUOTAS (la couche économique customer-facing).
 // Determinism-first: chaque op est calculée par le twin PUR de back/runtime/billing
@@ -24,11 +25,18 @@ export const metadata: Metadata = {
 export default async function BillingPage() {
 	const store = await cookies();
 	const locale = store.get("NEXT_LOCALE")?.value === "en" ? "en" : "fr";
+	// Initial LIVE read of the plan ladder + declared quotas through the passerelle (ADR 0092). The
+	// twin demoPlans() is the deterministic fallback — `plansSource` tags live vs demo.
+	const { plans, source } = await plansAction();
 	return (
 		<div className="min-h-screen bg-background text-foreground">
 			<WorkbenchHeader />
 			<main className="mx-auto max-w-5xl px-6 py-10">
-				<BillingPanel locale={locale} />
+				<BillingPanel
+					locale={locale}
+					plans={plans}
+					plansSource={source ?? "demo"}
+				/>
 			</main>
 		</div>
 	);

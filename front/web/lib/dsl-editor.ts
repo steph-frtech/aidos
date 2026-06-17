@@ -16,6 +16,15 @@
  *
  * DETERMINISM-FIRST (CLAUDE.md §6/§8): parseDoc + proposeEdit are PURE + TOTAL — same input → identical
  * output. Parsing DSL = pure function. dsl-editor.test.ts pins it (Vitest + fast-check).
+ *
+ * THE TWIN IS THE DEMO, NOT THE LIVE PATH (ADR 0092 batch-3). Since the kill-twins flip, the
+ * /dsl-editor panel reads the LIVE proposal from the Go dsl-editor MCP server through the passerelle
+ * (`readVia(scope, "dsl_propose", …)`); this module's parseDoc/proposeEdit/kinds are KEPT only as the
+ * deterministic DEMO-FALLBACK compute (driven by lib/dsl-editor-data.ts, the `source:"demo"` path).
+ * The presence of the `lib/dsl-editor-data.ts` sibling is what makes the T5 cliquet
+ * (twin-as-live-fitness) classify this lib as a twin — guarding the flip (the panel reads via the
+ * readVia frontier, the twin never sits on the live path again). The Go dsleditor.ParseDoc /
+ * ProposeEdit is the authoritative implementation; this twin mirrors it.
  */
 
 import { createHash } from "node:crypto";

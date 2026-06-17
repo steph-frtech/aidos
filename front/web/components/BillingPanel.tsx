@@ -1,36 +1,48 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useState } from "react";
+import { useFormStatus } from "react-dom";
 import {
-	applyEvent,
-	checkQuota,
-	type IngestEvent,
-	ingestWebhook,
-	type MeteredRun,
-	meterProject,
-	meterUsage,
-	PLAN_LADDER,
-	PLAN_QUOTAS,
-	type Plan,
-	PROVIDER_NAME,
-	type Usage,
-	WEBHOOK_KINDS,
-	type WebhookEvent,
-	type WebhookKind,
-} from "@/lib/billing";
-import { VerifyContractInBrowser } from "@/lib/billing-verify";
+	ingestAction,
+	meterAction,
+	pactAction,
+	quotaAction,
+} from "@/app/billing/actions";
+import {
+	INGEST_INITIAL,
+	METER_INITIAL,
+	PACT_INITIAL,
+	QUOTA_INITIAL,
+} from "@/app/billing/view";
+import type { Plan, WebhookKind } from "@/lib/billing";
+import type { PlanRow, RunRow } from "@/lib/billing-data";
+import type { Source } from "@/lib/gateway-sdk";
 
-// S114 — the action-capable billing panel. Every op the step develops has a control bound to
-// it, reachable AND executable from the screen (ui-completeness): meter usage (account +
-// per-project), enforce quota, ingest a provider webhook (idempotent), provider-verify the
-// Pact contract. All PURE — re-runs the lib/billing twin; the wall (§2): below the line.
+// S114 — the action-capable billing panel (ADR 0092 kill-twins flip). Every op the step develops
+// has a control bound to it, reachable AND EXECUTABLE from the screen (ui-completeness): meter
+// usage (account + per-project), enforce quota, ingest a provider webhook (idempotent), provider-
+// verify the Pact contract. Every control now reads the LIVE Go billing engine through the
+// passerelle (the server actions in app/billing/actions.ts use readVia), with the twin lib/billing
+// preserved ONLY as the deterministic demo fallback (lib/billing-data, source:"live"|"demo"). The
+// panel only `import type`s from @/lib/billing — NO client-side twin call — so the T5 cliquet stays
+// GREEN. THE WALL (§2): below the line — a plan/quota is declared data, the metering a COUNT; the
+// panel WRITES NO TRUTH.
 
 type Locale = "fr" | "en";
+
+const PROVIDER_LABEL = "stripe";
+const WEBHOOK_KIND_OPTIONS: WebhookKind[] = [
+	"checkout.completed",
+	"payment.succeeded",
+	"payment.failed",
+	"subscription.updated",
+	"subscription.canceled",
+];
 
 const T = {
 	fr: {
 		heading: "Plans, métrage déterministe & quotas",
-		sub: "La couche économique customer-facing : un compte a un plan, sa consommation est COMPTÉE depuis les AgentRun enregistrés (jamais estimée, jamais un LLM), et un build au-delà du quota est REFUSÉ avec un chemin d'upgrade — jamais un échec silencieux.",
+		sub: "La couche économique customer-facing : un compte a un plan, sa consommation est COMPTÉE depuis les AgentRun enregistrés (jamais estimée, jamais un LLM), et un build au-delà du quota est REFUSÉ avec un chemin d'upgrade — jamais un échec silencieux. Chaque contrôle lit le moteur Go via la passerelle (ADR 0092).",
 		plansHeading: "Plans & quotas déclarés",
 		account: "Compte",
 		plan: "Plan",
@@ -53,14 +65,20 @@ const T = {
 		eventsRecorded: "événement(s) enregistré(s)",
 		appliedPlan: "Plan appliqué",
 		duplicate: "doublon supprimé (exactly-once)",
-		pactHeading: `Contrat Pact avec le provider « ${PROVIDER_NAME} » (ADR 0049)`,
+		pactHeading: `Contrat Pact avec le provider « ${PROVIDER_LABEL} » (ADR 0049)`,
 		verify: "Provider-vérifier le webhook",
 		pass: "Contrat HONORÉ",
 		fail: "Contrat NON honoré",
+		working: "…",
+		sourceLive: "live",
+		sourceDemo: "démo",
+		sourceLiveTitle: "lu en direct depuis le moteur Go via la passerelle",
+		sourceDemoTitle:
+			"la passerelle est injoignable / la charge a été rejetée — repli sur la démo déterministe (ADR 0092)",
 	},
 	en: {
 		heading: "Plans, deterministic metering & quotas",
-		sub: "The customer-facing economic layer: an account has a plan, its usage is COUNTED from the recorded AgentRuns (never estimated, never an LLM), and a build over quota is REFUSED with an upgrade path — never a silent failure.",
+		sub: "The customer-facing economic layer: an account has a plan, its usage is COUNTED from the recorded AgentRuns (never estimated, never an LLM), and a build over quota is REFUSED with an upgrade path — never a silent failure. Every control reads the Go engine through the passerelle (ADR 0092).",
 		plansHeading: "Plans & declared quotas",
 		account: "Account",
 		plan: "Plan",
@@ -83,118 +101,146 @@ const T = {
 		eventsRecorded: "event(s) recorded",
 		appliedPlan: "Applied plan",
 		duplicate: "duplicate suppressed (exactly-once)",
-		pactHeading: `Pact contract with provider “${PROVIDER_NAME}” (ADR 0049)`,
+		pactHeading: `Pact contract with provider “${PROVIDER_LABEL}” (ADR 0049)`,
 		verify: "Provider-verify the webhook",
 		pass: "Contract HONOURED",
 		fail: "Contract NOT honoured",
+		working: "…",
+		sourceLive: "live",
+		sourceDemo: "demo",
+		sourceLiveTitle: "read live from the Go engine through the passerelle",
+		sourceDemoTitle:
+			"the passerelle is unreachable / the payload was rejected — fell back to the deterministic demo (ADR 0092)",
 	},
 } as const;
 
-interface RunForm {
-	id: string;
-	project: string;
-	tokens: number;
-	buildMinutes: number;
-}
-
 let runSeq = 2;
 
-export function BillingPanel({ locale }: { locale: Locale }) {
+function SourceBadge({
+	source,
+	testId,
+	t,
+}: {
+	source: Source;
+	testId: string;
+	t: (typeof T)[Locale];
+}) {
+	const live = source === "live";
+	return (
+		<span
+			data-testid={testId}
+			data-source={source}
+			title={live ? t.sourceLiveTitle : t.sourceDemoTitle}
+			className={
+				live
+					? "inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+					: "inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
+			}
+		>
+			<span
+				aria-hidden="true"
+				className={
+					live
+						? "size-1.5 rounded-full bg-primary"
+						: "size-1.5 rounded-full bg-muted-foreground"
+				}
+			/>
+			{live ? t.sourceLive : t.sourceDemo}
+		</span>
+	);
+}
+
+function Submit({
+	label,
+	testId,
+	variant = "primary",
+	working,
+}: {
+	label: string;
+	testId: string;
+	variant?: "primary" | "ghost";
+	working: string;
+}) {
+	const { pending } = useFormStatus();
+	return (
+		<button
+			type="submit"
+			data-testid={testId}
+			disabled={pending}
+			className={
+				variant === "primary"
+					? "rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50"
+					: "rounded border border-border px-3 py-1.5 text-sm disabled:opacity-50"
+			}
+		>
+			{pending ? working : label}
+		</button>
+	);
+}
+
+export function BillingPanel({
+	locale,
+	plans,
+	plansSource,
+}: {
+	locale: Locale;
+	plans: PlanRow[];
+	plansSource: Source;
+}) {
 	const t = T[locale];
 	const [account, setAccount] = useState("acct-1");
 	const [plan, setPlan] = useState<Plan>("free");
-	const [runs, setRuns] = useState<RunForm[]>([
+	const [runs, setRuns] = useState<RunRow[]>([
 		{ id: "run-0", project: "p1", tokens: 30_000, buildMinutes: 5 },
 		{ id: "run-1", project: "p2", tokens: 200_000, buildMinutes: 4 },
 	]);
-	const [usage, setUsage] = useState<Usage | null>(null);
-	const [quota, setQuota] = useState<ReturnType<typeof checkQuota> | null>(
-		null,
-	);
+	const runsJson = JSON.stringify(runs);
+
+	const [meter, meterSubmit] = useActionState(meterAction, METER_INITIAL);
+	const [quota, quotaSubmit] = useActionState(quotaAction, QUOTA_INITIAL);
+	const [ingest, ingestSubmit] = useActionState(ingestAction, INGEST_INITIAL);
+	const [pact, pactSubmit] = useActionState(pactAction, PACT_INITIAL);
 
 	const [whKind, setWhKind] = useState<WebhookKind>("checkout.completed");
 	const [whPlan, setWhPlan] = useState<Plan>("pro");
-	const [log, setLog] = useState<IngestEvent[]>([]);
-	const [appliedNext, setAppliedNext] = useState<Plan | "">("");
 
-	const [verify, setVerify] = useState<{
-		pass: boolean;
-		reason: string;
-		interactions: string[];
-	} | null>(null);
-
-	const metered: MeteredRun[] = useMemo(
-		() =>
-			runs.map((r, i) => ({
-				account,
-				project: r.project,
-				runId: `r${i + 1}`,
-				meter: { tokens: r.tokens, ciMinutes: r.buildMinutes },
-			})),
-		[runs, account],
-	);
-
-	const onMeter = () => {
-		const u = meterUsage(account, metered);
-		setUsage(u);
-		setQuota(null);
-	};
-	const onMeterProject = (project: string) => {
-		setUsage(meterProject(account, project, metered));
-		setQuota(null);
-	};
-	const onCheckQuota = () => {
-		const u = usage ?? meterUsage(account, metered);
-		setUsage(u);
-		setQuota(checkQuota(plan, u));
-	};
-	const onIngest = () => {
-		const e: WebhookEvent = {
-			kind: whKind,
-			providerId: "evt_demo",
-			account,
-			plan: whPlan,
-		};
-		try {
-			const { log: next } = ingestWebhook(log, e);
-			setLog(next);
-			setAppliedNext(applyEvent(plan, e));
-		} catch {
-			setAppliedNext("");
-		}
-	};
-	const onVerify = () => setVerify(VerifyContractInBrowser());
+	// The prior ingest log threads to the next ingest call (idempotent replay) — server actions are
+	// stateless, so the panel carries the live log forward via the hidden `prior` field.
+	const priorJson = JSON.stringify(ingest.read?.log ?? []);
 
 	return (
 		<section className="space-y-8">
 			<header className="space-y-2">
-				<h1 className="text-2xl font-semibold tracking-tight">{t.heading}</h1>
+				<div className="flex flex-wrap items-center gap-3">
+					<h1 className="text-2xl font-semibold tracking-tight">{t.heading}</h1>
+					<SourceBadge source={plansSource} testId="plans-source" t={t} />
+				</div>
 				<p className="max-w-3xl text-sm text-muted-foreground">{t.sub}</p>
 			</header>
 
-			{/* Plans */}
+			{/* Plans (read live from billing_plans) */}
 			<div className="rounded-lg border border-border bg-card p-5">
 				<h2 className="mb-3 text-lg font-medium">{t.plansHeading}</h2>
 				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-					{PLAN_LADDER.map((p) => (
+					{plans.map((row) => (
 						<button
-							key={p}
+							key={row.plan}
 							type="button"
-							data-testid={`plan-${p}`}
-							onClick={() => setPlan(p)}
+							data-testid={`plan-${row.plan}`}
+							onClick={() => setPlan(row.plan)}
 							className={`rounded-md border p-3 text-left text-sm transition ${
-								plan === p
+								plan === row.plan
 									? "border-primary bg-primary/10"
 									: "border-border bg-background"
 							}`}
 						>
-							<div className="font-medium capitalize">{p}</div>
+							<div className="font-medium capitalize">{row.plan}</div>
 							<div className="mt-1 text-xs text-muted-foreground">
-								{PLAN_QUOTAS[p].maxLLMTokens.toLocaleString()}{" "}
+								{row.quota.maxLLMTokens.toLocaleString()}{" "}
 								{t.tokens.toLowerCase()}
 								<br />
-								{PLAN_QUOTAS[p].maxBuildLoopMinutes.toLocaleString()} min ·{" "}
-								{PLAN_QUOTAS[p].maxDeployedApps} apps
+								{row.quota.maxBuildLoopMinutes.toLocaleString()} min ·{" "}
+								{row.quota.maxDeployedApps} apps
 							</div>
 						</button>
 					))}
@@ -260,14 +306,17 @@ export function BillingPanel({ locale }: { locale: Locale }) {
 								}
 								className="w-24 rounded border border-border bg-background px-2 py-1"
 							/>
-							<button
-								type="button"
-								data-testid={`meter-project-${i}`}
-								onClick={() => onMeterProject(r.project)}
-								className="rounded border border-border px-2 py-1 text-xs"
-							>
-								{t.meterProject}
-							</button>
+							<form action={meterSubmit} className="inline">
+								<input type="hidden" name="account" value={account} />
+								<input type="hidden" name="runs" value={runsJson} />
+								<input type="hidden" name="project" value={r.project} />
+								<Submit
+									label={t.meterProject}
+									testId={`meter-project-${i}`}
+									variant="ghost"
+									working={t.working}
+								/>
+							</form>
 						</div>
 					))}
 				</div>
@@ -290,46 +339,67 @@ export function BillingPanel({ locale }: { locale: Locale }) {
 					>
 						{t.addRun}
 					</button>
-					<button
-						type="button"
-						data-testid="meter-btn"
-						onClick={onMeter}
-						className="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-					>
-						{t.meter}
-					</button>
+					<form action={meterSubmit} className="inline">
+						<input type="hidden" name="account" value={account} />
+						<input type="hidden" name="runs" value={runsJson} />
+						<Submit label={t.meter} testId="meter-btn" working={t.working} />
+					</form>
 				</div>
-				{usage && (
+				{meter.ran && meter.usage ? (
 					<div
 						className="mt-4 rounded-md border border-border bg-background p-3 text-sm"
 						data-testid="usage"
 					>
-						<h3 className="mb-1 font-medium">{t.usageHeading}</h3>
+						<div className="mb-1 flex items-center justify-between">
+							<h3 className="font-medium">
+								{t.usageHeading}
+								{meter.scopeLabel ? ` — ${meter.scopeLabel}` : ""}
+							</h3>
+							{meter.source ? (
+								<SourceBadge
+									source={meter.source}
+									testId="usage-source"
+									t={t}
+								/>
+							) : null}
+						</div>
 						<div>
 							{t.tokens}:{" "}
 							<span data-testid="usage-tokens">
-								{usage.llmTokens.toLocaleString()}
+								{meter.usage.llmTokens.toLocaleString()}
 							</span>{" "}
-							· {t.buildMin}: {usage.buildLoopMinutes} · runs: {usage.runCount}
+							· {t.buildMin}: {meter.usage.buildLoopMinutes} · runs:{" "}
+							{meter.usage.runCount}
 						</div>
 					</div>
-				)}
+				) : null}
 			</div>
 
 			{/* Quota enforcement */}
 			<div className="rounded-lg border border-border bg-card p-5">
 				<h2 className="mb-3 text-lg font-medium">{t.quotaHeading}</h2>
-				<button
-					type="button"
-					data-testid="check-quota-btn"
-					onClick={onCheckQuota}
-					className="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-				>
-					{t.checkQuota}
-				</button>
-				{quota && (
+				<form action={quotaSubmit}>
+					<input type="hidden" name="account" value={account} />
+					<input type="hidden" name="plan" value={plan} />
+					<input type="hidden" name="runs" value={runsJson} />
+					<Submit
+						label={t.checkQuota}
+						testId="check-quota-btn"
+						working={t.working}
+					/>
+				</form>
+				{quota.ran && quota.decision ? (
 					<div className="mt-4 text-sm" data-testid="quota-result">
-						{quota.verdict === "allow" ? (
+						{quota.source ? (
+							<div className="mb-2 flex justify-end">
+								<SourceBadge
+									source={quota.source}
+									testId="quota-source"
+									t={t}
+								/>
+							</div>
+						) : null}
+						{quota.decision.verdict === "allow" ? (
 							<p
 								className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3"
 								data-testid="quota-allow"
@@ -342,26 +412,28 @@ export function BillingPanel({ locale }: { locale: Locale }) {
 								data-testid="quota-deny"
 							>
 								<p className="font-medium" data-testid="quota-code">
-									✗ {t.deny} — {quota.blockReason?.code}
+									✗ {t.deny} — {quota.decision.blockReason?.code}
 								</p>
 								<p className="mt-1 text-xs text-muted-foreground">
-									{quota.blockReason?.explanation}
+									{quota.decision.blockReason?.explanation}
 								</p>
-								{quota.upgradeTo ? (
+								{quota.decision.upgradeTo ? (
 									<p className="mt-2 text-xs" data-testid="quota-upgrade">
 										{t.upgrade}:{" "}
-										<strong className="capitalize">{quota.upgradeTo}</strong>
+										<strong className="capitalize">
+											{quota.decision.upgradeTo}
+										</strong>
 									</p>
 								) : null}
 								<ul className="mt-2 list-inside list-disc text-xs">
-									{quota.blockReason?.howToFix.map((f) => (
+									{quota.decision.blockReason?.howToFix.map((f) => (
 										<li key={f}>{f}</li>
 									))}
 								</ul>
 							</div>
 						)}
 					</div>
-				)}
+				) : null}
 			</div>
 
 			{/* Inbound webhook */}
@@ -374,7 +446,7 @@ export function BillingPanel({ locale }: { locale: Locale }) {
 						onChange={(e) => setWhKind(e.target.value as WebhookKind)}
 						className="rounded border border-border bg-background px-2 py-1"
 					>
-						{WEBHOOK_KINDS.map((k) => (
+						{WEBHOOK_KIND_OPTIONS.map((k) => (
 							<option key={k} value={k}>
 								{k}
 							</option>
@@ -386,70 +458,101 @@ export function BillingPanel({ locale }: { locale: Locale }) {
 						onChange={(e) => setWhPlan(e.target.value as Plan)}
 						className="rounded border border-border bg-background px-2 py-1"
 					>
-						{PLAN_LADDER.map((p) => (
-							<option key={p} value={p}>
-								{p}
+						{plans.map((row) => (
+							<option key={row.plan} value={row.plan}>
+								{row.plan}
 							</option>
 						))}
 					</select>
-					<button
-						type="button"
-						data-testid="ingest-btn"
-						onClick={onIngest}
-						className="rounded bg-primary px-3 py-1.5 text-primary-foreground"
-					>
-						{t.ingest}
-					</button>
-					<button
-						type="button"
-						data-testid="ingest-again-btn"
-						onClick={onIngest}
-						className="rounded border border-border px-3 py-1.5"
-					>
-						{t.ingestAgain}
-					</button>
+					<form action={ingestSubmit} className="inline">
+						<input type="hidden" name="account" value={account} />
+						<input type="hidden" name="kind" value={whKind} />
+						<input type="hidden" name="plan" value={whPlan} />
+						<input type="hidden" name="current" value={plan} />
+						<input type="hidden" name="prior" value="[]" />
+						<Submit label={t.ingest} testId="ingest-btn" working={t.working} />
+					</form>
+					<form action={ingestSubmit} className="inline">
+						<input type="hidden" name="account" value={account} />
+						<input type="hidden" name="kind" value={whKind} />
+						<input type="hidden" name="plan" value={whPlan} />
+						<input type="hidden" name="current" value={plan} />
+						<input type="hidden" name="prior" value={priorJson} />
+						<Submit
+							label={t.ingestAgain}
+							testId="ingest-again-btn"
+							variant="ghost"
+							working={t.working}
+						/>
+					</form>
 				</div>
-				<div className="mt-3 text-sm" data-testid="webhook-result">
-					<span data-testid="webhook-count">{log.length}</span>{" "}
-					{t.eventsRecorded}
-					{appliedNext ? (
-						<>
-							{" · "}
-							{t.appliedPlan}:{" "}
-							<strong className="capitalize" data-testid="webhook-applied">
-								{appliedNext}
-							</strong>
-						</>
-					) : null}
-				</div>
+				{ingest.ran && ingest.read ? (
+					<div className="mt-3 text-sm" data-testid="webhook-result">
+						{ingest.source ? (
+							<div className="mb-2 flex justify-end">
+								<SourceBadge
+									source={ingest.source}
+									testId="webhook-source"
+									t={t}
+								/>
+							</div>
+						) : null}
+						<span data-testid="webhook-count">{ingest.read.log.length}</span>{" "}
+						{t.eventsRecorded}
+						{ingest.read.duplicate ? <> · {t.duplicate}</> : null}
+						{ingest.read.nextPlan ? (
+							<>
+								{" · "}
+								{t.appliedPlan}:{" "}
+								<strong className="capitalize" data-testid="webhook-applied">
+									{ingest.read.nextPlan}
+								</strong>
+							</>
+						) : null}
+						{ingest.read.code ? (
+							<p
+								className="mt-1 text-xs text-destructive"
+								data-testid="webhook-error"
+							>
+								{ingest.read.code} — {ingest.read.explanation}
+							</p>
+						) : null}
+					</div>
+				) : null}
 			</div>
 
 			{/* Pact provider verification */}
 			<div className="rounded-lg border border-border bg-card p-5">
 				<h2 className="mb-3 text-lg font-medium">{t.pactHeading}</h2>
-				<button
-					type="button"
-					data-testid="verify-btn"
-					onClick={onVerify}
-					className="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-				>
-					{t.verify}
-				</button>
-				{verify && (
+				<form action={pactSubmit}>
+					<Submit label={t.verify} testId="verify-btn" working={t.working} />
+				</form>
+				{pact.ran && pact.pact ? (
 					<div className="mt-3 text-sm" data-testid="verify-result">
+						{pact.source ? (
+							<div className="mb-2 flex justify-end">
+								<SourceBadge
+									source={pact.source}
+									testId="verify-source"
+									t={t}
+								/>
+							</div>
+						) : null}
 						<p
-							className={verify.pass ? "text-emerald-600" : "text-destructive"}
+							className={
+								pact.pact.pass ? "text-emerald-600" : "text-destructive"
+							}
 							data-testid="verify-verdict"
 						>
-							{verify.pass ? `✓ ${t.pass}` : `✗ ${t.fail}`}
+							{pact.pact.pass ? `✓ ${t.pass}` : `✗ ${t.fail}`}
 						</p>
 						<ul className="mt-2 list-inside list-disc text-xs text-muted-foreground">
-							{verify.interactions.map((i) => (
+							{pact.pact.interactions.map((i) => (
 								<li key={i}>{i}</li>
 							))}
 						</ul>
 					</div>
-				)}
+				) : null}
 			</div>
 		</section>
 	);

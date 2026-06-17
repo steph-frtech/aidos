@@ -4904,6 +4904,10 @@
 		"wroteKernelLabel": "WroteKernel",
 		"wallNote": "The wall: proposing writes no truth — the ChangeSet stays DRAFT (only `aidos`, after approval, applies it). WroteKernel = false.",
 		"working": "Working…",
+		"sourceLive": "live — Go engine (gateway)",
+		"sourceDemo": "demo — deterministic fallback",
+		"sourceLiveTitle": "Proposal from the Go engine via the gateway (dispatched dsl_propose).",
+		"sourceDemoTitle": "Deterministic fallback: the gateway is unreachable or the response was rejected — the twin parses behind source:\"demo\".",
 		"footer": "S77 · typed editors (no free code) reusing the S09/S10/S11 interpreters. Parsing DSL is a pure function; the edit is a proposed ChangeSet, never an applied truth (the wall, §2)."
 	},
 	"relationEmitter": {

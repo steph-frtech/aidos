@@ -3,7 +3,9 @@
 import { useTranslations } from "next-intl";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { type DslKind, kinds } from "@/lib/dsl-editor";
+import type { DslKind } from "@/lib/dsl-editor";
+import { dslKindsList } from "@/lib/dsl-editor-data";
+import type { Source } from "@/lib/gateway-sdk";
 import { type ProposeView, proposeAction } from "./actions";
 
 /**
@@ -90,6 +92,38 @@ const PRESETS: Record<
 	},
 };
 
+/**
+ * SourceBadge tags whether the proposal came from the live Go engine (via the passerelle) or the
+ * deterministic demo fallback (ADR 0092 flip). `live` = the dispatched dsl_propose read resolved;
+ * `demo` = the gateway was unreachable / the payload was rejected (the twin behind source:"demo").
+ */
+function SourceBadge({ source, testId }: { source: Source; testId: string }) {
+	const t = useTranslations("dslEditor");
+	const live = source === "live";
+	return (
+		<span
+			data-testid={testId}
+			data-source={source}
+			title={live ? t("sourceLiveTitle") : t("sourceDemoTitle")}
+			className={
+				live
+					? "inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+					: "inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
+			}
+		>
+			<span
+				aria-hidden="true"
+				className={
+					live
+						? "size-1.5 rounded-full bg-primary"
+						: "size-1.5 rounded-full bg-muted-foreground"
+				}
+			/>
+			{live ? t("sourceLive") : t("sourceDemo")}
+		</span>
+	);
+}
+
 function Submit({ label, testId }: { label: string; testId: string }) {
 	const t = useTranslations("dslEditor");
 	const { pending } = useFormStatus();
@@ -113,12 +147,12 @@ export function DslEditorPanel() {
 	const [body, setBody] = useState(PRESETS.policy.body);
 	const [extra, setExtra] = useState<Record<string, string>>({});
 
-	const dslKinds = kinds();
+	const dslKinds = dslKindsList();
 	const proposed = state.ok && state.proposal?.ok === true;
 	const refused =
 		state.ok && (state.error !== undefined || state.parseError !== undefined);
-	const cs = state.proposal?.changeset;
-	const parsed = state.proposal?.parsed;
+	const proposal = state.proposal;
+	const source: Source | undefined = state.source;
 
 	function onKind(k: DslKind) {
 		setKind(k);
@@ -204,7 +238,7 @@ export function DslEditorPanel() {
 				<Submit label={t("proposeButton")} testId="propose-button" />
 			</form>
 
-			{proposed && cs && parsed ? (
+			{proposed && proposal ? (
 				<div
 					data-testid="proposal-result"
 					className="space-y-5 rounded-xl border border-border bg-muted/40 p-6"
@@ -214,11 +248,14 @@ export function DslEditorPanel() {
 							data-testid="changeset-status"
 							className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
 						>
-							{t("draftBadge")}: {cs.status}
+							{t("draftBadge")}: {proposal.changesetStatus ?? "DRAFT"}
 						</span>
 						<span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-							{parsed.kind}: {parsed.name}
+							{proposal.kind}: {proposal.name}
 						</span>
+						{source ? (
+							<SourceBadge source={source} testId="propose-source" />
+						) : null}
 					</div>
 					<p className="text-xs text-muted-foreground">{t("wallNote")}</p>
 					<dl className="grid gap-2 text-xs sm:grid-cols-1">
@@ -230,18 +267,7 @@ export function DslEditorPanel() {
 								data-testid="changeset-target"
 								className="break-all font-mono text-muted-foreground"
 							>
-								{cs.spec_delta.target}
-							</dd>
-						</div>
-						<div>
-							<dt className="font-semibold text-foreground">
-								{t("bodyHashLabel")}
-							</dt>
-							<dd
-								data-testid="changeset-body-hash"
-								className="break-all font-mono text-muted-foreground"
-							>
-								{cs.spec_delta.body}
+								{proposal.changesetRef}
 							</dd>
 						</div>
 						<div>
@@ -252,7 +278,7 @@ export function DslEditorPanel() {
 								data-testid="wrote-kernel"
 								className="font-mono text-muted-foreground"
 							>
-								{String(cs.wrote_kernel)}
+								{String(proposal.wroteKernel)}
 							</dd>
 						</div>
 					</dl>

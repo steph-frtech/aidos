@@ -4904,6 +4904,10 @@
 		"wroteKernelLabel": "WroteKernel",
 		"wallNote": "Le mur : proposer n'écrit aucune vérité — le ChangeSet reste DRAFT (seul `aidos`, après approbation, l'applique). WroteKernel = false.",
 		"working": "Traitement…",
+		"sourceLive": "live — moteur Go (passerelle)",
+		"sourceDemo": "démo — repli déterministe",
+		"sourceLiveTitle": "Proposition du moteur Go via la passerelle (dsl_propose dispatché).",
+		"sourceDemoTitle": "Repli déterministe : la passerelle est injoignable ou la réponse a été rejetée — le twin parse derrière source:\"demo\".",
 		"footer": "S77 · éditeurs typés (pas de code libre) réutilisant les interpréteurs S09/S10/S11. Le parsing DSL est une fonction pure ; l'édition est un ChangeSet proposé, jamais une vérité appliquée (le mur, §2)."
 	},
 	"relationEmitter": {

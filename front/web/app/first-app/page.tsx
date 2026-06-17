@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { listTemplates } from "@/app/templates/actions";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
-import { curated } from "@/lib/templates";
 import { FirstAppFunnel, type FunnelLabels } from "./FirstAppFunnel";
 
 export const metadata: Metadata = {
@@ -74,9 +74,11 @@ export default async function FirstAppPage() {
 		deployCta: t("funnel.deployCta"),
 	};
 
-	const templates = curated().map((b) => ({
+	// The template picker list — the LIVE catalogue via the templates server (ADR 0092), the twin
+	// behind the demo fallback; the funnel only needs each bundle's id + FR label.
+	const templates = (await listTemplates()).map((b) => ({
 		id: b.id,
-		label: b.labels.fr ?? b.id,
+		label: b.labelFr || b.id,
 	}));
 
 	// The eight teeth deep-linked to the real Workbench panels ("le faire pour de vrai").
