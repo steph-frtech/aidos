@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { Verdict } from "@/lib/economics";
+import type { Source } from "@/lib/gateway-sdk";
 import { disjoncteurAction, meterAction } from "./actions";
 import { CHECKOUT_BUDGET, METER_INITIAL, SIGNAL_INITIAL } from "./view";
 
@@ -41,6 +42,38 @@ function verdictBadgeClass(v: Verdict): string {
 		return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
 	if (v === "over_budget_justified") return "bg-primary/15 text-primary";
 	return "bg-amber-500/15 text-amber-600 dark:text-amber-400";
+}
+
+/**
+ * SourceBadge tags whether a result came from the live Go engine (via the passerelle) or the
+ * deterministic demo fallback (ADR 0092 flip). `live` = the dispatched cost-meter read resolved;
+ * `demo` = the gateway was unreachable / the payload was rejected (the twin behind source:"demo").
+ */
+function SourceBadge({ source, testId }: { source: Source; testId: string }) {
+	const t = useTranslations("costMeter");
+	const live = source === "live";
+	return (
+		<span
+			data-testid={testId}
+			data-source={source}
+			title={live ? t("sourceLiveTitle") : t("sourceDemoTitle")}
+			className={
+				live
+					? "inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+					: "inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
+			}
+		>
+			<span
+				aria-hidden="true"
+				className={
+					live
+						? "size-1.5 rounded-full bg-primary"
+						: "size-1.5 rounded-full bg-muted-foreground"
+				}
+			/>
+			{live ? t("sourceLive") : t("sourceDemo")}
+		</span>
+	);
 }
 
 function Submit({ label, testId }: { label: string; testId: string }) {
@@ -148,6 +181,11 @@ export function CostMeterPanel() {
 
 				{meter.ran && meter.cellMeter && meter.decision ? (
 					<div className="space-y-3" data-testid="meter-result">
+						{meter.source ? (
+							<div className="flex justify-end">
+								<SourceBadge source={meter.source} testId="meter-source" />
+							</div>
+						) : null}
 						<dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
 							<div>
 								<dt className="text-xs text-muted-foreground">
@@ -253,6 +291,14 @@ export function CostMeterPanel() {
 						className="rounded-lg border border-border bg-card p-3 text-sm"
 						data-testid="disjoncteur-result"
 					>
+						{signal.source ? (
+							<div className="mb-2 flex justify-end">
+								<SourceBadge
+									source={signal.source}
+									testId="disjoncteur-source"
+								/>
+							</div>
+						) : null}
 						<div className="flex flex-wrap items-center gap-2">
 							<span className="font-medium text-foreground">
 								{t("tripLabel")}:

@@ -1,4 +1,4 @@
-package main
+package autonomysrv
 
 import (
 	"context"
@@ -9,9 +9,9 @@ import (
 // tools, and each tool must faithfully relay the pure verdict (the wall: it adds no judgment).
 
 func TestServerExposesTwoTools(t *testing.T) {
-	srv := newMCPServer()
+	srv := NewServer()
 	if srv == nil {
-		t.Fatal("newMCPServer returned nil")
+		t.Fatal("NewServer returned nil")
 	}
 }
 

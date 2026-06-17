@@ -1,18 +1,16 @@
 "use server";
 
+import { browse, type LandedAttachment, landAttach } from "@/lib/behaviors";
 import {
-	add,
-	type BehaviorRecord,
-	browse,
-	DEMO_RECORD,
-	type LandedAttachment,
-	type LibEntry,
-	type Library,
-	landAttach,
-	newLibrary,
-	recordId,
-	search,
-} from "@/lib/behaviors";
+	demoSearch,
+	type EntryView,
+	gatewaySearchArgs,
+	recordIdOf,
+	seedLibrary,
+} from "@/lib/behaviors-data";
+import { readVia } from "@/lib/gateway-sdk";
+import { panelScope } from "@/lib/panelScope";
+import { searchDecoder } from "./live";
 
 /**
  * Server Actions for the /behaviors Workbench panel (S79 — « Librairie behaviors user-facing »).
@@ -22,77 +20,45 @@ import {
  * PREVIEWS the expansion (scoped policies+fixtures) by calling the ONE S76 Expand/Propose and LANDS
  * it via an APPROVED ChangeSet. It CONSUMES S76's single expander — it never re-implements it.
  *
- * THE WALL (§2/§7): every action WRITES NOTHING. Search/browse are read-only; attach previews a DRAFT
- * and lands an APPLIED changeset VALUE — the legal door (propose → approve), never a direct kernel
- * write. The matcher is PURE code (lib/behaviors), never an LLM (determinism-first, §6/§8).
+ * ADR 0092 CUTOVER (the Go engine is the SINGLE live source). `searchAction` now reads the LIVE
+ * library from the Go `aidos-behaviors` MCP server through the passerelle
+ * (`readVia(scope, "behaviors_search", …)`, the dispatched below-the-line read), with the twin
+ * `lib/behaviors.search()` preserved ONLY as the deterministic demo fallback (`source:"live"|"demo"`,
+ * lib/behaviors-data). `attachAction` stays on the twin compute as the demo path (a local
+ * preview/landing the front shows); the `readVia` frontier import keeps the T5 cliquet GREEN (the
+ * twin sits behind the demo fallback, never as the live source).
+ *
+ * THE WALL (§2/§7): every action WRITES NOTHING. Search/browse are read-only (a below-the-line read);
+ * attach previews a DRAFT and lands an APPLIED changeset VALUE — the legal door (propose → approve),
+ * never a direct kernel write. The matcher is PURE code, never an LLM (determinism-first, §6/§8).
  */
-
-/** The seeded project library the panel acts on (the §24.6 owner-scoping behaviour + two more). */
-function seedLibrary(): Library {
-	let lib = newLibrary("proj-shop");
-	[
-		DEMO_RECORD,
-		{
-			kind: "soft-deletable",
-			owner: "bob",
-			version: 1,
-			labels: { fr: "Archivable", en: "Soft-deletable" },
-		} as BehaviorRecord,
-		{
-			kind: "auditable",
-			owner: "carol",
-			version: 2,
-			tags: ["trace"],
-			labels: { fr: "Audité", en: "Auditable" },
-		} as BehaviorRecord,
-	].forEach((r) => {
-		lib = add(lib, r)[0];
-	});
-	return lib;
-}
-
-export interface EntryView {
-	recordId: string;
-	kind: string;
-	owner: string;
-	version: number;
-	tags: string[];
-	labelFr: string;
-	published: boolean;
-}
-
-function toView(e: LibEntry): EntryView {
-	return {
-		recordId: recordIdOf(e),
-		kind: e.record.kind,
-		owner: e.record.owner,
-		version: e.record.version,
-		tags: e.record.tags ?? [],
-		labelFr: e.record.labels.fr ?? "",
-		published: e.published,
-	};
-}
-
-// recordIdOf re-derives the entry's content id from its record (the library key). Deterministic.
-function recordIdOf(e: LibEntry): string {
-	return recordId(e.record);
-}
 
 export interface BrowseView {
 	ok: boolean;
 	entries: EntryView[];
 	query: string;
+	source: "live" | "demo";
 }
 
-/** searchAction — the deterministic search control (NEVER an LLM). Read-only. */
+/**
+ * searchAction — the deterministic search control (NEVER an LLM). LIVE read through the passerelle
+ * (the dispatched `behaviors_search` tool over the seeded library state); the twin demoSearch() is
+ * the deterministic fallback (`source:"live"|"demo"`). Read-only.
+ */
 export async function searchAction(
 	_prev: BrowseView,
 	formData: FormData,
 ): Promise<BrowseView> {
 	const query = String(formData.get("query") ?? "").trim();
-	const lib = seedLibrary();
-	const hits = query === "" ? browse(lib) : search(lib, query);
-	return { ok: true, entries: hits.map(toView), query };
+	const scope = await panelScope();
+	const { data, source } = await readVia(
+		scope,
+		"behaviors_search",
+		gatewaySearchArgs(query),
+		searchDecoder,
+		demoSearch(query),
+	);
+	return { ok: true, entries: data, query, source };
 }
 
 export interface AttachView {
@@ -105,8 +71,8 @@ export interface AttachView {
  * attachAction — the action-capable attach control (CLAUDE.md §7 ui-completeness): the user picks the
  * ownable behaviour + an entity, and the action PREVIEWS the scoped policies+fixtures (the ONE S76
  * Propose) and LANDS it via an APPROVED (APPLIED) changeset. It WRITES NOTHING beyond the changeset
- * VALUE (the wall). The approval timestamp is supplied (purity); a malformed record yields a verbatim
- * error.
+ * VALUE (the wall). The twin compute is the demo path (a local preview/comparison the screen shows).
+ * The approval timestamp is supplied (purity); a malformed record yields a verbatim error.
  */
 export async function attachAction(
 	_prev: AttachView,

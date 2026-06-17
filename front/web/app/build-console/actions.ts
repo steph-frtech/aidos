@@ -1,14 +1,24 @@
 "use server";
 
-import {
-	type BuildConsoleState,
-	project,
-	recordStablePhase,
-	type StablePhaseResult,
-	stateEqualsRun,
-	type Verdict,
-	type WriteAction,
+import type {
+	ConsoleInput,
+	StablePhaseRequest,
+	WriteAction,
 } from "@/lib/build-console";
+import {
+	demoProject,
+	demoStable,
+	gatewayProjectArgs,
+	gatewayStableArgs,
+} from "@/lib/build-console-data";
+import { readVia, type Source } from "@/lib/gateway-sdk";
+import { panelScope } from "@/lib/panelScope";
+import {
+	type ProjectView,
+	projectDecoder,
+	type StableView,
+	stableDecoder,
+} from "./live";
 
 /**
  * Server Actions for the /build-console Workbench panel (S86 — the live build console +
@@ -19,26 +29,26 @@ import {
  * the AgentRun timeline (S52), and the human approval gate (S85) — PLUS `aidos stable`'s
  * per-project DAG-node recording at the S23/S40 verdict.
  *
- * THE TWO ACTION-CAPABLE OPS (ui-completeness, CLAUDE.md §7):
- *   - PROJECT the build state — given a recorded AgentRun + the loop history + decision + cost +
- *     pending, COMPUTE the streamed console state and assert it EQUALS the recorded run (the
- *     console can never fabricate a turn or a green);
- *   - RECORD a stable phase — given a project's §43 cut, COMPUTE the verdict and record the
- *     per-project DAG node ONLY when stable; refuse an inconsistent cut
- *     (STABLE_PHASE_INCONSISTENT_CUT — no node from a red mirror).
+ * KILL-TWINS CUTOVER (ADR 0092 — the Go engine is the SINGLE live source). Both ops now read the
+ * LIVE result from the Go build-console MCP server through the passerelle:
+ *   - `projectBuildStateAction` → `readVia(scope, "buildconsole_project", …)`;
+ *   - `recordStablePhaseAction` → `readVia(scope, "buildconsole_record_stable_phase", …)`.
+ * The twin `lib/build-console` is preserved ONLY as the deterministic demo fallback
+ * (`demoProject` / `demoStable`, `source:"live"|"demo"`). The `readVia` frontier import keeps the
+ * T5 cliquet GREEN (the twin sits behind the demo fallback, never as the live source).
  *
- * THE WALL (CLAUDE.md §2): both ops are READ/COMPUTE below the line — they write NOTHING. The
+ * DETERMINISM-FIRST (CLAUDE.md §6/§8): the decoders + the demo fallbacks (the same pure twin
+ * compute the Go engine reproduces) are pure; a malformed / undispatched / refused answer yields
+ * the demo view. THE WALL (§2): both ops are READ/COMPUTE below the line — they write NOTHING. The
  * console projects records that already exist; recording a DAG node rides the privileged `aidos`
- * writer (this action returns the node VALUE). Determinism-first: the projection is a transform
- * and the stable verdict is phases.IsStable — no LLM enters; the pure twins are the authority.
+ * writer (these actions return the node VALUE). No LLM enters the dispatch.
  */
 
 export interface ProjectResult {
 	ok: boolean;
 	messageKey?: string;
-	state?: BuildConsoleState;
-	/** the non-gameable faithfulness check: the projected state EQUALS the recorded run. */
-	faithful?: boolean;
+	view?: ProjectView;
+	source?: Source;
 }
 
 function parseList(raw: string): string[] {
@@ -67,8 +77,8 @@ function parseWrites(raw: string): WriteAction[] {
  * projectBuildStateAction is the action-capable control behind the build console: the human
  * supplies the recorded run (id / goal / result / writes), the per-turn diff hashes, the latest
  * greens, the loop verdict, the cost meter and the pending approvals, then submits — the action
- * PROJECTS the streamed console state DETERMINISTICALLY and returns it, ASSERTING it equals the
- * recorded run (faithful). No LLM enters.
+ * reads the LIVE projected console state from the Go engine via the passerelle (the demo twin is
+ * the deterministic fallback), ASSERTING it equals the recorded run (faithfulProjection). No LLM.
  */
 export async function projectBuildStateAction(
 	_prev: ProjectResult,
@@ -78,13 +88,13 @@ export async function projectBuildStateAction(
 	if (runId === "") return { ok: false, messageKey: "runIdEmpty" };
 	const goal = String(formData.get("goal") ?? "").trim();
 	const result = (String(formData.get("result") ?? "green").trim() ||
-		"green") as BuildConsoleState["result"];
+		"green") as ConsoleInput["result"];
 
 	const writes = parseWrites(String(formData.get("writes") ?? ""));
 	const diffHashes = parseList(String(formData.get("diffHashes") ?? ""));
 	const greenMirrors = parseList(String(formData.get("greenMirrors") ?? ""));
 	const verdict = (String(formData.get("verdict") ?? "continue").trim() ||
-		"continue") as Verdict;
+		"continue") as ConsoleInput["verdict"];
 
 	const ciMinutesSpent = Number(formData.get("ciMinutesSpent") ?? "0") || 0;
 	const ciMinutesCap = Number(formData.get("ciMinutesCap") ?? "0") || 0;
@@ -95,7 +105,7 @@ export async function projectBuildStateAction(
 	);
 	const pending = parseList(String(formData.get("pending") ?? ""));
 
-	const state = project({
+	const input: ConsoleInput = {
 		runId,
 		goal,
 		result,
@@ -109,16 +119,26 @@ export async function projectBuildStateAction(
 		llmTokensCap,
 		overBudgetAxes,
 		pending,
-	});
+	};
 
-	const faithful = stateEqualsRun(state, { id: runId, goal, result, writes });
-	return { ok: true, state, faithful };
+	const scope = await panelScope();
+	// LIVE read through the passerelle (the dispatched buildconsole_project tool); demoProject() is
+	// the deterministic fallback (source:"live"|"demo") — ADR 0092.
+	const { data, source } = await readVia(
+		scope,
+		"buildconsole_project",
+		gatewayProjectArgs(input),
+		projectDecoder,
+		demoProject(input),
+	);
+	return { ok: true, view: data, source };
 }
 
 export interface StableResult {
 	ok: boolean;
 	messageKey?: string;
-	result?: StablePhaseResult;
+	view?: StableView;
+	source?: Source;
 }
 
 /**
@@ -176,10 +196,11 @@ function parseHeads(raw: string): Record<string, string> {
 
 /**
  * recordStablePhaseAction is the second action-capable control: the human supplies a project's
- * §43 cut (heads / links / sensors), then submits — the action COMPUTES the coherent-cut verdict
- * and records the per-project DAG node ONLY when stable; an inconsistent cut is refused with
+ * §43 cut (heads / links / sensors), then submits — the action reads the LIVE §43 verdict from the
+ * Go engine via the passerelle (the demo twin is the deterministic fallback) and records the
+ * per-project DAG node ONLY when stable; an inconsistent cut is refused with
  * STABLE_PHASE_INCONSISTENT_CUT (no node from a red mirror). It writes NOTHING (the wall): the
- * privileged `aidos` writer commits the node. Deterministic twin; no LLM.
+ * privileged `aidos` writer commits the node. No LLM enters the dispatch.
  */
 export async function recordStablePhaseAction(
 	_prev: StableResult,
@@ -196,13 +217,24 @@ export async function recordStablePhaseAction(
 	// the cut is the heads selection (one version per constraint).
 	const cut: Record<string, string> = { ...heads };
 
-	const result = recordStablePhase({
+	const req: StablePhaseRequest = {
 		projectId,
 		cut,
 		heads,
 		links,
 		sensors,
 		label,
-	});
-	return { ok: true, result };
+	};
+
+	const scope = await panelScope();
+	// LIVE read through the passerelle (the dispatched buildconsole_record_stable_phase tool);
+	// demoStable() is the deterministic fallback (source:"live"|"demo") — ADR 0092.
+	const { data, source } = await readVia(
+		scope,
+		"buildconsole_record_stable_phase",
+		gatewayStableArgs(req),
+		stableDecoder,
+		demoStable(req),
+	);
+	return { ok: true, view: data, source };
 }

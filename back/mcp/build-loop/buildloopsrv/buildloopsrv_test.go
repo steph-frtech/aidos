@@ -1,4 +1,4 @@
-package main
+package buildloopsrv
 
 import (
 	"context"
@@ -125,7 +125,7 @@ func TestVerdictsToolClosedSet(t *testing.T) {
 }
 
 func TestServerBuildsAndRegisters(t *testing.T) {
-	if newMCPServer() == nil {
-		t.Fatal("newMCPServer returned nil")
+	if NewServer() == nil {
+		t.Fatal("NewServer returned nil")
 	}
 }

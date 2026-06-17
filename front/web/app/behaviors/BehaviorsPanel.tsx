@@ -22,7 +22,12 @@ import {
  * tokens; strings via next-intl (0011).
  */
 
-const initialBrowse: BrowseView = { ok: false, entries: [], query: "" };
+const initialBrowse: BrowseView = {
+	ok: false,
+	entries: [],
+	query: "",
+	source: "demo",
+};
 const initialAttach: AttachView = { ok: false };
 
 function Submit({ label, testId }: { label: string; testId: string }) {
@@ -75,9 +80,39 @@ export function BehaviorsPanel() {
 				action={doSearch}
 				className="space-y-4 rounded-xl border border-border bg-card p-6"
 			>
-				<h2 className="text-sm font-semibold tracking-tight text-foreground">
-					{t("searchHeading")}
-				</h2>
+				<div className="flex flex-wrap items-center justify-between gap-2">
+					<h2 className="text-sm font-semibold tracking-tight text-foreground">
+						{t("searchHeading")}
+					</h2>
+					{browseState.ok ? (
+						<span
+							data-testid="search-source"
+							data-source={browseState.source}
+							className={
+								browseState.source === "live"
+									? "inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+									: "inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
+							}
+							title={
+								browseState.source === "live"
+									? t("sourceLiveTitle")
+									: t("sourceDemoTitle")
+							}
+						>
+							<span
+								aria-hidden="true"
+								className={
+									browseState.source === "live"
+										? "size-1.5 rounded-full bg-primary"
+										: "size-1.5 rounded-full bg-muted-foreground"
+								}
+							/>
+							{browseState.source === "live"
+								? t("sourceLive")
+								: t("sourceDemo")}
+						</span>
+					) : null}
+				</div>
 				<div className="flex flex-wrap items-end gap-3">
 					<label className="flex-1 space-y-1 text-sm">
 						<span className="font-medium text-foreground">

@@ -1603,6 +1603,8 @@
 			"continue": "CONTINUE — ni vert ni bloqué, on itère",
 			"no_progress": "NO_PROGRESS — arrêt honnête (le disjoncteur déterministe)"
 		},
+		"sourceLive": "live — moteur Go (passerelle)",
+		"sourceDemo": "démo — repli déterministe",
 		"messages": {
 			"redSetEmpty": "Le red set est vide : un goal sans miroir rouge n'est pas un goal (§56)."
 		},
@@ -2307,7 +2309,16 @@
 		"liveNoSurvivors": "Aucun mutant survivant.",
 		"liveBlockLabel": "bloc",
 		"liveTitle": "Lu en direct depuis la passerelle (run_mutation)",
-		"liveDemoTitle": "Passerelle injoignable — affichage du verdict de démo"
+		"liveDemoTitle": "Passerelle injoignable — affichage du verdict de démo",
+		"gardenHeading": "Jardin du projet (en direct)",
+		"gardenIntro": "Le jardinage par projet (S112, §82.4) lu EN DIRECT via la passerelle (garden_tend_project + garden_suggest_trim, du serveur kernel-garden) : les CINQ rouilles classées — orphelins, fixtures périmées, mutants survivants, liveness morte (une preuve morte qui épingle une vérité vivante) et contrainte à faible valeur (une cellule au-delà de son HarnessCostBudget sans ValueCase justifié). Lecture seule (le mur) : /trim PROPOSE — il ne supprime rien, chaque action ouvre une idée et exige la porte idea → mirror → /goal → human approval.",
+		"gardenLiveTitle": "Lu en direct via la passerelle (kernel-garden, serveur dispatché en mémoire)",
+		"gardenDemoTitle": "Jardin de démo déterministe — la passerelle n’a rien renvoyé (serveur non branché)",
+		"gardenLedgerTitle": "Ledger de dette",
+		"gardenPlanTitle": "Plan de /trim",
+		"gardenEmpty": "Jardin propre — aucune rouille dans cette tranche du dépôt de vérité.",
+		"gardenPlanEmpty": "Aucune proposition — le jardin est propre.",
+		"gardenCountLabel": "rouilles"
 	},
 	"evolutionSandbox": {
 		"eyebrow": "Sandbox d'évolution · /evolve",
@@ -5230,6 +5241,10 @@
 		"fixtures": "Fixtures scopées",
 		"wallNote": "Le mur : attacher n'écrit aucune vérité — l'expansion atterrit comme une VALEUR de ChangeSet APPLIQUÉ (porte propose → approve), jamais une écriture directe du kernel. Seul le CLI aidos fige la source via /goal.",
 		"working": "En cours…",
+		"sourceLive": "live — moteur Go (passerelle)",
+		"sourceDemo": "démo — repli déterministe",
+		"sourceLiveTitle": "Lu en direct par le moteur Go via la passerelle (outil behaviors_search) — la librairie project-scopée matérialisée.",
+		"sourceDemoTitle": "Passerelle injoignable — affichage du jumeau de démo déterministe (lib/behaviors-data).",
 		"footer": "S79 · La librairie consomme l'UNIQUE Expand de S76 — jamais une seconde expansion (loi de la fonction unique, §24.6)."
 	},
 	"appAuth": {
@@ -5372,7 +5387,11 @@
 		"messages": {
 			"runIdEmpty": "L'AgentRun id est requis pour projeter l'état.",
 			"projectIdEmpty": "Le projet est requis pour enregistrer une phase stable."
-		}
+		},
+		"sourceLive": "en direct",
+		"sourceDemo": "démo",
+		"sourceLiveTitle": "Projeté en direct par le moteur Go via la passerelle (outils buildconsole_project / buildconsole_record_stable_phase)",
+		"sourceDemoTitle": "Passerelle injoignable — affichage du jumeau de démo déterministe"
 	},
 	"doltgresSpike": {
 		"eyebrow": "S88 · spike Doltgres",
@@ -6285,7 +6304,11 @@
 		"tripped": "DÉCLENCHÉ (over-budget non justifié)",
 		"notTripped": "non déclenché",
 		"noTruthWrite": "le cockpit n'écrit aucune vérité (le budget est DÉCLARÉ, lecture seule)",
-		"working": "En cours…"
+		"working": "En cours…",
+		"sourceLive": "en direct",
+		"sourceDemo": "démo",
+		"sourceLiveTitle": "Mesuré en direct par le moteur Go via la passerelle (outils cost_meter_cell / cost_disjoncteur_signal)",
+		"sourceDemoTitle": "Passerelle injoignable — affichage du verdict de démo (jumeau déterministe)"
 	},
 	"kernelGarden": {
 		"eyebrow": "S112 · Jardinage du KernelDebt + /trim par projet",
@@ -6576,7 +6599,9 @@
 		"currentLabel": "courant",
 		"promoted": "montée gagnée (current+1) — proposée, à geler via /goal",
 		"withheld": "montée retenue — l'historique ne la gagne pas",
-		"footer": "FK10 — FKE-11/34. L'autonomie est un axe déclaré et fermé ; l'enforcement est fail-closed et la montée est une fonction pure de l'historique, jamais déclarée. A8 jamais sur action critique. Le mur (§2) : l'écran enforce et calcule, il n'écrit aucune vérité — figer une montée passe par idée → miroir → /goal → approbation."
+		"footer": "FK10 — FKE-11/34. L'autonomie est un axe déclaré et fermé ; l'enforcement est fail-closed et la montée est une fonction pure de l'historique, jamais déclarée. A8 jamais sur action critique. Le mur (§2) : l'écran enforce et calcule, il n'écrit aucune vérité — figer une montée passe par idée → miroir → /goal → approbation.",
+		"sourceLive": "live · moteur Go",
+		"sourceDemo": "démo · repli déterministe"
 	},
 	"aiLab": {
 		"eyebrow": "FK11 · Piste FKE · AI Lab",

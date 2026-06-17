@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+import type { Source } from "@/lib/gateway-sdk";
 import {
 	type ProjectResult,
 	projectBuildStateAction,
@@ -21,15 +22,35 @@ import {
  *   - RECORD a stable phase — the project's §43 cut → record the per-project DAG node when
  *     stable, refuse an inconsistent cut (STABLE_PHASE_INCONSISTENT_CUT).
  *
+ * S86 CUTOVER (ADR 0092 — the Go engine is the SINGLE live source): both ops now read the LIVE
+ * result from the Go build-console MCP server through the passerelle (the demo twin is the
+ * deterministic fallback), tagged by a `source` badge (live | démo).
+ *
  * DETERMINISM-FIRST (§6/§8): the projection is a transform and the stable verdict is the §43
- * engine — pure twins (lib/build-console), byte-identical to back/runtime/buildconsole; no LLM.
- * THE WALL (§2): both ops are read/compute below the line — they write NO truth; the DAG node
- * is committed by the privileged `aidos` writer. Themed on ADR 0010; strings via next-intl
- * (ADR 0011).
+ * engine — pure (back/runtime/buildconsole, the authority via the gateway); no LLM. THE WALL (§2):
+ * both ops are read/compute below the line — they write NO truth; the DAG node is committed by the
+ * privileged `aidos` writer. Themed on ADR 0010; strings via next-intl (ADR 0011).
  */
 
 const initialProject: ProjectResult = { ok: false };
 const initialStable: StableResult = { ok: false };
+
+function SourceBadge({ source }: { source: Source }) {
+	const t = useTranslations("buildConsole");
+	const live = source === "live";
+	return (
+		<span
+			data-testid="source-badge"
+			data-source={source}
+			title={live ? t("sourceLiveTitle") : t("sourceDemoTitle")}
+			className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+				live ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+			}`}
+		>
+			{live ? t("sourceLive") : t("sourceDemo")}
+		</span>
+	);
+}
 
 function Submit({ label, testid }: { label: string; testid: string }) {
 	const t = useTranslations("buildConsole");
@@ -217,46 +238,43 @@ export function BuildConsolePanel() {
 					<Submit label={t("project.submit")} testid="project-submit" />
 				</form>
 
-				{proj.ok && proj.state ? (
+				{proj.ok && proj.view ? (
 					<div
 						data-testid="project-result"
 						className="space-y-3 rounded-lg border border-border bg-muted/40 p-4 text-sm"
 					>
-						<p
-							data-testid="faithful"
-							className={
-								proj.faithful
-									? "font-medium text-primary"
-									: "font-medium text-destructive"
-							}
-						>
-							{proj.faithful
-								? t("project.faithfulOk")
-								: t("project.faithfulKo")}
-						</p>
+						<div className="flex items-center justify-between">
+							<p
+								data-testid="faithful"
+								className={
+									proj.view.faithfulProjection
+										? "font-medium text-primary"
+										: "font-medium text-destructive"
+								}
+							>
+								{proj.view.faithfulProjection
+									? t("project.faithfulOk")
+									: t("project.faithfulKo")}
+							</p>
+							<SourceBadge source={proj.source ?? "demo"} />
+						</div>
 						<p className="text-muted-foreground">
 							{t("project.attemptsLabel")}:{" "}
 							<span data-testid="attempts-count">
-								{proj.state.attempts.length}
+								{proj.view.attempts.length}
 							</span>{" "}
 							· {t("project.sensorsLabel")}:{" "}
 							<span data-testid="sensors-count">
-								{proj.state.sensors.length}
+								{proj.view.sensors.length}
 							</span>{" "}
 							· {t("project.pendingLabel")}:{" "}
-							<span data-testid="pending-count">
-								{proj.state.approval.pendingCount}
-							</span>
+							<span data-testid="pending-count">{proj.view.pendingCount}</span>
 						</p>
 						<p className="text-muted-foreground">
 							{t("project.breakerLabel")}:{" "}
-							<span data-testid="breaker-verdict">
-								{proj.state.breaker.verdict}
-							</span>{" "}
-							· {t("project.costLabel")}: {proj.state.cost.ciMinutesSpent}/
-							{proj.state.cost.ciMinutesCap} CI ·{" "}
-							{proj.state.cost.llmTokensSpent}/{proj.state.cost.llmTokensCap}{" "}
-							tok
+							<span data-testid="breaker-verdict">{proj.view.verdict}</span> ·{" "}
+							{t("project.costLabel")}: {proj.view.ciSpent}/{proj.view.ciCap} CI
+							· {proj.view.tokensSpent}/{proj.view.tokensCap} tok
 						</p>
 					</div>
 				) : null}
@@ -338,37 +356,40 @@ export function BuildConsolePanel() {
 					<Submit label={t("stable.submit")} testid="stable-submit" />
 				</form>
 
-				{stable.ok && stable.result ? (
+				{stable.ok && stable.view ? (
 					<div
 						data-testid="stable-result"
 						className={`space-y-2 rounded-lg border p-4 text-sm ${
-							stable.result.recorded
+							stable.view.recorded
 								? "border-primary/40 bg-primary/10"
 								: "border-destructive/40 bg-destructive/10"
 						}`}
 					>
-						<p
-							data-testid="stable-verdict"
-							className={
-								stable.result.recorded
-									? "font-medium text-primary"
-									: "font-medium text-destructive"
-							}
-						>
-							{stable.result.recorded
-								? t("stable.recorded")
-								: t("stable.refused")}
-						</p>
-						{!stable.result.recorded ? (
+						<div className="flex items-center justify-between">
+							<p
+								data-testid="stable-verdict"
+								className={
+									stable.view.recorded
+										? "font-medium text-primary"
+										: "font-medium text-destructive"
+								}
+							>
+								{stable.view.recorded
+									? t("stable.recorded")
+									: t("stable.refused")}
+							</p>
+							<SourceBadge source={stable.source ?? "demo"} />
+						</div>
+						{!stable.view.recorded ? (
 							<>
 								<p
 									data-testid="stable-block-code"
 									className="font-mono text-xs"
 								>
-									{stable.result.blockCode}
+									{stable.view.blockCode}
 								</p>
 								<ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-									{stable.result.howToFix.map((h) => (
+									{stable.view.howToFix.map((h) => (
 										<li key={h}>{h}</li>
 									))}
 								</ul>

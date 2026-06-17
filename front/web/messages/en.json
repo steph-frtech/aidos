@@ -1603,6 +1603,8 @@
 			"continue": "CONTINUE — neither green nor blocked, keep iterating",
 			"no_progress": "NO_PROGRESS — honest halt (the deterministic breaker)"
 		},
+		"sourceLive": "live — Go engine (gateway)",
+		"sourceDemo": "demo — deterministic fallback",
 		"messages": {
 			"redSetEmpty": "The red set is empty: a goal with no red mirror is not a goal (§56)."
 		},
@@ -2307,7 +2309,16 @@
 		"liveNoSurvivors": "No surviving mutant.",
 		"liveBlockLabel": "block",
 		"liveTitle": "Read live from the gateway (run_mutation)",
-		"liveDemoTitle": "Gateway unreachable — showing the demo verdict"
+		"liveDemoTitle": "Gateway unreachable — showing the demo verdict",
+		"gardenHeading": "Project garden (live)",
+		"gardenIntro": "The per-project gardening (S112, §82.4) read LIVE through the gateway (garden_tend_project + garden_suggest_trim, from the kernel-garden server): the FIVE ranked rots — orphans, stale fixtures, surviving mutants, dead liveness (a dead proof still pinning a live truth) and low-value constraint (a cell over its HarnessCostBudget without a justified ValueCase). Read-only (the wall): /trim PROPOSES — it deletes nothing, every action opens an idea and requires the door idea → mirror → /goal → human approval.",
+		"gardenLiveTitle": "Read live through the gateway (kernel-garden, dispatched in-process)",
+		"gardenDemoTitle": "Deterministic demo garden — the gateway returned nothing (server unwired)",
+		"gardenLedgerTitle": "Debt ledger",
+		"gardenPlanTitle": "/trim plan",
+		"gardenEmpty": "Clean garden — no rot in this slice of the truth-store.",
+		"gardenPlanEmpty": "No proposal — the garden is clean.",
+		"gardenCountLabel": "rots"
 	},
 	"evolutionSandbox": {
 		"eyebrow": "Evolution sandbox · /evolve",
@@ -5230,6 +5241,10 @@
 		"fixtures": "Scoped fixtures",
 		"wallNote": "The wall: attaching writes no truth — the expansion lands as an APPLIED ChangeSet VALUE (propose → approve door), never a direct kernel write. Only the aidos CLI freezes the source via /goal.",
 		"working": "Working…",
+		"sourceLive": "live — Go engine (gateway)",
+		"sourceDemo": "demo — deterministic fallback",
+		"sourceLiveTitle": "Read live from the Go engine through the gateway (behaviors_search tool) — the materialised project-scoped library.",
+		"sourceDemoTitle": "Gateway unreachable — showing the deterministic demo twin (lib/behaviors-data).",
 		"footer": "S79 · The library consumes S76's ONE Expand — never a second expansion (single-function law, §24.6)."
 	},
 	"appAuth": {
@@ -5372,7 +5387,11 @@
 		"messages": {
 			"runIdEmpty": "The AgentRun id is required to project the state.",
 			"projectIdEmpty": "The project is required to record a stable phase."
-		}
+		},
+		"sourceLive": "live",
+		"sourceDemo": "demo",
+		"sourceLiveTitle": "Projected live by the Go engine through the gateway (tools buildconsole_project / buildconsole_record_stable_phase)",
+		"sourceDemoTitle": "Gateway unreachable — showing the deterministic demo twin"
 	},
 	"doltgresSpike": {
 		"eyebrow": "S88 · Doltgres spike",
@@ -6285,7 +6304,11 @@
 		"tripped": "TRIPPED (unjustified over-budget)",
 		"notTripped": "not tripped",
 		"noTruthWrite": "the cockpit writes no truth (the budget is DECLARED, read-only)",
-		"working": "Working…"
+		"working": "Working…",
+		"sourceLive": "live",
+		"sourceDemo": "demo",
+		"sourceLiveTitle": "Metered live by the Go engine via the gateway (cost_meter_cell / cost_disjoncteur_signal tools)",
+		"sourceDemoTitle": "Gateway unreachable — showing the demo verdict (deterministic twin)"
 	},
 	"kernelGarden": {
 		"eyebrow": "S112 · KernelDebt gardening + per-project /trim",
@@ -6576,7 +6599,9 @@
 		"currentLabel": "current",
 		"promoted": "promotion earned (current+1) — proposed, to be frozen via /goal",
 		"withheld": "promotion withheld — the history does not earn it",
-		"footer": "FK10 — FKE-11/34. Autonomy is a declared, closed axis; enforcement is fail-closed and promotion is a pure function of the history, never declared. A8 never on a critical action. The wall (§2): the screen enforces and computes, it writes no truth — freezing a promotion goes idea → mirror → /goal → approval."
+		"footer": "FK10 — FKE-11/34. Autonomy is a declared, closed axis; enforcement is fail-closed and promotion is a pure function of the history, never declared. A8 never on a critical action. The wall (§2): the screen enforces and computes, it writes no truth — freezing a promotion goes idea → mirror → /goal → approval.",
+		"sourceLive": "live · Go engine",
+		"sourceDemo": "demo · deterministic fallback"
 	},
 	"aiLab": {
 		"eyebrow": "FK11 · FKE track · AI Lab",

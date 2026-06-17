@@ -109,6 +109,56 @@ export const GATEWAY_SERVERS: readonly string[] = [
 	// only (lib/arch-fitness-data). Without this entry route(measure)→unknown_tool→demo (the flip
 	// would be hollow — the cliquet's readVia-frontier blind spot).
 	"arch-fitness",
+	// 22nd — `build-loop` — the S83 build-loop + circuit-breaker read server (ADR 0092 kill-twins
+	// batch-2): the dispatched, dep-free buildloop_terminate (+ buildloop_no_progress /
+	// buildloop_verdicts), a PURE function of the run's Stop input + iteration history + declared
+	// HarnessCostBudget, is the LIVE path for the /build-loop console's termination Decision; the
+	// TS twin (lib/build-loop.terminate) becomes the demo fallback only (lib/build-loop-data).
+	// Without this entry route(buildloop_terminate)→unknown_tool→demo (the flip would be hollow —
+	// the cliquet's readVia-frontier blind spot).
+	"build-loop",
+	// 23rd — `cost-meter` — the S111 per-cell harness COST METER read server (ADR 0092 kill-twins
+	// batch-2): the dispatched, dep-free cost_meter_cell (+ cost_disjoncteur_signal /
+	// cost_validate_budget), a PURE function of the cell's REAL recorded AgentRuns (S52) + its
+	// DECLARED HarnessCostBudget, is the LIVE path for the /cost-meter cockpit's §66.3 verdict +
+	// the S83 disjoncteur signal; the TS twin (lib/cost-meter.meterCell / disjoncteurSignal)
+	// becomes the demo fallback only (lib/cost-meter-data). Without this entry
+	// route(cost_meter_cell)→unknown_tool→demo (the flip would be hollow — the cliquet's
+	// readVia-frontier blind spot).
+	"cost-meter",
+	// 24th — `behaviors` — the S79 project-scoped behavior LIBRARY read server (ADR 0092 kill-twins
+	// batch-2): the dispatched, dep-free behaviors_browse/search/tag/publish/soft_delete/comment/
+	// attach (PURE over the materialised library state, WroteKernel always false) is the LIVE path
+	// for the /behaviors panel's SEARCH read; the TS twin (lib/behaviors.search) becomes the demo
+	// fallback only (lib/behaviors-data). Without this entry route(behaviors_search)→unknown_tool→
+	// demo (the flip would be hollow — the cliquet's readVia-frontier blind spot).
+	"behaviors",
+	// 25th — `kernel-garden` — the S112/§82.4 per-project KernelDebt + /trim read server (ADR 0092
+	// kill-twins batch-2): the dispatched, dep-free garden_tend_project (the FIVE-rot ranked debt)
+	// + garden_suggest_trim (the open_idea_* trim plan) + garden_accept_proposal (the OpenIdea
+	// projection) are the LIVE path for the /kernel-debt garden section; the TS twin
+	// (lib/kernel-garden tend/suggestGardenTrim) becomes the demo fallback only
+	// (lib/kernel-garden-data). Without this entry route(garden_tend_project)→unknown_tool→demo
+	// (the flip would be hollow — the cliquet's readVia-frontier blind spot).
+	"kernel-garden",
+	// 26th — `autonomy` — the FK10 A0..A8 autonomy ladder read server (ADR 0092 kill-twins
+	// batch-2): the dispatched, dep-free enforce/promote — fail-closed enforcement of a declared
+	// level against an attempted action (required>declared REFUSED, a critical action never admits
+	// A8) + the PURE promotion-from-history (the level is COMPUTED from the record, never declared,
+	// §8; READ-ONLY, WroteKernel always false) — is the LIVE path for the /autonomy panel's verdict
+	// + proposed level; the TS twin (lib/autonomy enforce / promotionFromHistory) becomes the demo
+	// fallback only (lib/autonomy-data). Without this entry route(enforce)→unknown_tool→demo (the
+	// flip would be hollow — the cliquet's readVia-frontier blind spot).
+	"autonomy",
+	// 27th — `build-console` — the S86 live build-console + per-project stable-phase read server
+	// (ADR 0092 kill-twins batch-2): the dispatched, dep-free buildconsole_project (the FAITHFUL
+	// projection of a recorded AgentRun + loop + cost + approval inbox) + buildconsole_record_stable_phase
+	// (the §43 coherent-cut verdict returning the per-project DAG node) — both PURE values, READ-ONLY —
+	// are the LIVE path for the /build-console panel; the TS twin (lib/build-console.project /
+	// recordStablePhase) becomes the demo fallback only (lib/build-console-data). Without this entry
+	// route(buildconsole_project)→unknown_tool→demo (the flip would be hollow — the cliquet's
+	// readVia-frontier blind spot).
+	"build-console",
 ];
 
 /** defaultTools mirrors Go DefaultTools() — the closed exposed surface. */
@@ -243,6 +293,69 @@ export function defaultTools(): Tool[] {
 		// `arch-fitness` (S102) — measure/ratchet/gate are READ-ONLY graph analysis (no write).
 		// The LIVE path for the /arch-fitness panel; without it route(measure)→unknown_tool→demo.
 		...below("arch-fitness", ["measure", "ratchet", "gate"]),
+		// `build-loop` (S83) — buildloop_terminate/buildloop_no_progress/buildloop_verdicts are
+		// PURE functions of the run history + Stop input + declared budget (READ-ONLY, no write).
+		// The LIVE path for the /build-loop console; without it
+		// route(buildloop_terminate)→unknown_tool→demo (the flip would be hollow).
+		...below("build-loop", [
+			"buildloop_terminate",
+			"buildloop_no_progress",
+			"buildloop_verdicts",
+		]),
+		// `cost-meter` (S111) — cost_meter_cell/cost_disjoncteur_signal/cost_validate_budget are
+		// PURE functions of the cell's REAL recorded AgentRuns (S52) + its DECLARED HarnessCostBudget
+		// (READ-ONLY, no write — the budget is above-the-line, SELECT-only). The LIVE path for the
+		// /cost-meter cockpit; without it route(cost_meter_cell)→unknown_tool→demo (the flip would be
+		// hollow — the cliquet's readVia-frontier blind spot).
+		...below("cost-meter", [
+			"cost_meter_cell",
+			"cost_disjoncteur_signal",
+			"cost_validate_budget",
+		]),
+		// `behaviors` (S79) — browse/search/tag/publish/soft_delete/comment/attach are PURE functions
+		// of the materialised project library state (READ-ONLY on truth: WroteKernel always false;
+		// attach only COMPUTES the APPLIED ChangeSet envelope VALUE — the legal door propose → approve,
+		// never a direct kernel write). The LIVE path for the /behaviors panel's SEARCH read; without
+		// it route(behaviors_search)→unknown_tool→demo (the flip would be hollow — the cliquet's
+		// readVia-frontier blind spot). Byte-faithful to the Go registry (registry.go:170).
+		...below("behaviors", [
+			"behaviors_browse",
+			"behaviors_search",
+			"behaviors_tag",
+			"behaviors_publish",
+			"behaviors_soft_delete",
+			"behaviors_comment",
+			"behaviors_attach",
+		]),
+		// `kernel-garden` (S112/§82.4) — garden_tend_project/garden_suggest_trim/garden_accept_proposal
+		// are PURE functions of a project's read-only kernel ⋈ mirrors ⋈ mutation ⋈ declared budgets
+		// (READ-ONLY, no write — /trim SUGGESTS, deletes_anything is ALWAYS false; the only door is
+		// idea → mirror → /goal → human approval). The LIVE path for the /kernel-debt garden section;
+		// without it route(garden_tend_project)→unknown_tool→demo (the flip would be hollow — the
+		// cliquet's readVia-frontier blind spot). Byte-faithful to the Go registry (registry.go:156).
+		...below("kernel-garden", [
+			"garden_tend_project",
+			"garden_suggest_trim",
+			"garden_accept_proposal",
+		]),
+		// `autonomy` (FK10) — enforce/promote: the closed A0..A8 ladder, FAIL-CLOSED enforcement of a
+		// declared level against an attempted action, and the PURE promotion-from-history. Both READ-
+		// ONLY (no kernel write — freezing a promotion stays idea → mirror → /goal). The LIVE path for
+		// the /autonomy panel; without it route(enforce)→unknown_tool→demo. Byte-faithful to the Go
+		// registry (registry.go:162).
+		...below("autonomy", ["enforce", "promote"]),
+		// `build-console` (S86) — buildconsole_project/buildconsole_record_stable_phase: the FAITHFUL
+		// projection of a recorded AgentRun + loop + cost + approval inbox, and the §43 coherent-cut
+		// verdict returning the per-project DAG node. Both PURE values, READ-ONLY (no write — the
+		// console projects records that already exist; recording a DAG node rides the privileged aidos
+		// writer; an inconsistent cut is refused with no node born from a red mirror). The LIVE path
+		// for the /build-console panel; without it route(buildconsole_project)→unknown_tool→demo (the
+		// flip would be hollow — the cliquet's readVia-frontier blind spot). Byte-faithful to the Go
+		// registry (registry.go:145).
+		...below("build-console", [
+			"buildconsole_project",
+			"buildconsole_record_stable_phase",
+		]),
 		// The fenced truth-zone write namespace (§2) — refused with a ChangeSet hint.
 		{ name: "kernel_write", server: "kernel", disposition: "truth_write" },
 		{ name: "mirror_write", server: "mirrors", disposition: "truth_write" },

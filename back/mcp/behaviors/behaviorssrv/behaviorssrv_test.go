@@ -1,4 +1,4 @@
-package main
+package behaviorssrv
 
 import (
 	"context"
@@ -125,7 +125,7 @@ func TestAttachPreviewThenLand(t *testing.T) {
 }
 
 func TestServerRegistersSevenTools(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatalf("server must build")
 	}
 }

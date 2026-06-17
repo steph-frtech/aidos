@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { KernelDebtPanel } from "@/components/KernelDebtPanel";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { LiveGarden } from "./LiveGarden";
 import { LiveMutation } from "./LiveMutation";
 import { liveMutation } from "./liveActions";
+import { liveGarden } from "./liveGardenActions";
 
 // Read the engine's live mutation verdict on every request (the S59 cutover): the verdict is
 // read through the gateway (run_mutation), never baked into a static page.
@@ -30,6 +32,7 @@ export default async function KernelDebtPage() {
 	const t = await getTranslations("kernelDebt");
 	const tc = await getTranslations("common");
 	const mutation = await liveMutation();
+	const garden = await liveGarden();
 	const labels = {
 		scenarioLabel: t("scenarioLabel"),
 		ledgerTitle: t("ledgerTitle"),
@@ -88,6 +91,29 @@ export default async function KernelDebtPage() {
 				</h2>
 
 				<KernelDebtPanel labels={labels} />
+
+				{/* Live per-project garden — read through the gateway (kernel-garden), demo fallback */}
+				<LiveGarden
+					view={garden}
+					labels={{
+						heading: t("gardenHeading"),
+						intro: t("gardenIntro"),
+						live: tc("live"),
+						demo: tc("demo"),
+						liveTitle: t("gardenLiveTitle"),
+						demoTitle: t("gardenDemoTitle"),
+						ledgerTitle: t("gardenLedgerTitle"),
+						planTitle: t("gardenPlanTitle"),
+						emptyGarden: t("gardenEmpty"),
+						emptyPlan: t("gardenPlanEmpty"),
+						targetLabel: t("targetLabel"),
+						severityLabel: t("severityLabel"),
+						requiresLabel: t("requiresLabel"),
+						proposalBadge: t("proposalBadge"),
+						noDeleteNote: t("noDeleteNote"),
+						countLabel: t("gardenCountLabel"),
+					}}
+				/>
 
 				{/* Live mutation verdict — read through the gateway (run_mutation), demo fallback */}
 				<LiveMutation

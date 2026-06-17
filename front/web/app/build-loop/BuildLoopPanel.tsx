@@ -239,7 +239,7 @@ export function BuildLoopPanel() {
 					<h2 className="text-base font-semibold tracking-tight text-foreground">
 						{t("decisionHeading")}
 					</h2>
-					<div className="flex items-center gap-3">
+					<div className="flex flex-wrap items-center gap-3">
 						<span
 							data-testid="verdict-badge"
 							data-verdict={result.decision.verdict}
@@ -253,6 +253,15 @@ export function BuildLoopPanel() {
 						<span className="text-xs text-muted-foreground">
 							{t("iterationsTaken", { n: result.iterations ?? 0 })}
 						</span>
+						{result.source && (
+							<span
+								data-testid="source-badge"
+								data-source={result.source}
+								className="inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+							>
+								{result.source === "live" ? t("sourceLive") : t("sourceDemo")}
+							</span>
+						)}
 					</div>
 
 					{result.decision.blockCode && (

@@ -19,7 +19,7 @@
 //
 //	gateway_route   — the routing decision for a (scope, tool, target) call (the wall)
 //	gateway_tools   — the CLOSED set of exposed tools (server + disposition)
-//	gateway_servers — the 21 MCP servers the gateway fronts
+//	gateway_servers — the 27 MCP servers the gateway fronts
 //
 // DETERMINISM-FIRST (CLAUDE.md §6/§8): "pur routage, zéro LLM". The router is a pure
 // total function; this server only frames it over the two transports. The actual
@@ -43,15 +43,21 @@ import (
 	"github.com/steph-frtech/aidos/back/archive/contentstore"
 	"github.com/steph-frtech/aidos/back/archive/dag"
 	archfitnesssrv "github.com/steph-frtech/aidos/back/mcp/arch-fitness/archfitnesssrv"
+	"github.com/steph-frtech/aidos/back/mcp/autonomy/autonomysrv"
 	"github.com/steph-frtech/aidos/back/mcp/backtester/backtestersrv"
+	"github.com/steph-frtech/aidos/back/mcp/behaviors/behaviorssrv"
+	buildconsolesrv "github.com/steph-frtech/aidos/back/mcp/build-console/buildconsolesrv"
+	buildloopsrv "github.com/steph-frtech/aidos/back/mcp/build-loop/buildloopsrv"
 	"github.com/steph-frtech/aidos/back/mcp/changeset/changesetsrv"
 	"github.com/steph-frtech/aidos/back/mcp/conscience/consciencesrv"
 	"github.com/steph-frtech/aidos/back/mcp/context/contextsrv"
+	costmetersrv "github.com/steph-frtech/aidos/back/mcp/cost-meter/costmetersrv"
 	"github.com/steph-frtech/aidos/back/mcp/dag/dagsrv"
 	"github.com/steph-frtech/aidos/back/mcp/evolve/evolvesrv"
 	"github.com/steph-frtech/aidos/back/mcp/federation/federationsrv"
 	goalpilotingsrv "github.com/steph-frtech/aidos/back/mcp/goal-piloting/goalpilotingsrv"
 	ideaintakesrv "github.com/steph-frtech/aidos/back/mcp/idea-intake/ideaintakesrv"
+	kernelgardensrv "github.com/steph-frtech/aidos/back/mcp/kernel-garden/kernelgardensrv"
 	"github.com/steph-frtech/aidos/back/mcp/learn/learnsrv"
 	"github.com/steph-frtech/aidos/back/mcp/memory/memorysrv"
 	"github.com/steph-frtech/aidos/back/mcp/mirror-runner/mirrorrunnersrv"
@@ -472,6 +478,54 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	// SELECT-only fitness grade, never an authored bar.
 	"mutation-runner": func(ctx context.Context) (*mcp.Server, error) {
 		return mutationrunnersrv.NewFromDSN(ctx, serverDSN("AIDOS_RUNTIME_DSN"))
+	},
+	// ── ADR 0092 batch-2 DEP-FREE read servers (the Go engine is the SINGLE live source). ──
+	// Each of the six below is DEP-FREE like context/evolve/provision/pact-verifier/backtester:
+	// no DSN, no store, no clock, no embedder, NO LLM in the dispatch path (determinism-first,
+	// §6/§8). Every dispatched tool is a CHEAP/pure read (a meter over declared budgets, a loop
+	// verdict, a §43 cut check, a debt scan, an A0..A8 enforcement, a library browse) whose
+	// output is a VALUE — WroteKernel is always false; no kernel/mirrors/fitness write reaches a
+	// backend (the router refuses a truth-write before any dispatch). Every I/O is a scalar
+	// OBJECT (no json.RawMessage body — the S59 byte-array transport scar is avoided by
+	// construction; behaviors.attach echoes behavior.Policy/Fixture as plain object structs).
+	// The builder ignores its ctx and returns the default server; it dispatches identically
+	// whatever DSN is set.
+	//
+	// cost-meter (S111) — cost_meter_cell/cost_disjoncteur_signal/cost_validate_budget: meter a
+	// cell from its REAL recorded AgentRuns against its DECLARED HarnessCostBudget (a COUNT, never
+	// an estimate); raising a cap stays /goal.
+	"cost-meter": func(context.Context) (*mcp.Server, error) {
+		return costmetersrv.NewServer(), nil
+	},
+	// build-console (S86) — buildconsole_project/buildconsole_record_stable_phase: the FAITHFUL
+	// projection of the app-builder console + the §43 coherent-cut verdict. record_stable_phase
+	// returns the per-project DAG node to record (a VALUE); the privileged aidos writer commits it.
+	"build-console": func(context.Context) (*mcp.Server, error) {
+		return buildconsolesrv.NewServer(), nil
+	},
+	// build-loop (S83) — buildloop_terminate/buildloop_no_progress/buildloop_verdicts: the
+	// non-gameable termination Decision + the deterministic no-progress circuit-breaker (a
+	// FUNCTION OF THE HISTORY, never an LLM judgment).
+	"build-loop": func(context.Context) (*mcp.Server, error) {
+		return buildloopsrv.NewServer(), nil
+	},
+	// kernel-garden (S112/§82.4) — garden_tend_project/garden_suggest_trim/garden_accept_proposal:
+	// the per-project KernelDebt scan + /trim (suggest-only — deletes_anything is ALWAYS false;
+	// accepting a proposal OPENS an idea → mirror → /goal → human approval, never a removal).
+	"kernel-garden": func(context.Context) (*mcp.Server, error) {
+		return kernelgardensrv.NewServer(), nil
+	},
+	// autonomy (FK10) — enforce/promote: the closed A0..A8 ladder, FAIL-CLOSED enforcement and
+	// PURE promotion-from-history (the level is COMPUTED from the record, never declared §8);
+	// freezing a promotion stays idea → mirror → /goal.
+	"autonomy": func(context.Context) (*mcp.Server, error) {
+		return autonomysrv.NewServer(), nil
+	},
+	// behaviors (S79) — browse/search/tag/publish/soft_delete/comment/attach: the project-scoped
+	// behavior LIBRARY. attach PREVIEWS (DRAFT) or LANDS via an APPROVED ChangeSet (the wall:
+	// propose → approve); WroteKernel is always false (the kernel freeze is the aidos CLI's job).
+	"behaviors": func(context.Context) (*mcp.Server, error) {
+		return behaviorssrv.NewServer(), nil
 	},
 }
 
