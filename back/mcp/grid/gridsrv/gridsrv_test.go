@@ -1,4 +1,4 @@
-package main
+package gridsrv
 
 import (
 	"context"
@@ -68,6 +68,45 @@ func TestRungsTool(t *testing.T) {
 	}
 }
 
+// TestBuildTool — grid_build projects placed truths onto the full Level×Facet matrix: one
+// column per canonical facet (F→X), each carrying its truths top-down by rung, content-addressed.
+func TestBuildTool(t *testing.T) {
+	_, out, err := build(context.Background(), nil, buildInput{Truths: []truthIn{
+		{ID: "k-op-s", Rung: "operation", Facet: "S"},
+		{ID: "k-ent-f", Rung: "entity", Facet: "F"},
+		{ID: "k-prod-f", Rung: "product", Facet: "F"},
+	}})
+	if err != nil || !out.OK {
+		t.Fatalf("build should succeed: %+v err=%v", out, err)
+	}
+	if len(out.Columns) != 8 {
+		t.Fatalf("build should yield one column per canonical facet (8): %d", len(out.Columns))
+	}
+	if out.Hash == "" {
+		t.Fatalf("build must content-address the matrix (Grid.Hash)")
+	}
+	// The F column carries product (top) before entity (bottom) — top-down order.
+	var fcol *columnOut
+	for i := range out.Columns {
+		if out.Columns[i].Facet == "F" {
+			fcol = &out.Columns[i]
+		}
+	}
+	if fcol == nil || len(fcol.Truths) != 2 || fcol.Truths[0] != "k-prod-f" || fcol.Truths[1] != "k-ent-f" {
+		t.Fatalf("F column should be [k-prod-f, k-ent-f] top-down: %+v", fcol)
+	}
+}
+
+// TestBuildDeterministic — same truths ⇒ byte-identical grid hash (the reproducibility law).
+func TestBuildDeterministic(t *testing.T) {
+	in := buildInput{Truths: []truthIn{{ID: "a", Rung: "view", Facet: "I"}, {ID: "b", Rung: "action", Facet: "I"}}}
+	_, a, _ := build(context.Background(), nil, in)
+	_, b, _ := build(context.Background(), nil, in)
+	if a.Hash != b.Hash {
+		t.Fatalf("build must be deterministic: %q != %q", a.Hash, b.Hash)
+	}
+}
+
 // guard the import is exercised (the facets octuor backs the grid's orthogonal axis).
 func TestFacetsBacking(t *testing.T) {
 	if len(facets.Facets()) != 8 {
@@ -76,7 +115,7 @@ func TestFacetsBacking(t *testing.T) {
 }
 
 func TestServerBuilds(t *testing.T) {
-	if newMCPServer() == nil {
-		t.Fatal("newMCPServer returned nil")
+	if NewServer() == nil {
+		t.Fatal("NewServer returned nil")
 	}
 }

@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { linksGraphAction } from "./actions";
 import { LiensClient } from "./LiensClient";
 
 /**
@@ -7,17 +8,18 @@ import { LiensClient } from "./LiensClient";
  * SHELL V3 (V3Nav + V3SessionProvider) enveloppe automatiquement cette route ; on ne rend
  * ICI que l'intro + la lentille.
  *
- * L'écran montre les SIX FAMILLES de liens TYPÉS entre kernels (composes · depends_on ·
- * supersedes · provenance · triggers_binds · mirrors), rendues en React Flow (ADR 0053),
- * avec un FILTRE par famille (le critère de done) et le détail d'un lien cliqué : sa cible
- * PINNÉE `id@version`, jamais une identité nue (§41 — la vague de rouge §42).
+ * L'écran montre les SIX FAMILLES de liens TYPÉS entre kernels (projects_to · derives_from ·
+ * contracts_with · triggers · binds · mirrors), rendues en React Flow (ADR 0053), avec un
+ * FILTRE par famille (le critère de done) et le détail d'un lien cliqué : sa cible PINNÉE
+ * `id@version`, jamais une identité nue (§41 — la vague de rouge §42).
  *
- * MODE CLIENT (ADR 0092 §2, déterminisme-first §8) : il N'EXISTE PAS de serveur MCP des
- * liens dispatché par la passerelle. La logique (le jeu CLOS des familles, le graphe
- * synthétique canonique, le filtre, le pinning, le mapping vers le jeu canonique S17) est
- * un TWIN PUR AUTORITATIF (lib/v2/links.ts), couvert par son miroir de parité
- * lib/v2/links.test.ts. On PORTE cette logique UX pure (légitime, ADR 0092 §2), thémée V3,
- * SANS ré-implémenter le Go ni inventer une lecture « live » fantôme.
+ * LENTILLE NATIVE LIVE (ADR 0092 — le moteur Go est la SEULE source live des liens). Le graphe
+ * + le statut PAR LIEN (green|stale|absent §41–§42) sont LUS EN DIRECT par la passerelle, via
+ * l'outil Go `links_graph` (back/mcp/links/linksrv → back/kernel/links.Validate/Resolve). Le
+ * CALCUL des liens était un TWIN PUR « byte-identique au Go » (lib/v2/links.ts) — pas du
+ * client-UX légitime (§2) ; il est SUPPRIMÉ. La fixture synthétique (lib/v3/liens-data) reste
+ * UNIQUEMENT le repli déterministe de démo (badge « en direct » / « démo », ADR 0074), jamais
+ * « calcul pur (repli démo) ». On lit ici côté serveur (linksGraphAction) et on passe la vue à la lentille.
  *
  * LE MUR (CLAUDE.md §2) : LECTURE seule — projection des liens, aucune écriture-vérité ; la
  * promotion d'un lien reste propose → idée → miroir → /goal → approbation, jamais une
@@ -26,6 +28,7 @@ import { LiensClient } from "./LiensClient";
  */
 export default async function V3LiensScreen() {
 	const t = await getTranslations("v3");
+	const { view, source } = await linksGraphAction();
 	return (
 		<div data-testid="v3-liens" className="mx-auto w-full max-w-5xl space-y-6">
 			<div className="space-y-2">
@@ -42,7 +45,7 @@ export default async function V3LiensScreen() {
 					{t("liensWallNote")}
 				</div>
 			</div>
-			<LiensClient />
+			<LiensClient view={view} source={source} />
 		</div>
 	);
 }

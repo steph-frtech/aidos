@@ -3,37 +3,29 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { type NodeApi, Tree } from "react-arborist";
-import {
-	buildKernelTree,
-	countNodes,
-	type KernelNode,
-	syntheticComposes,
-	type TreeNode,
-} from "@/lib/v2/kernel-tree";
+import type { ArbreNodeDTO, ArbresSnapshot } from "./actions";
 
 /**
  * /v3/arbres — L'ARBRE DE COMPOSITION des kernels, client-only (React Arborist, virtualisé).
  *
- * MODE CLIENT (ADR 0092 §2) : TOUTE la logique de l'arbre est projetée du TWIN PUR
- * AUTORITATIF lib/v2/kernel-tree.ts (buildKernelTree, countNodes, syntheticComposes —
- * couverts par lib/v2/kernel-tree.test.ts, fast-check). Cette lentille ne ré-implémente
- * AUCUNE logique du noyau ; React Arborist n'est QUE du rendu virtualisé, il ne juge rien.
- * L'import est PROFOND (`@/lib/v2/kernel-tree`) → jamais classé comme un twin par le cliquet
- * T5 (lib/twin-as-live-fitness.test.ts L6) : la lentille reste verte.
+ * S59 CUTOVER (ADR 0092 — le moteur Go est l'UNIQUE source vivante). Ce composant ne calcule PLUS
+ * rien : il REÇOIT le snapshot déjà résolu (la STRUCTURE de l'arbre composée par le calcul pur (repli démo) côté
+ * serveur + le VERDICT §109 LU LIVE depuis le moteur Go via la passerelle — Server Action
+ * `arbresSnapshot`) et ne fait que le RENDRE (React Arborist n'est QUE du rendu virtualisé, il ne
+ * juge rien). Il n'importe AUCUNE logique twin (seulement les TYPES de actions, type-only) → le
+ * cliquet T5 (NO_TWIN_AS_LIVE_PATH) reste vert : le twin lib/v2/kernel-tree ne sert plus de source
+ * d'affichage live, il vit derrière la frontière readVia dans actions.ts (repli-démo).
  *
  * ACTION-CAPABLE (CLAUDE.md §6, ui-completeness) : l'écran NE FAIT PAS qu'afficher —
  *   - on DÉPLIE / REPLIE chaque nœud (le drill-down fractal §49) ;
- *   - un CLIC sur un kernel RÉVÈLE ses coordonnées (niveau, facette, profondeur) ;
+ *   - un CLIC sur un kernel RÉVÈLE ses coordonnées (niveau, facette, profondeur, voyant) ;
  *   - un lien OUVRE son anatomie (l'écran /v2/anatomie/[kernel], réel et atteignable).
  *
- * DÉTERMINISME-FIRST (§6/§8) : la donnée de l'arbre est figée par le twin pur ; même entrée
- * → même arbre (ordre verticale §23 puis id, profondeur calculée, aucun orphelin). La
- * relation `composes` est ici SYNTHÉTIQUE (240 kernels) pour PROUVER la virtualisation
- * (200+ nœuds) sans dégrader le rendu ; la projection réelle arrivera quand le store de
- * kernels exposera ses composes (OpenQuestion documentée, pas un blocage du portage).
+ * LE BADGE source "live"|"demo" (JAMAIS « calcul pur (repli démo) ») dit l'origine du verdict : le moteur Go
+ * (live) ou le repli-démo déterministe (la même loi §109 pure reproduite localement).
  *
- * LE MUR (CLAUDE.md §2) : l'arbre est une projection de lecture ; l'écran n'écrit AUCUNE
- * vérité. Recomposer/geler un kernel passe par idée → miroir → /goal → approbation.
+ * LE MUR (CLAUDE.md §2) : l'arbre + le verdict sont des projections de lecture ; l'écran n'écrit
+ * AUCUNE vérité. Recomposer/geler un kernel passe par idée → miroir → /goal → approbation.
  * Themed (tokens shadcn ADR 0010, zéro hex/zinc) + bilingue (libellés passés par le serveur).
  */
 
@@ -51,43 +43,138 @@ interface ArbresLabels {
 	depthLabel: string;
 	openAnatomy: string;
 	wallNote: string;
+	verdictHeading: string;
+	verdictGreen: string;
+	verdictRed: string;
+	drillDownHint: string;
+	cycleRefused: string;
+	weightsLegend: string;
+	sourceLive: string;
+	sourceDemo: string;
 }
 
-/** L'adaptateur Arborist : TreeNode (twin) → la forme { id, name, children } que la lib consomme. */
+/** L'adaptateur Arborist : ArbreNodeDTO (serveur) → la forme { id, name, children } de la lib. */
 interface ArboristNode {
 	id: string;
 	name: string;
 	level: string;
 	facet: string;
 	depth: number;
+	verdict: "GREEN" | "RED";
 	children: ArboristNode[];
 }
 
-function toArborist(n: TreeNode): ArboristNode {
+function toArborist(n: ArbreNodeDTO): ArboristNode {
 	return {
 		id: n.id,
 		name: n.label,
 		level: n.level,
 		facet: n.facet,
 		depth: n.depth,
+		verdict: n.verdict,
 		children: n.children.map(toArborist),
 	};
 }
 
-export function ArbresClient({ labels }: { labels: ArbresLabels }) {
-	// La relation `composes` (§17), figée par le twin pur → un arbre ordonné, sans orphelin.
-	// 240 kernels pour PROUVER la virtualisation (200+ nœuds) sans dégrader le rendu.
-	const { roots, total } = useMemo(() => {
-		const composes: KernelNode[] = syntheticComposes(240);
-		const res = buildKernelTree(composes);
-		if (!res.ok) return { roots: [] as ArboristNode[], total: 0 };
-		return { roots: res.roots.map(toArborist), total: countNodes(res.roots) };
-	}, []);
-
+export function ArbresClient({
+	snapshot,
+	labels,
+}: {
+	snapshot: ArbresSnapshot;
+	labels: ArbresLabels;
+}) {
+	// le snapshot est déjà résolu côté serveur ; on n'adapte que la forme pour la lib de rendu.
+	const roots = useMemo(() => snapshot.roots.map(toArborist), [snapshot.roots]);
 	const [selected, setSelected] = useState<ArboristNode | null>(null);
+
+	const isLive = snapshot.source === "live";
+	const rootGreen = snapshot.rootVerdict === "GREEN";
 
 	return (
 		<div className="space-y-6">
+			{/* Le VERDICT §109 + le badge source + la légende des poids. */}
+			<section data-testid="v3-arbres-verdict" className="space-y-3">
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<h2 className="text-base font-semibold text-foreground">
+						{labels.verdictHeading}
+					</h2>
+					<span
+						data-testid="v3-arbres-source"
+						data-source={snapshot.source}
+						className={[
+							"rounded-full px-2.5 py-0.5 font-mono text-[11px]",
+							isLive
+								? "bg-primary/10 text-primary"
+								: "bg-muted text-muted-foreground",
+						].join(" ")}
+					>
+						{isLive ? labels.sourceLive : labels.sourceDemo}
+					</span>
+				</div>
+
+				<div
+					data-testid="v3-arbres-root-verdict"
+					data-verdict={snapshot.rootVerdict}
+					className={[
+						"flex items-center gap-2 rounded-lg border px-4 py-3 text-sm",
+						rootGreen
+							? "border-primary/30 bg-primary/5 text-primary"
+							: "border-destructive/40 bg-destructive/5 text-destructive",
+					].join(" ")}
+				>
+					<span className="font-mono text-xs">●</span>
+					<span>{rootGreen ? labels.verdictGreen : labels.verdictRed}</span>
+				</div>
+
+				{snapshot.cycle.length > 0 ? (
+					<p
+						data-testid="v3-arbres-cycle"
+						className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-2 text-sm text-destructive"
+					>
+						{labels.cycleRefused} : {snapshot.cycle.join(" → ")}
+					</p>
+				) : null}
+
+				{snapshot.drillDown.length > 1 && !rootGreen ? (
+					<div data-testid="v3-arbres-drilldown" className="space-y-1">
+						<p className="text-xs text-muted-foreground">
+							{labels.drillDownHint}
+						</p>
+						<ol className="flex flex-wrap items-center gap-x-1 gap-y-1 font-mono text-xs">
+							{snapshot.drillDown.map((step, i) => (
+								<li
+									key={step.layerId}
+									className="flex items-center gap-1"
+									data-testid={`v3-arbres-drill-${step.layerId}`}
+								>
+									{i > 0 ? (
+										<span className="text-muted-foreground">→</span>
+									) : null}
+									<span
+										className={[
+											"rounded px-1.5 py-0.5",
+											step.aggregate === "RED"
+												? "bg-destructive/10 text-destructive"
+												: "bg-muted text-muted-foreground",
+										].join(" ")}
+									>
+										{step.layerId}
+									</span>
+								</li>
+							))}
+						</ol>
+					</div>
+				) : null}
+
+				<p
+					data-testid="v3-arbres-weights"
+					className="font-mono text-[11px] text-muted-foreground"
+				>
+					{labels.weightsLegend} : {snapshot.weights.join(" · ")}
+				</p>
+			</section>
+
+			{/* L'arbre fractal virtualisé. */}
 			<section data-testid="v3-arbres-tree" className="space-y-3">
 				<div className="space-y-1">
 					<h2 className="text-base font-semibold text-foreground">
@@ -102,7 +189,7 @@ export function ArbresClient({ labels }: { labels: ArbresLabels }) {
 					data-testid="v3-arbres-count"
 					className="font-mono text-xs text-muted-foreground"
 				>
-					{labels.nodeCount} : {total}
+					{labels.nodeCount} : {snapshot.total}
 				</p>
 
 				{roots.length === 0 ? (
@@ -200,12 +287,14 @@ function ArbreRow({
 	onSelect: () => void;
 }) {
 	const caret = node.isLeaf ? "•" : node.isOpen ? "▾" : "▸";
+	const red = node.data.verdict === "RED";
 	return (
 		<div
 			style={style}
 			ref={dragHandle}
 			data-testid={`v3-arbres-node-${node.data.id}`}
 			data-open={node.isOpen}
+			data-verdict={node.data.verdict}
 			className={[
 				"flex items-center gap-2 rounded-md px-2 text-sm transition-colors",
 				node.isSelected
@@ -231,6 +320,15 @@ function ArbreRow({
 				onClick={onSelect}
 				className="flex flex-1 items-center gap-2 truncate text-left"
 			>
+				<span
+					aria-hidden
+					className={[
+						"shrink-0 font-mono text-[10px]",
+						red ? "text-destructive" : "text-primary",
+					].join(" ")}
+				>
+					●
+				</span>
 				<span className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
 					{node.data.facet}
 				</span>

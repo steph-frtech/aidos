@@ -1,33 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-	type Anatomy,
-	buildAnatomy,
-	type MirrorPair,
-	type PairKind,
-	syntheticPairStates,
-	type Voyant,
-} from "@/lib/v2/anatomy";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import type { Source } from "@/lib/gateway-sdk";
+import type { MirrorPair, PairKind, Voyant } from "@/lib/v2/anatomy";
+import { type AnatomyView, loadAnatomyAction } from "./actions";
 
 /**
- * /v3/anatomie — l'ANATOMIE d'un kernel : les SIX paires-miroir autour du MUR, client-only.
+ * /v3/anatomie — l'ANATOMIE d'un kernel : les SIX paires-miroir autour du MUR, lues EN DIRECT.
  *
- * RÉUTILISE LE TWIN PUR AUTORITATIF (lib/v2/anatomy — ADR 0092 §2) : la composition des six
- * paires, la table de vérité du voyant et la validation sont une FONCTION PURE & TOTALE,
- * épinglée par lib/v2/anatomy.test.ts. On NE ré-implémente AUCUNE logique du noyau ; on importe
- * la lib V2 par son chemin profond (`@/lib/v2/anatomy`), qui n'est PAS un twin-live au sens du
- * cliquet T5 (NO_TWIN_AS_LIVE_PATH ne reconnaît qu'un `@/lib/<x>` direct avec un sibling
- * `lib/<x>-data.ts`) — aucune lecture « live » fantôme n'est inventée.
+ * CHEMIN VIVANT (ADR 0092 — le moteur Go est l'UNIQUE source vivante). L'anatomie est computée
+ * par le moteur Go (`anatomy_build` sur le serveur `anatomy` dispatché — back/kernel/mirror/
+ * anatomy) et lue par la Server Action loadAnatomyAction (lib/gateway-sdk.readVia). On NE
+ * ré-implémente AUCUNE logique du noyau côté client : on N'importe QUE des TYPES de lib/v2/anatomy
+ * (import type — aucun runtime tiré), et tout le calcul vient du Go via l'action. Le twin
+ * lib/v2/anatomy n'est plus que le repli-démo (derrière la frontière readVia, dans actions.ts).
  *
  * ACTION-CAPABLE (CLAUDE.md §6, ui-completeness) : l'écran NE FAIT PAS qu'afficher — on SAISIT le
- * kernel à inspecter (l'atelier), puis CLIQUER une paire-miroir l'OUVRE (descend dans son détail :
- * la face déclarée au-dessus, la face prouvée en dessous, le voyant computé). Le MUR est DESSINÉ :
- * au-dessus = DÉCLARÉ (humain), en dessous = PROUVÉ (machine, READ-ONLY — aucun contrôle
- * d'écriture sous le mur). Les voyants 🟢/🔴/🟡 sont COMPUTÉS, jamais déclarés.
+ * kernel à inspecter (l'atelier) → la frappe relance la lecture live (anatomy_build) ; CLIQUER une
+ * paire-miroir l'OUVRE (descend dans son détail : la face déclarée au-dessus, la face prouvée en
+ * dessous, le voyant computé par le moteur). Le MUR est DESSINÉ : au-dessus = DÉCLARÉ (humain), en
+ * dessous = PROUVÉ (machine, READ-ONLY — aucun contrôle d'écriture sous le mur). Les voyants
+ * 🟢/🔴/🟡 sont COMPUTÉS par le Go, jamais déclarés.
  *
- * DÉTERMINISME-FIRST : l'état des paires est figé par syntheticPairStates(kernelId) tant que le
- * store de kernels n'expose pas ses voyants réels (OpenQuestion documentée — ne bloque pas). Le
+ * UN BADGE source "live"|"demo" (JAMAIS « calcul pur (repli démo) ») : "live" quand le moteur Go a répondu par
+ * la passerelle ; "demo" quand la passerelle est injoignable / aucun store dispatché (le repli
+ * déterministe, honnête — ADR 0074, pas de faux-live silencieux). DÉTERMINISME-FIRST (§6/§8) : le
  * composant ne fait que rendre ; il ne juge rien. Le mur intact : projection de lecture, aucune
  * écriture-vérité.
  */
@@ -68,23 +65,47 @@ const PAIR_FACE_KEYS: Record<PairKind, { above: string; below: string }> = {
 	evidence: { above: "evidence.above", below: "evidence.below" },
 };
 
-export function AnatomyClient({ t }: { t: Strings }) {
+export function AnatomyClient({
+	t,
+	initial,
+}: {
+	t: Strings;
+	initial: AnatomyView;
+}) {
 	// L'atelier : le kernel à inspecter (saisi par l'utilisateur — action-capable).
 	const [kernelId, setKernelId] = useState(DEFAULT_KERNEL);
+	const [view, setView] = useState<AnatomyView>(initial);
+	const [openKind, setOpenKind] = useState<PairKind | null>(null);
+	const [, startTransition] = useTransition();
+
 	const trimmed = kernelId.trim();
 
-	const anatomy: Anatomy | null = useMemo(() => {
-		if (trimmed === "") return null;
-		const r = buildAnatomy(trimmed, syntheticPairStates(trimmed));
-		return r.ok ? r.anatomy : null;
+	// La frappe relance la lecture LIVE (anatomy_build) — l'écran reste action-capable. Le premier
+	// rendu réutilise `initial` (SSR) pour le kernel par défaut ; toute frappe re-lit le moteur.
+	useEffect(() => {
+		let cancelled = false;
+		startTransition(async () => {
+			const next = await loadAnatomyAction(trimmed);
+			if (!cancelled) {
+				setView(next);
+				setOpenKind(null);
+			}
+		});
+		return () => {
+			cancelled = true;
+		};
 	}, [trimmed]);
 
-	const [openKind, setOpenKind] = useState<PairKind | null>(null);
+	const anatomy = view.anatomy;
+	const source: Source = view.source;
 
-	const openPair: MirrorPair | null =
-		anatomy && openKind
-			? (anatomy.pairs.find((p) => p.kind === openKind) ?? null)
-			: null;
+	const openPair: MirrorPair | null = useMemo(
+		() =>
+			anatomy && openKind
+				? (anatomy.pairs.find((p) => p.kind === openKind) ?? null)
+				: null,
+		[anatomy, openKind],
+	);
 
 	return (
 		<div className="space-y-5">
@@ -100,20 +121,33 @@ export function AnatomyClient({ t }: { t: Strings }) {
 					id="v3-anatomie-kernel-input"
 					data-testid="v3-anatomie-kernel-input"
 					value={kernelId}
-					onChange={(e) => {
-						setKernelId(e.target.value);
-						setOpenKind(null);
-					}}
+					onChange={(e) => setKernelId(e.target.value)}
 					placeholder={t.kernelPlaceholder}
 					className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
 				/>
 			</div>
 
-			<div
-				data-testid="v3-anatomie-wall-note"
-				className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm text-primary"
-			>
-				{t.wallNote}
+			<div className="flex flex-wrap items-center justify-between gap-2">
+				<div
+					data-testid="v3-anatomie-wall-note"
+					className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm text-primary"
+				>
+					{t.wallNote}
+				</div>
+				{/* LE BADGE source (live|demo) — jamais « calcul pur (repli démo) » (ADR 0092/0074). */}
+				<span
+					data-testid="v3-anatomie-source"
+					data-source={source}
+					title={source === "live" ? t.sourceLiveTitle : t.sourceDemoTitle}
+					className={[
+						"shrink-0 rounded-full border px-2.5 py-0.5 font-mono text-xs",
+						source === "live"
+							? "border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+							: "border-border bg-muted text-muted-foreground",
+					].join(" ")}
+				>
+					{source === "live" ? t.sourceLive : t.sourceDemo}
+				</span>
 			</div>
 
 			{!anatomy && (

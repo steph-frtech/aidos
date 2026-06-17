@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { gridLive } from "./actions";
 import { GrilleClient } from "./GrilleClient";
 
 /**
@@ -11,21 +12,22 @@ import { GrilleClient } from "./GrilleClient";
  * cellule ; les sommes Σ par ligne / par colonne / au total sont COHÉRENTES (Σ = total). Sélectionner
  * une cellule (niveau, facette) descend vers SES kernels/specs.
  *
- * MODE CLIENT (ADR 0092 §2, déterminisme-first §8) : il n'existe PAS de serveur MCP « grille »
- * dispatché par la passerelle ; la donnée vient du TWIN PUR AUTORITATIF lib/v2/grid (buildGrid, Σ
- * comptées), byte-identique au Go back/kernel et couvert par son miroir lib/v2/grid.test.ts. On PORTE
- * donc cette logique UX pure (légitime, ADR 0092 §2), thémée V3, SANS ré-implémenter le Go ni inventer
- * une lecture « live » fantôme — un branchement live arrivera quand le store exposera les coordonnées
- * de chaque kernel (OpenQuestion). La relation des kernels est ici synthétique (240, partagés avec
- * l'arbre /v2/kernels).
+ * S59 CUTOVER (ADR 0092 — le moteur Go est l'UNIQUE source vivante). La donnée vient du MOTEUR Go
+ * LIVE par la passerelle (`gridLive` → `readVia(scope, "grid_build", …)`, le serveur MCP `grid`
+ * dispatché — grid.Build est autoritatif), lue ICI côté serveur et passée à la lentille. Le twin
+ * lib/v2/grid (buildGrid, Σ comptées) reste UNIQUEMENT le repli démo déterministe (lib/v2/grid-data,
+ * source:"live"|"demo"), byte-identique au calcul Go que le décodeur reconstruit. La §2 ne couvre que
+ * les vraies logiques client — JAMAIS un calcul pur que le moteur fait : composer la grille EN était
+ * un, donc un twin flippé (plus de mode client fantôme).
  *
- * LE MUR (CLAUDE.md §2) : LECTURE seule — la grille est une projection ; geler une vérité passe par
- * idée → miroir → /goal → approbation, jamais une écriture depuis l'écran. Thémé (tokens ADR 0010,
- * 0 hex/zinc) ; bilingue (next-intl, FR par défaut, ADR 0011).
+ * LE MUR (CLAUDE.md §2) : LECTURE seule below-the-line — la grille est une projection ; geler une
+ * vérité passe par idée → miroir → /goal → approbation, jamais une écriture depuis l'écran. Thémé
+ * (tokens ADR 0010, 0 hex/zinc) ; bilingue (next-intl, FR par défaut, ADR 0011).
  */
 
 export default async function V3GrilleScreen() {
 	const t = await getTranslations("v3");
+	const { grid, source } = await gridLive();
 
 	return (
 		<div data-testid="v3-grille" className="mx-auto w-full max-w-5xl space-y-6">
@@ -38,6 +40,8 @@ export default async function V3GrilleScreen() {
 				</p>
 			</div>
 			<GrilleClient
+				grid={grid}
+				source={source}
 				labels={{
 					total: t("grilleTotal"),
 					levelAxis: t("grilleLevelAxis"),
@@ -48,7 +52,8 @@ export default async function V3GrilleScreen() {
 					cellHint: t("grilleCellHint"),
 					noSelection: t("grilleNoSelection"),
 					sourceLabel: t("grilleSourceLabel"),
-					sourceTwin: t("grilleSourceTwin"),
+					sourceLive: t("grilleSourceLive"),
+					sourceDemo: t("grilleSourceDemo"),
 					sourceTitle: t("grilleSourceTitle"),
 					wallNote: t("grilleWallNote"),
 				}}

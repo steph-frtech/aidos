@@ -269,6 +269,40 @@ func DefaultTools() []Tool {
 	// (WroteKernel always false — the wall).
 	t = append(t, below("grilling-loop", "grill_route", "grill_verify_verdict", "grill_verdicts")...)
 
+	// ── ADR 0092 PHASE-2 conceptual-lens servers (the Go engine is the SINGLE live source). ──
+	// The four V3 conceptual lenses (grille · liens · anatomie · arbres) were reading TS twins
+	// (lib/v2/*) as "client-UX" — but each is a PURE CALCUL the Go kernel already owns (the §2
+	// client-UX carve-out covers live editors / optimistic preview / AST extraction / on-keystroke
+	// feedback, NEVER a pure computation byte-identical to the Go back). So each is a TWIN to flip:
+	// its read tool calls the EXISTING Go kernel logic (it never reimplements it). All BELOW THE
+	// LINE: every dispatched tool is a CHEAP/pure read whose output is a VALUE — no DSN, no store,
+	// no clock, no embedder, no LLM (determinism-first §6/§8); WroteKernel is always false (the
+	// wall, §2). Every I/O is a scalar OBJECT (no json.RawMessage body — the S59 byte-array scar is
+	// avoided by construction; grid_build/anatomy_build echo the matrix/anatomy as plain structs).
+	//
+	// 39. grid (FK03) — grid_build/resolve/mark/affected/rungs: the GRILLE (FKE-1.4) over
+	// back/kernel/grid. grid_build projects placed truths onto the full Level×Facet matrix (the
+	// /v3/grille read); the four laws (resolve/mark/affected/rungs) are the existing FK03 tools
+	// (gridsrv extracts the former package-main so BOTH the stdio binary and the dispatcher reuse
+	// one source — no twin).
+	t = append(t, below("grid", "grid_build", "grid_resolve", "grid_mark", "grid_affected", "grid_rungs")...)
+	// 40. links (KRD §41) — links_kinds/validate/resolve/graph: the SIX versioned link types over
+	// back/kernel/links. links_graph validates + resolves a whole graph against the heads (the
+	// /v3/liens read); each verdict is the existing links.Validate / links.Resolve (the §41–§42
+	// staleness check — green|stale|absent). A new kernel.link row stays the aidos CLI's job.
+	t = append(t, below("links", "links_kinds", "links_validate", "links_resolve", "links_graph")...)
+	// 41. anatomy (FKE) — anatomy_pairs/voyant/build: the SIX mirror-pairs around the wall + the
+	// deterministic VOYANT (the §8 judge is a calcul) over back/kernel/mirror/anatomy (the pure
+	// truth-table is NEW Go logic — per determinism-first it MUST be code, so the Go engine is the
+	// authoritative source). anatomy_build is the /v3/anatomie read (six ordered pairs + worst-of-
+	// six overall + counts). A red voyant is a SIGNAL routed to idea → mirror → /goal, never a write.
+	t = append(t, below("anatomy", "anatomy_pairs", "anatomy_voyant", "anatomy_build")...)
+	// 42. kernel-tree (KRD §108/§109) — tree_weights/aggregate/reopens: the `composes` mereology
+	// link over back/kernel/composes. tree_aggregate is the §109 recursive verdict + the §110
+	// drill-down (the /v3/arbres read); a cycle is a typed refusal (CAUSED_BY_CYCLE). tree_reopens
+	// is the §112 weighted/thresholded activation. Weights/thresholds are DECLARED, never learned.
+	t = append(t, below("kernel-tree", "tree_weights", "tree_aggregate", "tree_reopens")...)
+
 	// THE FENCED TRUTH-ZONE WRITE NAMESPACE (§2). Not a real tool of any server — the
 	// door a caller might craft to move truth directly. Registered as TruthWrite so the
 	// gateway refuses it with a ChangeSet-pointing BlockReason (server-side wall).
@@ -334,5 +368,8 @@ func GatewayServers() []string {
 		"billing", "dsl-editor", "templates",
 		"besoin-intake", "self-cert", "app-auth", "workspace",
 		"entity-modeler", "shape-editor", "context-map", "grilling-loop",
+		// ADR 0092 PHASE-2 conceptual-lens servers — the four V3 lenses whose pure-calcul twins
+		// (lib/v2/grid · lib/v2/links · lib/v2/anatomy · lib/v2/kernel-tree) flip to the Go engine.
+		"grid", "links", "anatomy", "kernel-tree",
 	}
 }

@@ -95,13 +95,29 @@ export interface Verdict {
  * twin-LOGIQUE iff `lib/<x>.ts` AND `lib/<x>-data.ts` both exist (the demo
  * sibling is the witness that `<x>.ts` re-implements the Go and `<x>-data.ts`
  * is its demo fallback). Pure over the given listing (sorted, stable). The
- * caller supplies the real `fs.readdirSync('lib')` listing — the I/O lives at
- * the edge; this stays a pure function of the names.
+ * caller supplies the real RECURSIVE `fs.readdirSync('lib', {recursive:true})`
+ * listing — the I/O lives at the edge; this stays a pure function of the names.
+ *
+ * RECURSIVE — the BLIND-SPOT CLOSE (ADR 0092, kill-twins recipe (c)). The
+ * listing is POSIX-relative to `lib/` and may carry a sub-directory prefix
+ * (`v2/grid.ts`, `v2/grid-data.ts`, `v3/kernels.ts`…) so a twin that hides in
+ * `lib/v2/*` (a pure calc byte-identique au Go — buildGrid/buildGraph/anatomyOf/
+ * treeFrom — proven by its `<x>.test.ts` reproducibility mirror) is recognised
+ * exactly like a top-level twin. The witness is UNCHANGED — `<x>.ts` AND
+ * `<x>-data.ts` both present — so the rule stays narrow: a `lib/v2/<x>` only
+ * becomes a twin once its demo-fallback fixture `lib/v2/<x>-data.ts` exists (the
+ * flip, recipe (b)). The returned twin NAME keeps its sub-dir prefix
+ * (`v2/grid`), so `@/lib/v2/grid` resolves through `libBaseOf`. Before this
+ * close, a deep `@/lib/v2/grid` import slipped the cliquet twice over: the flat
+ * top-level scan never saw `v2/*`, and `libBaseOf` rejected any deeper path.
+ * Back-slashes (a Windows `readdirSync`) are normalised to POSIX so the verdict
+ * stays platform-independent.
  */
 export function twinNamesFromLibDir(libEntries: string[]): string[] {
-	const set = new Set(libEntries);
+	const norm = libEntries.map((e) => e.split("\\").join("/"));
+	const set = new Set(norm);
 	const out: string[] = [];
-	for (const name of libEntries) {
+	for (const name of norm) {
 		if (!name.endsWith("-data.ts")) continue;
 		const base = name.slice(0, -"-data.ts".length);
 		if (set.has(`${base}.ts`)) out.push(base);
@@ -118,13 +134,25 @@ function lineOf(sf: ts.SourceFile, node: ts.Node): number {
 	return sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
 }
 
-/** A `@/lib/<x>` import normalised to its twin base name `<x>`, or null. */
+/**
+ * A `@/lib/…` import normalised to its candidate twin base name, or null:
+ *   - `@/lib/<x>`        → `<x>`     (a top-level twin)
+ *   - `@/lib/<sub>/<x>`  → `<sub>/<x>` (a one-level-deep twin, e.g. `v2/grid`)
+ * Deeper paths (`@/lib/a/b/c`) and bare `@/lib` are NOT twin names. The
+ * one-level-deep arm is the BLIND-SPOT CLOSE (ADR 0092 recipe (c)): a deep
+ * `@/lib/v2/grid` now maps to the twin name `v2/grid`, which `twinNamesFromLibDir`
+ * derives from the recursive listing — so the AST pass finally sees it. Whether
+ * the resulting base IS a twin is decided downstream against the twin set
+ * (membership stays the witness; this only widens what CAN be a twin name).
+ */
 function libBaseOf(spec: string): string | null {
 	const prefix = "@/lib/";
 	if (!spec.startsWith(prefix)) return null;
 	const rest = spec.slice(prefix.length);
-	// only a direct `@/lib/<x>` (no deeper path) maps to a twin name `<x>`.
-	if (rest.includes("/")) return null;
+	if (rest.length === 0) return null;
+	const segs = rest.split("/");
+	// `@/lib/<x>` or `@/lib/<sub>/<x>` — at most one sub-directory level.
+	if (segs.length > 2) return null;
 	return rest;
 }
 

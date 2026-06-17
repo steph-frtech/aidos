@@ -227,6 +227,17 @@ export const GATEWAY_SERVERS: readonly string[] = [
 	"shape-editor",
 	"context-map",
 	"grilling-loop",
+	// ── ADR 0092 PHASE-2 conceptual-lens servers (the Go engine is the SINGLE live source). ──
+	// 41st–44th — grid · links · anatomy · kernel-tree — the four V3 conceptual lenses (grille ·
+	// liens · anatomie · arbres) whose pure-calcul reads flip from the lib/v2/* TS twins to the Go
+	// engine. Each dispatches CHEAP/pure reads (the matrix · the link graph · the six mirror-pairs ·
+	// the §109 composition verdict) — the LIVE path for its lens; the twin becomes the demo fallback
+	// only. Without these entries route(grid_build)→unknown_tool→demo (a hollow flip — the cliquet's
+	// blind spot, since lib/v2/* only NOW gain a -data.ts sibling).
+	"grid",
+	"links",
+	"anatomy",
+	"kernel-tree",
 ];
 
 /** defaultTools mirrors Go DefaultTools() — the closed exposed surface. */
@@ -542,6 +553,35 @@ export function defaultTools(): Tool[] {
 			"grill_verify_verdict",
 			"grill_verdicts",
 		]),
+		// ── ADR 0092 PHASE-2 conceptual-lens servers (the Go engine is the SINGLE live source). ──
+		// The four V3 conceptual lenses (grille · liens · anatomie · arbres) were reading TS twins
+		// (lib/v2/*) as "client-UX" — but each is a PURE CALCUL the Go kernel already owns (the §2
+		// client-UX carve-out covers live editors / optimistic preview / AST extraction, NEVER a pure
+		// computation byte-identical to the Go back). Each read tool is the LIVE path for its lens; the
+		// TS twin (lib/v2/grid · lib/v2/links · lib/v2/anatomy · lib/v2/kernel-tree) becomes the demo
+		// fallback only. Byte-faithful to the Go registry (back/runtime/gateway/registry.go).
+		// `grid` (FK03) — grid_build (the /v3/grille Level×Facet matrix read) + the four FK03 laws.
+		...below("grid", [
+			"grid_build",
+			"grid_resolve",
+			"grid_mark",
+			"grid_affected",
+			"grid_rungs",
+		]),
+		// `links` (KRD §41) — links_graph (the /v3/liens validate+resolve graph read) + kinds/validate/
+		// resolve (the §41–§42 staleness check: green|stale|absent).
+		...below("links", [
+			"links_kinds",
+			"links_validate",
+			"links_resolve",
+			"links_graph",
+		]),
+		// `anatomy` (FKE) — anatomy_build (the /v3/anatomie six-mirror-pairs read) + pairs/voyant (the
+		// §8 voyant truth-table, the judge is a calcul). A red voyant is a SIGNAL → idea → mirror → /goal.
+		...below("anatomy", ["anatomy_pairs", "anatomy_voyant", "anatomy_build"]),
+		// `kernel-tree` (KRD §108/§109) — tree_aggregate (the /v3/arbres §109 recursive verdict +
+		// §110 drill-down) + weights/reopens (the §112 weighted activation). A cycle is a typed refusal.
+		...below("kernel-tree", ["tree_weights", "tree_aggregate", "tree_reopens"]),
 		// The fenced truth-zone write namespace (§2) — refused with a ChangeSet hint.
 		{ name: "kernel_write", server: "kernel", disposition: "truth_write" },
 		{ name: "mirror_write", server: "mirrors", disposition: "truth_write" },

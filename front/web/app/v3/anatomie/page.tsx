@@ -1,35 +1,40 @@
 import { getTranslations } from "next-intl/server";
 import { AnatomyClient } from "./AnatomyClient";
+import { loadAnatomyAction } from "./actions";
 
 /**
  * /v3/anatomie — LA LENTILLE ANATOMIE (un écran conceptuel KRD porté EN PROPRE dans la
  * session V3, parcours « Comprendre ») : l'ANATOMIE 1-pour-1 d'un kernel, les SIX PAIRES-MIROIR
  * autour du MUR (Spec↔Doc · Comportement↔Résultats · Scénarios↔Tests · Modèle↔Projection ·
  * Contrat↔Code · Evidence-attendue↔Evidence-observée). AU-DESSUS du mur = DÉCLARÉ (humain) ;
- * EN DESSOUS = PROUVÉ (machine, read-only). Un voyant 🟢/🔴/🟡 par paire, COMPUTÉ par le twin
- * pur (lib/v2/anatomy), jamais déclaré (CLAUDE.md §8).
+ * EN DESSOUS = PROUVÉ (machine, read-only). Un voyant 🟢/🔴/🟡 par paire, COMPUTÉ par le moteur
+ * Go, jamais déclaré (CLAUDE.md §8).
  *
- * MODE CLIENT (ADR 0092 §2, déterminisme-first §8) : il N'EXISTE PAS de serveur MCP qui expose
- * les voyants RÉELS d'un kernel dispatché par la passerelle (le store de kernels ne projette pas
- * encore ses paires d'anatomie — OpenQuestion documentée). La logique — le jeu CLOS des six
- * paires-miroir, la table de vérité du voyant, la composition ordonnée et la validation — est un
- * TWIN PUR AUTORITATIF (lib/v2/anatomy), couvert par son miroir de parité lib/v2/anatomy.test.ts.
- * On PORTE donc cette logique UX pure (légitime, ADR 0092 §2), thémée V3, en RÉUTILISANT la
- * source V2 (app/v2/anatomie/[kernel]) SANS ré-implémenter le Go ni inventer une lecture « live »
- * fantôme : un branchement live deviendra possible le jour où le store de kernels exposera ses
- * voyants réels.
+ * CHEMIN VIVANT (ADR 0092 — le moteur Go est l'UNIQUE source vivante). L'anatomie d'un kernel —
+ * le jeu CLOS des six paires-miroir, la table de vérité du voyant (§8 « le juge est un calcul »),
+ * la composition ordonnée + le voyant global — est un CALCUL PUR que le noyau Go possède
+ * (back/kernel/mirror/anatomy), exposé par l'outil MCP `anatomy_build` (serveur `anatomy`
+ * dispatché par la passerelle). La lentille le lit EN DIRECT via la Server Action loadAnatomyAction
+ * (lib/gateway-sdk.readVia). Le twin lib/v2/anatomy n'est PLUS le chemin live : il ne sert que de
+ * repli-démo déterministe (lib/v2/anatomy-data), derrière la frontière readVia, quand la passerelle
+ * est injoignable. Le §2 « client-UX légitime » ne couvre PAS un calcul pur byte-identique au Go —
+ * c'était un twin, désormais flipé.
  *
- * Le serveur ne porte que le titre + l'intro + les chaînes ; tout le contenu (l'atelier de saisie
- * du kernel, le mur dessiné, les six paires, le détail) est projeté côté client (AnatomyClient ←
- * lib/v2/anatomy pour la logique). Themed (tokens shadcn ADR 0010, zéro hex/zinc) + bilingue
- * (next-intl, FR par défaut, ADR 0011).
+ * Le serveur fait la PREMIÈRE lecture (SSR) pour le kernel par défaut puis porte le titre + l'intro
+ * + les chaînes ; tout le contenu (l'atelier de saisie, le mur dessiné, les six paires, le détail,
+ * le badge live|demo) est rendu côté client (AnatomyClient), la frappe relançant la lecture live.
+ * Themed (tokens shadcn ADR 0010, zéro hex/zinc) + bilingue (next-intl, FR par défaut, ADR 0011).
  *
- * LE MUR (§2) : l'écran COMPOSE une projection de lecture et REND ses voyants ; il n'écrit AUCUNE
- * vérité. En dessous du mur, tout est read-only (la machine prouve) — aucune écriture
- * kernel/mirrors/fitness ; la promotion reste idée → miroir → /goal → approbation.
+ * LE MUR (§2) : l'écran LIT une projection (anatomy_build est below-the-line) et REND ses voyants ;
+ * il n'écrit AUCUNE vérité. En dessous du mur, tout est read-only (la machine prouve) — aucune
+ * écriture kernel/mirrors/fitness ; la promotion reste idée → miroir → /goal → approbation.
  */
 export default async function V3AnatomyScreen() {
 	const t = await getTranslations("v3");
+
+	// La PREMIÈRE lecture (SSR) pour le kernel d'exemple — l'écran n'est jamais vide ; readVia
+	// retombe sur l'anatomie-démo si la passerelle est injoignable (source:"demo").
+	const initial = await loadAnatomyAction("truth-checkout-authz");
 
 	// Toutes les chaînes que le client rend (faces des six paires + libellés d'état + voyants).
 	const strings: Record<string, string> = {
@@ -71,6 +76,10 @@ export default async function V3AnatomyScreen() {
 		"contractCode.below": t("anatomieContractCodeBelow"),
 		"evidence.above": t("anatomieEvidenceAbove"),
 		"evidence.below": t("anatomieEvidenceBelow"),
+		sourceLive: t("anatomieSourceLive"),
+		sourceDemo: t("anatomieSourceDemo"),
+		sourceLiveTitle: t("anatomieSourceLiveTitle"),
+		sourceDemoTitle: t("anatomieSourceDemoTitle"),
 	};
 
 	return (
@@ -86,7 +95,7 @@ export default async function V3AnatomyScreen() {
 					{t("anatomieIntro")}
 				</p>
 			</div>
-			<AnatomyClient t={strings} />
+			<AnatomyClient t={strings} initial={initial} />
 		</div>
 	);
 }

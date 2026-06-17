@@ -1,24 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { FACETS } from "@/lib/facets";
-import { buildGrid, type Grid, type GridCell } from "@/lib/v2/grid";
-import { type KernelNode, syntheticComposes } from "@/lib/v2/kernel-tree";
+import type { Source } from "@/lib/gateway-sdk";
+import type { Grid, GridCell } from "@/lib/v2/grid";
 
 /**
  * GrilleClient — LA GRILLE niveau × facette (FKE-1.4 « les deux axes ») portée EN PROPRE dans le
- * shell V3 (parcours « Comprendre », ADR 0060). Client-only car TOUTE la donnée vient du TWIN PUR
- * AUTORITATIF lib/v2/grid.ts (buildGrid, sommes comptées) — byte-identique au Go back/kernel, couvert
- * par son miroir de reproductibilité lib/v2/grid.test.ts. Cette lentille ne RÉIMPLÉMENTE aucune
- * logique : elle PROJETTE la même matrice que /v2/grille, thémée V3.
+ * shell V3 (parcours « Comprendre », ADR 0060). La donnée — la matrice + les Σ comptées — vient du
+ * MOTEUR Go LIVE par la passerelle (le serveur MCP `grid`, dispatché : grid.Build est autoritatif),
+ * lue côté serveur dans actions.ts (`gridLive` → `readVia(scope, "grid_build", …)`) et passée ici en
+ * props. Ce composant ne RÉIMPLÉMENTE aucune logique : il REND la matrice que le moteur calcule.
  *
- * MODE CLIENT (ADR 0092 §2, déterminisme-first §8) : il N'EXISTE PAS de serveur MCP « grille »
- * dispatché par la passerelle (le serveur grid existe mais reste non-dispatché). La logique — les
- * niveaux (la verticale §23), les facettes (FKE-1.3), le placement et le COMPTAGE des Σ — est un
- * twin pur ; on PORTE donc cette logique UX pure (légitime, ADR 0092 §2), SANS inventer une lecture
- * « live » fantôme. Un branchement live deviendra possible le jour où le store exposera les
- * coordonnées (niveau, facette) de chaque kernel (OpenQuestion documentée) ; la relation est ici
- * SYNTHÉTIQUE (240 kernels, partagés avec l'arbre /v2/kernels).
+ * S59 CUTOVER (ADR 0092 — le moteur Go est l'UNIQUE source vivante). Avant, cette lentille composait
+ * la grille depuis le TWIN PUR lib/v2/grid (buildGrid) directement — le twin ÉTAIT la source. Le
+ * cutover route la lecture par le moteur Go via la passerelle ; lib/v2/grid reste UNIQUEMENT le repli
+ * démo déterministe (lib/v2/grid-data, source:"live"|"demo"). La §2 ne couvre que les vraies
+ * logiques client (éditeurs live, aperçu optimiste, extracteur d'AST) — JAMAIS un calcul pur que le
+ * moteur fait : composer la grille EN était un, donc un twin flippé.
  *
  * ACTION-CAPABLE (CLAUDE.md §6, ui-completeness) : l'écran NE FAIT PAS qu'afficher —
  *   - on lit le total + les sommes Σ par ligne / par colonne (COHÉRENTES : Σ = total) ;
@@ -26,10 +25,11 @@ import { type KernelNode, syntheticComposes } from "@/lib/v2/kernel-tree";
  *   - une cellule vide reste légale (zéro spec) — jamais un lien mort.
  *
  * DÉTERMINISME-FIRST : composer la grille est PUR & TOTAL (mêmes coordonnées → même matrice, Σ
- * comptées, jamais estimées). Ce composant ne fait que du RENDU ; il ne juge rien.
+ * comptées, jamais estimées) — c'est pourquoi c'est le moteur (code), jamais un agent. Ce composant
+ * ne fait que du RENDU ; il ne juge rien.
  *
- * LE MUR (§2) : projection de LECTURE — aucune écriture kernel/mirrors/fitness. Geler une vérité
- * passe par idée → miroir → /goal → approbation, jamais depuis cet écran.
+ * LE MUR (§2) : projection de LECTURE below-the-line — aucune écriture kernel/mirrors/fitness. Geler
+ * une vérité passe par idée → miroir → /goal → approbation, jamais depuis cet écran.
  */
 
 interface Labels {
@@ -42,7 +42,8 @@ interface Labels {
 	cellHint: string;
 	noSelection: string;
 	sourceLabel: string;
-	sourceTwin: string;
+	sourceLive: string;
+	sourceDemo: string;
 	sourceTitle: string;
 	wallNote: string;
 }
@@ -50,14 +51,15 @@ interface Labels {
 /** Le libellé d'une facette (FKE-1.3), pour l'infobulle d'en-tête de colonne. */
 const FACET_NAME = new Map(FACETS.map((f) => [f.letter, f.name] as const));
 
-export function GrilleClient({ labels }: { labels: Labels }) {
-	// La liste plate des kernels (mêmes 240 que l'arbre /v2/kernels), figée par le twin → grille + Σ.
-	const grid: Grid | null = useMemo(() => {
-		const composes: KernelNode[] = syntheticComposes(240);
-		const res = buildGrid(composes);
-		return res.ok ? res.grid : null;
-	}, []);
-
+export function GrilleClient({
+	grid,
+	source,
+	labels,
+}: {
+	grid: Grid | null;
+	source: Source;
+	labels: Labels;
+}) {
 	const [selected, setSelected] = useState<{
 		level: string;
 		facet: string;
@@ -73,7 +75,7 @@ export function GrilleClient({ labels }: { labels: Labels }) {
 
 	return (
 		<div className="space-y-6" data-testid="v3-grille-lens">
-			{/* LA MATRICE niveau × facette : la table + les sommes Σ + sa source honnête (twin pur). */}
+			{/* LA MATRICE niveau × facette : la table + les sommes Σ + sa source honnête (live|démo). */}
 			<section
 				data-testid="v3-grille-grid"
 				className="space-y-4 rounded-xl border border-border bg-card p-5"
@@ -87,15 +89,24 @@ export function GrilleClient({ labels }: { labels: Labels }) {
 					</p>
 					<span
 						data-testid="v3-grille-source"
-						data-source="twin"
+						data-source={source}
 						title={labels.sourceTitle}
-						className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
+						className={[
+							"inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold",
+							source === "live"
+								? "bg-primary/10 text-primary"
+								: "bg-muted text-muted-foreground",
+						].join(" ")}
 					>
 						<span
 							aria-hidden="true"
-							className="size-1.5 rounded-full bg-muted-foreground"
+							className={[
+								"size-1.5 rounded-full",
+								source === "live" ? "bg-primary" : "bg-muted-foreground",
+							].join(" ")}
 						/>
-						{labels.sourceLabel}: {labels.sourceTwin}
+						{labels.sourceLabel}:{" "}
+						{source === "live" ? labels.sourceLive : labels.sourceDemo}
 					</span>
 				</div>
 

@@ -206,6 +206,29 @@ describe("T5 L6 — closed reasons + the deterministic twin set", () => {
 		expect(twinNamesFromLibDir(listing)).toEqual(["adoption", "context-pack"]);
 	});
 
+	// BLIND-SPOT CLOSE (ADR 0092 recipe (c)) — a RECURSIVE listing exposes
+	// sub-directory twins. A lib/v2/<x> with its demo-fallback fixture is a twin
+	// named `v2/<x>` (sub-dir prefix kept); a lib/v2/<x> with only its
+	// reproducibility-mirror `.test.ts` sibling and NO `-data.ts` is NOT yet a
+	// twin (the witness is unchanged — the flip adds the fixture, recipe (b)).
+	it("twinNamesFromLibDir scans lib/v2/* recursively (the closed blind spot)", () => {
+		const listing = [
+			"adoption.ts",
+			"adoption-data.ts", // top-level twin (unchanged)
+			"v2/grid.ts",
+			"v2/grid-data.ts", // ⇒ v2/grid is a twin (post-flip)
+			"v2/links.ts",
+			"v2/links.test.ts", // mirror-only, NO -data sibling ⇒ not yet a twin
+			"v3/kernels-data.ts", // orphan fixture (no <x>.ts) ⇒ not a twin
+		];
+		expect(twinNamesFromLibDir(listing)).toEqual(["adoption", "v2/grid"]);
+	});
+
+	it("twinNamesFromLibDir normalises back-slash (Windows) recursive entries", () => {
+		const listing = ["v2\\grid.ts", "v2\\grid-data.ts"];
+		expect(twinNamesFromLibDir(listing)).toEqual(["v2/grid"]);
+	});
+
 	it("a non-`@/lib/<x>` or deeper import is never a twin (e.g. @/lib/sub/x)", () => {
 		const src =
 			'import { f } from "@/lib/adoption/deep";\n' +
@@ -222,7 +245,12 @@ describe("T5 L6 — closed reasons + the deterministic twin set", () => {
 // that re-makes a TS twin a live source — or deletes a readVia from a cutover
 // panel — reds this same pass.
 describe("T5 L7 — reality: the rule classifies the real tree correctly", () => {
-	const realTwins = twinNamesFromLibDir(readdirSync(join(WEB_ROOT, "lib")));
+	// RECURSIVE listing (ADR 0092 recipe (c)) — POSIX-relative paths so a twin
+	// hiding in lib/v2/* is visible. readdirSync({recursive:true}) yields nested
+	// entries with the platform separator; the function normalises back-slashes.
+	const realTwins = twinNamesFromLibDir(
+		readdirSync(join(WEB_ROOT, "lib"), { recursive: true }) as string[],
+	);
 
 	it("the real twin set is the lib/<x>.ts + lib/<x>-data.ts pairs (non-empty)", () => {
 		expect(realTwins.length).toBeGreaterThan(0);
@@ -249,5 +277,93 @@ describe("T5 L7 — reality: the rule classifies the real tree correctly", () =>
 		const findings = scanPanel(p, src, realTwins);
 		expect(findings.length).toBeGreaterThan(0);
 		expect(findings.some((f) => f.twin === "@/lib/adoption")).toBe(true);
+	});
+});
+
+// ── L8 — the CLOSED BLIND SPOT: a deep lib/v2/<x> twin (ADR 0092 recipe (c)) ──
+// Before this close the cliquet was BLIND twice over to the four V3 lenses
+// (grille→buildGrid, liens→buildGraph, anatomie→anatomyOf, arbres→treeFrom):
+// the flat top-level scan never saw lib/v2/*, and the AST pass rejected any
+// `@/lib/v2/<x>` deeper path. These were mis-labelled "client-UX légitime §2"
+// — but a PURE calc byte-identique au Go is a TWIN, not client-UX. This block
+// proves the door is shut: a lib/v2 twin read AS the live path REDS, and the
+// same twin behind the readVia/demo frontier PASSES.
+describe("T5 L8 — closed blind spot: lib/v2/<x> deep twins are classified", () => {
+	// The four named V2 pure-calc twins (post-flip names, sub-dir prefix kept).
+	const V2_TWINS = ["v2/anatomy", "v2/grid", "v2/kernel-tree", "v2/links"];
+
+	it("a deep `@/lib/v2/grid` value import IS recognised as a twin", () => {
+		const src =
+			'import { buildGrid } from "@/lib/v2/grid";\nexport const x = 1;\n';
+		const p = parseImports(src, V2_TWINS);
+		expect(p.twinValueImports.map((t) => t.twin)).toEqual(["@/lib/v2/grid"]);
+	});
+
+	it("L8 RED — a lib/v2 twin read AS the live path reds, naming file + twin", () => {
+		// the pre-flip GrilleClient shape: buildGrid from @/lib/v2/grid, NO frontier.
+		const src =
+			"// the grille lens computing displayed data from the v2 twin (no readVia)\n" +
+			'import { buildGrid, type Grid } from "@/lib/v2/grid";\n' +
+			'import { syntheticComposes } from "@/lib/v2/kernel-tree";\n' +
+			"export function GrilleClient() {\n" +
+			"\tconst g: Grid | null = buildGrid(syntheticComposes(240)).grid;\n" +
+			"\treturn g;\n" +
+			"}\n";
+		const findings = scanPanel("app/v3/grille/GrilleClient.tsx", src, V2_TWINS);
+		// two value twin imports (grid + kernel-tree), NO frontier ⇒ both red.
+		expect(findings.length).toBe(2);
+		expect(findings.map((f) => f.twin).sort()).toEqual([
+			"@/lib/v2/grid",
+			"@/lib/v2/kernel-tree",
+		]);
+		for (const f of findings) {
+			expect(f.file).toBe("app/v3/grille/GrilleClient.tsx");
+			expect(f.reason).toBe("twin_value_import_without_frontier");
+		}
+	});
+
+	it("L8 GREEN — the same v2 twin behind readVia/demo passes (the flip)", () => {
+		// the post-flip shape: the twin compute builds the demo fallback ONLY, and
+		// readVia from gateway-sdk forces it behind source:"demo".
+		const src =
+			'"use server";\n' +
+			'import { buildGraph } from "@/lib/v2/links";\n' +
+			'import { readVia, type Source } from "@/lib/gateway-sdk";\n' +
+			'import { panelScope } from "@/lib/panelScope";\n' +
+			"export async function live(): Promise<{ source: Source }> {\n" +
+			"\tconst scope = await panelScope();\n" +
+			"\tconst demo = buildGraph([]);\n" +
+			'\tconst { source } = await readVia(scope, "links_build", {}, () => demo, demo);\n' +
+			"\treturn { source };\n" +
+			"}\n";
+		expect(scanPanel("app/v3/liens/actions.ts", src, V2_TWINS)).toHaveLength(0);
+	});
+
+	it("L8 GREEN — a type-only deep v2 twin import passes", () => {
+		const src =
+			'import type { Grid } from "@/lib/v2/grid";\nexport const x = 1;\n';
+		expect(scanPanel("app/v3/grille/page.tsx", src, V2_TWINS)).toHaveLength(0);
+	});
+
+	it("L8 load-bearing — neutralising the v2 twin set lets the deep red pass", () => {
+		// drop v2/grid from the set ⇒ the AST pass no longer knows it as a twin ⇒
+		// the breach slips through (a dead guard would be a monster, §5).
+		const src =
+			'import { buildGrid } from "@/lib/v2/grid";\nexport const x = 1;\n';
+		const inert = V2_TWINS.filter((n) => n !== "v2/grid");
+		expect(
+			scanPanel("app/v3/grille/GrilleClient.tsx", src, inert),
+		).toHaveLength(0);
+		// and present in the set ⇒ red — the gate is the only thing standing.
+		expect(
+			scanPanel("app/v3/grille/GrilleClient.tsx", src, V2_TWINS).length,
+		).toBe(1);
+	});
+
+	it("L8 — a >1-level deep import (@/lib/v3/design/x) is never a twin", () => {
+		const src =
+			'import { f } from "@/lib/v3/design/tokens";\nexport const x = 1;\n';
+		const p = parseImports(src, ["v3/design/tokens"]);
+		expect(p.twinValueImports).toHaveLength(0);
 	});
 });

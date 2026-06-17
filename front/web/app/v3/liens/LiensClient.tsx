@@ -12,54 +12,52 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useMemo, useState } from "react";
+import type { Source } from "@/lib/gateway-sdk";
 import {
-	countByKind,
-	filterByKind,
-	kindToCanon,
-	LINK_KINDS,
-	type Link,
-	type LinkKind,
+	CANON_KINDS,
+	type CanonKind,
+	type LinkRow,
+	type LinkStatus,
+	type LinksView,
 	type Ref,
-	refString,
-	syntheticLinkGraph,
-} from "@/lib/v2/links";
+	refStr,
+} from "@/lib/v2/links-data";
 import { useV3Session } from "../V3Session";
 
 /**
- * /v3/liens — LA LENTILLE DES SIX LIENS (KRD §17/§41), portée EN PROPRE dans la session
- * V3 (parcours « Comprendre »). Un kernel ne flotte jamais seul : il est RELIÉ aux autres
- * par six familles de liens TYPÉS (composes verticaux · depends_on horizontaux · supersedes
- * généalogiques · provenance · triggers/binds · mirrors), et chaque lien pointe une VERSION
- * (`id@version`), JAMAIS une identité nue — c'est l'enjeu §41 (la vague de rouge §42).
+ * /v3/liens — LA LENTILLE DES SIX LIENS (KRD §17/§41), portée EN PROPRE dans la session V3
+ * (parcours « Comprendre »). Un kernel ne flotte jamais seul : il est RELIÉ aux autres par six
+ * familles de liens TYPÉS (projects_to · derives_from · contracts_with · triggers · binds ·
+ * mirrors), et chaque lien pointe une VERSION (`id@version`), JAMAIS une identité nue — c'est
+ * l'enjeu §41 (la vague de rouge §42).
  *
- * MODE CLIENT (ADR 0092 §2, déterminisme-first §8) : il N'EXISTE PAS de serveur MCP des
- * liens dispatché par la passerelle. La logique — le jeu CLOS des familles, le graphe
- * synthétique canonique, le filtre par type, le pinning §41, le mapping vers le jeu
- * canonique S17 — est un TWIN PUR AUTORITATIF (lib/v2/links.ts), couvert par son miroir de
- * parité lib/v2/links.test.ts. On PORTE cette logique UX pure (légitime, ADR 0092 §2),
- * thémée V3, SANS ré-implémenter le Go ; un branchement live deviendra possible le jour où
- * un outil de lecture des liens sera dispatché.
+ * LENTILLE NATIVE LIVE (ADR 0092 — le moteur Go est la SEULE source live des liens). Le graphe et
+ * le STATUT PAR LIEN (green|stale|absent) viennent EN DIRECT du serveur Go `links` (outil
+ * `links_graph`, back/kernel/links.Validate/Resolve), lus côté serveur (page.tsx → linksGraphAction)
+ * et reçus ici en props. Le calcul des liens (validate/resolve/filter) était un TWIN PUR
+ * « byte-identique au Go » (lib/v2/links.ts) — pas du client-UX légitime (§2) ; il est SUPPRIMÉ.
+ * Le badge dit HONNÊTEMENT la source : « en direct » (la passerelle a dispatché) ou « démo » (repli
+ * déterministe lib/v2/links-data, calculé À PARTIR DU TWIN) — JAMAIS « calcul pur (repli démo) » (ADR 0074).
  *
  * ACTION-CAPABLE (CLAUDE.md §6, ui-completeness) : l'écran NE FAIT PAS qu'afficher —
- *   1) le FILTRE par famille est une action exécutable : cliquer une famille ne montre QUE
- *      ses arêtes (filterByKind, twin pur) ; « toutes » les remontre ;
- *   2) cliquer un lien l'OUVRE (son détail : famille, from, cible pinnée @version, canonique) ;
+ *   1) le FILTRE par famille est une action exécutable : cliquer une famille ne montre QUE ses
+ *      arêtes (filtrage CLIENT sur les verdicts live, pas un recalcul du statut) ; « toutes » les
+ *      remontre ;
+ *   2) cliquer un lien l'OUVRE (son détail : famille, from, cible pinnée @version, statut live) ;
  *   3) PAN/ZOOM activé (React Flow Controls + molette + drag).
  *
- * LE MUR (CLAUDE.md §2) : projection de LECTURE, aucune écriture-vérité — aucun drag de
- * nœud, aucune connexion ; la promotion d'un lien reste idée → miroir → /goal → approbation.
- * Themed (tokens shadcn ADR 0010, zéro hex/zinc) + bilingue (next-intl, FR par défaut, ADR
- * 0011 — strings depuis la session V3).
+ * LE MUR (CLAUDE.md §2) : projection de LECTURE, aucune écriture-vérité — aucun drag de nœud,
+ * aucune connexion ; la promotion d'un lien reste idée → miroir → /goal → approbation. Themed
+ * (tokens shadcn ADR 0010, zéro hex/zinc) + bilingue (next-intl, FR par défaut, ADR 0011 — strings
+ * depuis la session V3).
  */
 
-/** La couleur d'arête par famille de lien (tokens ADR 0010, jamais de hex en dur). */
-const KIND_STROKE: Record<LinkKind, string> = {
-	composes: "var(--color-primary)",
-	depends_on: "var(--color-chart-2)",
-	supersedes: "var(--color-chart-3)",
-	provenance: "var(--color-chart-4)",
-	triggers_binds: "var(--color-chart-5)",
-	mirrors: "var(--color-chart-1)",
+/** La couleur d'arête par STATUT live (tokens ADR 0010, jamais de hex en dur). Le statut prime sur
+ * la famille : c'est le verdict §41–§42 (green sain ; stale/absent = rouge) que l'écran doit crier. */
+const STATUS_STROKE: Record<LinkStatus, string> = {
+	green: "var(--color-primary)",
+	stale: "var(--color-chart-3)",
+	absent: "var(--color-destructive)",
 };
 
 type KernelNodeData = { ref: Ref };
@@ -96,114 +94,163 @@ function KernelNode({ data }: NodeProps<Node<KernelNodeData>>) {
 
 const nodeTypes = { kernel: KernelNode };
 
-/** L'id stable d'une arête (pour la sélection + la clé React Flow). */
-function edgeId(l: Link): string {
-	return `${refString(l.from)}--${l.kind}-->${refString(l.to)}`;
+/** L'id stable d'une arête (pour la sélection + la clé React Flow) — depuis les verdicts live. */
+function rowEdgeId(r: LinkRow): string {
+	return `${r.from}--${r.kind}-->${r.to}`;
 }
 
-export function LiensClient() {
+export function LiensClient({
+	view,
+	source,
+}: {
+	view: LinksView;
+	source: Source;
+}) {
 	// Les strings de la session V3 (bilingue, FR par défaut — injectées par le layout).
 	const { strings: t } = useV3Session();
+	const isLive = source === "live";
 
-	// La donnée vient du twin PUR (déterministe) — le graphe canonique des six liens.
-	const graph = useMemo(() => syntheticLinkGraph(), []);
-	const counts = useMemo(() => countByKind(graph), [graph]);
-
-	// L'état du filtre : null = toutes les familles ; sinon une famille du jeu clos.
-	const [activeKind, setActiveKind] = useState<LinkKind | null>(null);
+	// L'état du filtre : null = toutes les familles ; sinon une famille du jeu clos canonique.
+	const [activeKind, setActiveKind] = useState<CanonKind | null>(null);
 	const [openEdgeId, setOpenEdgeId] = useState<string | null>(null);
 
-	// Le sous-graphe filtré (filterByKind, twin pur) — c'est ce que React Flow rend.
-	const shown = useMemo(
-		() => (activeKind ? filterByKind(graph, activeKind) : graph),
-		[graph, activeKind],
+	// Les verdicts live (rows) du moteur Go ; on FILTRE par famille côté client (pas de recalcul du
+	// statut — c'est le Go qui a jugé green|stale|absent). « toutes » = tous les verdicts.
+	const shownRows = useMemo(
+		() =>
+			activeKind ? view.rows.filter((r) => r.kind === activeKind) : view.rows,
+		[view.rows, activeKind],
 	);
 
-	// Le libellé localisé de chaque famille (le jeu clos LINK_KINDS → liensKind*).
+	// Le compte par famille (sur les verdicts live), pour le résumé du filtre.
+	const counts = useMemo(() => {
+		const out = Object.fromEntries(CANON_KINDS.map((k) => [k, 0])) as Record<
+			CanonKind,
+			number
+		>;
+		for (const r of view.rows) {
+			if ((CANON_KINDS as readonly string[]).includes(r.kind)) {
+				out[r.kind as CanonKind] += 1;
+			}
+		}
+		return out;
+	}, [view.rows]);
+
+	// Le libellé localisé de chaque famille (le jeu clos canonique CANON_KINDS → liensKind*).
 	const kindLabels = useMemo(
 		() =>
 			Object.fromEntries(
-				LINK_KINDS.map((k) => [k, t[`liensKind_${k}`] ?? k]),
-			) as Record<LinkKind, string>,
+				CANON_KINDS.map((k) => [k, t[`liensKind_${k}`] ?? k]),
+			) as Record<CanonKind, string>,
 		[t],
 	);
+
+	// Le libellé localisé d'un statut live (green|stale|absent → liensStatus*).
+	const statusLabel = (s?: LinkStatus): string =>
+		s ? (t[`liensStatus_${s}`] ?? s) : (t.liensStatusInvalid ?? "invalid");
 
 	// Position déterministe des nœuds : une grille fixe par index (aucun aléa).
 	const positions = useMemo(() => {
 		const m = new Map<string, { x: number; y: number }>();
-		graph.nodes.forEach((n, i) => {
-			m.set(refString(n), {
+		view.nodes.forEach((n, i) => {
+			m.set(refStr(n), {
 				x: (i % 4) * 200,
 				y: Math.floor(i / 4) * 180,
 			});
 		});
 		return m;
-	}, [graph]);
+	}, [view.nodes]);
 
 	const nodes = useMemo<Node<KernelNodeData>[]>(
 		() =>
-			graph.nodes.map((n) => ({
-				id: refString(n),
+			view.nodes.map((n) => ({
+				id: refStr(n),
 				type: "kernel",
-				position: positions.get(refString(n)) ?? { x: 0, y: 0 },
+				position: positions.get(refStr(n)) ?? { x: 0, y: 0 },
 				data: { ref: n },
 				selectable: false,
 				draggable: false,
 				connectable: false,
 			})),
-		[graph, positions],
+		[view.nodes, positions],
 	);
 
 	const edges = useMemo<Edge[]>(
 		() =>
-			shown.links.map((l) => ({
-				id: edgeId(l),
-				source: refString(l.from),
-				target: refString(l.to),
-				label: kindLabels[l.kind as LinkKind] ?? l.kind,
-				animated: false,
+			shownRows.map((r) => ({
+				id: rowEdgeId(r),
+				source: r.from,
+				target: r.to,
+				label: kindLabels[r.kind as CanonKind] ?? r.kind,
+				animated: r.status === "stale" || r.status === "absent",
 				selectable: true,
-				data: { kind: l.kind },
+				data: { kind: r.kind, status: r.status },
 				style: {
-					stroke: KIND_STROKE[l.kind as LinkKind] ?? "var(--color-border)",
+					stroke: r.status
+						? STATUS_STROKE[r.status]
+						: "var(--color-destructive)",
 					strokeWidth: 2,
 				},
 				labelStyle: { fontSize: 10 },
 			})),
-		[shown, kindLabels],
+		[shownRows, kindLabels],
 	);
 
-	const openLink = openEdgeId
-		? (shown.links.find((l) => edgeId(l) === openEdgeId) ?? null)
+	const openRow = openEdgeId
+		? (shownRows.find((r) => rowEdgeId(r) === openEdgeId) ?? null)
 		: null;
 
 	return (
 		<div className="space-y-5">
-			{/* Le badge de source HONNÊTE (ADR 0074) : twin pur autoritatif, pas un live fantôme. */}
+			{/* Le badge de source HONNÊTE (ADR 0074) : en direct (passerelle) ou démo (repli) —
+			    JAMAIS « calcul pur (repli démo) ». La logique des liens vient du moteur Go (links_graph). */}
 			<div
 				data-testid="v3-liens-source"
-				className="inline-flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-1 text-xs text-muted-foreground"
-				title={t.liensSourceTitle}
+				data-source={source}
+				className={[
+					"inline-flex items-center gap-2 rounded-md border px-3 py-1 text-xs",
+					isLive
+						? "border-primary/30 bg-primary/5 text-primary"
+						: "border-border bg-muted text-muted-foreground",
+				].join(" ")}
+				title={isLive ? t.liensSourceLiveTitle : t.liensSourceDemoTitle}
 			>
 				<span
-					className="h-1.5 w-1.5 rounded-full bg-muted-foreground"
+					className={[
+						"h-1.5 w-1.5 rounded-full",
+						isLive ? "bg-primary" : "bg-muted-foreground",
+					].join(" ")}
 					aria-hidden
 				/>
-				{t.liensSource}
+				{isLive ? t.liensSourceLive : t.liensSourceDemo}
 			</div>
 
-			{/* Le résumé : nombre de kernels, nombre de liens affichés. */}
+			{/* Le résumé : nombre de kernels, nombre de liens affichés, et les comptes de statut live. */}
 			<div
 				data-testid="v3-liens-summary"
-				data-node-count={graph.nodes.length}
-				data-link-count={shown.links.length}
+				data-node-count={view.nodes.length}
+				data-link-count={shownRows.length}
+				data-green={view.green}
+				data-stale={view.stale}
+				data-absent={view.absent}
 				className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm"
 			>
 				<span className="font-medium text-foreground">
-					{graph.nodes.length} {t.liensKernels}
+					{view.nodes.length} {t.liensKernels}
 				</span>
 				<span className="font-mono text-xs text-muted-foreground">
-					{shown.links.length} {t.liensLinks}
+					{shownRows.length} {t.liensLinks}
+				</span>
+				<span className="ml-auto flex items-center gap-3 font-mono text-xs">
+					<span className="text-primary">
+						{view.green} {t.liensStatus_green}
+					</span>
+					<span className="text-chart-3">
+						{view.stale} {t.liensStatus_stale}
+					</span>
+					<span className="text-destructive">
+						{view.absent} {t.liensStatus_absent}
+					</span>
 				</span>
 			</div>
 
@@ -230,7 +277,7 @@ export function LiensClient() {
 				>
 					{t.liensAll}
 				</button>
-				{LINK_KINDS.map((k) => (
+				{CANON_KINDS.map((k) => (
 					<button
 						key={k}
 						type="button"
@@ -282,8 +329,8 @@ export function LiensClient() {
 				</ReactFlow>
 			</div>
 
-			{/* Le DÉTAIL d'un lien cliqué — read-only, le mur intact. Montre la cible PINNÉE @version. */}
-			{openLink && (
+			{/* Le DÉTAIL d'un lien cliqué — read-only, le mur intact. Montre la cible PINNÉE + le statut. */}
+			{openRow && (
 				<div
 					data-testid="v3-liens-edge-detail"
 					className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm"
@@ -293,29 +340,33 @@ export function LiensClient() {
 							{t.liensDetailKind} :{" "}
 						</span>
 						<span data-testid="v3-liens-detail-kind" className="font-semibold">
-							{kindLabels[openLink.kind as LinkKind] ?? openLink.kind}
+							{kindLabels[openRow.kind as CanonKind] ?? openRow.kind}
 						</span>
 					</p>
 					<p className="text-xs text-foreground">
 						<span className="font-medium text-muted-foreground">
 							{t.liensDetailFrom} :{" "}
 						</span>
-						<span className="font-mono">{refString(openLink.from)}</span>
+						<span className="font-mono">{openRow.from}</span>
 					</p>
 					<p className="text-xs text-foreground">
 						<span className="font-medium text-muted-foreground">
 							{t.liensDetailTo} :{" "}
 						</span>
 						<span data-testid="v3-liens-detail-to" className="font-mono">
-							{refString(openLink.to)}
+							{openRow.to}
 						</span>
 					</p>
 					<p className="text-xs text-foreground">
 						<span className="font-medium text-muted-foreground">
-							{t.liensDetailCanon} :{" "}
+							{t.liensDetailStatus} :{" "}
 						</span>
-						<span className="font-mono">
-							{kindToCanon(openLink.kind as LinkKind).join(" + ")}
+						<span
+							data-testid="v3-liens-detail-status"
+							data-status={openRow.status ?? "invalid"}
+							className="font-semibold"
+						>
+							{statusLabel(openRow.status)}
 						</span>
 					</p>
 					<p

@@ -42,6 +42,7 @@ import (
 	cs "github.com/steph-frtech/aidos/back/archive/changeset"
 	"github.com/steph-frtech/aidos/back/archive/contentstore"
 	"github.com/steph-frtech/aidos/back/archive/dag"
+	anatomysrv "github.com/steph-frtech/aidos/back/mcp/anatomy/anatomysrv"
 	appauthsrv "github.com/steph-frtech/aidos/back/mcp/app-auth/appauthsrv"
 	archfitnesssrv "github.com/steph-frtech/aidos/back/mcp/arch-fitness/archfitnesssrv"
 	"github.com/steph-frtech/aidos/back/mcp/autonomy/autonomysrv"
@@ -62,9 +63,12 @@ import (
 	"github.com/steph-frtech/aidos/back/mcp/evolve/evolvesrv"
 	"github.com/steph-frtech/aidos/back/mcp/federation/federationsrv"
 	goalpilotingsrv "github.com/steph-frtech/aidos/back/mcp/goal-piloting/goalpilotingsrv"
+	"github.com/steph-frtech/aidos/back/mcp/grid/gridsrv"
 	grillingloopsrv "github.com/steph-frtech/aidos/back/mcp/grilling-loop/grillingloopsrv"
 	ideaintakesrv "github.com/steph-frtech/aidos/back/mcp/idea-intake/ideaintakesrv"
 	kernelgardensrv "github.com/steph-frtech/aidos/back/mcp/kernel-garden/kernelgardensrv"
+	kerneltreesrv "github.com/steph-frtech/aidos/back/mcp/kernel-tree/kerneltreesrv"
+	"github.com/steph-frtech/aidos/back/mcp/links/linksrv"
 	"github.com/steph-frtech/aidos/back/mcp/learn/learnsrv"
 	"github.com/steph-frtech/aidos/back/mcp/memory/memorysrv"
 	"github.com/steph-frtech/aidos/back/mcp/mirror-runner/mirrorrunnersrv"
@@ -643,6 +647,43 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	// barricaded re-verify gate over the closed verdict schema, grill_verdicts a closed-table read.
 	"grilling-loop": func(context.Context) (*mcp.Server, error) {
 		return grillingloopsrv.NewServer(), nil
+	},
+	// ── ADR 0092 PHASE-2 conceptual-lens servers (the Go engine is the SINGLE live source). ──
+	// The four V3 lenses (grille · liens · anatomie · arbres) were reading TS twins (lib/v2/*) as
+	// "client-UX" — but each is a PURE CALCUL the Go kernel already owns, so each is a TWIN to flip
+	// (the §2 client-UX carve-out never covers a pure computation byte-identical to the Go back).
+	// Each builder is DEP-FREE + STATELESS like context/self-cert/workspace: no DSN, no store, no
+	// clock, no embedder, NO LLM (determinism-first §6/§8). Every dispatched tool is a CHEAP/pure
+	// read whose output is a scalar OBJECT VALUE (no json.RawMessage — the S59 byte-array scar is
+	// avoided by construction); WroteKernel always false (the wall, §2). The builder ignores its ctx
+	// and returns the default server; it dispatches identically whatever DSN is set.
+	//
+	// grid (FK03) — grid_build/resolve/mark/affected/rungs: the GRILLE over back/kernel/grid (the
+	// gridsrv lib is the former package-main extracted so the stdio binary + the dispatcher reuse
+	// one source). grid_build projects placed truths onto the Level×Facet matrix (the /v3/grille read).
+	"grid": func(context.Context) (*mcp.Server, error) {
+		return gridsrv.NewServer(), nil
+	},
+	// links (KRD §41) — links_kinds/validate/resolve/graph: the six versioned link types over
+	// back/kernel/links. links_graph validates + resolves a whole graph against the heads (the
+	// /v3/liens read) — the §41–§42 staleness check (green|stale|absent), each verdict the existing
+	// links.Validate / links.Resolve. A new kernel.link row stays the aidos CLI's job (WroteKernel false).
+	"links": func(context.Context) (*mcp.Server, error) {
+		return linksrv.NewServer(), nil
+	},
+	// anatomy (FKE) — anatomy_pairs/voyant/build: the six mirror-pairs around the wall + the
+	// deterministic VOYANT (the §8 judge is a calcul) over back/kernel/mirror/anatomy. anatomy_build
+	// is the /v3/anatomie read (six ordered pairs + worst-of-six overall + counts). A red voyant is a
+	// SIGNAL routed to idea → mirror → /goal, never a write (WroteKernel always false — the wall).
+	"anatomy": func(context.Context) (*mcp.Server, error) {
+		return anatomysrv.NewServer(), nil
+	},
+	// kernel-tree (KRD §108/§109) — tree_weights/aggregate/reopens: the `composes` mereology link
+	// over back/kernel/composes. tree_aggregate is the §109 recursive verdict + the §110 drill-down
+	// (the /v3/arbres read); a cycle is a typed refusal (CAUSED_BY_CYCLE). Weights/thresholds are
+	// DECLARED, never learned (§8). Writes nothing (the wall).
+	"kernel-tree": func(context.Context) (*mcp.Server, error) {
+		return kerneltreesrv.NewServer(), nil
 	},
 }
 
