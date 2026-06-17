@@ -6729,6 +6729,8 @@
 		"reqShowAll": "tout afficher"
 	},
 	"v2Shell": {
+		"legacyBanner": "Workbench V2 — legacy. Le modèle conceptuel KRD est désormais intégré « en propre » dans V3.",
+		"legacyCta": "Aller au Workbench V3",
 		"eyebrow": "Workbench V2 — le schéma KRD",
 		"title": "Le Workbench, par concept",
 		"subtitle": "La refonte V2 du cockpit, organisée selon le schéma KRD : de l’idée au mur, puis la verticale × la facette × les paires-miroir, les liens du §17, les arbres et les cellules.",
@@ -7517,7 +7519,7 @@
 		"navCode": "Code",
 		"navInstance": "Instance",
 		"navParams": "Paramètres",
-		"navWorkbench": "Workbench V2",
+		"navWorkbench": "Workbench V2 (legacy)",
 		"navGroupConcevoir": "Concevoir",
 		"navGroupComprendre": "Comprendre",
 		"navGroupConstruire": "Construire & déployer",

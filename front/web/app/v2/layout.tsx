@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { V2Header } from "./V2Header";
+import { V2LegacyBanner } from "./V2LegacyBanner";
 import { V2Nav } from "./V2Nav";
 
 /**
@@ -19,6 +20,7 @@ export default function V2Layout({ children }: { children: ReactNode }) {
 			data-testid="v2-shell"
 			className="flex min-h-screen flex-col bg-background text-foreground sm:-ml-64"
 		>
+			<V2LegacyBanner />
 			<V2Header />
 			<div className="flex flex-1 flex-col sm:flex-row">
 				<aside className="shrink-0 border-b border-border bg-card/40 p-3 sm:w-64 sm:border-b-0 sm:border-r">
