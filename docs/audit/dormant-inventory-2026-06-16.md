@@ -113,3 +113,17 @@ ATTENTION: deadcode ne voit pas la reachability HTTP (gateway dispatch) ni les t
 3. **`honoemit.EmitDesktopChild`/`EmitMobileChild`** — **doublon mort**, PAS une capacité manquante. Le déploiement émet DÉJÀ les 3 enfants (web/mobile/desktop) : `runFound → FoundProject → recompileFamilies(AllFamilies())` (found.go:185-214, via `ReproduceWithCapitalised`). Les fonctions `Emit{Desktop,Mobile}Child` bares sont un doublon à /trim. **LOW (rangement).**
 
 > Reste réel côté desktop : la SOURCE Electron est émise, mais **aucun chemin pour la VOIR** (pas de build+run+stream du GUI). C'est le « voir Electron » à câbler (CDP screencast, le webVNC faisable).
+
+## Dette connue (décision propriétaire 2026-06-17) — point-aveugle cliquet lib/v2
+
+Le cliquet anti-twin `front/web/lib/twin-as-live-fitness.ts` (`twinNamesFromLibDir`) ne scanne
+que le TOP-LEVEL `lib/*.ts`. Les **27 twins sous `lib/v2/*.ts`** sont donc INVISIBLES au cliquet :
+les 22 panneaux `app/v2/*` les lisent comme chemin live, sans frontière readVia/demo.
+
+**Décision : NON traité (V2 est legacy — lien de pied dans V3Nav, V3 est la lentille primaire).**
+Ventilation des 27 (scoping 2026-06-17) : 2 déjà dispatchés (conscience, why), 6 flippables-now
+(serveur back/mcp existant : ai-lab, deploy, grid, cellules, composition, goal), ~9 needs-new-server
+(= recoupe le programme « serveurs manquants »), ~10 **client-UX légitimes** (ADR 0092 §2 : builder,
+code-extract/graph, grill, schema, screens, version-dag, workflows… — à GARDER côté client, pas à tuer).
+Si V2 redevient une cible active : fermer le point-aveugle (scanner `lib/v2/`) DOIT atterrir avec les
+flips + les exemptions client-UX en une fois (sinon rouge sur tous les panneaux V2 non flippés).
