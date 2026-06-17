@@ -19,7 +19,7 @@
 //
 //	gateway_route   — the routing decision for a (scope, tool, target) call (the wall)
 //	gateway_tools   — the CLOSED set of exposed tools (server + disposition)
-//	gateway_servers — the 13 MCP servers the gateway fronts
+//	gateway_servers — the 21 MCP servers the gateway fronts
 //
 // DETERMINISM-FIRST (CLAUDE.md §6/§8): "pur routage, zéro LLM". The router is a pure
 // total function; this server only frames it over the two transports. The actual
@@ -42,12 +42,17 @@ import (
 	cs "github.com/steph-frtech/aidos/back/archive/changeset"
 	"github.com/steph-frtech/aidos/back/archive/contentstore"
 	"github.com/steph-frtech/aidos/back/archive/dag"
+	archfitnesssrv "github.com/steph-frtech/aidos/back/mcp/arch-fitness/archfitnesssrv"
 	"github.com/steph-frtech/aidos/back/mcp/backtester/backtestersrv"
 	"github.com/steph-frtech/aidos/back/mcp/changeset/changesetsrv"
+	"github.com/steph-frtech/aidos/back/mcp/conscience/consciencesrv"
 	"github.com/steph-frtech/aidos/back/mcp/context/contextsrv"
 	"github.com/steph-frtech/aidos/back/mcp/dag/dagsrv"
 	"github.com/steph-frtech/aidos/back/mcp/evolve/evolvesrv"
+	"github.com/steph-frtech/aidos/back/mcp/federation/federationsrv"
+	goalpilotingsrv "github.com/steph-frtech/aidos/back/mcp/goal-piloting/goalpilotingsrv"
 	ideaintakesrv "github.com/steph-frtech/aidos/back/mcp/idea-intake/ideaintakesrv"
+	"github.com/steph-frtech/aidos/back/mcp/learn/learnsrv"
 	"github.com/steph-frtech/aidos/back/mcp/memory/memorysrv"
 	"github.com/steph-frtech/aidos/back/mcp/mirror-runner/mirrorrunnersrv"
 	"github.com/steph-frtech/aidos/back/mcp/mutation-runner/mutationrunnersrv"
@@ -57,6 +62,7 @@ import (
 	realityingestsrv "github.com/steph-frtech/aidos/back/mcp/reality-ingest/realityingestsrv"
 	"github.com/steph-frtech/aidos/back/mcp/store/storesrv"
 	"github.com/steph-frtech/aidos/back/mcp/telemetry-reader/telemetryreadersrv"
+	whytreesrv "github.com/steph-frtech/aidos/back/mcp/why-tree/whytreesrv"
 	"github.com/steph-frtech/aidos/back/runtime/gateway"
 	"github.com/steph-frtech/aidos/back/runtime/gatewaydispatch"
 	"github.com/steph-frtech/aidos/back/runtime/markitdown"
@@ -214,7 +220,7 @@ func newMCPServer(dispatch *gatewaydispatch.Dispatcher) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "aidos-gateway", Version: "v0.1.0"}, nil)
 	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_route", Description: "The server-side wall routing decision for a (scope, tool, target) call: route a below-the-line op, refuse a cross-project/forged call (AGENT_CROSS_PROJECT_WRITE), or refuse a truth-write (GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET). Pure, deterministic — zero LLM."}, s.route)
 	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_tools", Description: "The CLOSED set of MCP tools the gateway exposes (name · owning server · wall disposition), sorted. Pure."}, s.tools)
-	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_servers", Description: "The 14 MCP servers the gateway fronts (store · mirror-runner · changeset · dag · idea-intake · memory · context · evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project · provision — the DP13 stack/bootstrap/profile tools)."}, s.servers)
+	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_servers", Description: "The 21 MCP servers the gateway fronts (store · mirror-runner · changeset · dag · idea-intake · memory · context · evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project · provision · reality-ingest · why-tree · goal-piloting · federation · learn · conscience · arch-fitness)."}, s.servers)
 	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_call", Description: "Route THEN dispatch a (scope, tool, args) call to its owning backend in-process (S59). The wall applies FIRST: a truth-write is refused (GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET), a cross-project/forged call is refused (AGENT_CROSS_PROJECT_WRITE), an unknown tool is refused. A routed below-the-line call returns the backend's structured result; without a configured store it returns route_undispatched (the caller falls back to demo)."}, s.call)
 	return srv
 }
@@ -409,6 +415,55 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	"backtester": func(context.Context) (*mcp.Server, error) {
 		return backtestersrv.NewServer(), nil
 	},
+	// ── S59-batch DEP-FREE read servers (ADR 0092: the Go engine is the SINGLE live source). ──
+	// Each of the six below is DEP-FREE like context/evolve/provision/pact-verifier/backtester:
+	// no DSN, no store, no clock, no embedder, NO LLM in the dispatch path (determinism-first,
+	// §6/§8). Every dispatched tool is a CHEAP/pure read (a graph-walk, a compute, a hash) whose
+	// output is a VALUE with WroteKernel=false — the wall holds (§2): no kernel/mirrors/fitness
+	// write reaches a backend (the router refuses a truth-write before any dispatch). The builder
+	// ignores its ctx and returns the default server; it dispatches identically whatever DSN is set.
+	//
+	// why-tree (FK13 /why) — build/serialize/kinds: a content-addressed WhyTree from a red symptom,
+	// its kernel.link body, the link-kind discriminator. Freezing the terminal mirror stays /goal.
+	"why-tree": func(context.Context) (*mcp.Server, error) {
+		return whytreesrv.NewServer(), nil
+	},
+	// goal-piloting (S66) — goal_pilot_open/close/live_red_set: pure computation that PROPOSES a
+	// DRAFT ChangeSet (by id/status reference, never the RawMessage envelope body) + the LIVE red
+	// set; the NON-GAMEABLE close gate. Persistence rides the changeset door under approval — there
+	// is no apply/close-stamp tool (closing stays the aidos role).
+	"goal-piloting": func(context.Context) (*mcp.Server, error) {
+		return goalpilotingsrv.NewServer(), nil
+	},
+	// federation (S103/§51) — saga_over_cells/fan_out/temporal_over_cells: PURE cross-cell
+	// compositions returning the per-cell RedWorkQueue waves as VALUES. fan_out NEVER enqueues —
+	// the actual INSERT into runtime.red_work_queue is the S22 PostKernelChange hook's job below the
+	// waterline (the tool computes the waves; the hook writes them). Writes nothing here.
+	"federation": func(context.Context) (*mcp.Server, error) {
+		return federationsrv.NewServer(), nil
+	},
+	// learn (S107/E12) — bump_hash/targeted_wave/close_loop: READ-ONLY on the kernel; every tool's
+	// WroteKernel is false and the direct Reality→Kernel edge is always refused. The dispatch-safe
+	// Target carries spec_body as an OBJECT (learnsrv wraps learn.Target.SpecBody, a json.RawMessage,
+	// behind a map[string]any so the HTTP input schema is an object, not a byte-array — the S59 scar).
+	"learn": func(context.Context) (*mcp.Server, error) {
+		return learnsrv.NewServer(), nil
+	},
+	// conscience (FK09) — reconcile/decision_cards: PURE aggregation of the EXISTING judges'
+	// verdicts (AUCUN NOUVEAU JUGE) into a ConsciousnessReport / the §FKE-31 decision cards. A
+	// divergence card is a SIGNAL routed to idea → mirror → /goal — never a write (the wall).
+	"conscience": func(context.Context) (*mcp.Server, error) {
+		return consciencesrv.NewServer(), nil
+	},
+	// arch-fitness (S102) — measure/ratchet/gate are dispatched (PURE graph algorithms returning a
+	// metric/verdict VALUE). `propose` is NOT dispatched (it stays exposed by the server for the
+	// stdio binary + CI): it returns a DRAFT ChangeSet whose Delta.Body is a json.RawMessage (the
+	// byte-array output scar) AND it is the baseline-MOVE proposal the front never fires
+	// synchronously — the move goes through the changeset commit gate under approval (like
+	// run_mutation: a proposal/heavy tool is governed/async by design, never a blocking one-shot).
+	"arch-fitness": func(context.Context) (*mcp.Server, error) {
+		return archfitnesssrv.NewServer(), nil
+	},
 	// mutation-runner — read_threshold is the CHEAP dispatched read (SELECT-only on fitness,
 	// the declared mutation-score bar the /mutation-score panel shows live). run_mutation stays
 	// exposed (the standalone binary + CI use it) but is HEAVY (gremlins/Stryker subprocess,
@@ -457,9 +512,11 @@ func gatewayDSNConfigured() bool {
 // buildDispatcher constructs the S59 Dispatcher when a DSN is configured, else nil (the wall
 // still holds for gateway_call — see (*server).call). The StoreProvider consults serverBuilders:
 // changeset · store · dag · project · memory · context · idea-intake · telemetry-reader · evolve ·
-// reality-ingest · provision · mirror-runner · pact-verifier · backtester are wired; every OTHER
-// server returns ErrServerNotDispatched, so the front falls back to demo for the un-wired ones
-// (strictly additive cutover, no regression).
+// reality-ingest · provision · mirror-runner · pact-verifier · backtester · why-tree ·
+// goal-piloting · federation · learn · conscience · arch-fitness are wired (the last six are the
+// ADR 0092 dep-free read batch — their CHEAP/pure read tools dispatch in-process so the Go engine
+// is the single live source and the TS twin dies); every OTHER server returns ErrServerNotDispatched,
+// so the front falls back to demo for the un-wired ones (strictly additive cutover, no regression).
 //
 // mutation-runner is DELIBERATELY left UN-WIRED (route_undispatched → demo). Its dominant tool
 // run_mutation shells out to gremlins/Stryker — a LONG subprocess that must NOT block a

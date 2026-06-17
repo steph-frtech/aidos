@@ -1,4 +1,4 @@
-package main
+package federationsrv
 
 import (
 	"context"
@@ -67,7 +67,7 @@ func TestFanOutTool_NonAffectedStayGreen(t *testing.T) {
 }
 
 func TestNewMCPServer(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("server must build")
 	}
 }

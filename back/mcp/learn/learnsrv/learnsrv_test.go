@@ -1,8 +1,7 @@
-package main
+package learnsrv
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/steph-frtech/aidos/back/archive/brain/firewall"
@@ -17,19 +16,23 @@ import (
 // The learn MCP server is the S107 capability door (the wall: read-only on the kernel). These
 // tests prove the tools close the §S107 loop deterministically at the MCP boundary — the
 // done-criterion: incident → draft idea (provenance=incident) → approved mirror → hash bump →
-// targeted red wave ; the wall always refuses ; nothing learns its own fitness.
+// targeted red wave ; the wall always refuses ; nothing learns its own fitness. The Target is the
+// DISPATCH-SAFE targetIn (spec_body as an OBJECT, not a json.RawMessage — the S59 scar guard).
 
-func createOrderTarget() learn.Target {
-	return learn.Target{
-		Kind:     learn.TargetOperation,
+func createOrderTarget() targetIn {
+	return targetIn{
+		Kind:     string(learn.TargetOperation),
 		ID:       "op-createOrder",
 		Version:  "v1",
-		SpecBody: json.RawMessage(`{"kind":"operation","name":"createOrder"}`),
+		SpecBody: map[string]any{"kind": "operation", "name": "createOrder"},
 	}
 }
 
-func approvedMirror(t learn.Target) learn.ApprovedMirror {
-	return learn.ApprovedMirror{MirrorID: "mir-out-of-stock-during-checkout", Reflects: t.Ref()}
+func approvedMirror(t targetIn) learn.ApprovedMirror {
+	return learn.ApprovedMirror{
+		MirrorID: "mir-out-of-stock-during-checkout",
+		Reflects: links.Ref{ID: t.ID, Version: t.Version},
+	}
 }
 
 func incident(t *testing.T) reality.Incident {
@@ -121,7 +124,7 @@ func TestCloseLoopTool_IncidentToWaveProvenanceIncidentNoKernelWrite(t *testing.
 }
 
 func TestNewMCPServer_Builds(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("nil server")
 	}
 }

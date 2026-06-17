@@ -5995,7 +5995,11 @@
 		"mComplexity": "complexité max",
 		"howToFixLabel": "Comment corriger",
 		"wallNote": "Le mur : ceci est un brouillon (DRAFT) — la base structurelle ne se déplace qu'après approbation humaine du ChangeSet. L'écran n'écrit jamais la vérité directement.",
-		"working": "En cours…"
+		"working": "En cours…",
+		"sourceLive": "en direct",
+		"sourceDemo": "démo",
+		"sourceLiveTitle": "Mesuré en direct par le moteur Go via la passerelle (outil measure)",
+		"sourceDemoTitle": "Passerelle injoignable — affichage de la mesure de démo (jumeau déterministe)"
 	},
 	"secretStore": {
 		"eyebrow": "S91 · secret store par projet",

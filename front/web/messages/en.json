@@ -5995,7 +5995,11 @@
 		"mComplexity": "max complexity",
 		"howToFixLabel": "How to fix",
 		"wallNote": "The wall: this is a DRAFT — the structural baseline only moves after a human approves the ChangeSet. The screen never writes truth directly.",
-		"working": "Working…"
+		"working": "Working…",
+		"sourceLive": "live",
+		"sourceDemo": "demo",
+		"sourceLiveTitle": "Measured live by the Go engine via the passerelle (the measure tool)",
+		"sourceDemoTitle": "Passerelle unreachable — showing the demo measure (deterministic twin)"
 	},
 	"secretStore": {
 		"eyebrow": "S91 · per-project secret store",

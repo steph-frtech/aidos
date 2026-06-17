@@ -1,4 +1,4 @@
-package main
+package goalpilotingsrv
 
 import (
 	"context"
@@ -85,7 +85,7 @@ func TestGoalPilotCloseIsNonGameable(t *testing.T) {
 	green := []sensorInput{{Mirror: "Order.discount.fixture", State: "green"}}
 
 	// All four hold ⇒ closeable.
-	_, out, _ := close(context.Background(), nil, closeInput{
+	_, out, _ := closeGoal(context.Background(), nil, closeInput{
 		RedSet: red, Sensors: green, PriorGreen: "intact", Mutation: 0.9, MutationFloor: 0.8,
 	})
 	if !out.Closeable || out.Block != nil {
@@ -100,7 +100,7 @@ func TestGoalPilotCloseIsNonGameable(t *testing.T) {
 		{RedSet: red, Sensors: green, PriorGreen: "intact", Mutation: 0.9, MutationFloor: 0.8, Monsters: []string{"m"}},
 	}
 	for i, f := range faults {
-		_, o, _ := close(context.Background(), nil, f)
+		_, o, _ := closeGoal(context.Background(), nil, f)
 		if o.Closeable {
 			t.Fatalf("fault %d: close must be refused", i)
 		}
@@ -121,7 +121,7 @@ func TestGoalLiveRedSetSorted(t *testing.T) {
 }
 
 func TestServerRegistersThreeTools(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("nil server")
 	}
 }

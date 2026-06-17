@@ -1,4 +1,4 @@
-package main
+package whytreesrv
 
 import (
 	"context"
@@ -25,8 +25,8 @@ func allRepro() []reproIn {
 }
 
 func TestServerBuilds(t *testing.T) {
-	if srv := newMCPServer(); srv == nil {
-		t.Fatal("newMCPServer returned nil")
+	if srv := NewServer(); srv == nil {
+		t.Fatal("NewServer returned nil")
 	}
 }
 

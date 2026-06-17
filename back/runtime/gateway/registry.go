@@ -89,6 +89,45 @@ func DefaultTools() []Tool {
 	// outward edge is a DRAFT idea (idea → mirror → /goal → approval). Registering it
 	// here makes `/learn`'s door reachable — the capability ceases to be dormant.
 	t = append(t, below("reality-ingest", "detect_divergence", "ingest_divergence", "render_idea_text")...)
+	// 16. why-tree — FK13 /why (the 5-whys redressed): build a content-addressed WhyTree
+	// from a red symptom, serialize it to its kernel.link body, read the link-kind
+	// discriminator. ALL BELOW THE LINE: three PURE graph-walks whose output is a VALUE
+	// (a tree / a record / a discriminator); freezing the terminal mirror is /goal, never
+	// these tools (WroteKernel always false — the wall).
+	t = append(t, below("why-tree", "build", "serialize", "kinds")...)
+	// 17. goal-piloting — S66 UI-piloted /goal: open a goal (a DRAFT ChangeSet PROPOSAL by
+	// reference + the LIVE red set), the NON-GAMEABLE close gate, the live red-set worklist.
+	// ALL BELOW THE LINE: pure computation that PROPOSES (the open returns the changeset by
+	// id/status, never a raw kernel write); persistence rides the changeset door under
+	// approval (the wall). No apply/close-stamp tool exists — closing stays the aidos role.
+	t = append(t, below("goal-piloting", "goal_pilot_open", "goal_pilot_close", "goal_live_red_set")...)
+	// 18. federation — S103/§51 cross-cell composition: run the canonical saga over two real
+	// contracted cells, fan a global policy out to a RedWorkQueue per cell, evaluate a
+	// temporal deadline across cells. ALL BELOW THE LINE: three PURE compositions returning
+	// the per-cell waves as VALUES — the actual INSERT into runtime.red_work_queue is the
+	// S22 hook's job below the waterline, never these tools (writes nothing — the wall).
+	t = append(t, below("federation", "saga_over_cells", "fan_out", "temporal_over_cells")...)
+	// 19. learn — S107/E12 /learn loop-closure: the hash bump an approved mirror causes on
+	// its target, the targeted red wave it seeds, the full incident→wave loop. ALL BELOW THE
+	// LINE: READ-ONLY on the kernel — every tool's WroteKernel is false; the loop never
+	// authors the mirror (the human's /goal does) and the direct Reality→Kernel edge is
+	// always refused (the wall). The dispatch-safe Target carries spec_body as an object
+	// (the S59 RawMessage-scar guard lives in learnsrv).
+	t = append(t, below("learn", "bump_hash", "targeted_wave", "close_loop")...)
+	// 20. conscience — FK09 the conscience: reconcile the verdicts of the EXISTING judges
+	// into a ConsciousnessReport, project the §FKE-31 decision cards. ALL BELOW THE LINE:
+	// two PURE aggregations (AUCUN NOUVEAU JUGE) returning a projection as a VALUE — a
+	// divergence card is a SIGNAL routed to idea → mirror → /goal, never a write (the wall).
+	t = append(t, below("conscience", "reconcile", "decision_cards")...)
+	// 21. arch-fitness — S102 structural ratchet: measure a cut's four lower-is-better
+	// metrics, ratchet a candidate against a baseline, gate (measure∘ratchet) a candidate
+	// cut. ALL BELOW THE LINE: three PURE graph algorithms returning a metric/verdict VALUE.
+	// `propose` (the baseline-MOVE door) is DELIBERATELY NOT dispatched: it returns a DRAFT
+	// ChangeSet whose Delta.Body is a json.RawMessage (a byte-array the HTTP output schema
+	// rejects — the S59 scar) AND it is a truth-PROPOSAL the front never fires synchronously
+	// (the move goes through the changeset commit gate under approval, like run_mutation).
+	// It stays EXPOSED by the server (the stdio binary + CI use it), simply not wired here.
+	t = append(t, below("arch-fitness", "measure", "ratchet", "gate")...)
 
 	// THE FENCED TRUTH-ZONE WRITE NAMESPACE (§2). Not a real tool of any server — the
 	// door a caller might craft to move truth directly. Registered as TruthWrite so the
@@ -106,17 +145,23 @@ func DefaultTools() []Tool {
 	return t
 }
 
-// GatewayServers is the closed list of the 15 MCP servers the gateway exposes (display
+// GatewayServers is the closed list of the 21 MCP servers the gateway exposes (display
 // + the completeness assertion: every named server has ≥1 exposed tool). Ordered. The
 // 14th — `provision` — is ACTIVATED at DP13 (the scaffold the gateway now fronts:
 // every provisioning op is an MCP tool, ADR 0009; a scaffold the gateway never fronts
 // is dead). The 15th — `reality-ingest` — is REGISTERED at ADR 0081 (issue A): the
 // prod→kernel on-ramp the gateway must front so `/learn` has its door; a capability the
 // gateway never fronts is the symmetric monster of an orphan mirror (§1, §5 generalised).
+// The 16th–21st — why-tree · goal-piloting · federation · learn · conscience ·
+// arch-fitness — are the S59-batch DEP-FREE read servers (ADR 0092): each fronts only its
+// CHEAP/pure read tools (graph-walk, compute, hash), the in-process dispatch is the live
+// path and the TS twin dies. A capability the gateway never fronts is dormant; fronting it
+// here makes the engine the single live source.
 func GatewayServers() []string {
 	return []string{
 		"store", "mirror-runner", "changeset", "dag", "idea-intake", "memory",
 		"context", "evolve", "backtester", "telemetry-reader", "pact-verifier",
 		"mutation-runner", "project", "provision", "reality-ingest",
+		"why-tree", "goal-piloting", "federation", "learn", "conscience", "arch-fitness",
 	}
 }

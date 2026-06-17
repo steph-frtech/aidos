@@ -199,9 +199,39 @@ export function ArchFitnessPanel({
 				action={measureFormAction}
 				className="space-y-4 rounded-xl border border-border p-5"
 			>
-				<h2 className="text-sm font-semibold tracking-tight text-foreground">
-					{t("measureHeading")}
-				</h2>
+				<div className="flex flex-wrap items-center gap-3">
+					<h2 className="text-sm font-semibold tracking-tight text-foreground">
+						{t("measureHeading")}
+					</h2>
+					{measureState.ok && measureState.source ? (
+						<span
+							data-testid="measure-source"
+							data-source={measureState.source}
+							className={
+								measureState.source === "live"
+									? "inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+									: "inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
+							}
+							title={
+								measureState.source === "live"
+									? t("sourceLiveTitle")
+									: t("sourceDemoTitle")
+							}
+						>
+							<span
+								aria-hidden="true"
+								className={
+									measureState.source === "live"
+										? "size-1.5 rounded-full bg-primary"
+										: "size-1.5 rounded-full bg-muted-foreground"
+								}
+							/>
+							{measureState.source === "live"
+								? t("sourceLive")
+								: t("sourceDemo")}
+						</span>
+					) : null}
+				</div>
 				<input type="hidden" name="projectId" value={project} />
 				<Submit label={t("measureLabel")} testid="measure-submit" />
 				{measureState.ok && measureState.metric ? (

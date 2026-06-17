@@ -3,6 +3,7 @@ import type {
 	RatchetVerdict,
 	StructuralMetric,
 } from "@/lib/arch-fitness";
+import type { Source } from "@/lib/gateway-sdk";
 
 /**
  * View models for the /arch-fitness panel (S102 — the structural ratchet, §47). Kept OUT of
@@ -12,6 +13,8 @@ import type {
 export interface MeasureView {
 	ok: boolean;
 	metric?: StructuralMetric;
+	/** whether the metric came from the live Go engine (passerelle) or the demo fixture (S59). */
+	source?: Source;
 }
 
 export interface RatchetView {

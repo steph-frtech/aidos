@@ -1,6 +1,14 @@
 "use server";
 
 import { type DepGraph, measure, propose, ratchet } from "@/lib/arch-fitness";
+import {
+	cleanCut,
+	demoMeasure,
+	gatewayGraphArgs,
+} from "@/lib/arch-fitness-data";
+import { readVia } from "@/lib/gateway-sdk";
+import { panelScope } from "@/lib/panelScope";
+import { metricDecoder } from "./live";
 import type { GateView, MeasureView, ProposeView, RatchetView } from "./view";
 
 /**
@@ -13,31 +21,21 @@ import type { GateView, MeasureView, ProposeView, RatchetView } from "./view";
  * structural ratchet and BLOCKS THE CUT, INDEPENDENT of the (green) behavioural mirrors — it
  * prevents "tests verts, système pourri". The baseline moves ONLY via a DRAFT ChangeSet.
  *
- * DETERMINISM-FIRST (CLAUDE.md §6/§8): measure + ratchet + propose are PURE functions
- * (lib/arch-fitness) — same input → byte-identical result, never an LLM. THE WALL (§2/§9):
- * /arch-fitness measures + ratchets + PROPOSES; propose returns a DRAFT envelope, it does not
- * persist truth from the screen.
+ * S59 CUTOVER (ADR 0092 — the Go engine is the SINGLE live source). `measureAction` now reads the
+ * LIVE metric from the Go arch-fitness MCP server through the passerelle
+ * (`readVia(scope, "measure", …)`, the dispatched below-the-line read), with the twin
+ * `lib/arch-fitness.measure()` preserved ONLY as the deterministic demo fallback
+ * (`source:"live"|"demo"`). ratchet/gate/propose stay on the twin compute as the demo path (a
+ * proposal/comparison the front shows locally); the `readVia` frontier import keeps the T5 cliquet
+ * GREEN (the twin sits behind the demo fallback, never as the live source).
+ *
+ * DETERMINISM-FIRST (CLAUDE.md §6/§8): the decoder + the demo fallback (the same pure twin compute
+ * the Go engine reproduces) are pure; a malformed / undispatched / refused answer yields the demo
+ * metric. THE WALL (§2/§9): /arch-fitness measures + ratchets + PROPOSES; propose returns a DRAFT
+ * envelope, it does not persist truth from the screen — measure is a below-the-line read.
  */
 
-// The canonical CLEAN cut of the §46 checkout federation: checkout depends on billing across
-// the HONORED contract; no violation, no cycle. The BASELINE the ratchet protects.
-function cleanCut(projectId: string): DepGraph {
-	return {
-		project: projectId || "shop",
-		cells: { checkout: 5, billing: 3, catalog: 4 },
-		honored: [{ a: "checkout", b: "billing" }],
-		edges: [
-			{
-				from: "checkout.place",
-				fromCell: "checkout",
-				to: "billing.charge",
-				toCell: "billing",
-			},
-		],
-	};
-}
-
-// A candidate cut carrying the injected fault: a NEW uncontracted edge (boundary violation) or a
+// candidateCut carries the injected fault: a NEW uncontracted edge (boundary violation) or a
 // NEW back-edge (inter-cell cycle). Each must REDDEN the structural ratchet against the baseline.
 function candidateCut(projectId: string, scenario: string): DepGraph {
 	const g = cleanCut(projectId);
@@ -64,7 +62,18 @@ export async function measureAction(
 	formData: FormData,
 ): Promise<MeasureView> {
 	const projectId = String(formData.get("projectId") ?? "shop");
-	return { ok: true, metric: measure(cleanCut(projectId)) };
+	const graph = cleanCut(projectId);
+	const scope = await panelScope();
+	// LIVE read through the passerelle (the dispatched arch-fitness `measure` tool); the twin
+	// demoMeasure() is the deterministic fallback (source:"live"|"demo") — ADR 0092.
+	const { data, source } = await readVia(
+		scope,
+		"measure",
+		{ graph: gatewayGraphArgs(graph) },
+		metricDecoder,
+		demoMeasure(projectId),
+	);
+	return { ok: true, metric: data, source };
 }
 
 export async function ratchetAction(
