@@ -13,7 +13,7 @@ import type { Grid, GridCell } from "@/lib/v2/grid";
  * props. Ce composant ne RÉIMPLÉMENTE aucune logique : il REND la matrice que le moteur calcule.
  *
  * S59 CUTOVER (ADR 0092 — le moteur Go est l'UNIQUE source vivante). Avant, cette lentille composait
- * la grille depuis le TWIN PUR lib/v2/grid (buildGrid) directement — le twin ÉTAIT la source. Le
+ * la grille depuis le calcul TS lib/v2/grid (buildGrid) directement — le twin ÉTAIT la source. Le
  * cutover route la lecture par le moteur Go via la passerelle ; lib/v2/grid reste UNIQUEMENT le repli
  * démo déterministe (lib/v2/grid-data, source:"live"|"demo"). La §2 ne couvre que les vraies
  * logiques client (éditeurs live, aperçu optimiste, extracteur d'AST) — JAMAIS un calcul pur que le

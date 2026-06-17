@@ -2522,7 +2522,7 @@
 		"title": "Adoption + Release v0",
 		"intro": "L'échelle AdoptionStage nomme le plus petit cliquet qui clique ensuite (KRD §82.5) : cinq paliers déclarés T0→T4. T1 ne requiert PAS la QualityDiversity (avancée, §82.6) ; T2 exige un RealityMirror vivant (Livre XX) ; T4 exige un EvolutionSandbox (§66.1). Le Release v0 est ASSEMBLÉ — un inventaire en lecture seule de ce qui existe, content-addressed. On assemble ; on n'installe rien, on ne livre rien, on n'écrit aucune vérité.",
 		"tutorialTitle": "Comment lire ce panneau",
-		"tutorialStep1": "Choisissez un scénario de capacités : l'échelle et le pack se recalculent (twin pur, déterministe).",
+		"tutorialStep1": "Choisissez un scénario de capacités : l'échelle et le pack se recalculent (calcul pur, déterministe).",
 		"tutorialStep2": "Lisez l'échelle T0→T4 : le palier courant est surligné, le prochain cliquet installable est marqué, chaque palier bloqué liste ses manques (Gaps).",
 		"tutorialStep3": "Repérez les trois faits porteurs : T1 sans QualityDiversity, T2 bloqué sans RealityMirror, T4 bloqué sans EvolutionSandbox.",
 		"tutorialStep4": "Parcourez le Release v0 : surface CLI, routes, démo, docs, inventaire de tests, changelog, limites connues — aucun bouton installer / livrer / publier (on assemble seulement).",
@@ -7143,7 +7143,7 @@
 		"inputPlaceholder": "Ex. « Je veux un tunnel de paiement sécurisé du panier au reçu »",
 		"placeBtn": "Placer sur la verticale",
 		"fallbackBtn": "Fallback déterministe",
-		"fallbackNote": "Fallback déterministe : Claude indisponible — le twin pur a posé un placement par défaut (produit · F · spec). Honnête sur le cerveau.",
+		"fallbackNote": "Fallback déterministe : Claude indisponible — le calcul pur a posé un placement par défaut (produit · F · spec). Honnête sur le cerveau.",
 		"samplesHeading": "Besoins d'exemple (incluent une cellule inventée — clampée)",
 		"rightHeading": "La verticale — specs placées",
 		"rightHint": "Chaque spec placée porte son (facette · paire) ; les cellules inventées par le cerveau gauche sont JETÉES par le clamp (jamais coercées).",
@@ -8159,7 +8159,7 @@
 		"grilleSourceDemo": "démo (repli)",
 		"grilleSourceTitle": "La matrice est lue EN LIVE depuis le moteur Go par la passerelle (le serveur grid dispatché, grid_build — grid.Build est autoritatif). Si la passerelle est injoignable, l'écran retombe sur la démo déterministe (le twin lib/v2/grid, byte-identique au Go).",
 		"grilleWallNote": "Le mur (§2) : la grille est une projection de lecture. Aucune écriture kernel/mirrors/fitness — la promotion reste idée → miroir → /goal.",
-		"grilleFooter": "Le moteur Go est l'UNIQUE source vivante (ADR 0092) : la grille est lue en live par la passerelle (grid_build), le twin pur lib/v2/grid n'étant conservé que comme repli démo déterministe. Composer la grille est une fonction pure & totale (mêmes coordonnées → même matrice, Σ comptées, jamais estimées) — c'est pourquoi c'est le moteur (code), jamais un agent."
+		"grilleFooter": "Le moteur Go est l'UNIQUE source vivante (ADR 0092) : la grille est lue en live par la passerelle (grid_build), le calcul TS lib/v2/grid n'étant conservé que comme repli démo déterministe. Composer la grille est une fonction pure & totale (mêmes coordonnées → même matrice, Σ comptées, jamais estimées) — c'est pourquoi c'est le moteur (code), jamais un agent."
 	},
 	"v3cellules": {
 		"title": "Les cellules — la fédération",
@@ -8740,7 +8740,7 @@
 		"subtitle": "Sauvegardes déterministes",
 		"intro": "La stratégie de BACKUP DÉTERMINISTE de l'app émise : ses volumes nommés bind (${APP_DATA_PATH}) ET son datastore (dump Postgres / snapshot Doltgres non-prod). Planifiée sur une horloge INJECTÉE (côté twin, jamais time.Now), append-only, scopée project_id. DISTINCT du rollback-par-phase (DP28) : le backup protège la DONNÉE, le rollback ré-émet le CODE.",
 		"tutorialHeading": "Comment ça marche",
-		"tutorialBody": "Cliquez « Planifier un backup » : le twin pur de RealizeBackup (horloge injectée) tire le job planifié à l'échéance et frappe un artefact RESTAURABLE content-addressed, scopé au projet, qui entre dans le journal append-only. « Restaurer » round-trip la donnée SANS PERTE — l'état restauré ÉGALE l'état sauvegardé. Le backup ne porte AUCUN secret en clair (S91 ScanEmission, indicateur vert) et reste isolé par projet (DP15 : un backup de A est inaccessible depuis B). Le mur : below-the-line, aucune écriture-vérité ; une restauration est une décision enregistrée (§9).",
+		"tutorialBody": "Cliquez « Planifier un backup » : le calcul pur de RealizeBackup (horloge injectée) tire le job planifié à l'échéance et frappe un artefact RESTAURABLE content-addressed, scopé au projet, qui entre dans le journal append-only. « Restaurer » round-trip la donnée SANS PERTE — l'état restauré ÉGALE l'état sauvegardé. Le backup ne porte AUCUN secret en clair (S91 ScanEmission, indicateur vert) et reste isolé par projet (DP15 : un backup de A est inaccessible depuis B). Le mur : below-the-line, aucune écriture-vérité ; une restauration est une décision enregistrée (§9).",
 		"backupsHeading": "Sauvegardes",
 		"backupsIntro": "Planifier, lister et restaurer les backups déterministes de l'app — volumes bind + datastore. Horloge injectée côté twin ; append-only ; scopé project_id.",
 		"noSecretOk": "Aucun secret en clair",

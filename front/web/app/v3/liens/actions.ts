@@ -17,7 +17,7 @@ import { linksGraphDecoder } from "./live";
  * `linksGraphAction` lit le graphe LIVE depuis le serveur Go `links` à travers la passerelle
  * (`readVia(scope, "links_graph", …)`, la lecture below-the-line dispatchée qui appelle
  * back/kernel/links.Validate/Resolve). Le calcul des liens (validate/resolve/filter/all-pinned)
- * était un TWIN PUR « byte-identique au Go » (lib/v2/links.ts) — pas du client-UX légitime (§2) ;
+ * était un calcul TS « byte-identique au Go » (lib/v2/links.ts) — pas du client-UX légitime (§2) ;
  * il N'EST PLUS le chemin vivant. Le twin (via lib/v2/links-data) n'est conservé QUE comme repli
  * déterministe de démo (source:"live"|"demo", JAMAIS « calcul pur (repli démo) ») ; l'import de la frontière
  * readVia garde le cliquet T5 (twin-as-live-fitness) VERT (le twin est derrière le repli de démo).

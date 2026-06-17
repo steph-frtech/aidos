@@ -34,7 +34,7 @@ import { useV3Session } from "../V3Session";
  * LENTILLE NATIVE LIVE (ADR 0092 — le moteur Go est la SEULE source live des liens). Le graphe et
  * le STATUT PAR LIEN (green|stale|absent) viennent EN DIRECT du serveur Go `links` (outil
  * `links_graph`, back/kernel/links.Validate/Resolve), lus côté serveur (page.tsx → linksGraphAction)
- * et reçus ici en props. Le calcul des liens (validate/resolve/filter) était un TWIN PUR
+ * et reçus ici en props. Le calcul des liens (validate/resolve/filter) était un calcul TS
  * « byte-identique au Go » (lib/v2/links.ts) — pas du client-UX légitime (§2) ; il est SUPPRIMÉ.
  * Le badge dit HONNÊTEMENT la source : « en direct » (la passerelle a dispatché) ou « démo » (repli
  * déterministe lib/v2/links-data, calculé À PARTIR DU TWIN) — JAMAIS « calcul pur (repli démo) » (ADR 0074).

@@ -16,7 +16,7 @@ import { LiensClient } from "./LiensClient";
  * LENTILLE NATIVE LIVE (ADR 0092 — le moteur Go est la SEULE source live des liens). Le graphe
  * + le statut PAR LIEN (green|stale|absent §41–§42) sont LUS EN DIRECT par la passerelle, via
  * l'outil Go `links_graph` (back/mcp/links/linksrv → back/kernel/links.Validate/Resolve). Le
- * CALCUL des liens était un TWIN PUR « byte-identique au Go » (lib/v2/links.ts) — pas du
+ * CALCUL des liens était un calcul TS « byte-identique au Go » (lib/v2/links.ts) — pas du
  * client-UX légitime (§2) ; il est SUPPRIMÉ. La fixture synthétique (lib/v3/liens-data) reste
  * UNIQUEMENT le repli déterministe de démo (badge « en direct » / « démo », ADR 0074), jamais
  * « calcul pur (repli démo) ». On lit ici côté serveur (linksGraphAction) et on passe la vue à la lentille.
