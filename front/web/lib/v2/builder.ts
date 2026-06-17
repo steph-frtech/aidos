@@ -1354,10 +1354,12 @@ export function resolveScreen(
 		.replace(/[̀-ͯ]/g, "")
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")}-`;
-	let best: { s: ScreenRef; score: number } | null = null;
+	let best: { s: ScreenRef; score: number; rank: number } | null = null;
 	for (const sc of screens) {
 		const routeTokens = screenTokens(sc.route.replace(/[/-]/g, " "));
 		const labelTokens = screenTokens(sc.label);
+		// Le SCORE POSITIF : c'est lui (et lui seul) qui ouvre la porte fail-closed —
+		// un message sans aucune accroche reste à 0 → refus, jamais une route inventée.
 		let score = 0;
 		for (const t of tokens) {
 			if (routeTokens.has(t)) score += 3;
@@ -1368,12 +1370,23 @@ export function resolveScreen(
 		// déterministe des collisions, exigé par la loi de couverture totale).
 		const lastSeg = sc.route.split("/").pop() ?? "";
 		if (lastSeg.length > 0 && phrase.includes(`-${lastSeg}-`)) score += 4;
+		// PÉNALITÉ DE PRÉCISION (départage seulement, JAMAIS la porte fail-closed) : un
+		// token de route NON cité par la phrase rend le match moins précis (−1 chacun),
+		// appliqué dans un score de RANG dérivé du score positif — sans pouvoir le rendre
+		// nul (la porte ci-dessous teste `score`, pas `rank`). Quand un MÊME slug existe en
+		// haut (`/version-dag`) ET porté en V3 (`/v3/version-dag`), « ouvre l'écran
+		// version-dag » préfère le top-level (0 token oublié) tandis que « ouvre l'écran v3
+		// version-dag » préfère la lentille V3 (le token `v3` cité, donc 0 oubli) — un
+		// départage déterministe qui ne dépend plus de l'ordre lexical des routes.
+		let rank = score;
+		for (const rt of routeTokens) if (!tokens.has(rt)) rank -= 1;
 		if (
 			best === null ||
 			score > best.score ||
-			(score === best.score && sc.route < best.s.route)
+			(score === best.score &&
+				(rank > best.rank || (rank === best.rank && sc.route < best.s.route)))
 		)
-			best = { s: sc, score };
+			best = { s: sc, score, rank };
 	}
 	return best === null || best.score === 0 ? null : best.s;
 }

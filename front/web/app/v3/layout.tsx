@@ -62,6 +62,18 @@ const KEYS = [
 	"navDesign",
 	"navEmetteurs",
 	"navWorkbench",
+	"navGroupConcevoir",
+	"navGroupComprendre",
+	"navGroupConstruire",
+	"navGroupEvoluer",
+	"navGroupReglages",
+	"navSoon",
+	"navPolicy",
+	"navKernels",
+	"navWhyTree",
+	"navConscience",
+	"navVersionDag",
+	"navArchFitness",
 	"paletteOpen",
 	"palettePlaceholder",
 	"paletteEmpty",
@@ -461,6 +473,38 @@ const KEYS = [
 	"emetteursDesktopFrameHint",
 	"emetteursDesktopUnavailable",
 	"emetteursDesktopBundleTree",
+	"policyTitle",
+	"policyIntro",
+	"policyWallBadge",
+	"policyReadOnly",
+	"policyAuthorityBadge",
+	"policyKernelBadge",
+	"policyTutorialHeading",
+	"policyTutorialLead",
+	"policyTutorialScope",
+	"policyTutorialRule",
+	"policyTutorialEffect",
+	"policyTutorialExample",
+	"policyAnchorHeading",
+	"policyScopeLabel",
+	"policyEffectLabel",
+	"policyRuleLabel",
+	"policyIdLabel",
+	"policyScopesHeading",
+	"policyKindsHeading",
+	"policyTryHeading",
+	"policyTryLead",
+	"policyCtxLabel",
+	"policyDecisionLabel",
+	"policyProposeNote",
+	"policyKindAll",
+	"policyKindAny",
+	"policyKindNot",
+	"policyKindEq",
+	"policyKindGt",
+	"policyKindLt",
+	"policyKindExists",
+	"policyKindMatches",
 	"navEvolve",
 	"evolveTitle",
 	"evolveIntro",
@@ -545,7 +589,14 @@ const KEYS = [
 
 export default async function V3Layout({ children }: { children: ReactNode }) {
 	const t = await getTranslations("v3");
-	const strings = Object.fromEntries(KEYS.map((k) => [k, t(k)]));
+	// Build the client string bundle RÉSILIENT : la liste KEYS a dérivé au-delà du
+	// namespace `v3` (des clés design*/emetteurs*/provisioning* y figurent sans message).
+	// En dev, next-intl LÈVE `MISSING_MESSAGE` au resolve d'une clé absente lors du
+	// re-render RSC d'une Server Action (ex. /v3/why-tree → buildAction re-rend le layout),
+	// ce qui AVORTAIT le rendu du panneau. `t.has(k)` (next-intl 4.x) teste l'existence sans
+	// lever ; une clé absente retombe DÉTERMINISTIQUEMENT sur son propre nom (jamais un crash).
+	// Projection sous la ligne, aucune vérité touchée — le mur intact.
+	const strings = Object.fromEntries(KEYS.map((k) => [k, t.has(k) ? t(k) : k]));
 
 	// LE PROJET ACTIF : le cookie → le record (fail-closed) ; sans cookie, le plus
 	// récemment sauvé ; sans aucun projet, l'auto-création « Mon application » —

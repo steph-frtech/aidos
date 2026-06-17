@@ -1,17 +1,23 @@
 "use client";
 
 import {
+	Boxes,
 	ChevronDown,
 	ClipboardCheck,
 	Code,
 	Dna,
+	Eye,
 	FileCode2,
 	FolderOpen,
+	GitBranch,
 	History,
 	Layers,
 	ListChecks,
 	Map as MapIcon,
+	Network,
 	PenTool,
+	Ruler,
+	Scale,
 	Search,
 	Server,
 	Settings,
@@ -26,32 +32,99 @@ import { PALETTE_OPEN_EVENT } from "./Palette";
 import { useV3Session } from "./V3Session";
 
 /**
- * La navigation V3 (ADR 0010 thème · ADR 0011 bilingue) : dix lentilles sur UNE même
- * session (AI Lab · Parcours produit · Spécifications · Historique · Environnements ·
- * Code · Instance · Paramètres · Design · Émetteurs) + le retour Workbench V2 en pied.
- * Libellés AMICAUX
- * (aucun jargon KRD en copie primaire). LE COMMUTATEUR DE PROJETS (ADR 0061) sous le
- * logo : le projet actif + un petit panneau (la liste — cliquer rouvre AVEC tout
- * l'historique, le rejeu — et « Nouveau projet »). En pied, l'ouverture de la PALETTE
- * (⌘K — « tous les écrans au meilleur endroit »). Client Component (route active via
- * usePathname). Le mur intact : la nav LIE, n'écrit rien.
+ * La navigation V3 (ADR 0010 thème · ADR 0011 bilingue) : les lentilles d'UNE même
+ * session, REGROUPÉES par parcours utilisateur en CINQ sections (Concevoir · Comprendre ·
+ * Construire & déployer · Faire évoluer · Réglages) — une nav LOGIQUE et COORDONNÉE plutôt
+ * qu'une liste plate. Chaque section porte un en-tête thémé + bilingue (navGroupConcevoir…).
+ * Libellés AMICAUX (aucun jargon KRD en copie primaire). LE COMMUTATEUR DE PROJETS
+ * (ADR 0061) sous le logo : le projet actif + un petit panneau (la liste — cliquer rouvre
+ * AVEC tout l'historique, le rejeu — et « Nouveau projet »). En pied, l'ouverture de la
+ * PALETTE (⌘K — « tous les écrans au meilleur endroit »). Client Component (route active
+ * via usePathname). Le mur intact : la nav LIE, n'écrit rien.
+ *
+ * REGROUPER SANS CASSER : les treize lentilles existantes conservent leurs treize routes
+ * et leur comportement (data-testid `v3-nav-item`, data-route) ; seule l'ORGANISATION
+ * visuelle change. Les écrans CONCEPTUELS KRD (les `soon: true`) sont annoncés à leur
+ * place de parcours — routés en /v3/<concept> — mais rendus DÉSACTIVÉS tant que leur
+ * lentille native (lecture LIVE du moteur, jamais un twin) n'est pas portée (1er batch :
+ * policy · kernels · version-dag · arch-fitness — why-tree et conscience sont désormais
+ * PORTÉES, lecture LIVE des serveurs Go `why-tree` / `conscience` via la passerelle).
+ * Aucun lien mort.
  */
 
-export const ENTRIES = [
-	{ route: "/v3/lab", key: "navLab", Icon: Sparkles },
-	{ route: "/v3/parcours", key: "navParcours", Icon: MapIcon },
-	{ route: "/v3/specs", key: "navSpecs", Icon: ListChecks },
-	{ route: "/v3/operation", key: "navOperation", Icon: Workflow },
-	{ route: "/v3/history", key: "navHistory", Icon: History },
-	{ route: "/v3/environnements", key: "navEnvs", Icon: Layers },
-	{ route: "/v3/code", key: "navCode", Icon: Code },
-	{ route: "/v3/instance", key: "navInstance", Icon: Server },
-	{ route: "/v3/parametrage", key: "navParams", Icon: Settings },
-	{ route: "/v3/design", key: "navDesign", Icon: PenTool },
-	{ route: "/v3/emetteurs", key: "navEmetteurs", Icon: FileCode2 },
-	{ route: "/v3/evolve", key: "navEvolve", Icon: Dna },
-	{ route: "/v3/bench", key: "navBench", Icon: ClipboardCheck },
+/** Une entrée de nav : une lentille. `soon` ⇒ conceptuel annoncé, page pas encore portée. */
+interface NavEntry {
+	route: string;
+	key: string;
+	Icon: typeof Sparkles;
+	/** Conceptuel KRD pas encore porté en /v3 : rendu désactivé (placeholder, aucun lien mort). */
+	soon?: boolean;
+}
+
+/** Une section de la nav : un parcours utilisateur (en-tête + ses lentilles). */
+interface NavSection {
+	/** La clé i18n de l'en-tête de groupe (navGroupConcevoir…). */
+	titleKey: string;
+	entries: readonly NavEntry[];
+}
+
+export const SECTIONS: readonly NavSection[] = [
+	{
+		titleKey: "navGroupConcevoir",
+		entries: [
+			{ route: "/v3/lab", key: "navLab", Icon: Sparkles },
+			{ route: "/v3/specs", key: "navSpecs", Icon: ListChecks },
+			{ route: "/v3/operation", key: "navOperation", Icon: Workflow },
+			{ route: "/v3/policy", key: "navPolicy", Icon: Scale },
+			{ route: "/v3/kernels", key: "navKernels", Icon: Boxes },
+		],
+	},
+	{
+		titleKey: "navGroupComprendre",
+		entries: [
+			{ route: "/v3/parcours", key: "navParcours", Icon: MapIcon },
+			{ route: "/v3/why-tree", key: "navWhyTree", Icon: Network },
+			{ route: "/v3/conscience", key: "navConscience", Icon: Eye },
+			{
+				route: "/v3/version-dag",
+				key: "navVersionDag",
+				Icon: GitBranch,
+			},
+			{ route: "/v3/history", key: "navHistory", Icon: History },
+		],
+	},
+	{
+		titleKey: "navGroupConstruire",
+		entries: [
+			{ route: "/v3/code", key: "navCode", Icon: Code },
+			{ route: "/v3/emetteurs", key: "navEmetteurs", Icon: FileCode2 },
+			{ route: "/v3/environnements", key: "navEnvs", Icon: Layers },
+			{ route: "/v3/instance", key: "navInstance", Icon: Server },
+		],
+	},
+	{
+		titleKey: "navGroupEvoluer",
+		entries: [
+			{ route: "/v3/evolve", key: "navEvolve", Icon: Dna },
+			{ route: "/v3/bench", key: "navBench", Icon: ClipboardCheck },
+			{ route: "/v3/arch-fitness", key: "navArchFitness", Icon: Ruler },
+			{ route: "/v3/design", key: "navDesign", Icon: PenTool },
+		],
+	},
+	{
+		titleKey: "navGroupReglages",
+		entries: [{ route: "/v3/parametrage", key: "navParams", Icon: Settings }],
+	},
 ] as const;
+
+/**
+ * Le tableau PLAT des lentilles RÉELLEMENT navigables (non-`soon`), dérivé des sections —
+ * conservé pour la palette ⌘K et la loi de couverture (les conceptuels `soon` n'ont pas
+ * encore de page, on ne les expose donc pas comme écrans atteignables).
+ */
+export const ENTRIES = SECTIONS.flatMap((s) =>
+	s.entries.filter((e) => e.soon !== true),
+);
 
 export function V3Nav() {
 	const pathname = usePathname();
@@ -197,27 +270,64 @@ export function V3Nav() {
 					</div>
 				)}
 			</div>
-			{ENTRIES.map(({ route, key, Icon }) => {
-				const active = pathname === route || pathname.startsWith(`${route}/`);
-				return (
-					<Link
-						key={route}
-						href={route}
-						data-testid="v3-nav-item"
-						data-route={route}
-						aria-current={active ? "page" : undefined}
-						className={[
-							"flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-							active
-								? "bg-primary/10 font-semibold text-primary"
-								: "text-muted-foreground hover:bg-muted hover:text-foreground",
-						].join(" ")}
+			{/* LES CINQ SECTIONS : un en-tête de groupe thémé + ses lentilles. Les conceptuels
+			    `soon` sont des placeholders DÉSACTIVÉS (aucun lien mort) jusqu'à leur portage. */}
+			{SECTIONS.map((section) => (
+				<div
+					key={section.titleKey}
+					className="flex flex-col gap-0.5 pt-2 first:pt-0"
+				>
+					<h2
+						data-testid="v3-nav-group"
+						data-group={section.titleKey}
+						className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70"
 					>
-						<Icon className="h-4 w-4 shrink-0" aria-hidden />
-						<span>{t(key)}</span>
-					</Link>
-				);
-			})}
+						{t(section.titleKey)}
+					</h2>
+					{section.entries.map(({ route, key, Icon, soon }) => {
+						if (soon === true) {
+							// Conceptuel KRD annoncé à sa place de parcours, page pas encore portée :
+							// un placeholder DÉSACTIVÉ + un badge « bientôt » (jamais un lien mort).
+							return (
+								<span
+									key={route}
+									data-testid="v3-nav-soon"
+									data-route={route}
+									aria-disabled="true"
+									title={t("navSoon")}
+									className="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground/50"
+								>
+									<Icon className="h-4 w-4 shrink-0" aria-hidden />
+									<span className="min-w-0 flex-1 truncate">{t(key)}</span>
+									<span className="shrink-0 rounded border border-border bg-muted px-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+										{t("navSoon")}
+									</span>
+								</span>
+							);
+						}
+						const active =
+							pathname === route || pathname.startsWith(`${route}/`);
+						return (
+							<Link
+								key={route}
+								href={route}
+								data-testid="v3-nav-item"
+								data-route={route}
+								aria-current={active ? "page" : undefined}
+								className={[
+									"flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+									active
+										? "bg-primary/10 font-semibold text-primary"
+										: "text-muted-foreground hover:bg-muted hover:text-foreground",
+								].join(" ")}
+							>
+								<Icon className="h-4 w-4 shrink-0" aria-hidden />
+								<span>{t(key)}</span>
+							</Link>
+						);
+					})}
+				</div>
+			))}
 			<div className="mt-auto border-t border-border pt-3">
 				{/* L'OUVERTURE DE LA PALETTE (⌘K) : le bouton DISPATCHE l'événement que la
 				    palette (montée dans le layout) écoute — aucun état partagé de plus. */}

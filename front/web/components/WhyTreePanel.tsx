@@ -1,11 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import {
-	type BuildView,
-	buildAction,
-	EMPTY_BUILD_VIEW,
-} from "@/app/why-tree/actions";
+import { buildAction } from "@/app/why-tree/actions";
+import { type BuildView, EMPTY_BUILD_VIEW } from "@/app/why-tree/view";
 import { WHY_TREE_CASES } from "@/lib/why-tree-data";
 
 /**
