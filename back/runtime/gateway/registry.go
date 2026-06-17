@@ -169,6 +169,33 @@ func DefaultTools() []Tool {
 	// structs (no json.RawMessage body — the S59 byte-array transport scar is avoided).
 	t = append(t, below("behaviors", "behaviors_browse", "behaviors_search", "behaviors_tag", "behaviors_publish", "behaviors_soft_delete", "behaviors_comment", "behaviors_attach")...)
 
+	// ── ADR 0092 batch-3 servers (the Go engine is the SINGLE live source). ──
+	// 28. billing — S114 customer-facing economic plane: plans/meter/meter_project/check_quota are
+	// PURE READS (the closed plan ladder + the COUNTED usage fold + the quota verdict over the REAL
+	// AgentRun ledger, never an estimate, never an LLM); ingest_webhook is the S73 async inbound
+	// operation (idempotent, content-addressed) and pact_verify the read-only Pact provider check.
+	// ALL BELOW THE LINE: plans/usage/quotas/webhook-events are runtime/commercial rows — the server
+	// writes NO kernel/mirrors/fitness (a plan/limit is DECLARED data, §8). Every I/O is a scalar
+	// object (billing.Quota/Usage/IngestEvent are plain structs — no json.RawMessage body, the S59
+	// byte-array scar is avoided by construction). The dispatched live reads are the four pure ones;
+	// ingest_webhook stays exposed but is the inbound async op (not a synchronous front read).
+	t = append(t, below("billing", "billing_plans", "billing_meter", "billing_meter_project", "billing_check_quota", "billing_ingest_webhook", "billing_pact_verify")...)
+	// 29. dsl-editor — S77 typed-DSL editors over the four behaviour DSLs: dsl_kinds (the editable
+	// kinds), dsl_parse (typed editor doc → AST preview, no free code), dsl_propose (parse + wrap a
+	// DRAFT ChangeSet — NEVER applied). ALL BELOW THE LINE: PURE computation, WroteKernel ALWAYS
+	// false (there is no apply tool — freezing the edited source stays the /goal flow, the wall).
+	// The S59 RawMessage scar is guarded in dsleditorsrv: DslDoc.Body / Parsed.Canonical are wrapped
+	// as OBJECT (map[string]any) input/output schemas, so dsl_parse/dsl_propose dispatch over HTTP.
+	t = append(t, below("dsl-editor", "dsl_kinds", "dsl_parse", "dsl_propose")...)
+	// 30. templates — S81 curated starter catalogue: templates_list/get (read the content-addressed
+	// bundles) + templates_instantiate/fork (DRY-RUN duplicate-from-template / fork-at-phase). ALL
+	// BELOW THE LINE: every tool PURE, instantiate/fork are dry-run VALUES (WroteKernel ALWAYS false);
+	// landing the bundle's truths rides templates.Propose through the changeset door (propose →
+	// ChangeSet → approval), never these read tools. Every I/O is a scalar object (Bundle/
+	// StarterProject are plain structs — the only RawMessage is in templates.Propose's Delta, not
+	// dispatched here — so the S59 byte-array scar is avoided by construction).
+	t = append(t, below("templates", "templates_list", "templates_get", "templates_instantiate", "templates_fork")...)
+
 	// THE FENCED TRUTH-ZONE WRITE NAMESPACE (§2). Not a real tool of any server — the
 	// door a caller might craft to move truth directly. Registered as TruthWrite so the
 	// gateway refuses it with a ChangeSet-pointing BlockReason (server-side wall).
@@ -198,8 +225,14 @@ func DefaultTools() []Tool {
 // the live path and the TS twin dies. The 22nd–27th — cost-meter · build-console ·
 // build-loop · kernel-garden · autonomy · behaviors — are the ADR 0092 batch-2 DEP-FREE
 // read servers (same shape: no DSN, no LLM, every I/O a scalar object, WroteKernel always
-// false). A capability the gateway never fronts is dormant; fronting it here makes the
-// engine the single live source.
+// false). The 28th–30th — billing · dsl-editor · templates — are the ADR 0092 batch-3
+// servers (same shape: dep-free pure reads, every I/O a scalar object — dsl-editor wraps its
+// Body/Canonical as OBJECT schemas to dodge the S59 RawMessage scar; WroteKernel always false).
+// truth-approval is DELIBERATELY NOT fronted: its three tools (truth_propose/approve/
+// apply_concurrent) DECIDE/GATE a truth-write and return the apply envelope — they ARE the
+// propose → ChangeSet → approval door, never a below-the-line read, so the /truth-approval panel
+// stays that door (route(truth_propose) resolves to unknown_tool, never a readVia). A capability
+// the gateway never fronts is dormant; fronting it here makes the engine the single live source.
 func GatewayServers() []string {
 	return []string{
 		"store", "mirror-runner", "changeset", "dag", "idea-intake", "memory",
@@ -207,5 +240,6 @@ func GatewayServers() []string {
 		"mutation-runner", "project", "provision", "reality-ingest",
 		"why-tree", "goal-piloting", "federation", "learn", "conscience", "arch-fitness",
 		"cost-meter", "build-console", "build-loop", "kernel-garden", "autonomy", "behaviors",
+		"billing", "dsl-editor", "templates",
 	}
 }

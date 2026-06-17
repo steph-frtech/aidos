@@ -1,21 +1,24 @@
-package main
+package dsleditorsrv
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 )
 
-// The dsl-editor MCP server is PURE computation (the wall): these tests prove each S77 tool
-// returns deterministically without any I/O — the editable kinds, a typed parse verdict, and a
-// propose that opens a DRAFT ChangeSet (never applied). No apply tool exists (the wall).
+// The dsl-editor MCP server is PURE computation (the wall): these tests prove each S77 tool returns
+// deterministically without any I/O — the editable kinds, a typed parse verdict, and a propose that
+// opens a DRAFT ChangeSet (never applied). No apply tool exists (the wall). Moved from
+// mcp/dsl-editor/main_test.go at ADR 0092 batch-3; Body/Canonical are now OBJECT (map[string]any)
+// to be dispatch-safe over HTTP (the S59 byte-array scar guard).
 
 func policyDoc() docInput {
-	body, _ := json.Marshal(map[string]any{
-		"kind": "policy", "name": "canPlaceOrder", "scope": "OPERATION", "target": "createOrder",
-		"effect": "ALLOW", "rule": map[string]any{"kind": "exists", "sel": "$.auth"},
-	})
-	return docInput{Kind: "policy", Name: "canPlaceOrder", Body: body, ParentPhase: "phase-0"}
+	return docInput{
+		Kind: "policy", Name: "canPlaceOrder", ParentPhase: "phase-0",
+		Body: map[string]any{
+			"kind": "policy", "name": "canPlaceOrder", "scope": "OPERATION", "target": "createOrder",
+			"effect": "ALLOW", "rule": map[string]any{"kind": "exists", "sel": "$.auth"},
+		},
+	}
 }
 
 func TestKindsAreCanonical(t *testing.T) {
@@ -37,11 +40,11 @@ func TestKindsAreCanonical(t *testing.T) {
 func TestParseOKAndRejected(t *testing.T) {
 	_, ok, _ := parseTool(context.Background(), nil, policyDoc())
 	if !ok.OK || len(ok.Canonical) == 0 {
-		t.Fatalf("a well-formed policy must parse + canonicalise, got %+v", ok)
+		t.Fatalf("a well-formed policy must parse + canonicalise (object), got %+v", ok)
 	}
 	// A free-code escape is refused.
 	bad := policyDoc()
-	bad.Body, _ = json.Marshal(map[string]any{"kind": "policy", "code": "rm -rf /"})
+	bad.Body = map[string]any{"kind": "policy", "code": "rm -rf /"}
 	_, no, _ := parseTool(context.Background(), nil, bad)
 	if no.OK || no.Error == "" {
 		t.Fatal("a free-code body must be refused with an actionable error")

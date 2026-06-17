@@ -1,4 +1,4 @@
-package main
+package templatessrv
 
 import (
 	"context"
@@ -7,7 +7,9 @@ import (
 
 // The templates MCP server is PURE computation (the wall): these tests prove each S81 tool returns
 // deterministically without any I/O — list the curated bundles, get one, instantiate a deterministic
-// GREEN starter, and fork from a stable phase.
+// GREEN starter, and fork from a stable phase. Moved from mcp/templates/main_test.go at ADR 0092
+// batch-3 (the tools moved into this reusable library so the gateway dispatcher reuses the SAME
+// server in-process).
 
 func TestListCurated(t *testing.T) {
 	_, out, err := listTool(context.Background(), nil, listInput{})
@@ -81,7 +83,7 @@ func TestForkFromPhase(t *testing.T) {
 }
 
 func TestServerRegistersTools(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("server must be constructed")
 	}
 }

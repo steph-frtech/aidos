@@ -46,6 +46,7 @@ import (
 	"github.com/steph-frtech/aidos/back/mcp/autonomy/autonomysrv"
 	"github.com/steph-frtech/aidos/back/mcp/backtester/backtestersrv"
 	"github.com/steph-frtech/aidos/back/mcp/behaviors/behaviorssrv"
+	"github.com/steph-frtech/aidos/back/mcp/billing/billingsrv"
 	buildconsolesrv "github.com/steph-frtech/aidos/back/mcp/build-console/buildconsolesrv"
 	buildloopsrv "github.com/steph-frtech/aidos/back/mcp/build-loop/buildloopsrv"
 	"github.com/steph-frtech/aidos/back/mcp/changeset/changesetsrv"
@@ -53,6 +54,7 @@ import (
 	"github.com/steph-frtech/aidos/back/mcp/context/contextsrv"
 	costmetersrv "github.com/steph-frtech/aidos/back/mcp/cost-meter/costmetersrv"
 	"github.com/steph-frtech/aidos/back/mcp/dag/dagsrv"
+	dsleditorsrv "github.com/steph-frtech/aidos/back/mcp/dsl-editor/dsleditorsrv"
 	"github.com/steph-frtech/aidos/back/mcp/evolve/evolvesrv"
 	"github.com/steph-frtech/aidos/back/mcp/federation/federationsrv"
 	goalpilotingsrv "github.com/steph-frtech/aidos/back/mcp/goal-piloting/goalpilotingsrv"
@@ -68,6 +70,7 @@ import (
 	realityingestsrv "github.com/steph-frtech/aidos/back/mcp/reality-ingest/realityingestsrv"
 	"github.com/steph-frtech/aidos/back/mcp/store/storesrv"
 	"github.com/steph-frtech/aidos/back/mcp/telemetry-reader/telemetryreadersrv"
+	"github.com/steph-frtech/aidos/back/mcp/templates/templatessrv"
 	whytreesrv "github.com/steph-frtech/aidos/back/mcp/why-tree/whytreesrv"
 	"github.com/steph-frtech/aidos/back/runtime/gateway"
 	"github.com/steph-frtech/aidos/back/runtime/gatewaydispatch"
@@ -526,6 +529,36 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	// propose → approve); WroteKernel is always false (the kernel freeze is the aidos CLI's job).
 	"behaviors": func(context.Context) (*mcp.Server, error) {
 		return behaviorssrv.NewServer(), nil
+	},
+	// ── ADR 0092 batch-3 DEP-FREE servers (the Go engine is the SINGLE live source). ──
+	// Each of the three below is DEP-FREE like context/evolve/provision/pact-verifier/backtester:
+	// no DSN, no store, no clock, no embedder, NO LLM in the dispatch path (determinism-first,
+	// §6/§8). Every dispatched tool is a CHEAP/pure read whose output is a VALUE with WroteKernel=false
+	// — the wall holds (§2): no kernel/mirrors/fitness write reaches a backend. The builder ignores
+	// its ctx and returns the default server; it dispatches identically whatever DSN is set.
+	//
+	// billing (S114) — plans/meter/meter_project/check_quota: the closed plan ladder + the COUNTED
+	// usage fold over the REAL AgentRun ledger + the quota verdict (a COUNT, never an estimate, never
+	// an LLM); ingest_webhook is the idempotent S73 inbound async op + pact_verify the read-only Pact
+	// check. All BELOW THE LINE (runtime/commercial rows) — a plan/limit is DECLARED data (§8); raising
+	// a quota stays /goal. Every I/O is a scalar object (billing.Quota/Usage/IngestEvent), no RawMessage.
+	"billing": func(context.Context) (*mcp.Server, error) {
+		return billingsrv.NewServer(), nil
+	},
+	// dsl-editor (S77) — dsl_kinds/dsl_parse/dsl_propose: the typed editors over the four behaviour
+	// DSLs. dsl_propose returns a DRAFT ChangeSet VALUE (never applies — there is NO apply tool; freezing
+	// the edited source stays /goal). The S59 RawMessage scar is guarded in dsleditorsrv (DslDoc.Body /
+	// Parsed.Canonical wrapped as OBJECT map[string]any schemas), so dsl_parse/dsl_propose dispatch over
+	// HTTP. WroteKernel always false — the wall holds (§2).
+	"dsl-editor": func(context.Context) (*mcp.Server, error) {
+		return dsleditorsrv.NewServer(), nil
+	},
+	// templates (S81) — templates_list/get/instantiate/fork: the curated starter catalogue. instantiate
+	// + fork are DRY-RUN VALUE computations (WroteKernel always false); the true fork/instantiate of the
+	// bundle's kernel truths rides templates.Propose through the changeset door (propose → ChangeSet →
+	// approval), NOT these read tools. Every I/O is a scalar object (Bundle/StarterProject), no RawMessage.
+	"templates": func(context.Context) (*mcp.Server, error) {
+		return templatessrv.NewServer(), nil
 	},
 }
 

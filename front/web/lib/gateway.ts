@@ -159,6 +159,29 @@ export const GATEWAY_SERVERS: readonly string[] = [
 	// route(buildconsole_project)→unknown_tool→demo (the flip would be hollow — the cliquet's
 	// readVia-frontier blind spot).
 	"build-console",
+	// ── ADR 0092 batch-3 servers (the Go engine is the SINGLE live source). ──
+	// 28th — `billing` — the S114 customer-facing economic plane read server: the dispatched,
+	// dep-free billing_plans/meter/meter_project/check_quota (the closed plan ladder + the COUNTED
+	// usage fold over the REAL AgentRun ledger + the quota verdict, a COUNT never an estimate never
+	// an LLM) + ingest_webhook (the idempotent S73 inbound async op) + pact_verify (the read-only
+	// Pact check) — ALL BELOW THE LINE (runtime/commercial rows, WroteKernel always false) — is the
+	// LIVE path for the /billing panel; the TS twin (lib/billing.ts) becomes the demo fallback only.
+	// Without this entry route(billing_meter) resolves to unknown_tool then demo (a hollow flip).
+	"billing",
+	// 29th — `dsl-editor` — the S77 typed-DSL editors read server: the dispatched, dep-free
+	// dsl_kinds/dsl_parse/dsl_propose (PURE — dsl_propose returns a DRAFT ChangeSet VALUE, never
+	// applies; there is no apply tool, freezing the edited source stays /goal; WroteKernel always
+	// false) is the LIVE path for the /dsl-editor panel; the TS twin (lib/dsl-editor.ts) becomes the
+	// demo fallback only. The Go server wraps Body/Canonical as OBJECT schemas (the S59 RawMessage
+	// scar guard). Without this entry route(dsl_parse) resolves to unknown_tool then demo (hollow).
+	"dsl-editor",
+	// 30th — `templates` — the S81 curated starter catalogue read server: the dispatched, dep-free
+	// templates_list/get (read the content-addressed bundles) + templates_instantiate/fork (DRY-RUN
+	// duplicate-from-template / fork-at-phase, WroteKernel always false — landing the bundle's truths
+	// rides templates.Propose through the changeset door, never these read tools) is the LIVE path for
+	// the /templates panel; the TS twin (lib/templates.ts) becomes the demo fallback only. Without
+	// this entry route(templates_instantiate) resolves to unknown_tool then demo (a hollow flip).
+	"templates",
 ];
 
 /** defaultTools mirrors Go DefaultTools() — the closed exposed surface. */
@@ -355,6 +378,41 @@ export function defaultTools(): Tool[] {
 		...below("build-console", [
 			"buildconsole_project",
 			"buildconsole_record_stable_phase",
+		]),
+		// `billing` (S114) — plans/meter/meter_project/check_quota are PURE READS (the closed plan
+		// ladder + the COUNTED usage fold over the REAL AgentRun ledger + the quota verdict, a COUNT
+		// never an estimate never an LLM); ingest_webhook is the idempotent S73 inbound async op;
+		// pact_verify the read-only Pact check. ALL BELOW THE LINE (runtime/commercial rows, no
+		// kernel/mirrors/fitness write — a plan/limit is DECLARED data, §8; WroteKernel always false).
+		// The LIVE path for the /billing panel; without it route(billing_meter)→unknown_tool→demo (the
+		// flip would be hollow). Byte-faithful to the Go registry (registry.go:billing).
+		...below("billing", [
+			"billing_plans",
+			"billing_meter",
+			"billing_meter_project",
+			"billing_check_quota",
+			"billing_ingest_webhook",
+			"billing_pact_verify",
+		]),
+		// `dsl-editor` (S77) — dsl_kinds/dsl_parse/dsl_propose: the typed editors over the four
+		// behaviour DSLs. PURE; dsl_propose returns a DRAFT ChangeSet VALUE (never applies — there is
+		// no apply tool, freezing the edited source stays /goal; WroteKernel always false). The Go
+		// server wraps Body/Canonical as OBJECT schemas (the S59 RawMessage scar guard). The LIVE path
+		// for the /dsl-editor panel; without it route(dsl_parse)→unknown_tool→demo (the flip would be
+		// hollow). Byte-faithful to the Go registry (registry.go:dsl-editor).
+		...below("dsl-editor", ["dsl_kinds", "dsl_parse", "dsl_propose"]),
+		// `templates` (S81) — templates_list/get (read the content-addressed bundles) +
+		// templates_instantiate/fork (DRY-RUN duplicate-from-template / fork-at-phase). ALL BELOW THE
+		// LINE: every tool PURE, instantiate/fork are dry-run VALUES (WroteKernel always false; landing
+		// the bundle's truths rides templates.Propose through the changeset door, never these read
+		// tools). The LIVE path for the /templates panel; without it
+		// route(templates_instantiate)→unknown_tool→demo (the flip would be hollow). Byte-faithful to
+		// the Go registry (registry.go:templates).
+		...below("templates", [
+			"templates_list",
+			"templates_get",
+			"templates_instantiate",
+			"templates_fork",
 		]),
 		// The fenced truth-zone write namespace (§2) — refused with a ChangeSet hint.
 		{ name: "kernel_write", server: "kernel", disposition: "truth_write" },

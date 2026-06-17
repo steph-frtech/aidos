@@ -1,8 +1,9 @@
-// main_test.go — pins the S114 done-criteria at the MCP door (the capability boundary): the
+// billingsrv_test.go — pins the S114 done-criteria at the MCP door (the capability boundary): the
 // six tools are registered; metering COUNTS from the runs (exact, per-project); a build over-
 // quota is refused QUOTA_EXCEEDED with an upgrade path; a replayed webhook is idempotent; the
-// Pact provider verifies.
-package main
+// Pact provider verifies. Moved verbatim from mcp/billing/main_test.go at ADR 0092 batch-3 (the
+// tools moved into this reusable library so the gateway dispatcher reuses the SAME server).
+package billingsrv
 
 import (
 	"context"
@@ -10,8 +11,8 @@ import (
 )
 
 func TestServerRegistersSixTools(t *testing.T) {
-	// newMCPServer must construct without panicking and register the six billing tools.
-	if newMCPServer() == nil {
+	// NewServer must construct without panicking and register the six billing tools.
+	if NewServer() == nil {
 		t.Fatal("the billing MCP server must construct")
 	}
 }
