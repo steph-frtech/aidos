@@ -212,6 +212,21 @@ export const GATEWAY_SERVERS: readonly string[] = [
 	// (lib/workspace.ts) becomes the demo fallback only (lib/workspace-data). Without this entry
 	// route(workspace_can_access)→unknown_tool→demo (the flip would be hollow — the cliquet's blind spot).
 	"workspace",
+	// ── ADR 0092 batch-4B PURE (NON-DSN, NON-RLS) servers (the Go engine is the SINGLE live source). ──
+	// 35th–38th — entity-modeler · shape-editor · context-map · grilling-loop — four STATELESS,
+	// DETERMINISTIC servers (no DSN, no store, no clock, no embedder, no LLM). Each fronts only its
+	// CHEAP/pure READ tools; the `*_propose` tools (schema_propose · shape_propose · context-map.propose)
+	// are DELIBERATELY NOT registered — each returns a changeset.ChangeSet whose Delta.Body is a
+	// json.RawMessage (the S59 byte-array scar) AND is a truth-PROPOSAL the front never fires
+	// synchronously, so those panels keep their propose→ChangeSet voie propre (route(schema_propose)→
+	// unknown_tool, never a readVia). The dispatched read tools are the LIVE path; the TS twins
+	// (lib/entity-modeler · lib/shape-editor · lib/context-map · lib/grilling-loop) become the demo
+	// fallback only (lib/<x>-data). Without these entries route(schema_validate)→unknown_tool→demo (a
+	// hollow flip — the cliquet's blind spot, since the twin libs only NOW gain a -data.ts sibling).
+	"entity-modeler",
+	"shape-editor",
+	"context-map",
+	"grilling-loop",
 ];
 
 /** defaultTools mirrors Go DefaultTools() — the closed exposed surface. */
@@ -498,6 +513,34 @@ export function defaultTools(): Tool[] {
 			"workspace_can_access",
 			"workspace_check_resources",
 			"workspace_build_hello",
+		]),
+		// ── ADR 0092 batch-4B PURE servers (the Go engine is the SINGLE live source). ──
+		// Only the CHEAP/pure READ tools are registered; the `*_propose` tools (schema_propose ·
+		// shape_propose · context-map.propose) are DELIBERATELY ABSENT — each returns a changeset.ChangeSet
+		// (Delta.Body is a json.RawMessage, the S59 scar) AND is a truth-proposal the front never fires
+		// synchronously, so route(schema_propose)→unknown_tool and the panel uses its propose→ChangeSet door.
+		// `entity-modeler` (S75) — schema_validate/schema_hash/canvas_merge/canvas_presence: the canvas modeler
+		// reads (CRDT merge surfaces conflicts as VALUES, never last-write-wins). Byte-faithful (registry.go).
+		...below("entity-modeler", [
+			"schema_validate",
+			"schema_hash",
+			"canvas_merge",
+			"canvas_presence",
+		]),
+		// `shape-editor` (S68) — shape_derive/shape_parse/shape_merge: the mirror-shaper reads (the parser is
+		// pure, never an LLM; the merge LOCKS a same-field clash, never last-write-wins). Byte-faithful.
+		...below("shape-editor", ["shape_derive", "shape_parse", "shape_merge"]),
+		// `context-map` (S101/§46) — verify_pair/verify_all/check_call: the federation pact-verifier reads (a
+		// cross-cell call over an unhonored/absent pair is refused CROSS_CELL_NO_CONTRACT). Byte-faithful.
+		...below("context-map", ["verify_pair", "verify_all", "check_call"]),
+		// `grilling-loop` (S65, EL06) — grill_route/grill_verify_verdict/grill_verdicts: the in-product /grill
+		// reads. ALL THREE dispatch (no RawMessage): grill_route returns a VerdictRecord idea VALUE (a DRAFT;
+		// persistence rides the idea_capture door, WroteKernel always false), grill_verify_verdict is the
+		// barricaded re-verify gate, grill_verdicts a closed-table read. Byte-faithful (registry.go).
+		...below("grilling-loop", [
+			"grill_route",
+			"grill_verify_verdict",
+			"grill_verdicts",
 		]),
 		// The fenced truth-zone write namespace (§2) — refused with a ChangeSet hint.
 		{ name: "kernel_write", server: "kernel", disposition: "truth_write" },

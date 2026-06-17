@@ -1,4 +1,4 @@
-package main
+package contextmapsrv
 
 import (
 	"context"
@@ -78,7 +78,7 @@ func TestProposeTool(t *testing.T) {
 }
 
 func TestServerBuilds(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("nil server")
 	}
 }

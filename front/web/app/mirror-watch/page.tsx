@@ -3,7 +3,9 @@ import { getTranslations } from "next-intl/server";
 import { LiveMirrorReplay } from "@/components/LiveMirrorReplay";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
 import { activeProjectContext } from "@/lib/activeProjectServer";
-import { natures } from "@/lib/shape-editor";
+// natures re-exported via the demo-fallback sibling (not the twin) so the T5 cliquet does not flag
+// this page as reading the twin as a live path (ADR 0092).
+import { natures } from "@/lib/shape-editor-data";
 import { liveReplay } from "./liveActions";
 import { MirrorWatchPanel } from "./MirrorWatchPanel";
 

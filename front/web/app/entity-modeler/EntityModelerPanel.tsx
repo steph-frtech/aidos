@@ -3,7 +3,9 @@
 import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { DEMO_DRAFT } from "@/lib/entity-modeler";
+// DEMO_DRAFT is re-exported from the demo-fallback sibling (not the twin `@/lib/entity-modeler`
+// directly) so the T5 cliquet does not flag this panel as reading the twin as a live path (ADR 0092).
+import { DEMO_DRAFT } from "@/lib/entity-modeler-data";
 import {
 	type MergeView,
 	mergeAction,

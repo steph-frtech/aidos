@@ -1,12 +1,20 @@
 "use server";
 
+import type { PairVerdict } from "@/lib/context-map";
+import { propose } from "@/lib/context-map";
 import {
-	type ContextMap,
-	checkCrossCellCall,
-	propose,
-	verifyAll,
-	verifyPair,
-} from "@/lib/context-map";
+	type CheckCallVerdict,
+	checkCallArgs,
+	demoCheckCall,
+	demoMap,
+	demoVerifyAll,
+	demoVerifyPair,
+	verifyAllArgs,
+	verifyPairArgs,
+} from "@/lib/context-map-data";
+import { readVia } from "@/lib/gateway-sdk";
+import { panelScope } from "@/lib/panelScope";
+import { checkCallDecoder, verifyAllDecoder, verifyPairDecoder } from "./live";
 import type {
 	CheckCallView,
 	ProposeView,
@@ -24,75 +32,17 @@ import type {
  * cell call that VIOLATES the contract is REFUSED. The Context-Map persists as Kernel truth ONLY
  * via a DRAFT ChangeSet (propose → ChangeSet → approval), never a direct write.
  *
- * DETERMINISM-FIRST (CLAUDE.md §6/§8): verifyPair + verifyAll + checkCrossCellCall + propose are
- * PURE functions (lib/context-map) — same input → byte-identical result, never an LLM. THE WALL
- * (§2/§9): /context-map designs + verifies + PROPOSES; propose returns a DRAFT envelope, it does
- * not persist truth from the screen.
+ * THE FLIP (ADR 0092 batch-4B — the Go engine is the SINGLE live source). The READ controls —
+ * verify_pair, verify_all, check_call — now read LIVE from the Go context-map MCP server through the
+ * passerelle (`readVia(scope, …)`, the dispatched below-the-line reads), with the twin compute preserved
+ * ONLY as the deterministic demo fallback (lib/context-map-data, tagged `source:"live"|"demo"`). The
+ * `readVia` frontier import keeps the T5 cliquet GREEN (the twin sits behind the demo fallback; the
+ * `-data.ts` sibling now makes the cliquet recognise `lib/context-map` as a twin).
+ *
+ * THE WALL (§2/§9): /context-map designs + verifies + PROPOSES; proposeAction returns a DRAFT envelope,
+ * it does not persist truth from the screen. propose is NOT dispatched (it carries a RawMessage ChangeSet
+ * body + is a truth-proposal), so it keeps its propose→ChangeSet voie propre via the twin `propose`.
  */
-
-// The canonical demo Context-Map (the §46 checkout federation): checkout CONSUMES billing
-// (HONORED — billing publishes a superset) and catalog (UNHONORED — price unpublished).
-function demoMap(projectId: string): ContextMap {
-	return {
-		project: projectId || "shop",
-		cells: ["checkout", "billing", "catalog"],
-		surfaces: [
-			{
-				cell: "billing",
-				published: [
-					{
-						method: "POST",
-						path: "/charges",
-						fields: ["amount", "orderId", "status"],
-						status: 201,
-					},
-				],
-			},
-			{
-				cell: "catalog",
-				published: [
-					{ method: "GET", path: "/items", fields: ["sku"], status: 200 },
-				],
-			},
-		],
-		pairs: [
-			{
-				consumer: "checkout",
-				provider: "billing",
-				expected: [
-					{
-						method: "POST",
-						path: "/charges",
-						fields: ["amount", "orderId"],
-						status: 201,
-					},
-				],
-			},
-			{
-				consumer: "checkout",
-				provider: "catalog",
-				expected: [
-					{
-						method: "GET",
-						path: "/items",
-						fields: ["sku", "price"],
-						status: 200,
-					},
-				],
-			},
-		],
-	};
-}
-
-function pairByProvider(map: ContextMap, provider: string) {
-	return (
-		map.pairs.find((p) => p.provider === provider) ?? {
-			consumer: "checkout",
-			provider,
-			expected: [],
-		}
-	);
-}
 
 export async function verifyPairAction(
 	_prev: VerifyPairView,
@@ -101,7 +51,15 @@ export async function verifyPairAction(
 	const projectId = String(formData.get("projectId") ?? "shop");
 	const provider = String(formData.get("provider") ?? "billing");
 	const map = demoMap(projectId);
-	return { ok: true, verdict: verifyPair(map, pairByProvider(map, provider)) };
+	const scope = await panelScope();
+	const { data: verdict } = await readVia<PairVerdict>(
+		scope,
+		"verify_pair",
+		verifyPairArgs(map, provider),
+		verifyPairDecoder,
+		demoVerifyPair(map, provider),
+	);
+	return { ok: true, verdict };
 }
 
 export async function verifyAllAction(
@@ -109,7 +67,16 @@ export async function verifyAllAction(
 	formData: FormData,
 ): Promise<VerifyAllView> {
 	const projectId = String(formData.get("projectId") ?? "shop");
-	return { ok: true, verdicts: verifyAll(demoMap(projectId)) };
+	const map = demoMap(projectId);
+	const scope = await panelScope();
+	const { data: verdicts } = await readVia<PairVerdict[]>(
+		scope,
+		"verify_all",
+		verifyAllArgs(map),
+		verifyAllDecoder,
+		demoVerifyAll(map),
+	);
+	return { ok: true, verdicts };
 }
 
 export async function checkCallAction(
@@ -119,14 +86,24 @@ export async function checkCallAction(
 	const projectId = String(formData.get("projectId") ?? "shop");
 	const from = String(formData.get("from") ?? "checkout");
 	const to = String(formData.get("to") ?? "catalog");
-	const block = checkCrossCellCall(from, to, demoMap(projectId));
-	return { ok: true, allowed: block === null, block: block ?? undefined };
+	const map = demoMap(projectId);
+	const scope = await panelScope();
+	const { data: verdict } = await readVia<CheckCallVerdict>(
+		scope,
+		"check_call",
+		checkCallArgs(from, to, map),
+		checkCallDecoder,
+		demoCheckCall(from, to, map),
+	);
+	return { ok: true, allowed: verdict.allowed, block: verdict.block };
 }
 
 export async function proposeAction(
 	_prev: ProposeView,
 	formData: FormData,
 ): Promise<ProposeView> {
+	// propose is NOT dispatched (the wall — propose → ChangeSet → approval): the twin builds the DRAFT
+	// envelope the panel shows; the aidos CLI applies it under approval.
 	const projectId = String(formData.get("projectId") ?? "shop");
 	const cs = propose(
 		demoMap(projectId),

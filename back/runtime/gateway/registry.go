@@ -232,6 +232,43 @@ func DefaultTools() []Tool {
 	// scalar object (no json.RawMessage body — the S59 scar avoided by construction).
 	t = append(t, below("workspace", "workspace_provision", "workspace_can_access", "workspace_check_resources", "workspace_build_hello")...)
 
+	// ── ADR 0092 batch-4B PURE (NON-DSN, NON-RLS) servers (the Go engine is the SINGLE live source). ──
+	// The final dispatcher-ready cohort: four STATELESS, DETERMINISTIC servers (no DSN, no store, no clock,
+	// no embedder, no LLM — every builder returns a pre-built *mcp.Server directly). For each, only the
+	// CHEAP/pure READ tools are dispatched; every dispatched tool's I/O is a scalar OBJECT (no
+	// json.RawMessage body — the S59 byte-array transport scar avoided by construction). The `*_propose`
+	// tools are DELIBERATELY NOT dispatched: each returns a changeset.ChangeSet whose Delta.Body is a
+	// json.RawMessage (the byte-array output scar the HTTP edge rejects) AND is a truth-PROPOSAL the front
+	// never fires synchronously — the move goes through the changeset commit gate under approval (the exact
+	// arch-fitness `propose` precedent, line 130). Those panels keep their propose→ChangeSet voie propre
+	// (the wall). All dispatched tools are BELOW THE LINE: WroteKernel always false.
+	//
+	// 35. entity-modeler (S75) — schema_validate/schema_hash/canvas_merge/canvas_presence: the canvas-side
+	// modeler reads. validate resolves every relation (refuses UNKNOWN_RELATION_TARGET, never guessed),
+	// hash is INPUT-ORDER-INVARIANT, merge is a CRDT three-way merge surfacing conflicts as VALUES (never
+	// last-write-wins), presence is advisory. schema_propose (the DRAFT-ChangeSet door) is NOT dispatched
+	// (RawMessage body + truth-proposal) — the /entity-modeler panel proposes through the changeset door.
+	t = append(t, below("entity-modeler", "schema_validate", "schema_hash", "canvas_merge", "canvas_presence")...)
+	// 36. shape-editor (S68) — shape_derive/shape_parse/shape_merge: the mirror-shaper reads. derive picks
+	// the form from the truth-nature (the closed table), parse is a pure parser (typed spec or typed
+	// refusal, never an LLM), merge folds two concurrent edits (MERGE disjoint | LOCK same-field clash,
+	// never last-write-wins). shape_propose (the born-red DRAFT-ChangeSet door) is NOT dispatched
+	// (RawMessage body + truth-proposal) — the /shape-editor panel proposes through the changeset door.
+	t = append(t, below("shape-editor", "shape_derive", "shape_parse", "shape_merge")...)
+	// 37. context-map (S101/§46) — verify_pair/verify_all/check_call: the federation pact-verifier reads
+	// (HONORED iff the provider publishes a superset of the consumer's expectation; a cross-cell call over
+	// an unhonored/absent pair is refused CROSS_CELL_NO_CONTRACT). The verifier is an algorithm, never an
+	// LLM. `propose` (the Context-Map DRAFT-ChangeSet door) is NOT dispatched (RawMessage body + truth-
+	// proposal) — the /context-map panel proposes through the changeset door.
+	t = append(t, below("context-map", "verify_pair", "verify_all", "check_call")...)
+	// 38. grilling-loop (S65, EL06) — grill_route/grill_verify_verdict/grill_verdicts: the in-product
+	// /grill reads. ALL THREE dispatch (no RawMessage): route returns a VerdictRecord VALUE (the routed
+	// idea — a DRAFT; persistence rides the idea_capture door, EL05/§S27), verify_verdict is the barricaded
+	// re-verify gate over the closed verdict schema (the LLM exception), verdicts a closed-table read. The
+	// routing is deterministic and authoritative; the routed idea persists via idea-intake, never here
+	// (WroteKernel always false — the wall).
+	t = append(t, below("grilling-loop", "grill_route", "grill_verify_verdict", "grill_verdicts")...)
+
 	// THE FENCED TRUTH-ZONE WRITE NAMESPACE (§2). Not a real tool of any server — the
 	// door a caller might craft to move truth directly. Registered as TruthWrite so the
 	// gateway refuses it with a ChangeSet-pointing BlockReason (server-side wall).
@@ -248,7 +285,7 @@ func DefaultTools() []Tool {
 	return t
 }
 
-// GatewayServers is the closed list of the 34 MCP servers the gateway exposes (display
+// GatewayServers is the closed list of the 38 MCP servers the gateway exposes (display
 // + the completeness assertion: every named server has ≥1 exposed tool). Ordered. The
 // 14th — `provision` — is ACTIVATED at DP13 (the scaffold the gateway now fronts:
 // every provisioning op is an MCP tool, ADR 0009; a scaffold the gateway never fronts
@@ -272,7 +309,17 @@ func DefaultTools() []Tool {
 // (app_auth_attach lands via an APPROVED ChangeSet, WroteKernel false; workspace provisioning is a
 // dry-run descriptor). Every I/O is a scalar object — the besoin body fields are map[string]any (NOT
 // a json.RawMessage byte-array), so the S59 RawMessage scar is avoided by construction.
-// truth-approval is DELIBERATELY NOT fronted: its three tools (truth_propose/approve/
+// The 35th–38th — entity-modeler · shape-editor · context-map · grilling-loop — are the ADR 0092
+// batch-4B PURE servers (NON-DSN, NON-RLS, stateless/deterministic — each builder returns a pre-built
+// *mcp.Server directly). Each fronts only its CHEAP/pure READ tools (the canvas modeler reads, the
+// mirror-shaper reads, the federation pact-verifier reads, the in-product /grill reads); every
+// dispatched I/O is a scalar object. The `*_propose` tools (entity-modeler.schema_propose ·
+// shape-editor.shape_propose · context-map.propose) are DELIBERATELY NOT dispatched — each returns a
+// changeset.ChangeSet whose Delta.Body is a json.RawMessage (the byte-array scar) AND is a truth-
+// PROPOSAL the front never fires synchronously (the arch-fitness `propose` precedent, line 130); those
+// panels keep their propose→ChangeSet voie propre. grilling-loop dispatches ALL THREE (no RawMessage:
+// grill_route returns a VerdictRecord idea VALUE that persists via the idea_capture door, WroteKernel
+// always false). truth-approval is DELIBERATELY NOT fronted: its three tools (truth_propose/approve/
 // apply_concurrent) DECIDE/GATE a truth-write and return the apply envelope — they ARE the
 // propose → ChangeSet → approval door, never a below-the-line read, so the /truth-approval panel
 // stays that door (route(truth_propose) resolves to unknown_tool, never a readVia). A capability
@@ -286,5 +333,6 @@ func GatewayServers() []string {
 		"cost-meter", "build-console", "build-loop", "kernel-garden", "autonomy", "behaviors",
 		"billing", "dsl-editor", "templates",
 		"besoin-intake", "self-cert", "app-auth", "workspace",
+		"entity-modeler", "shape-editor", "context-map", "grilling-loop",
 	}
 }

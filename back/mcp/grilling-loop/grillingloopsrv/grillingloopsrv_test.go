@@ -1,4 +1,4 @@
-package main
+package grillingloopsrv
 
 import (
 	"context"
@@ -89,7 +89,7 @@ func TestGrillVerdictsTool(t *testing.T) {
 }
 
 func TestServerRegistersThreeTools(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("nil server")
 	}
 }

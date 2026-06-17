@@ -5,12 +5,16 @@ import postgres from "postgres";
 import { activeProjectContext } from "@/lib/activeProjectServer";
 import { PROPOSES_KINDS, type Proposes } from "@/lib/capture-idea";
 import type { GrillVerdict } from "@/lib/exploration";
+import { readVia } from "@/lib/gateway-sdk";
 import {
 	type Intention,
 	knownVerdict,
 	route,
 	type VerdictRecord,
 } from "@/lib/grilling-loop";
+import { demoRoute, routeArgs } from "@/lib/grilling-loop-data";
+import { panelScope } from "@/lib/panelScope";
+import { routeDecoder } from "./live";
 
 /**
  * Server Actions for the /grilling-loop Workbench panel (S65 — the in-product grilling loop).
@@ -216,9 +220,22 @@ export async function routeIntentionAction(
 		: `humain: « ${intent} »`;
 	const intention: Intention = { intent, scenarios };
 
+	// THE FLIP (ADR 0092 batch-4B): the routed VerdictRecord is computed LIVE by the Go grilling-loop MCP
+	// server through the passerelle (`grill_route` — the deterministic, authoritative routing), with the
+	// twin `route` (via demoRoute) as the deterministic fallback. The pre-flight gates above already
+	// guarantee a valid intention/verdict, so demoRoute will not throw; readVia degrades to it on any
+	// gateway-unreachable / undispatched / malformed answer (tagged source, never silently mis-routed).
 	let rec: VerdictRecord;
 	try {
-		rec = route(proposesRaw, intention, verdictRaw, detail, reason);
+		const scope = await panelScope();
+		const { data } = await readVia<VerdictRecord>(
+			scope,
+			"grill_route",
+			routeArgs(proposesRaw, intention, verdictRaw, detail, reason),
+			routeDecoder,
+			demoRoute(proposesRaw, intention, verdictRaw, detail, reason),
+		);
+		rec = data;
 	} catch (err) {
 		console.warn("[/grilling-loop] route failed:", (err as Error).message);
 		return { ok: false, messageKey: "tooManyScenarios", projectId };

@@ -1,4 +1,4 @@
-package main
+package shapeeditorsrv
 
 import (
 	"context"

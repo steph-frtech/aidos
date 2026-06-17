@@ -53,13 +53,16 @@ import (
 	buildloopsrv "github.com/steph-frtech/aidos/back/mcp/build-loop/buildloopsrv"
 	"github.com/steph-frtech/aidos/back/mcp/changeset/changesetsrv"
 	"github.com/steph-frtech/aidos/back/mcp/conscience/consciencesrv"
+	contextmapsrv "github.com/steph-frtech/aidos/back/mcp/context-map/contextmapsrv"
 	"github.com/steph-frtech/aidos/back/mcp/context/contextsrv"
 	costmetersrv "github.com/steph-frtech/aidos/back/mcp/cost-meter/costmetersrv"
 	"github.com/steph-frtech/aidos/back/mcp/dag/dagsrv"
 	dsleditorsrv "github.com/steph-frtech/aidos/back/mcp/dsl-editor/dsleditorsrv"
+	entitymodelersrv "github.com/steph-frtech/aidos/back/mcp/entity-modeler/entitymodelersrv"
 	"github.com/steph-frtech/aidos/back/mcp/evolve/evolvesrv"
 	"github.com/steph-frtech/aidos/back/mcp/federation/federationsrv"
 	goalpilotingsrv "github.com/steph-frtech/aidos/back/mcp/goal-piloting/goalpilotingsrv"
+	grillingloopsrv "github.com/steph-frtech/aidos/back/mcp/grilling-loop/grillingloopsrv"
 	ideaintakesrv "github.com/steph-frtech/aidos/back/mcp/idea-intake/ideaintakesrv"
 	kernelgardensrv "github.com/steph-frtech/aidos/back/mcp/kernel-garden/kernelgardensrv"
 	"github.com/steph-frtech/aidos/back/mcp/learn/learnsrv"
@@ -71,6 +74,7 @@ import (
 	"github.com/steph-frtech/aidos/back/mcp/provision/provisionsrv"
 	realityingestsrv "github.com/steph-frtech/aidos/back/mcp/reality-ingest/realityingestsrv"
 	selfcertsrv "github.com/steph-frtech/aidos/back/mcp/self-cert/selfcertsrv"
+	shapeeditorsrv "github.com/steph-frtech/aidos/back/mcp/shape-editor/shapeeditorsrv"
 	"github.com/steph-frtech/aidos/back/mcp/store/storesrv"
 	"github.com/steph-frtech/aidos/back/mcp/telemetry-reader/telemetryreadersrv"
 	"github.com/steph-frtech/aidos/back/mcp/templates/templatessrv"
@@ -233,7 +237,7 @@ func newMCPServer(dispatch *gatewaydispatch.Dispatcher) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "aidos-gateway", Version: "v0.1.0"}, nil)
 	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_route", Description: "The server-side wall routing decision for a (scope, tool, target) call: route a below-the-line op, refuse a cross-project/forged call (AGENT_CROSS_PROJECT_WRITE), or refuse a truth-write (GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET). Pure, deterministic — zero LLM."}, s.route)
 	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_tools", Description: "The CLOSED set of MCP tools the gateway exposes (name · owning server · wall disposition), sorted. Pure."}, s.tools)
-	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_servers", Description: "The 21 MCP servers the gateway fronts (store · mirror-runner · changeset · dag · idea-intake · memory · context · evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project · provision · reality-ingest · why-tree · goal-piloting · federation · learn · conscience · arch-fitness)."}, s.servers)
+	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_servers", Description: "The 38 MCP servers the gateway fronts (the closed gateway.GatewayServers list — store · mirror-runner · changeset · dag · idea-intake · memory · context · evolve · backtester · telemetry-reader · pact-verifier · mutation-runner · project · provision · reality-ingest · why-tree · goal-piloting · federation · learn · conscience · arch-fitness · cost-meter · build-console · build-loop · kernel-garden · autonomy · behaviors · billing · dsl-editor · templates · besoin-intake · self-cert · app-auth · workspace · entity-modeler · shape-editor · context-map · grilling-loop)."}, s.servers)
 	mcp.AddTool(srv, &mcp.Tool{Name: "gateway_call", Description: "Route THEN dispatch a (scope, tool, args) call to its owning backend in-process (S59). The wall applies FIRST: a truth-write is refused (GATEWAY_TRUTH_WRITE_NEEDS_CHANGESET), a cross-project/forged call is refused (AGENT_CROSS_PROJECT_WRITE), an unknown tool is refused. A routed below-the-line call returns the backend's structured result; without a configured store it returns route_undispatched (the caller falls back to demo)."}, s.call)
 	return srv
 }
@@ -606,6 +610,39 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	// ctx (no DSN); it dispatches identically whatever DSN is set.
 	"workspace": func(context.Context) (*mcp.Server, error) {
 		return workspacesrv.NewServer(), nil
+	},
+	// ── ADR 0092 batch-4B PURE (NON-DSN, NON-RLS) servers (the Go engine is the SINGLE live source). ──
+	// Each of the four below is DEP-FREE + STATELESS like context/self-cert/workspace: no DSN, no store,
+	// no clock, no embedder, NO LLM in the dispatch path (determinism-first §6/§8). The builder ignores
+	// its ctx and returns the default server; it dispatches identically whatever DSN is set. Only the
+	// CHEAP/pure READ tools are registered (the registry's below() set) — the `*_propose` tools stay
+	// EXPOSED by each server (the stdio binary + CI use them) but are NOT in the registry, so a propose
+	// call routes to unknown_tool and the panel uses its own propose→ChangeSet door (the arch-fitness
+	// `propose` precedent). Every dispatched I/O is a scalar OBJECT (no json.RawMessage body — the S59
+	// byte-array transport scar avoided by construction). All dispatched tools are below the line —
+	// WroteKernel always false (the wall, §2).
+	//
+	// entity-modeler (S75) — schema_validate/schema_hash/canvas_merge/canvas_presence: the canvas-side
+	// modeler reads (CRDT three-way merge surfaces conflicts as VALUES, never last-write-wins).
+	"entity-modeler": func(context.Context) (*mcp.Server, error) {
+		return entitymodelersrv.NewServer(), nil
+	},
+	// shape-editor (S68) — shape_derive/shape_parse/shape_merge: the mirror-shaper reads (the parser is
+	// pure, never an LLM; the merge LOCKS a same-field clash, never last-write-wins).
+	"shape-editor": func(context.Context) (*mcp.Server, error) {
+		return shapeeditorsrv.NewServer(), nil
+	},
+	// context-map (S101/§46) — verify_pair/verify_all/check_call: the federation pact-verifier reads (the
+	// verifier is an algorithm — a cross-cell call over an unhonored/absent pair is refused CROSS_CELL_NO_CONTRACT).
+	"context-map": func(context.Context) (*mcp.Server, error) {
+		return contextmapsrv.NewServer(), nil
+	},
+	// grilling-loop (S65, EL06) — grill_route/grill_verify_verdict/grill_verdicts: the in-product /grill
+	// reads. ALL THREE dispatch (no RawMessage): grill_route returns a VerdictRecord idea VALUE (a DRAFT;
+	// persistence rides the idea_capture door, WroteKernel always false), grill_verify_verdict is the
+	// barricaded re-verify gate over the closed verdict schema, grill_verdicts a closed-table read.
+	"grilling-loop": func(context.Context) (*mcp.Server, error) {
+		return grillingloopsrv.NewServer(), nil
 	},
 }
 

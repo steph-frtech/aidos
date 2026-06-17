@@ -1,14 +1,23 @@
 "use server";
 
 import { activeProjectContext } from "@/lib/activeProjectServer";
+import { readVia, type Source } from "@/lib/gateway-sdk";
+import { panelScope } from "@/lib/panelScope";
 import {
-	deriveShape,
-	mergeEdits,
+	type Derivation,
+	type MergeResult,
 	openDraft,
 	type ParsedSpec,
 	proposeMirror,
 	type TruthNature,
 } from "@/lib/shape-editor";
+import {
+	demoDerive,
+	demoMerge,
+	deriveArgs,
+	mergeArgs,
+} from "@/lib/shape-editor-data";
+import { deriveDecoder, mergeDecoder } from "./live";
 
 /**
  * Server Actions for the /shape-editor Workbench panel (S68 — the three-shape mirror editor).
@@ -18,10 +27,17 @@ import {
  * project-scoped mirror is proposed as a DRAFT ChangeSet. Two concurrent draft edits MERGE or LOCK —
  * never last-write-wins. Shape selection + parsing are PURE FUNCTIONS, never an LLM.
  *
+ * THE FLIP (ADR 0092 batch-4B — the Go engine is the SINGLE live source). The READ controls — derive
+ * and the CRDT merge — now read LIVE from the Go shape-editor MCP server through the passerelle
+ * (`readVia(scope, "shape_derive" | "shape_merge", …)`, the dispatched below-the-line reads), with the
+ * twin compute preserved ONLY as the deterministic demo fallback (lib/shape-editor-data, tagged
+ * `source:"live"|"demo"`). The `readVia` frontier import keeps the T5 cliquet GREEN (the twin sits behind
+ * the demo fallback; the `-data.ts` sibling now makes the cliquet recognise `lib/shape-editor` as a twin).
+ *
  * THE WALL (CLAUDE.md §2/§7). Every action WRITES NOTHING — it returns the derivation, the proposal
- * (a DRAFT ChangeSet), or the merge verdict as VALUES. Freezing the authored mirror into the mirrors
- * schema goes through the wall (propose → ChangeSet → approval), via the changeset door (S20); the
- * agent DB role can never write the mirrors/kernel. The screen PROPOSES, it never writes truth.
+ * (a DRAFT ChangeSet), or the merge verdict as VALUES. proposeMirrorAction is NOT dispatched (shape_propose
+ * carries a RawMessage ChangeSet body + is a truth-proposal), so it keeps its propose→ChangeSet voie propre
+ * via the twin `proposeMirror`; the aidos role can never write the mirrors/kernel. The screen PROPOSES.
  */
 
 export interface DeriveResultView {
@@ -31,18 +47,33 @@ export interface DeriveResultView {
 	shape?: string;
 	testKind?: string;
 	certLanguage?: string;
+	/** the read source — "live" (the Go engine answered) or "demo" (the deterministic fallback). */
+	source?: Source;
 }
 
-/** deriveShapeAction is the read control — derive the mirror form from a picked truth-nature. */
+/**
+ * deriveShapeAction is the read control — derive the mirror form from a picked truth-nature, LIVE from
+ * the Go shape-editor MCP server (twin demoDerive is the deterministic fallback). An unknown nature
+ * decodes to null and both paths surface natureUnknown.
+ */
 export async function deriveShapeAction(
 	_prev: DeriveResultView,
 	formData: FormData,
 ): Promise<DeriveResultView> {
 	const nature = String(formData.get("nature") ?? "").trim();
-	const der = deriveShape(nature);
-	if (der === null) {
-		return { ok: false, messageKey: "natureUnknown", nature };
+	const demo = demoDerive(nature);
+	if (demo === null) {
+		// An unknown nature is refused locally (no Go call needed — the closed table has no row).
+		return { ok: false, messageKey: "natureUnknown", nature, source: "demo" };
 	}
+	const scope = await panelScope();
+	const { data: der, source } = await readVia<Derivation>(
+		scope,
+		"shape_derive",
+		deriveArgs(nature),
+		deriveDecoder,
+		demo,
+	);
 	return {
 		ok: true,
 		messageKey: "deriveOk",
@@ -50,6 +81,7 @@ export async function deriveShapeAction(
 		shape: der.shape,
 		testKind: der.testKind,
 		certLanguage: der.certLanguage,
+		source,
 	};
 }
 
@@ -139,13 +171,15 @@ export interface MergeResultView {
 	conflictField?: string;
 	valueA?: string;
 	valueB?: string;
+	/** the read source — "live" (the Go engine answered) or "demo" (the deterministic fallback). */
+	source?: Source;
 }
 
 /**
  * mergeEditsAction is the action-capable concurrency control: two authors edit the SAME draft field
- * concurrently — the action runs the pure CRDT merge and returns the verdict. Same value or disjoint
- * fields MERGE (version bumps); a same-field clash LOCKS (DRAFT_EDIT_CONFLICT, both candidates
- * surfaced) — NEVER a silent last-write-wins. This is a draft-level (below-the-wall) conflict.
+ * concurrently — the action reads the CRDT merge verdict LIVE from the Go shape-editor MCP server (twin
+ * demoMerge is the fallback). Same value or disjoint fields MERGE (version bumps); a same-field clash
+ * LOCKS (DRAFT_EDIT_CONFLICT, both candidates surfaced) — NEVER a silent last-write-wins. Below the wall.
  */
 export async function mergeEditsAction(
 	_prev: MergeResultView,
@@ -159,10 +193,15 @@ export async function mergeEditsAction(
 	const { draft } = openDraft(projectId, "Order.discount", "v1", "workflow");
 	if (draft === null) return { ok: false, messageKey: "proposeRefused" };
 
-	const r = mergeEdits(
-		draft,
-		{ author: "alice", baseVersion: 0, title: titleA },
-		{ author: "bob", baseVersion: 0, title: titleB },
+	const a = { author: "alice", baseVersion: 0, title: titleA };
+	const b = { author: "bob", baseVersion: 0, title: titleB };
+	const scope = await panelScope();
+	const { data: r, source } = await readVia<MergeResult>(
+		scope,
+		"shape_merge",
+		mergeArgs(draft, a, b),
+		mergeDecoder,
+		demoMerge(draft, a, b),
 	);
 	if (r.error !== null) {
 		const c = r.conflicts[0];
@@ -173,6 +212,7 @@ export async function mergeEditsAction(
 			conflictField: c?.field,
 			valueA: c?.valueA,
 			valueB: c?.valueB,
+			source,
 		};
 	}
 	return {
@@ -180,5 +220,6 @@ export async function mergeEditsAction(
 		messageKey: "mergeMerged",
 		locked: false,
 		mergedVersion: r.merged.version,
+		source,
 	};
 }

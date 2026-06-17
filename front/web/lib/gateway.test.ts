@@ -192,4 +192,71 @@ describe("gateway registry completeness", () => {
 			expect(d.tool?.disposition).toBe("below_line");
 		}
 	});
+
+	// ── ADR 0092 batch-4B PURE servers: the dispatched read tools resolve below the line ──
+	// The four batch-4B servers (entity-modeler · shape-editor · context-map · grilling-loop) are
+	// STATELESS + DETERMINISTIC (no DSN, no store). Each fronts only its CHEAP/pure READ tools; the
+	// `*_propose` tools are DELIBERATELY ABSENT (a json.RawMessage ChangeSet body + a truth-proposal —
+	// the panel keeps its propose→ChangeSet voie propre). Without the lookup resolving, the flip would
+	// be HOLLOW (route(shape_derive)→unknown_tool→demo, the cliquet's blind spot).
+	it("fronts the shape-editor server (the 36th) — its read tools route below the line", () => {
+		expect(GATEWAY_SERVERS).toContain("shape-editor");
+		for (const tool of ["shape_derive", "shape_parse", "shape_merge"]) {
+			const d = route({ identity: "alice", activeProject: "proj-a" }, tool, {
+				projectId: "proj-a",
+			});
+			expect(d.outcome).toBe("route");
+			expect(d.tool?.server).toBe("shape-editor");
+			expect(d.tool?.disposition).toBe("below_line");
+		}
+	});
+
+	it("the shape-editor *_propose tool is NOT dispatched (the propose→ChangeSet voie propre)", () => {
+		// shape_propose carries a json.RawMessage ChangeSet body + is a truth-proposal — it must NOT
+		// resolve through the gateway (the panel proposes via the twin, the move rides the changeset gate).
+		const d = route(
+			{ identity: "alice", activeProject: "proj-a" },
+			"shape_propose",
+			{
+				projectId: "proj-a",
+			},
+		);
+		expect(d.outcome).toBe("unknown_tool");
+		expect(d.blockReason?.code).toBe(CODE_UNKNOWN_TOOL);
+	});
+
+	// ── ADR 0092 batch-4B: the grilling-loop server (S65, EL06) — ALL THREE tools dispatch ──
+	// grilling-loop is the ONE batch-4B server with NO *_propose tool: all three reads dispatch (no
+	// RawMessage, scalar I/O). grill_route returns a VerdictRecord idea VALUE (a DRAFT; persistence
+	// rides the idea_capture door, WroteKernel always false), grill_verify_verdict is the barricaded
+	// LLM re-verify gate, grill_verdicts a closed-table read. Without the lookup resolving, the
+	// /grilling-loop flip would be HOLLOW (route(grill_route)→unknown_tool→demo, the cliquet's blind
+	// spot — exactly what the lib/grilling-loop-data.ts sibling + this dispatch entry prevent).
+	it("fronts the grilling-loop server (the 38th) — all three read tools route below the line", () => {
+		expect(GATEWAY_SERVERS).toContain("grilling-loop");
+		for (const tool of [
+			"grill_route",
+			"grill_verify_verdict",
+			"grill_verdicts",
+		]) {
+			const d = route({ identity: "alice", activeProject: "proj-a" }, tool, {
+				projectId: "proj-a",
+			});
+			expect(d.outcome).toBe("route");
+			expect(d.tool?.server).toBe("grilling-loop");
+			expect(d.tool?.disposition).toBe("below_line");
+		}
+	});
+
+	// A cross-project grill_route is refused at the edge (the wall, S55) — scope is checked BEFORE
+	// the below-the-line route, so even a dispatched read cannot leak across projects.
+	it("refuses a cross-project grill_route (scope checked before the route)", () => {
+		const d = route(
+			{ identity: "alice", activeProject: "proj-a" },
+			"grill_route",
+			{ projectId: "proj-b" },
+		);
+		expect(d.outcome).toBe("refused_scope");
+		expect(d.blockReason?.code).toBe(CODE_AGENT_CROSS_PROJECT_WRITE);
+	});
 });
