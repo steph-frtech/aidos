@@ -135,3 +135,4 @@ testdata/rapid/
 
 # ephemeral workflow run-scripts (orchestration artifacts, not product code)
 .claude/workflows/scripts/
+back/runtime/desktoppreview/.toolchain/
