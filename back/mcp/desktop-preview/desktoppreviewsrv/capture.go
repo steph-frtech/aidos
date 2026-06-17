@@ -30,6 +30,14 @@ func CaptureDemoFrame(ctx context.Context, child honoemit.DesktopChild) (desktop
 	if nm == "" {
 		return desktoppreview.FrameResult{}, false, "AIDOS_DESKTOP_PREVIEW_NM non configuré (node_modules electron+esbuild absent)"
 	}
+	// Make nm ABSOLUTE before deriving the bin paths: the Runner runs esbuild/electron with
+	// cmd.Dir=<tempDir>, so a RELATIVE .bin/esbuild would resolve against the temp dir (not the
+	// caller's cwd) and fork/exec would fail. The Workbench Server Action runs the binary with
+	// cwd=REPO and a relative candidate ("back/runtime/.../node_modules") — without this, capture
+	// silently degrades to the fallback (a hollow live view). Found by running from the repo root.
+	if abs, err := filepath.Abs(nm); err == nil {
+		nm = abs
+	}
 	node, err := exec.LookPath("node")
 	if err != nil {
 		return desktoppreview.FrameResult{}, false, "node introuvable sur l'hôte"
