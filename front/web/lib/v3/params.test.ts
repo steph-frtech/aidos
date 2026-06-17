@@ -94,15 +94,24 @@ describe("paramCatalog — le catalogue des paramètres déclarés (twin pur)", 
 		expect(ids.length).toBeGreaterThanOrEqual(16);
 	});
 
-	it("CHAT — les 12 intentions du jeu clos, chacune avec sa phrase canonique", () => {
+	it("CHAT — TOUTES les intentions du jeu clos (noyau + vocabulaire V3 étendu), chacune avec sa phrase canonique", () => {
 		const s = byId(paramCatalog(), "chat");
-		expect(INTENT_KINDS).toHaveLength(12);
+		// L'écran « gestes du chat » itère INTENT_KINDS → COMPLET par construction : le noyau (12)
+		// PLUS les ≥25 gestes V3 (lectures live + propositions, ADR 0092) — jamais « plein de gestes
+		// manquants ». Une ligne par intention, avec SA phrase canonique (la bijection écran↔jeu clos).
+		expect(INTENT_KINDS.length).toBeGreaterThanOrEqual(37);
 		expect(s.rows).toHaveLength(INTENT_KINDS.length);
 		for (const k of INTENT_KINDS) {
 			const row = s.rows.find((r) => r.label === k);
-			expect(row?.value).toBe(CANONICAL_PHRASES[k]);
+			expect(row?.value, `geste ${k} sans phrase canonique à l'écran`).toBe(
+				CANONICAL_PHRASES[k],
+			);
+			expect(CANONICAL_PHRASES[k]?.length ?? 0).toBeGreaterThan(0);
 		}
 		expect(CANONICAL_PHRASES.capturer_idee).toBe("capture l'idée : <besoin>");
+		// Chaque geste V3 montre son serveur dispatché dans la phrase (la lentille pointée).
+		expect(CANONICAL_PHRASES.voir_pourquoi).toContain("why-tree/build");
+		expect(CANONICAL_PHRASES.editer_dsl).toContain("dsl-editor/dsl_propose");
 	});
 
 	it("ENVIRONNEMENTS — les 3 barreaux de l'échelle, dans l'ordre déclaré", () => {

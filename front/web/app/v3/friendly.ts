@@ -25,6 +25,9 @@ export const FRIENDLY_TEMPLATES: Record<BuilderEvent["kind"], string> = {
 	ecran_adapte: "tplEcranAdapte",
 	bench_lance: "tplBenchLance",
 	evolution_exploree: "tplEvolutionExploree",
+	// LE VOCABULAIRE ÉTENDU (ADR 0092) : la lecture live d'un serveur dispatché + la proposition DRAFT.
+	lecture_live: "tplLectureLive",
+	proposition: "tplProposition",
 	etat_lu: "tplEtatLu",
 	refus: "tplRefus",
 };

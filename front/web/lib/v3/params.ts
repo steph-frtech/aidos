@@ -43,7 +43,12 @@ import { BEHAVIOR_CATALOGUE } from "../compound";
 import { CHECKOUT_BUDGET } from "../economics-data";
 import { FACETS } from "../facets";
 import { PAIR_KINDS } from "../v2/anatomy";
-import { ENV_LADDER, INTENT_KINDS, type IntentKind } from "../v2/builder";
+import {
+	ENV_LADDER,
+	INTENT_KINDS,
+	type IntentKind,
+	LIVE_GESTURES,
+} from "../v2/builder";
 import { MIN_MIRROR_LEN } from "../v2/goal";
 import { MIN_INTENT_LEN } from "../v2/idea";
 import { kindToCanon, LINK_KINDS } from "../v2/links";
@@ -64,8 +69,14 @@ export interface ParamSection {
 	readonly rows: readonly ParamRow[];
 }
 
-/** La PHRASE CANONIQUE prouvée par intention (le jeu clos — lib/v2/builder + son miroir). */
-export const CANONICAL_PHRASES: Record<IntentKind, string> = {
+/**
+ * La PHRASE CANONIQUE prouvée par intention (le jeu clos — lib/v2/builder + son miroir).
+ * Le NOYAU (cycle de vie + nav + capacités lancées) est écrit à la main ; LES GESTES V3
+ * (lectures live + propositions) sont DÉRIVÉS de LIVE_GESTURES — l'écran « gestes du chat »
+ * reste COMPLET par construction (∀ geste déclaré → une ligne ; jamais « plein de gestes
+ * manquants »). DÉTERMINISTE & TOTAL : Object.assign sur le jeu clos, aucune horloge/aléa.
+ */
+const CANONICAL_PHRASES_NOYAU: Record<string, string> = {
 	capturer_idee: "capture l'idée : <besoin>",
 	greffer: "greffe <libellé> sous <chemin>",
 	promouvoir: "promeus la dernière idée",
@@ -79,6 +90,49 @@ export const CANONICAL_PHRASES: Record<IntentKind, string> = {
 	lancer_bench: "lance le bench de complétude sur la spec <id>",
 	explorer_evolution: "explore l'évolution de la cellule <id> par <sampler>",
 };
+
+/** Le VERBE canonique affiché par geste live/propose (la phrase = verbe + ancre + cible). */
+const LIVE_PHRASE_VERB: Readonly<Record<string, string>> = {
+	voir_pourquoi: "montre l'arbre pourquoi de l'incident",
+	piloter_goal: "pilote l'objectif",
+	voir_federation: "affiche la fédération entre les cellules",
+	reconcilier: "réconcilie les décisions du scope",
+	mesurer_archfit: "mesure la conformité architecturale du projet",
+	voir_boucle: "affiche la boucle buildloop du projet",
+	mesurer_cout: "mesure le coût de la cellule",
+	parcourir_comportements: "parcours les comportements de",
+	jardiner_kernel: "tend le jardin kernel du projet",
+	enforcer_autonomie: "enforce l'autonomie du niveau",
+	voir_console: "affiche la console buildconsole du projet",
+	voir_facturation: "affiche la facturation billing du projet",
+	parcourir_gabarits: "parcours les gabarits",
+	voir_besoin: "travaille le besoin du niveau",
+	auto_certifier: "auto-certifie la batterie",
+	verifier_auth: "vérifie l'auth du role",
+	explorer_espace: "explore l'espace workspace du projet",
+	modeler_entites: "modèle les entités du scope",
+	inspecter_forme: "inspecte la forme de l'entité",
+	mapper_contexte: "mappe le contexte du domaine",
+	griller_intention: "grille le challenge de l'intention",
+	apprendre_incident: "apprends de l'incident",
+	editer_dsl: "édite le dsl de la spec",
+	provisionner_substrat: "provisionne le substrat de la version",
+	ingerer_realite: "ingère le signal de réalité du path",
+};
+
+export const CANONICAL_PHRASES: Record<IntentKind, string> = (() => {
+	const out = { ...CANONICAL_PHRASES_NOYAU } as Record<IntentKind, string>;
+	for (const g of LIVE_GESTURES) {
+		const verb = LIVE_PHRASE_VERB[g.intent] ?? g.intent;
+		// La phrase montre le serveur dispatché (lecture) ou la nature DRAFT (proposition).
+		const tail =
+			g.propose === false
+				? ` <cible> → ${g.server}/${g.tool}`
+				: ` <cible> → ${g.server}/${g.tool} (proposition ${g.propose} DRAFT)`;
+		out[g.intent] = `${verb}${tail}`;
+	}
+	return out;
+})();
 
 /** Le libellé déclaré par forme de preuve (la forme technique reste la valeur). */
 const PROOF_LABELS: Record<MirrorForm, string> = {

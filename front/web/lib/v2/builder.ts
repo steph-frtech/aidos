@@ -72,8 +72,334 @@ export const INTENT_KINDS = [
 	// §1/§5 généralisée : aucune action exposée sans type de réponse). Voir CANONICAL_ACTIONS.
 	"lancer_bench",
 	"explorer_evolution",
+	// LES LECTURES LIVE (ADR 0092 — la passerelle dispatche le serveur Go ; le moteur est la
+	// SOURCE) : chaque geste de LECTURE adossé à un serveur DISPATCHÉ produit un kind `lecture_live`
+	// dont l'événement porte `via = { server, tool, args }` — l'aval (V3Session/actions) résout par
+	// `readVia(scope, tool, args)`. Le réducteur reste PUR : il NE fait AUCUN I/O, il POINTE la
+	// capacité (jamais réimplémenter la logique du serveur — déterminisme-first §6, le moteur la SOURCE).
+	"voir_pourquoi", // why-tree/build — l'arbre POURQUOI d'un incident (FK13 /why)
+	"piloter_goal", // goal-piloting/goal_pilot_open — l'objectif piloté (état DRAFT)
+	"voir_federation", // federation/fan_out — la fédération entre cellules (§51)
+	"reconcilier", // conscience/reconcile — réconcilier les décisions sourcées (FK09)
+	"mesurer_archfit", // arch-fitness/measure — la conformité architecturale (S102)
+	"voir_boucle", // build-loop/buildloop_terminate — la boucle de construction (S83)
+	"mesurer_cout", // cost-meter/cost_meter_cell — le coût d'une cellule (S111)
+	"parcourir_comportements", // behaviors/behaviors_search — la bibliothèque de comportements
+	"jardiner_kernel", // kernel-garden/garden_tend_project — la dette kernel (S112)
+	"enforcer_autonomie", // autonomy/enforce — le verdict de niveau d'autonomie
+	"voir_console", // build-console/buildconsole_project — la console de construction (S86)
+	"voir_facturation", // billing/billing_meter — la facturation du projet (S110)
+	"parcourir_gabarits", // templates/templates_list — les gabarits content-adressés (S81)
+	"voir_besoin", // besoin-intake/besoin_graph_state — l'état du BesoinGraph (EL15)
+	"auto_certifier", // self-cert/selfcert_gate — le verdict de certification (batterie)
+	"verifier_auth", // app-auth/app_auth_check_access — un lookup d'autorisation pur
+	"explorer_espace", // workspace/workspace_provision — le provisioning DRY-RUN (sandbox)
+	"modeler_entites", // entity-modeler/schema_validate — la validation d'entités (S75)
+	"inspecter_forme", // shape-editor/shape_derive — la forme dérivée d'une entité (S76)
+	"mapper_contexte", // context-map/verify_all — la vérif des contrats inter-cellules (S78)
+	"griller_intention", // grilling-loop/grill_route — le verdict de fidélité du grilling
+	// LES PROPOSITIONS (LE MUR §2 — un geste qui CHANGERAIT la vérité ne grave JAMAIS depuis le
+	// réducteur ; il PROPOSE : une idée DRAFT / un ChangeSet DRAFT) : le kind `proposition` porte
+	// `via = { server, tool, args }` ET `propose` (la nature de la proposition) ; l'aval ouvre la
+	// porte légale (idée → miroir → /goal). wroteKernel/hasMirror restent toujours faux.
+	"apprendre_incident", // learn/bump_hash — signal d'incident → Idea DRAFT (firewall.ViaIdea)
+	"editer_dsl", // dsl-editor/dsl_propose — un ChangeSet DRAFT typé sur un DSL (S77)
+	"provisionner_substrat", // provision/stack.emit — un StackManifest ChangeSet DRAFT (DP13)
+	"ingerer_realite", // idea-intake — un signal de réalité → Idea DRAFT (la seule porte prod→kernel)
 ] as const;
 export type IntentKind = (typeof INTENT_KINDS)[number];
+
+/**
+ * LE RÉFÉRENCEMENT D'UN SERVEUR DISPATCHÉ (ADR 0092) — la coordonnée que le réducteur
+ * POINTE pour un geste live/propose, SANS jamais appeler la passerelle (il reste PUR).
+ * L'aval (V3Session/actions) lit `readVia(scope, tool, args)` ; le moteur Go est la SOURCE.
+ */
+export interface ServerVia {
+	/** Le serveur DISPATCHÉ par la passerelle (ex. « why-tree », « goal-piloting »). */
+	readonly server: string;
+	/** L'outil MCP à invoquer en aval (ex. « build », « goal_pilot_open »). */
+	readonly tool: string;
+	/** Les arguments extraits du message (la cible citée VERBATIM), passés à readVia. */
+	readonly args: Readonly<Record<string, string>>;
+}
+
+/**
+ * LA TABLE DÉCLARÉE des gestes LIVE/PROPOSE → (intent, serveur, outil, nature). FERMÉE,
+ * au-dessus de la ligne (§8 — jamais apprise). Le réducteur la consulte pour POINTER la
+ * capacité ; le miroir l'itère pour prouver la bijection geste↔kind. `propose` distingue
+ * une LECTURE (false — un read live câblé à un serveur) d'une PROPOSITION (la nature de la
+ * proposition : idée / changeset — le MUR §2, jamais une écriture directe).
+ */
+export interface LiveGesture {
+	readonly intent: IntentKind;
+	readonly server: string;
+	readonly tool: string;
+	/** L'ANCRE lexicale qui précède la cible (« incident », « cellule », « spec »…). */
+	readonly anchor: string;
+	/** La clé d'argument passée à readVia (ex. « incident », « cell », « scope »). */
+	readonly argKey: string;
+	/** La cible par défaut si aucune n'est citée (l'écran porte la canonique). */
+	readonly fallback: string;
+	/** La route Workbench de la lentille correspondante (la cible de l'événement). */
+	readonly route: string;
+	/** false = LECTURE live ; sinon la nature de la PROPOSITION (le MUR §2). */
+	readonly propose: false | "idee" | "changeset";
+}
+
+export const LIVE_GESTURES: readonly LiveGesture[] = [
+	// — LECTURES LIVE (un serveur dispatché → readVia, le moteur est la SOURCE, ADR 0092) —
+	{
+		intent: "voir_pourquoi",
+		server: "why-tree",
+		tool: "build",
+		anchor: "incident",
+		argKey: "incident",
+		fallback: "le-symptome",
+		route: "/v2/why-tree",
+		propose: false,
+	},
+	{
+		intent: "piloter_goal",
+		server: "goal-piloting",
+		tool: "goal_pilot_open",
+		anchor: "objectif",
+		argKey: "goal",
+		fallback: "la-derniere-idee",
+		route: "/v2/goal",
+		propose: false,
+	},
+	{
+		intent: "voir_federation",
+		server: "federation",
+		tool: "fan_out",
+		anchor: "federation",
+		argKey: "policy",
+		fallback: "la-politique-globale",
+		route: "/federation-cockpit",
+		propose: false,
+	},
+	{
+		intent: "reconcilier",
+		server: "conscience",
+		tool: "reconcile",
+		anchor: "decisions",
+		argKey: "scope",
+		fallback: "le-projet",
+		route: "/v2/conscience",
+		propose: false,
+	},
+	{
+		intent: "mesurer_archfit",
+		server: "arch-fitness",
+		tool: "measure",
+		anchor: "architecturale",
+		argKey: "scope",
+		fallback: "le-projet",
+		route: "/arch-fitness",
+		propose: false,
+	},
+	{
+		intent: "voir_boucle",
+		server: "build-loop",
+		tool: "buildloop_terminate",
+		anchor: "construction",
+		argKey: "project",
+		fallback: "le-projet",
+		route: "/build-loop",
+		propose: false,
+	},
+	{
+		intent: "mesurer_cout",
+		server: "cost-meter",
+		tool: "cost_meter_cell",
+		anchor: "cellule",
+		argKey: "cell",
+		fallback: "la-cellule-canonique",
+		route: "/cost-meter",
+		propose: false,
+	},
+	{
+		intent: "parcourir_comportements",
+		server: "behaviors",
+		tool: "behaviors_search",
+		anchor: "comportements",
+		argKey: "facet",
+		fallback: "toutes",
+		route: "/behaviors",
+		propose: false,
+	},
+	{
+		intent: "jardiner_kernel",
+		server: "kernel-garden",
+		tool: "garden_tend_project",
+		anchor: "jardin",
+		argKey: "project",
+		fallback: "le-projet",
+		route: "/kernel-garden",
+		propose: false,
+	},
+	{
+		intent: "enforcer_autonomie",
+		server: "autonomy",
+		tool: "enforce",
+		anchor: "autonomie",
+		argKey: "level",
+		fallback: "le-niveau-courant",
+		route: "/autonomy",
+		propose: false,
+	},
+	{
+		intent: "voir_console",
+		server: "build-console",
+		tool: "buildconsole_project",
+		anchor: "construction",
+		argKey: "project",
+		fallback: "le-projet",
+		route: "/build-console",
+		propose: false,
+	},
+	{
+		intent: "voir_facturation",
+		server: "billing",
+		tool: "billing_meter",
+		anchor: "facturation",
+		argKey: "project",
+		fallback: "le-projet",
+		route: "/billing",
+		propose: false,
+	},
+	{
+		intent: "parcourir_gabarits",
+		server: "templates",
+		tool: "templates_list",
+		anchor: "gabarits",
+		argKey: "kind",
+		fallback: "tous",
+		route: "/templates",
+		propose: false,
+	},
+	{
+		intent: "voir_besoin",
+		server: "besoin-intake",
+		tool: "besoin_graph_state",
+		anchor: "besoin",
+		argKey: "level",
+		fallback: "le-niveau-courant",
+		route: "/besoin-intake",
+		propose: false,
+	},
+	{
+		intent: "auto_certifier",
+		server: "self-cert",
+		tool: "selfcert_gate",
+		anchor: "batterie",
+		argKey: "spec",
+		fallback: "la-batterie-canonique",
+		route: "/self-cert",
+		propose: false,
+	},
+	{
+		intent: "verifier_auth",
+		server: "app-auth",
+		tool: "app_auth_check_access",
+		anchor: "auth",
+		argKey: "role",
+		fallback: "le-role-courant",
+		route: "/app-auth",
+		propose: false,
+	},
+	{
+		intent: "explorer_espace",
+		server: "workspace",
+		tool: "workspace_provision",
+		anchor: "espace",
+		argKey: "project",
+		fallback: "le-projet",
+		route: "/workspace",
+		propose: false,
+	},
+	{
+		intent: "modeler_entites",
+		server: "entity-modeler",
+		tool: "schema_validate",
+		anchor: "entites",
+		argKey: "scope",
+		fallback: "le-projet",
+		route: "/entity-modeler",
+		propose: false,
+	},
+	{
+		intent: "inspecter_forme",
+		server: "shape-editor",
+		tool: "shape_derive",
+		anchor: "forme",
+		argKey: "entity",
+		fallback: "l-entite-courante",
+		route: "/shape-editor",
+		propose: false,
+	},
+	{
+		intent: "mapper_contexte",
+		server: "context-map",
+		tool: "verify_all",
+		anchor: "contexte",
+		argKey: "domain",
+		fallback: "le-domaine",
+		route: "/context-map",
+		propose: false,
+	},
+	{
+		intent: "griller_intention",
+		server: "grilling-loop",
+		tool: "grill_route",
+		anchor: "challenge",
+		argKey: "intent",
+		fallback: "l-intention-courante",
+		route: "/v2/grill",
+		propose: false,
+	},
+	// — PROPOSITIONS (LE MUR §2 — idée / ChangeSet DRAFT, JAMAIS une écriture-vérité) —
+	{
+		intent: "apprendre_incident",
+		server: "learn",
+		tool: "bump_hash",
+		anchor: "incident",
+		argKey: "incident",
+		fallback: "le-dernier-incident",
+		route: "/learn",
+		propose: "idee",
+	},
+	{
+		intent: "editer_dsl",
+		server: "dsl-editor",
+		tool: "dsl_propose",
+		anchor: "dsl",
+		argKey: "spec",
+		fallback: "la-spec-courante",
+		route: "/dsl-editor",
+		propose: "changeset",
+	},
+	{
+		intent: "provisionner_substrat",
+		server: "provision",
+		tool: "stack.emit",
+		anchor: "substrat",
+		argKey: "version",
+		fallback: "la-version-courante",
+		route: "/v3/environnements",
+		propose: "changeset",
+	},
+	{
+		intent: "ingerer_realite",
+		server: "idea-intake",
+		tool: "idea_capture",
+		anchor: "realite",
+		argKey: "path",
+		fallback: "le-signal-courant",
+		route: "/v2/idee",
+		propose: "idee",
+	},
+] as const;
 
 /**
  * LE REGISTRE CANONIQUE DES ACTIONS DE L'OS — déclaré, clos (la LOI DE COUVERTURE des
@@ -152,6 +478,134 @@ export const CANONICAL_ACTIONS: readonly CanonicalAction[] = [
 		phrase: "explore l'évolution de la cellule debit-du-compte par self-play",
 		expect: "explorer_evolution",
 	},
+	// — LES LECTURES LIVE (ADR 0092 — un serveur DISPATCHÉ ; l'aval résout par readVia ;
+	//   le moteur Go est la SOURCE). Chaque phrase canonique cite l'ANCRE + la cible. —
+	{
+		id: "why-tree-display",
+		phrase: "montre l'arbre pourquoi de l'incident debit-double",
+		expect: "voir_pourquoi",
+	},
+	{
+		id: "goal-pilot-open",
+		phrase: "pilote l'objectif idee-checkout",
+		expect: "piloter_goal",
+	},
+	{
+		id: "federation-view",
+		phrase: "affiche la fédération entre les cellules paiement-catalogue",
+		expect: "voir_federation",
+	},
+	{
+		id: "conscience-reconcile",
+		phrase: "réconcilie les décisions du scope paiement",
+		expect: "reconcilier",
+	},
+	{
+		id: "arch-fitness-measure",
+		phrase: "mesure la conformité architecturale du projet",
+		expect: "mesurer_archfit",
+	},
+	{
+		id: "build-loop-view",
+		phrase: "affiche la boucle buildloop du projet",
+		expect: "voir_boucle",
+	},
+	{
+		id: "cost-meter-cell",
+		phrase: "mesure le coût de la cellule debit-du-compte",
+		expect: "mesurer_cout",
+	},
+	{
+		id: "behaviors-search",
+		phrase: "parcours les comportements de paiement",
+		expect: "parcourir_comportements",
+	},
+	{
+		id: "kernel-garden-tend",
+		phrase: "tend le jardin kernel du projet demoshop",
+		expect: "jardiner_kernel",
+	},
+	{
+		id: "autonomy-enforce",
+		phrase: "enforce l'autonomie du niveau N2",
+		expect: "enforcer_autonomie",
+	},
+	{
+		id: "build-console-project",
+		phrase: "affiche la console buildconsole du projet",
+		expect: "voir_console",
+	},
+	{
+		id: "billing-meter",
+		phrase: "affiche la facturation billing du projet demoshop",
+		expect: "voir_facturation",
+	},
+	{
+		id: "templates-browse",
+		phrase: "parcours les gabarits saas",
+		expect: "parcourir_gabarits",
+	},
+	{
+		id: "besoin-compound",
+		phrase: "travaille le besoin du niveau product",
+		expect: "voir_besoin",
+	},
+	{
+		id: "self-cert-gate",
+		phrase: "auto-certifie la batterie createOrder",
+		expect: "auto_certifier",
+	},
+	{
+		id: "app-auth-check",
+		phrase: "vérifie l'auth du role admin",
+		expect: "verifier_auth",
+	},
+	{
+		id: "workspace-provision",
+		phrase: "explore l'espace workspace du projet demoshop",
+		expect: "explorer_espace",
+	},
+	{
+		id: "entity-modeler-validate",
+		phrase: "modèle les entités du scope paiement",
+		expect: "modeler_entites",
+	},
+	{
+		id: "shape-editor-inspect",
+		phrase: "inspecte la forme de l'entité Commande",
+		expect: "inspecter_forme",
+	},
+	{
+		id: "context-map-verify",
+		phrase: "mappe le contexte du domaine paiement",
+		expect: "mapper_contexte",
+	},
+	{
+		id: "grilling-loop-grill",
+		phrase: "grille le challenge de l'intention idee-checkout",
+		expect: "griller_intention",
+	},
+	// — LES PROPOSITIONS (LE MUR §2 — idée / ChangeSet DRAFT, jamais une écriture-vérité) —
+	{
+		id: "learn-from-incident",
+		phrase: "apprends de l'incident debit-double",
+		expect: "apprendre_incident",
+	},
+	{
+		id: "dsl-parse-edit",
+		phrase: "édite le dsl de la spec createOrder",
+		expect: "editer_dsl",
+	},
+	{
+		id: "provision-stack",
+		phrase: "provisionne le substrat de la version v2",
+		expect: "provisionner_substrat",
+	},
+	{
+		id: "reality-ingest-signal",
+		phrase: "ingère le signal de réalité du path checkout-latence",
+		expect: "ingerer_realite",
+	},
 ] as const;
 
 /**
@@ -202,12 +656,29 @@ export interface BuilderEvent {
 		// LES CAPACITÉS LANCÉES (below-the-line — un run de port projeté, jamais une vérité) :
 		| "bench_lance"
 		| "evolution_exploree"
+		// LA LECTURE LIVE (ADR 0092 — un serveur DISPATCHÉ ; l'aval résout par readVia ; le
+		// moteur Go est la SOURCE). `via` porte { server, tool, args } ; le réducteur reste PUR.
+		| "lecture_live"
+		// LA PROPOSITION (LE MUR §2 — idée / ChangeSet DRAFT, jamais une écriture-vérité).
+		| "proposition"
 		| "refus";
 	readonly detail: string;
 	/** La référence content-adressée touchée (chemin, id d'idée, version, route…). */
 	readonly ref: string;
 	/** Le barreau d'environnement concerné (déploiements/refus d'échelle). */
 	readonly env?: EnvName;
+	/**
+	 * LA COORDONNÉE DE SERVEUR (lecture_live / proposition) — ce que l'aval (V3Session/
+	 * actions) passe à `readVia(scope, tool, args)`. Le réducteur ne l'APPELLE jamais (il
+	 * reste pur) : il POINTE la capacité. Absent pour les événements purement locaux.
+	 */
+	readonly via?: ServerVia;
+	/**
+	 * LA NATURE DE LA PROPOSITION (proposition uniquement, LE MUR §2) — « idee » (un signal/
+	 * besoin → Idea DRAFT, hasMirror=false) ou « changeset » (un ChangeSet DRAFT, jamais
+	 * appliqué). Atteste qu'AUCUNE vérité n'est gravée depuis le chat.
+	 */
+	readonly propose?: "idee" | "changeset";
 }
 
 /** Un IMPACT calculé (« quoi est touché ») — la vague, jamais estimée. */
@@ -360,8 +831,9 @@ const LEXICONS: Record<
 	// faibles (variant/sampler/self-play…). Le run reste en quarantaine (le sandbox), jamais
 	// une promotion (idée → miroir → /goal pour une variante à verser).
 	explorer_evolution: {
-		strong: ["explore", "explorer", "evolution", "evolue", "cellule"],
+		strong: ["explore", "explorer", "evolution", "evolue"],
 		weak: [
+			"cellule",
 			"variant",
 			"variante",
 			"sampler",
@@ -370,6 +842,111 @@ const LEXICONS: Record<
 			"quarantaine",
 			"sandbox",
 		],
+	},
+	// LES LECTURES LIVE (ADR 0092) — l'ANCRE distinctive de chaque serveur est un verbe FORT
+	// (l'incident, la fédération, le jardin… n'apparaissent dans aucun autre lexique) ; les indices
+	// faibles désambiguïsent. Le moteur Go est la SOURCE en aval ; ici, juste le classement.
+	voir_pourquoi: {
+		strong: ["pourquoi", "incident", "whytree"],
+		weak: ["arbre", "symptome", "cause", "racine", "rouge"],
+	},
+	piloter_goal: {
+		strong: ["pilote", "piloter", "goal", "objectif"],
+		weak: ["draft", "redset", "promotion", "fige"],
+	},
+	voir_federation: {
+		strong: ["federation", "federe", "federer", "saga"],
+		weak: ["cellules", "cross", "policy", "fanout", "globale"],
+	},
+	reconcilier: {
+		strong: ["reconcilie", "reconcilier", "reconciliation", "conscience"],
+		weak: ["decisions", "decision", "sourcees", "verdicts", "cards"],
+	},
+	mesurer_archfit: {
+		strong: ["architecturale", "archfit", "fitness"],
+		weak: ["conformite", "mesure", "ratchet", "depguard", "architecture"],
+	},
+	voir_boucle: {
+		strong: ["boucle", "buildloop"],
+		weak: ["construction", "terminate", "progress", "verdict", "iteration"],
+	},
+	mesurer_cout: {
+		strong: ["cout", "couts", "costmeter", "disjoncteur"],
+		weak: ["mesure", "cellule", "budget", "facture", "depense"],
+	},
+	parcourir_comportements: {
+		strong: ["comportements", "comportement", "behaviors"],
+		weak: ["parcours", "parcourt", "bibliotheque", "facette", "library"],
+	},
+	jardiner_kernel: {
+		strong: ["jardin", "jardine", "jardinage", "garden"],
+		weak: ["tend", "dette", "debt", "trim", "rot"],
+	},
+	enforcer_autonomie: {
+		strong: ["autonomie", "enforce", "enforcer", "autonomy"],
+		weak: ["niveau", "level", "verdict", "promote"],
+	},
+	voir_console: {
+		strong: ["console", "buildconsole"],
+		weak: ["construction", "phase", "stable", "journal", "tableau"],
+	},
+	voir_facturation: {
+		strong: ["facturation", "facture", "billing"],
+		weak: ["plan", "quota", "meter", "compteur", "abonnement"],
+	},
+	parcourir_gabarits: {
+		strong: ["gabarits", "gabarit", "templates", "template"],
+		weak: ["parcours", "parcourt", "modeles", "bundle", "instancie"],
+	},
+	voir_besoin: {
+		strong: ["besoin", "besoingraph"],
+		weak: ["niveau", "level", "graphe", "intake", "rung"],
+	},
+	auto_certifier: {
+		strong: ["certifie", "certifier", "certification", "selfcert"],
+		weak: ["batterie", "verdict", "auto", "gate", "battery"],
+	},
+	verifier_auth: {
+		strong: ["auth", "authentification", "autorisation"],
+		weak: ["verifie", "verifier", "role", "acces", "access", "gere"],
+	},
+	explorer_espace: {
+		strong: ["espace", "workspace"],
+		weak: ["provision", "provisionne", "sandbox", "dryrun", "isole"],
+	},
+	modeler_entites: {
+		strong: ["entites", "entite", "modeler", "modele", "modeleur"],
+		weak: ["schema", "scope", "canvas", "valide", "champs"],
+	},
+	inspecter_forme: {
+		strong: ["forme", "shape", "inspecte", "inspecter"],
+		weak: ["entite", "derive", "valide", "champs", "type"],
+	},
+	mapper_contexte: {
+		strong: ["contexte", "mappe", "mapper", "contextmap", "pact"],
+		weak: ["domaine", "domain", "contrats", "verifie", "frontiere"],
+	},
+	griller_intention: {
+		strong: ["grille", "griller", "grilling", "challenge"],
+		weak: ["intention", "fidelite", "verdict", "tranchant", "route"],
+	},
+	// LES PROPOSITIONS (LE MUR §2) — un verbe d'apprentissage/édition/provisioning/ingestion
+	// FORT ; la cible (incident/dsl/substrat/realite) désambiguïse. Aucune écriture-vérité ici.
+	apprendre_incident: {
+		strong: ["apprends", "apprendre", "apprend", "learn"],
+		weak: ["incident", "signal", "telemetrie", "leçon", "lecon", "loop"],
+	},
+	editer_dsl: {
+		strong: ["dsl", "edite", "editer", "editez"],
+		weak: ["spec", "grammaire", "ast", "expr", "policy"],
+	},
+	provisionner_substrat: {
+		strong: ["substrat", "provisionne", "provisionner", "stack"],
+		weak: ["version", "manifest", "base", "interpreteur", "bootstrap"],
+	},
+	ingerer_realite: {
+		strong: ["ingere", "ingerer", "realite", "ingestion"],
+		weak: ["signal", "path", "webhook", "telemetrie", "prod"],
 	},
 };
 
@@ -526,6 +1103,173 @@ function refAfter(text: string, anchors: readonly string[]): string | null {
 		return text.slice(start).match(/^[A-Za-z0-9][A-Za-z0-9-]*/)?.[0] ?? null;
 	}
 	return null;
+}
+
+/** L'INDEX par intent des gestes live/propose (la table déclarée, fermée — §8). */
+const LIVE_BY_INTENT: Readonly<Record<string, LiveGesture>> =
+	Object.fromEntries(LIVE_GESTURES.map((g) => [g.intent, g]));
+
+/**
+ * LE PRÉFIXE-VERBE de désambiguïsation par geste LIVE/PROPOSE — DÉRIVÉ du PREMIER verbe FORT
+ * de son lexique (un token DISTINCTIF, unique au geste — « pourquoi », « federation »,
+ * « jardin »… n'apparaissent dans aucun autre lexique). Préfixer ce token force ce type de
+ * réponse au reclassement (la désambiguïsation déterministe, motif /v2/builder). Garantit que
+ * chaque geste du vocabulaire étendu a SON préfixe — l'écran reste complet par construction
+ * (jamais « plein de gestes manquants »). PURE & TOTALE & DÉTERMINISTE.
+ */
+export const LIVE_FORCE_PREFIX: Readonly<Record<string, string>> =
+	Object.fromEntries(
+		LIVE_GESTURES.map((g) => [g.intent, `${LEXICONS[g.intent].strong[0]} `]),
+	);
+
+/**
+ * COMPLÈTE une carte de libellés du NOYAU (les 12 gestes du cycle de vie/nav/capacités) en une
+ * carte TOTALE `Record<IntentKind, V>` : chaque geste LIVE/PROPOSE reçoit `readValue` (lecture)
+ * ou `proposeValue` (proposition). L'écran qui rend une carte de libellés reste COMPLET par
+ * construction (∀ geste du jeu clos → un libellé ; jamais « plein de gestes manquants »). PURE.
+ */
+export function withLiveLabels<V>(
+	noyau: Record<string, V>,
+	readValue: V,
+	proposeValue: V,
+): Record<IntentKind, V> {
+	const out = { ...noyau } as Record<IntentKind, V>;
+	for (const g of LIVE_GESTURES)
+		out[g.intent] = g.propose === false ? readValue : proposeValue;
+	return out;
+}
+
+/**
+ * LE JEU CLOS DES MOTS-OUTILS FRANÇAIS (articles, prépositions, le vocabulaire d'ancrage des
+ * serveurs) — DÉCLARÉ, jamais appris (§8). L'extracteur de cible les saute pour ne retenir que
+ * le RÉFÉRENT (le grain réel cité : un id de cellule, un nom d'entité, un hash d'incident…).
+ */
+const TARGET_STOPWORDS: ReadonlySet<string> = new Set([
+	// articles / prépositions
+	"du",
+	"de",
+	"des",
+	"la",
+	"le",
+	"les",
+	"un",
+	"une",
+	"au",
+	"aux",
+	"entre",
+	// le vocabulaire d'ancrage des serveurs (les anchors/argKeys eux-mêmes, jamais le grain)
+	"kernel",
+	"niveau",
+	"scope",
+	"projet",
+	"spec",
+	"specification",
+	"version",
+	"path",
+	"role",
+	"domaine",
+	"domain",
+	"entite",
+	"cellule",
+	"cell",
+	"intention",
+	"batterie",
+	"facette",
+	"facet",
+	"conformite",
+	"construction",
+	"boucle",
+	"console",
+	"decisions",
+	"decision",
+	"comportements",
+	"gabarits",
+	"gabarit",
+	"espace",
+	"forme",
+	"auth",
+	"besoin",
+	"fitness",
+	"federation",
+	"contexte",
+	"challenge",
+	"substrat",
+	"incident",
+	"objectif",
+	"signal",
+	"arbre",
+	"pourquoi",
+	"realite",
+	"dsl",
+	"goal",
+	"policy",
+	"kind",
+	"level",
+	"project",
+	"entity",
+	"intent",
+	"buildloop",
+	"buildconsole",
+	"billing",
+	"workspace",
+]);
+
+/**
+ * EXTRAIT le RÉFÉRENT d'un geste live/propose — PURE & TOTALE & DÉTERMINISTE : le DERNIER token
+ * de contenu (≥2 chars, hors mots-outils) cité APRÈS l'ancre. La phrase canonique cite toujours
+ * la cible en fin (« …du projet demoshop », « …la batterie createOrder ») ; on la reprend VERBATIM
+ * (casse préservée : « createOrder » reste « createOrder »). Aucune cible → null (l'écran porte la
+ * canonique de repli). Le pliage NFD+lowercase est 1:1 sur ce vocabulaire latin (index alignés).
+ */
+function liveTarget(text: string, anchor: string): string | null {
+	const folded = text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+	const m = folded.match(new RegExp(`\\b${anchor}\\b`));
+	if (m === null || m.index === undefined) return null;
+	const from = m.index + anchor.length;
+	const afterFolded = folded.slice(from);
+	const afterOrig = text.slice(from);
+	const re = /[a-z0-9][a-z0-9-]*/g;
+	let tok: RegExpExecArray | null;
+	let last: string | null = null;
+	// biome-ignore lint/suspicious/noAssignInExpressions: itération de matches, idiome standard
+	while ((tok = re.exec(afterFolded)) !== null) {
+		if (tok[0].length < 2 || TARGET_STOPWORDS.has(tok[0])) continue;
+		last = afterOrig.slice(tok.index, tok.index + tok[0].length);
+	}
+	return last;
+}
+
+/**
+ * CONSTRUIT l'événement d'un geste LIVE/PROPOSE — PURE & TOTALE & DÉTERMINISTE : extrait la
+ * CIBLE citée après l'ancre (VERBATIM, casse préservée) sinon la valeur de repli, POINTE le
+ * serveur dispatché (`via`) que l'aval résout par readVia (le moteur Go est la SOURCE, ADR 0092),
+ * et — pour une proposition — atteste la nature DRAFT (le MUR §2, jamais une écriture). Le
+ * réducteur NE fait AUCUN I/O : il ne réimplémente JAMAIS la logique du serveur.
+ */
+function liveEvent(g: LiveGesture, text: string): BuilderEvent {
+	const target = liveTarget(text, g.anchor) ?? g.fallback;
+	const via: ServerVia = {
+		server: g.server,
+		tool: g.tool,
+		args: { [g.argKey]: target },
+	};
+	if (g.propose === false)
+		return {
+			kind: "lecture_live",
+			detail: `lecture live « ${g.server}/${g.tool} » sur « ${target} » — le moteur Go est la source (readVia en aval, ADR 0092) ; voir ${g.route}`,
+			ref: `${g.route}#${target}`,
+			via,
+		};
+	return {
+		kind: "proposition",
+		detail:
+			g.propose === "idee"
+				? `proposition : signal « ${target} » → Idea DRAFT via ${g.server}/${g.tool} (hasMirror=false ; la porte reste idée → miroir → /goal) ; voir ${g.route}`
+				: `proposition : ChangeSet DRAFT via ${g.server}/${g.tool} sur « ${target} » (jamais appliqué — le MUR §2) ; voir ${g.route}`,
+		ref: `${g.route}#${target}`,
+		via,
+		propose: g.propose,
+	};
 }
 
 /** L'APP PROJETÉE depuis les kernels proposés — une PROJECTION pure, jamais stockée. */
@@ -1136,6 +1880,40 @@ export function applyIntent(state: BuilderState, text: string): ApplyResult {
 				],
 				[],
 			);
+		}
+
+		// LES LECTURES LIVE + LES PROPOSITIONS (ADR 0092 × LE MUR §2) — un SEUL chemin déclaré,
+		// piloté par la table fermée LIVE_GESTURES (jamais un cas codé par geste — déterminisme-first).
+		// Une LECTURE pointe son serveur dispatché (via → readVia en aval, le moteur Go est la SOURCE) ;
+		// une PROPOSITION atteste une idée/ChangeSet DRAFT (aucune écriture-vérité depuis le réducteur).
+		// AUCUNE mutation d'état (le journal append-only mis à part) — un run/une proposition projeté(e).
+		case "voir_pourquoi":
+		case "piloter_goal":
+		case "voir_federation":
+		case "reconcilier":
+		case "mesurer_archfit":
+		case "voir_boucle":
+		case "mesurer_cout":
+		case "parcourir_comportements":
+		case "jardiner_kernel":
+		case "enforcer_autonomie":
+		case "voir_console":
+		case "voir_facturation":
+		case "parcourir_gabarits":
+		case "voir_besoin":
+		case "auto_certifier":
+		case "verifier_auth":
+		case "explorer_espace":
+		case "modeler_entites":
+		case "inspecter_forme":
+		case "mapper_contexte":
+		case "griller_intention":
+		case "apprendre_incident":
+		case "editer_dsl":
+		case "provisionner_substrat":
+		case "ingerer_realite": {
+			const g = LIVE_BY_INTENT[u.attente as IntentKind];
+			return finish(state, [liveEvent(g, text)], []);
 		}
 	}
 }

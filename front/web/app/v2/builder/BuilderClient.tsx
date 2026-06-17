@@ -15,8 +15,10 @@ import {
 	emitApp,
 	type IntentKind,
 	initBuilderState,
+	LIVE_FORCE_PREFIX,
 	type Understanding,
 	understand,
+	withLiveLabels,
 } from "@/lib/v2/builder";
 import type { CodeEdge, CodeNode } from "@/lib/v2/code-graph";
 import { nodePath, type Position, positionOf } from "@/lib/v2/composition";
@@ -76,20 +78,24 @@ const SUGGESTIONS: readonly string[] = [
 ];
 
 /** Le verbe FORT canonique par intention — le préfixe de désambiguïsation (déclaré, jamais appris). */
-const FORCE_PREFIX: Record<IntentKind, string> = {
-	capturer_idee: "capture l'idée : ",
-	greffer: "greffe ",
-	promouvoir: "promeus ",
-	generer: "génère ",
-	deployer: "déploie ",
-	delta: "delta ",
-	impacter: "impact ",
-	interroger: "montre ",
-	ouvrir: "ouvre ",
-	adapter: "adapte ",
-	lancer_bench: "lance le bench de complétude sur la spec ",
-	explorer_evolution: "explore l'évolution de la cellule ",
-};
+const FORCE_PREFIX: Record<IntentKind, string> = Object.assign(
+	{
+		capturer_idee: "capture l'idée : ",
+		greffer: "greffe ",
+		promouvoir: "promeus ",
+		generer: "génère ",
+		deployer: "déploie ",
+		delta: "delta ",
+		impacter: "impact ",
+		interroger: "montre ",
+		ouvrir: "ouvre ",
+		adapter: "adapte ",
+		lancer_bench: "lance le bench de complétude sur la spec ",
+		explorer_evolution: "explore l'évolution de la cellule ",
+	},
+	// LE VOCABULAIRE ÉTENDU (ADR 0092) : le préfixe dérivé du premier verbe fort de chaque geste.
+	LIVE_FORCE_PREFIX,
+) as Record<IntentKind, string>;
 
 /**
  * LA DÉSAMBIGUÏSATION DÉTERMINISTE (le « trick », documenté) : le twin n'a pas de paramètre
@@ -313,20 +319,25 @@ export function BuilderClient({
 	// La référence vers l'état courant (évite une fermeture périmée après un await Claude).
 	const stateRef = useRef(builderState);
 
-	const intentLabel: Record<IntentKind, string> = {
-		capturer_idee: t.intentCapturerIdee,
-		greffer: t.intentGreffer,
-		promouvoir: t.intentPromouvoir,
-		generer: t.intentGenerer,
-		deployer: t.intentDeployer,
-		delta: t.intentDelta,
-		impacter: t.intentImpacter,
-		interroger: t.intentInterroger,
-		ouvrir: t.intentOuvrir,
-		adapter: t.intentAdapter,
-		lancer_bench: t.intentLancerBench,
-		explorer_evolution: t.intentExplorerEvolution,
-	};
+	const intentLabel: Record<IntentKind, string> = withLiveLabels(
+		{
+			capturer_idee: t.intentCapturerIdee,
+			greffer: t.intentGreffer,
+			promouvoir: t.intentPromouvoir,
+			generer: t.intentGenerer,
+			deployer: t.intentDeployer,
+			delta: t.intentDelta,
+			impacter: t.intentImpacter,
+			interroger: t.intentInterroger,
+			ouvrir: t.intentOuvrir,
+			adapter: t.intentAdapter,
+			lancer_bench: t.intentLancerBench,
+			explorer_evolution: t.intentExplorerEvolution,
+		},
+		// LE VOCABULAIRE ÉTENDU (ADR 0092) : un libellé générique lecture/proposition par geste V3.
+		t.intentLectureLive,
+		t.intentProposition,
+	);
 	const tabLabel: Record<TabId, string> = {
 		arbre: t.tabArbre,
 		app: t.tabApp,

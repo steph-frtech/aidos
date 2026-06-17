@@ -9,6 +9,7 @@ import {
 	ENV_LADDER,
 	INTENT_KINDS,
 	initBuilderState,
+	LIVE_GESTURES,
 	resolveScreen,
 	type ScreenRef,
 	understand,
@@ -40,8 +41,9 @@ import { SCREENS } from "./screens";
 const S = (): BuilderState => initBuilderState();
 
 describe("la grammaire d'intentions — un jeu CLOS, déclaré", () => {
-	it("le jeu des intentions est déclaré et clos (le cycle de vie ENTIER d'une appli + la navigation totale + les capacités lancées)", () => {
-		expect(INTENT_KINDS).toEqual([
+	it("le jeu des intentions est déclaré et clos (le cycle de vie ENTIER d'une appli + la navigation totale + les capacités lancées + les LECTURES LIVE + les PROPOSITIONS)", () => {
+		// LE NOYAU : le cycle de vie + la nav + les deux capacités lancées (l'ordre déclaré est fixe).
+		const noyau = [
 			"capturer_idee",
 			"greffer",
 			"promouvoir",
@@ -56,7 +58,14 @@ describe("la grammaire d'intentions — un jeu CLOS, déclaré", () => {
 			// un bouton de cockpit ENVOIE le geste au chat, le réducteur le ROUTE vers son port.
 			"lancer_bench",
 			"explorer_evolution",
-		]);
+		];
+		expect(INTENT_KINDS.slice(0, noyau.length)).toEqual(noyau);
+		// LE VOCABULAIRE ÉTENDU (ADR 0092) — chaque geste LIVE/PROPOSE déclaré dans LIVE_GESTURES
+		// EST un intent du jeu clos (la bijection table↔jeu), et chaque intent n'apparaît qu'UNE fois.
+		for (const g of LIVE_GESTURES) expect(INTENT_KINDS).toContain(g.intent);
+		expect(new Set(INTENT_KINDS).size).toBe(INTENT_KINDS.length);
+		// Le jeu couvre AU MOINS le noyau + les 25 gestes de capacités V3 (jamais « plein de gestes manquants »).
+		expect(INTENT_KINDS.length).toBeGreaterThanOrEqual(noyau.length + 25);
 	});
 
 	it("l'ÉCHELLE D'ENVIRONNEMENTS est déclarée, close, ordonnée (le cliquet généralisé)", () => {
@@ -193,7 +202,12 @@ describe("LA LOI DE COUVERTURE DES ACTIONS — 100 % des actions de l'OS sont CO
 			for (const i of r.state.ideas) expect(i.hasMirror).toBe(false);
 			// les capacités lancées ne mutent RIEN sauf le journal (append-only §9) : un run
 			// below-the-line projeté — l'arbre, les idées, les kernels, les envs sont intacts.
-			if (a.expect === "lancer_bench" || a.expect === "explorer_evolution") {
+			const live = LIVE_GESTURES.some((g) => g.intent === a.expect);
+			if (
+				a.expect === "lancer_bench" ||
+				a.expect === "explorer_evolution" ||
+				live
+			) {
 				expect(r.state.tree).toEqual(withK.tree);
 				expect(r.state.ideas).toEqual(withK.ideas);
 				expect(r.state.kernels).toEqual(withK.kernels);
@@ -201,6 +215,150 @@ describe("LA LOI DE COUVERTURE DES ACTIONS — 100 % des actions de l'OS sont CO
 				expect(r.impacts).toEqual([]);
 			}
 		}
+	});
+});
+
+// ── LE VOCABULAIRE ÉTENDU (ADR 0092) : LES LECTURES LIVE + LES PROPOSITIONS ────
+//
+// L'utilisateur : « il manque toujours plein de gestes ». Le vocabulaire du chat doit
+// couvrir TOUTES les capacités V3 (les serveurs DISPATCHÉS par la passerelle), pas 12.
+// LIVE_GESTURES est la table FERMÉE, déclarée (§8) qui mappe chaque geste à son intent +
+// son serveur dispatché + son outil + la nature (lecture live / proposition). Le miroir
+// prouve trois lois :
+//   (NO-LIE §8)  ∀ geste DÉCLARÉ → un kind TRAITÉ par le réducteur (bijection geste↔kind ;
+//                un geste qui parse mais ne produit rien = un mensonge, interdit) ;
+//   (ADR 0092)   une LECTURE pointe son serveur dispatché (via → readVia en aval ; le moteur
+//                Go est la SOURCE — jamais une logique réimplémentée dans le réducteur) ;
+//   (LE MUR §2)  une PROPOSITION atteste une idée/ChangeSet DRAFT — JAMAIS une écriture-vérité.
+
+describe("LE VOCABULAIRE ÉTENDU — chaque capacité V3 a SON geste, SON kind, SON serveur (ADR 0092)", () => {
+	it("la table LIVE_GESTURES est close et bien formée (intents uniques, serveur/outil/ancre non vides)", () => {
+		expect(LIVE_GESTURES.length).toBeGreaterThanOrEqual(25);
+		const intents = LIVE_GESTURES.map((g) => g.intent);
+		expect(new Set(intents).size, "un intent par geste, jamais dupliqué").toBe(
+			intents.length,
+		);
+		for (const g of LIVE_GESTURES) {
+			expect(INTENT_KINDS, `${g.intent} hors du jeu clos`).toContain(g.intent);
+			expect(g.server.length).toBeGreaterThan(0);
+			expect(g.tool.length).toBeGreaterThan(0);
+			expect(g.anchor.length).toBeGreaterThan(0);
+			expect(g.argKey.length).toBeGreaterThan(0);
+			expect(g.fallback.length).toBeGreaterThan(0);
+			expect(g.route.startsWith("/"), `route ${g.route}`).toBe(true);
+			expect([false, "idee", "changeset"]).toContain(g.propose);
+		}
+	});
+
+	it("NO-LIE (§8) : ∀ geste DÉCLARÉ dans CANONICAL_ACTIONS, le réducteur PRODUIT un événement (jamais un parse sans réponse)", () => {
+		// La BIJECTION geste↔kind-traité : chaque action canonique → understand comprise →
+		// applyIntent produit AU MOINS un événement ≠ refus. Un geste qui parse mais ne produit
+		// rien (ou retombe en refus) serait un MENSONGE (§8). On joue chaque geste sur l'état
+		// PRÉPARÉ pour lui (les actions de cycle de vie exigent un substrat).
+		const base = applyIntent(
+			S(),
+			"capture l'idée : au checkout, débiter le compte une seule fois",
+		).state;
+		const withK = applyIntent(base, "promeus la dernière idée").state;
+		for (const a of CANONICAL_ACTIONS) {
+			const st = a.expect === "promouvoir" ? base : withK;
+			const u = understand(st, a.phrase);
+			expect(u.attente, `geste ${a.id} non compris`).toBe(a.expect);
+			const r = applyIntent(st, a.phrase);
+			expect(
+				r.events.length,
+				`geste ${a.id} ne produit AUCUN événement (un mensonge §8)`,
+			).toBeGreaterThan(0);
+			expect(
+				r.events.some((e) => e.kind === "refus"),
+				`geste ${a.id} retombe en refus`,
+			).toBe(false);
+		}
+	});
+
+	it("NO-LIE (bijection) : ∀ geste LIVE/PROPOSE, son intent est TRAITÉ → un événement lecture_live|proposition (jamais incompris/refus)", () => {
+		const st = S();
+		// Une phrase canonique MINIMALE par geste (le verbe d'ancrage + la cible) — chaque
+		// intent du jeu clos a son cas dans le réducteur (la couverture, l'inverse d'un monstre).
+		const phraseFor: Record<string, string> = {};
+		for (const a of CANONICAL_ACTIONS) phraseFor[a.expect] = a.phrase;
+		for (const g of LIVE_GESTURES) {
+			const phrase = phraseFor[g.intent];
+			expect(phrase, `geste ${g.intent} sans phrase canonique`).toBeDefined();
+			const u = understand(st, phrase);
+			expect(u.attente, `« ${phrase} » → ${u.attente}`).toBe(g.intent);
+			const r = applyIntent(st, phrase);
+			const ev = r.events[0];
+			const expectedKind = g.propose === false ? "lecture_live" : "proposition";
+			expect(ev.kind, `geste ${g.intent} kind`).toBe(expectedKind);
+		}
+	});
+
+	it("ADR 0092 : ∀ LECTURE live → un événement lecture_live qui POINTE le serveur dispatché (via.server/via.tool), aval = readVia", () => {
+		const st = S();
+		const byIntent: Record<string, string> = {};
+		for (const a of CANONICAL_ACTIONS) byIntent[a.expect] = a.phrase;
+		for (const g of LIVE_GESTURES.filter((x) => x.propose === false)) {
+			const r = applyIntent(st, byIntent[g.intent]);
+			const ev = r.events.find((e) => e.kind === "lecture_live");
+			expect(ev, `lecture ${g.intent} absente`).toBeDefined();
+			expect(ev?.via?.server, `${g.intent} via.server`).toBe(g.server);
+			expect(ev?.via?.tool, `${g.intent} via.tool`).toBe(g.tool);
+			// la cible extraite est passée en argument (la clé déclarée) — VERBATIM.
+			expect(ev?.via?.args[g.argKey]).toBeDefined();
+			// AUCUNE proposition (propose absent) — une lecture ne change pas la vérité.
+			expect(ev?.propose).toBeUndefined();
+			expect(ev?.ref?.startsWith(g.route)).toBe(true);
+		}
+	});
+
+	it("LE MUR (§2) : ∀ PROPOSITION → un événement proposition DRAFT (idee|changeset), JAMAIS une écriture-vérité", () => {
+		const st = S();
+		const byIntent: Record<string, string> = {};
+		for (const a of CANONICAL_ACTIONS) byIntent[a.expect] = a.phrase;
+		for (const g of LIVE_GESTURES.filter((x) => x.propose !== false)) {
+			const r = applyIntent(st, byIntent[g.intent]);
+			const ev = r.events.find((e) => e.kind === "proposition");
+			expect(ev, `proposition ${g.intent} absente`).toBeDefined();
+			expect(ev?.propose, `${g.intent} nature`).toBe(g.propose);
+			expect(ev?.via?.server).toBe(g.server);
+			// AUCUNE écriture : ni idée gravée avec miroir, ni kernel — l'état est intact.
+			expect(r.state.ideas).toEqual(st.ideas);
+			expect(r.state.kernels).toEqual(st.kernels);
+			expect(r.state.envs).toEqual(st.envs);
+		}
+	});
+
+	it("∀ geste LIVE/PROPOSE est DÉTERMINISTE : même message → même événement (le réducteur reste PUR, aucun I/O)", () => {
+		const st = S();
+		for (const a of CANONICAL_ACTIONS.filter((x) =>
+			LIVE_GESTURES.some((g) => g.intent === x.expect),
+		)) {
+			const a1 = applyIntent(st, a.phrase);
+			const a2 = applyIntent(st, a.phrase);
+			expect(a1.events).toEqual(a2.events);
+			expect(a1.state).toEqual(a2.state);
+		}
+	});
+
+	it("la cible est reprise VERBATIM (casse préservée) — « createOrder » reste « createOrder », jamais « createorder »", () => {
+		const st = S();
+		const r = applyIntent(st, "auto-certifie la batterie createOrder");
+		const ev = r.events.find((e) => e.kind === "lecture_live");
+		expect(ev?.via?.args.spec).toBe("createOrder");
+		const r2 = applyIntent(st, "inspecte la forme de l'entité Commande");
+		expect(
+			r2.events.find((e) => e.kind === "lecture_live")?.via?.args.entity,
+		).toBe("Commande");
+	});
+
+	it("un geste de LECTURE sans cible citée tombe sur la CANONIQUE de repli (fail-soft, jamais un crash, l'écran porte la spec)", () => {
+		const st = S();
+		// « mesure la conformité architecturale » sans cible → la lecture part quand même.
+		const r = applyIntent(st, "mesure la conformité architecturale du projet");
+		const ev = r.events.find((e) => e.kind === "lecture_live");
+		expect(ev?.via?.server).toBe("arch-fitness");
+		expect(ev?.via?.args.scope.length).toBeGreaterThan(0);
 	});
 });
 

@@ -6,6 +6,8 @@ import {
 	type BuilderEvent,
 	classifyIntent,
 	type IntentKind,
+	LIVE_FORCE_PREFIX,
+	withLiveLabels,
 } from "@/lib/v2/builder";
 import type { SessionTurn } from "@/lib/v3/session";
 import { friendlyLine, type Strings } from "../friendly";
@@ -29,37 +31,51 @@ import { PreviewPane } from "./PreviewPane";
  * chat PROPOSE, aucune écriture-vérité.
  */
 
-/** Le libellé AMICAL par intention (clé i18n) — pour les chips d'ambiguïté. */
-const INTENT_LABELS: Record<IntentKind, string> = {
-	capturer_idee: "intentCapturerIdee",
-	greffer: "intentGreffer",
-	promouvoir: "intentPromouvoir",
-	generer: "intentGenerer",
-	deployer: "intentDeployer",
-	delta: "intentDelta",
-	impacter: "intentImpacter",
-	interroger: "intentInterroger",
-	ouvrir: "intentOuvrir",
-	adapter: "intentAdapter",
-	lancer_bench: "intentLancerBench",
-	explorer_evolution: "intentExplorerEvolution",
-};
+/**
+ * Le libellé AMICAL par intention (clé i18n) — pour les chips d'ambiguïté. Le NOYAU est écrit
+ * à la main ; LES GESTES V3 (lectures live + propositions) sont DÉRIVÉS de LIVE_GESTURES — la
+ * clé i18n « intentLive » / « intentPropose » porte un libellé générique paramétré, l'écran
+ * reste COMPLET par construction (∀ geste du jeu clos a un libellé, jamais un trou).
+ */
+const INTENT_LABELS: Record<IntentKind, string> = withLiveLabels(
+	{
+		capturer_idee: "intentCapturerIdee",
+		greffer: "intentGreffer",
+		promouvoir: "intentPromouvoir",
+		generer: "intentGenerer",
+		deployer: "intentDeployer",
+		delta: "intentDelta",
+		impacter: "intentImpacter",
+		interroger: "intentInterroger",
+		ouvrir: "intentOuvrir",
+		adapter: "intentAdapter",
+		lancer_bench: "intentLancerBench",
+		explorer_evolution: "intentExplorerEvolution",
+	},
+	// LE VOCABULAIRE ÉTENDU (ADR 0092) : une clé i18n générique lecture/proposition par geste V3.
+	"intentLectureLive",
+	"intentProposition",
+);
 
 /** Le verbe FORT canonique par intention — le préfixe de désambiguïsation (motif /v2/builder). */
-const FORCE_PREFIX: Record<IntentKind, string> = {
-	capturer_idee: "capture l'idée : ",
-	greffer: "greffe ",
-	promouvoir: "promeus ",
-	generer: "génère ",
-	deployer: "déploie ",
-	delta: "delta ",
-	impacter: "impact ",
-	interroger: "montre ",
-	ouvrir: "ouvre ",
-	adapter: "adapte ",
-	lancer_bench: "lance le bench de complétude sur la spec ",
-	explorer_evolution: "explore l'évolution de la cellule ",
-};
+const FORCE_PREFIX: Record<IntentKind, string> = Object.assign(
+	{
+		capturer_idee: "capture l'idée : ",
+		greffer: "greffe ",
+		promouvoir: "promeus ",
+		generer: "génère ",
+		deployer: "déploie ",
+		delta: "delta ",
+		impacter: "impact ",
+		interroger: "montre ",
+		ouvrir: "ouvre ",
+		adapter: "adapte ",
+		lancer_bench: "lance le bench de complétude sur la spec ",
+		explorer_evolution: "explore l'évolution de la cellule ",
+	},
+	// LE VOCABULAIRE ÉTENDU : le préfixe dérivé du premier verbe fort de chaque geste (ADR 0092).
+	LIVE_FORCE_PREFIX,
+) as Record<IntentKind, string>;
 
 /**
  * Les CHIPS de prochaine étape contextuelles — après un événement, le geste canonique

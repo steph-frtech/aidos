@@ -55,6 +55,8 @@ const KEYS = [
 	"intentOuvrir",
 	"intentLancerBench",
 	"intentExplorerEvolution",
+	"intentLectureLive",
+	"intentProposition",
 	"openScreen",
 	"tabArbre",
 	"tabApp",

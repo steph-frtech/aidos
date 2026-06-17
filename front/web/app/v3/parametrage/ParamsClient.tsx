@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { IntentKind } from "@/lib/v2/builder";
+import { type IntentKind, withLiveLabels } from "@/lib/v2/builder";
 import { type ParamSection, paramCatalog } from "@/lib/v3/params";
 import { useV3Session } from "../V3Session";
 
@@ -23,20 +23,26 @@ import { useV3Session } from "../V3Session";
  */
 
 /** Le libellé AMICAL par intention (clé i18n — les mêmes que les chips du lab). */
-const INTENT_LABEL_KEYS: Record<IntentKind, string> = {
-	capturer_idee: "intentCapturerIdee",
-	greffer: "intentGreffer",
-	promouvoir: "intentPromouvoir",
-	generer: "intentGenerer",
-	deployer: "intentDeployer",
-	delta: "intentDelta",
-	impacter: "intentImpacter",
-	interroger: "intentInterroger",
-	ouvrir: "intentOuvrir",
-	adapter: "intentAdapter",
-	lancer_bench: "intentLancerBench",
-	explorer_evolution: "intentExplorerEvolution",
-};
+// L'écran « gestes du chat » itère INTENT_KINDS → reste COMPLET par construction (jamais un trou) :
+// le NOYAU est écrit à la main, LES GESTES V3 reçoivent une clé i18n générique (ADR 0092).
+const INTENT_LABEL_KEYS: Record<IntentKind, string> = withLiveLabels(
+	{
+		capturer_idee: "intentCapturerIdee",
+		greffer: "intentGreffer",
+		promouvoir: "intentPromouvoir",
+		generer: "intentGenerer",
+		deployer: "intentDeployer",
+		delta: "intentDelta",
+		impacter: "intentImpacter",
+		interroger: "intentInterroger",
+		ouvrir: "intentOuvrir",
+		adapter: "intentAdapter",
+		lancer_bench: "intentLancerBench",
+		explorer_evolution: "intentExplorerEvolution",
+	},
+	"intentLectureLive",
+	"intentProposition",
+);
 
 /** Replie les accents + la casse — « écran » et « Ecran » se trouvent pareil. */
 function fold(s: string): string {
