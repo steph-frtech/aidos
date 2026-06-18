@@ -1,16 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FACETS } from "@/lib/facets";
 import type { Source } from "@/lib/gateway-sdk";
 import type { Grid, GridCell } from "@/lib/v2/grid";
+import { demoGridFromTruths, type GridTruth } from "@/lib/v2/grid-data";
+import { specsWithStack } from "@/lib/v3/specs";
+import { useV3Session } from "../V3Session";
+import { gridLive } from "./actions";
 
 /**
  * GrilleClient — LA GRILLE niveau × facette (FKE-1.4 « les deux axes ») portée EN PROPRE dans le
  * shell V3 (parcours « Comprendre », ADR 0060). La donnée — la matrice + les Σ comptées — vient du
  * MOTEUR Go LIVE par la passerelle (le serveur MCP `grid`, dispatché : grid.Build est autoritatif),
- * lue côté serveur dans actions.ts (`gridLive` → `readVia(scope, "grid_build", …)`) et passée ici en
- * props. Ce composant ne RÉIMPLÉMENTE aucune logique : il REND la matrice que le moteur calcule.
+ * NOURRI DES VRAIES VÉRITÉS DU PROJET. Ce composant ne RÉIMPLÉMENTE aucune logique : il REND la
+ * matrice que le moteur calcule.
+ *
+ * VRAIES VÉRITÉS DU PROJET (la cohérence grille ⇄ specs) : la lentille lit le rejeu du projet
+ * (`useV3Session`) et projette ses specs (`specsWithStack` — la MÊME source que /v3/specs) en vérités
+ * placées (level → rung, facet → facet). Elle les passe au moteur Go (`gridLive(truths)` →
+ * `readVia(scope, "grid_build", …)`). La grille affiche donc les comptes RÉELS du projet — plus les
+ * 240 kernels synthétiques — et concorde avec la vue Spécifications. Le repli démo (gateway
+ * injoignable) est `demoGridFromTruths` sur ces mêmes vérités réelles : déjà peuplé, jamais vide à tort.
  *
  * S59 CUTOVER (ADR 0092 — le moteur Go est l'UNIQUE source vivante). Avant, cette lentille composait
  * la grille depuis le calcul TS lib/v2/grid (buildGrid) directement — le twin ÉTAIT la source. Le
@@ -51,19 +62,47 @@ interface Labels {
 /** Le libellé d'une facette (FKE-1.3), pour l'infobulle d'en-tête de colonne. */
 const FACET_NAME = new Map(FACETS.map((f) => [f.letter, f.name] as const));
 
-export function GrilleClient({
-	grid,
-	source,
-	labels,
-}: {
-	grid: Grid | null;
-	source: Source;
-	labels: Labels;
-}) {
+export function GrilleClient({ labels }: { labels: Labels }) {
+	const { state } = useV3Session();
 	const [selected, setSelected] = useState<{
 		level: string;
 		facet: string;
 	} | null>(null);
+
+	// Les VRAIES vérités du projet (la même projection que /v3/specs), passées au moteur Go.
+	const truths = useMemo<GridTruth[]>(
+		() =>
+			specsWithStack(state).map((r) => ({
+				id: r.id,
+				rung: r.level,
+				facet: r.facet,
+			})),
+		[state],
+	);
+
+	// Repli démo INSTANTANÉ sur ces vraies vérités (via la porte-démo grid-data), remplacé par la
+	// lecture LIVE du moteur Go dès qu'elle résout (source bascule "demo" → "live").
+	const demo = useMemo(() => demoGridFromTruths(truths), [truths]);
+	const [live, setLive] = useState<{
+		grid: Grid | null;
+		source: Source;
+	} | null>(null);
+	useEffect(() => {
+		let cancelled = false;
+		gridLive(truths)
+			.then((r) => {
+				if (!cancelled) setLive(r);
+			})
+			.catch(() => {
+				/* le repli démo reste affiché */
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [truths]);
+
+	const grid: Grid | null = live?.grid ?? demo;
+	const source: Source = live?.source ?? "demo";
 
 	if (!grid) return null;
 

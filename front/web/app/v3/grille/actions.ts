@@ -4,9 +4,9 @@ import { readVia, type Source } from "../../../lib/gateway-sdk";
 import { panelScope } from "../../../lib/panelScope";
 import type { Grid } from "../../../lib/v2/grid";
 import {
-	DEMO_GRID_KERNELS,
-	demoGrid,
-	gridBuildArgs,
+	demoGridFromTruths,
+	type GridTruth,
+	gridBuildArgsFromTruths,
 } from "../../../lib/v2/grid-data";
 import { gridDecoder } from "./live";
 
@@ -17,9 +17,14 @@ import { gridDecoder } from "./live";
  * S59 CUTOVER (ADR 0092 — le moteur Go est l'UNIQUE source vivante). `gridLive` lit la matrice LIVE
  * depuis le serveur MCP `grid` du moteur Go par la passerelle (`readVia(scope, "grid_build", …)`, la
  * lecture below-the-line dispatchée — grid.Build est autoritatif). Le twin lib/v2/grid (buildGrid)
- * est CONSERVÉ UNIQUEMENT comme repli démo déterministe (`demoGrid`, source:"live"|"demo"). L'import
- * frontière readVia garde le cliquet T5 (twin-as-live-fitness) VERT : le twin (importé via le
- * fichier-data) reste DERRIÈRE le repli source:"demo", jamais comme source vivante.
+ * est CONSERVÉ UNIQUEMENT comme repli démo déterministe (`demoGridFromTruths`, source:"live"|"demo").
+ * L'import frontière readVia garde le cliquet T5 (twin-as-live-fitness) VERT : le twin (importé via
+ * le fichier-data) reste DERRIÈRE le repli source:"demo", jamais comme source vivante.
+ *
+ * VRAIES VÉRITÉS DU PROJET (la correction de cohérence grille ⇄ specs) : `gridLive` reçoit les
+ * vérités RÉELLES du projet (les SpecRow projetées du rejeu, level → rung / facet → facet — la même
+ * source que /v3/specs), et NON plus 240 kernels synthétiques. La grille devient donc à la fois LIVE
+ * (moteur Go) ET réelle — ses comptes concordent désormais avec la vue Spécifications.
  *
  * DÉTERMINISME-FIRST (CLAUDE.md §6/§8) : le décodeur + le repli démo (le même calcul pur que le Go
  * reproduit) sont purs ; un payload mal formé / non-dispatché / refusé rend la grille-démo. LE MUR
@@ -33,20 +38,21 @@ export interface GridView {
 }
 
 /**
- * gridLive lit la grille via la passerelle (le tool `grid_build`, dispatché), avec la grille-démo
- * du twin comme repli déterministe. Renvoie la grille + sa source honnête ("live"|"demo"). Quand le
- * repli démo lui-même est vide (n ≤ 0), le composant rend l'état vide (jamais un lien mort).
+ * gridLive lit la grille via la passerelle (le tool `grid_build`, dispatché) pour les VRAIES vérités
+ * du projet, avec la grille-démo du twin (sur ces mêmes vérités) comme repli déterministe. Renvoie la
+ * grille + sa source honnête ("live"|"demo"). Quand le projet n'a aucune vérité plaçable, le repli
+ * démo est vide et le composant rend l'état vide (jamais un lien mort).
  */
 export async function gridLive(
-	n: number = DEMO_GRID_KERNELS,
+	truths: readonly GridTruth[],
 ): Promise<GridView> {
 	const scope = await panelScope();
-	const demo = demoGrid(n);
+	const demo = demoGridFromTruths(truths);
 	if (demo === null) return { grid: null, source: "demo" };
 	const { data, source } = await readVia(
 		scope,
 		"grid_build",
-		gridBuildArgs(n),
+		gridBuildArgsFromTruths(truths),
 		gridDecoder,
 		demo,
 	);

@@ -1,3 +1,4 @@
+import type { Level } from "../besoin-grammar";
 import { buildGrid, type Grid } from "./grid";
 import { type KernelNode, syntheticComposes } from "./kernel-tree";
 
@@ -53,6 +54,50 @@ export function gridBuildArgs(n: number = DEMO_GRID_KERNELS): {
  */
 export function demoGrid(n: number = DEMO_GRID_KERNELS): Grid | null {
 	const nodes: KernelNode[] = syntheticComposes(n);
+	const r = buildGrid(nodes);
+	return r.ok ? r.grid : null;
+}
+
+/**
+ * Une vérité PLACÉE du PROJET RÉEL — la forme que `grid_build` consomme (id, rung, facet).
+ * C'est la projection d'une spec (lib/v3/specs SpecRow : level → rung, facet → facet) que la
+ * lentille grille passe au moteur Go pour qu'il place les VRAIES vérités du projet (et non plus
+ * les 240 synthétiques de démo) : la grille devient à la fois LIVE et RÉELLE (cohérente avec /v3/specs).
+ */
+export interface GridTruth {
+	readonly id: string;
+	readonly rung: string;
+	readonly facet: string;
+}
+
+/**
+ * gridBuildArgsFromTruths — l'argument de `grid_build` à partir des VRAIES vérités du projet
+ * (et non du jeu synthétique). Pure : mêmes vérités → même payload. Le shape (rung + facet
+ * scalaires) survit au round-trip HTTP (aucun json.RawMessage côté Go), exactement comme gridBuildArgs.
+ */
+export function gridBuildArgsFromTruths(truths: readonly GridTruth[]): {
+	truths: { id: string; rung: string; facet: string }[];
+} {
+	return {
+		truths: truths.map((t) => ({ id: t.id, rung: t.rung, facet: t.facet })),
+	};
+}
+
+/**
+ * demoGridFromTruths compose la grille-démo via le twin pur À PARTIR DES VRAIES VÉRITÉS du projet
+ * (l'image exacte que le Go `grid_build` renverrait pour ces mêmes vérités). PURE & TOTALE : mêmes
+ * vérités → même grille (mêmes comptes, mêmes Σ, même ordre). C'est le repli honnête — déjà PEUPLÉ
+ * de la donnée réelle — quand le live est injoignable. Un rung hors verticale / une facette hors
+ * octuor est ignoré par buildGrid (comme le filtre IsSourceRung du Go).
+ */
+export function demoGridFromTruths(truths: readonly GridTruth[]): Grid | null {
+	const nodes: KernelNode[] = truths.map((t) => ({
+		id: t.id,
+		level: t.rung as Level,
+		facet: t.facet,
+		label: t.id,
+		parentId: null,
+	}));
 	const r = buildGrid(nodes);
 	return r.ok ? r.grid : null;
 }
