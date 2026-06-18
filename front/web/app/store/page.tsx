@@ -94,6 +94,7 @@ export default async function StorePage() {
 								{chunks}
 							</code>
 						),
+						em: (chunks) => <em className="italic">{chunks}</em>,
 					})}
 				</footer>
 			</main>

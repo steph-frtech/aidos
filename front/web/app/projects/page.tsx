@@ -79,6 +79,7 @@ export default async function ProjectsPage() {
 								{chunks}
 							</code>
 						),
+						em: (chunks) => <em className="italic">{chunks}</em>,
 					})}
 				</footer>
 			</main>
