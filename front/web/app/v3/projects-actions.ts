@@ -5,6 +5,8 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { cookies } from "next/headers";
 import postgres from "postgres";
+import { callGateway } from "@/lib/gateway-sdk";
+import { WORKBENCH_IDENTITY } from "@/lib/panelScope";
 import {
 	canonicalBody,
 	contentAddress,
@@ -12,7 +14,10 @@ import {
 	newProject,
 	type Project,
 } from "@/lib/project";
+import type { Scope } from "@/lib/projectWall";
 import type { AppProjection } from "@/lib/v2/builder";
+import { bareTree } from "@/lib/v2/composition";
+import { projectStateToBacklog } from "@/lib/v3/backlog";
 import { filesOf } from "@/lib/v3/emit-files";
 import {
 	classifyNewName,
@@ -23,6 +28,7 @@ import {
 	serializeProject,
 	sortProjects,
 } from "@/lib/v3/project";
+import { replayTo } from "@/lib/v3/session";
 
 /**
  * V3 — le MAGASIN DE PROJETS (la couche IMPURE du twin lib/v3/project, ADR 0061).
@@ -188,6 +194,111 @@ async function registerV3Project(record: {
 	}
 }
 
+/**
+ * saveProjectBacklog — ADR 0073 Plan B (le BACKLOG GOUVERNÉ). Projette l'état REJOUÉ du projet
+ * vers le truth-store via la PASSERELLE (le mur §2 : des gestes Go gouvernés, jamais une écriture
+ * directe) : les idées (idea_capture, below-the-line, idempotent content-adressé), puis les
+ * changesets (changeset_open + changeset_apply, mirror_delta TOUJOURS fourni), puis le dag
+ * (dag_branch), dans l'ordre idée → changeset → dag (twin pur lib/v3/backlog).
+ *
+ * ISOLATION PAR CONSTRUCTION (Miroir d'isolation, ADR 0074) : ENTIÈREMENT best-effort — appelée
+ * APRÈS Plan A (le fichier + le body Postgres déjà écrits), tout enveloppé en try/catch, et
+ * callGateway ne JETTE JAMAIS (il renvoie {ok:false} sur toute panne : no_endpoint, unknown_tool,
+ * http_*, outcome_route_undispatched, tool_error). Donc une panne du Plan B (gateway injoignable,
+ * apply Blocked) n'altère JAMAIS le Plan A, le fichier, ni le tour de chat. C'est une projection
+ * d'INSPECTION LOSSY — jamais le chemin de reprise (ça reste Plan A / le transcript).
+ */
+async function saveProjectBacklog(record: {
+	id: string;
+	name: string;
+	transcript: readonly string[];
+	replies: Readonly<Record<string, string>>;
+	savedAt: number;
+}): Promise<void> {
+	try {
+		const scope: Scope = {
+			identity: WORKBENCH_IDENTITY,
+			activeProject: record.id,
+		};
+		const state = replayTo(
+			record.transcript,
+			record.transcript.length,
+			[],
+			bareTree(),
+		);
+		const backlog = projectStateToBacklog(state);
+		if (backlog.ideas.length === 0 && backlog.changesets.length === 0) {
+			return; // rien à projeter (transcript sans idée/kernel) — no-op.
+		}
+		// 1. Les idées (idea_capture — below-the-line, idempotent, le mur via firewall.ViaIdea).
+		for (const idea of backlog.ideas) {
+			await callGateway(scope, "idea_capture", {
+				proposes: idea.proposes,
+				intent: idea.intent,
+				source: idea.source,
+				detail: idea.detail,
+				project_id: record.id,
+			});
+		}
+		// 2-3. Les changesets + le dag, branchés sur le nœud GENESIS du projet (projection lossy).
+		if (backlog.changesets.length > 0) {
+			const c = pg();
+			let genesis: string | null = null;
+			if (c) {
+				try {
+					const rows = await c<{ node_id: string }[]>`
+						select dr.node_id from projects.dag_root dr
+						join projects.project p on p.id = dr.project_id
+						where p.body->>'owner_ref' = ${V3_OWNER} and p.body->>'slug' = ${record.id}
+						limit 1`;
+					genesis = rows[0]?.node_id ?? null;
+				} catch {
+					genesis = null;
+				}
+			}
+			if (genesis) {
+				const applied = new Map<string, string>(); // backlog id → applied changeset id
+				for (const cs of backlog.changesets) {
+					const open = await callGateway(scope, "changeset_open", {
+						label: cs.label,
+						parent_phase: genesis,
+						spec_delta: cs.specDelta,
+						mirror_delta: cs.mirrorDelta,
+					});
+					const openId =
+						open.ok &&
+						typeof open.content === "object" &&
+						open.content !== null &&
+						typeof (open.content as { id?: unknown }).id === "string"
+							? (open.content as { id: string }).id
+							: null;
+					if (openId) {
+						const ap = await callGateway(scope, "changeset_apply", {
+							id: openId,
+						});
+						if (ap.ok) applied.set(cs.id, openId);
+					}
+				}
+				for (const edge of backlog.dagEdges) {
+					const appliedId = applied.get(edge.changeset);
+					if (appliedId) {
+						await callGateway(scope, "dag_branch", {
+							from: genesis,
+							label: edge.label,
+							changeset: appliedId,
+						});
+					}
+				}
+			}
+		}
+	} catch (err) {
+		console.warn(
+			"[/v3 projects] backlog projection failed:",
+			(err as Error).message,
+		);
+	}
+}
+
 /** Les slugs V3 présents (têtes vivantes, non supprimées) dans le truth-store, ou null si DB injoignable. */
 async function liveV3Slugs(): Promise<Map<string, { name: string }> | null> {
 	const c = pg();
@@ -338,15 +449,19 @@ export async function saveProjectAction(record: {
 		serializeProject({ ...record, savedAt }),
 		"utf8",
 	);
-	// ADR 0073 — PERSISTE l'état (transcript inclus) dans le truth-store Postgres
+	// ADR 0073 — PLAN A : PERSISTE l'état (transcript inclus) dans le truth-store Postgres
 	// (append-only, idempotent, best-effort). Le body porte désormais le transcript.
-	await registerV3Project({
+	const full = {
 		id: record.id,
 		name: record.name.trim(),
 		transcript: record.transcript,
 		replies: record.replies,
 		savedAt,
-	});
+	};
+	await registerV3Project(full);
+	// ADR 0073 — PLAN B : projette le backlog gouverné (idées/changesets/dag) via la passerelle.
+	// APRÈS Plan A, best-effort — ne peut JAMAIS altérer le fichier ni le body (isolation §0074).
+	await saveProjectBacklog(full);
 }
 
 /**
