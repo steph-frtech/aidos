@@ -3,9 +3,9 @@
 import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import type { ColumnReport, Divergence } from "@/lib/facetwire";
 import { wireAction } from "./actions";
 import { emptyView, type FacetWireView, SCENARIOS } from "./fixtures";
+import type { LiveColumn, LiveDivergence } from "./live";
 
 /**
  * FacetWirePanel makes the /facet-wire route action-capable (ui-completeness, CLAUDE.md §7):
@@ -35,7 +35,7 @@ function Submit() {
 	);
 }
 
-function DivergenceRow({ d }: { d: Divergence }) {
+function DivergenceRow({ d }: { d: LiveDivergence }) {
 	const t = useTranslations("facetWire");
 	return (
 		<li
@@ -63,7 +63,7 @@ function DivergenceRow({ d }: { d: Divergence }) {
 	);
 }
 
-function ColumnCard({ col }: { col: ColumnReport }) {
+function ColumnCard({ col }: { col: LiveColumn }) {
 	const t = useTranslations("facetWire");
 	const divs = col.soft ? col.advisories : col.divergences;
 	return (
@@ -184,6 +184,27 @@ export function FacetWirePanel() {
 								? t("deterministicYes")
 								: t("deterministicNo")}
 						</span>
+						{state.source ? (
+							<span
+								data-testid="source-badge"
+								data-source={state.source}
+								className={
+									state.source === "live"
+										? "inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+										: "inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground"
+								}
+							>
+								<span
+									aria-hidden="true"
+									className={
+										state.source === "live"
+											? "size-1.5 rounded-full bg-primary"
+											: "size-1.5 rounded-full bg-muted-foreground"
+									}
+								/>
+								{state.source === "live" ? t("sourceLive") : t("sourceDemo")}
+							</span>
+						) : null}
 					</div>
 
 					<div

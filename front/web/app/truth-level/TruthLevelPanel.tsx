@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { LEVELS } from "@/lib/truth-level";
+import { LEVELS } from "@/lib/truth-level-data";
 import { type FilterView, filterAction } from "./actions";
 
 /**
@@ -114,12 +114,25 @@ export function TruthLevelPanel({
 						<h2 className="text-sm font-semibold tracking-tight text-foreground">
 							{t("resultsHeading")}
 						</h2>
-						<span
-							data-testid="results-count"
-							className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 font-mono text-xs text-muted-foreground"
-						>
-							{state.records.length} / {state.total}
-						</span>
+						<div className="flex items-center gap-2">
+							<span
+								data-testid="results-source"
+								data-source={state.source ?? "demo"}
+								className={
+									state.source === "live"
+										? "inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+										: "inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
+								}
+							>
+								{state.source === "live" ? t("sourceLive") : t("sourceDemo")}
+							</span>
+							<span
+								data-testid="results-count"
+								className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 font-mono text-xs text-muted-foreground"
+							>
+								{state.records.length} / {state.total}
+							</span>
+						</div>
 					</div>
 					{state.records.length === 0 ? (
 						<p

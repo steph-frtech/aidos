@@ -1,10 +1,11 @@
 import {
 	type Column,
-	type ColumnReport,
 	type Facet,
 	NON_FUNCTIONAL_COLUMNS,
 	RUNGS,
 } from "@/lib/facetwire";
+import type { Source } from "@/lib/gateway-sdk";
+import type { LiveColumn } from "./live";
 
 /**
  * Non-action module for /facet-wire (FK08): the wiring scenarios + view types + empty view.
@@ -73,10 +74,12 @@ export interface FacetWireView {
 	ok: boolean;
 	kernelId?: string;
 	verdict?: "green" | "red";
-	columns: ColumnReport[];
+	columns: LiveColumn[];
 	verdictAgain?: "green" | "red";
 	deterministic?: boolean;
 	error?: string;
+	/** whether the verdict came from the live gateway or the deterministic demo fixture. */
+	source?: Source;
 }
 
 export const emptyView: FacetWireView = { ok: false, columns: [] };

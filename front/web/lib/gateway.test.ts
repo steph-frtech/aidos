@@ -259,4 +259,58 @@ describe("gateway registry completeness", () => {
 		expect(d.outcome).toBe("refused_scope");
 		expect(d.blockReason?.code).toBe(CODE_AGENT_CROSS_PROJECT_WRITE);
 	});
+
+	// ── ADR 0092 PHASE-5 emitter/kernel/mirror servers: the dispatched read tools resolve below the line ──
+	// relation-emitter (S74) · truth-level (FK01) · facet-completeness (FK04) · facet-wire (FK08) are
+	// DEP-FREE pure-read servers. Each fronts only its CHEAP/pure read tools; relation-emitter OMITS
+	// emit_worker + schema_hash (they collide by name with hono-emitter / entity-modeler — registering
+	// them would shadow the prior owner). Without the lookup resolving, the flip would be HOLLOW
+	// (route(emit_ddl)→unknown_tool→demo, the cliquet's readVia-frontier blind spot).
+	it("fronts the phase-5 emitter/kernel/mirror servers — their read tools route below the line", () => {
+		const expected: Record<string, string[]> = {
+			"relation-emitter": ["emit_ddl", "emit_ts", "emit_all"],
+			"truth-level": ["compute", "check_parity", "levels"],
+			"facet-completeness": ["check"],
+			"facet-wire": ["facet_wire", "facet_skeleton"],
+		};
+		for (const [server, serverTools] of Object.entries(expected)) {
+			expect(GATEWAY_SERVERS).toContain(server);
+			for (const tool of serverTools) {
+				const d = route({ identity: "alice", activeProject: "proj-a" }, tool, {
+					projectId: "proj-a",
+				});
+				expect(d.outcome).toBe("route");
+				expect(d.tool?.server).toBe(server);
+				expect(d.tool?.disposition).toBe("below_line");
+			}
+		}
+	});
+
+	// relation-emitter's emit_worker / schema_hash are NOT owned by relation-emitter: they resolve to
+	// hono-emitter / entity-modeler (the flat registry's prior owner). The collision is exactly why
+	// relation-emitter must not re-register them (a §9 anti-overwrite). strangler's carve/freeze/refactor
+	// are unregistered everywhere (the json.RawMessage byte-array scar + heavy gestures) → unknown_tool.
+	it("the colliding emit_worker/schema_hash keep their prior owner; strangler tools never resolve", () => {
+		const emitWorker = route(
+			{ identity: "alice", activeProject: "proj-a" },
+			"emit_worker",
+			{ projectId: "proj-a" },
+		);
+		expect(emitWorker.outcome).toBe("route");
+		expect(emitWorker.tool?.server).toBe("hono-emitter");
+		const schemaHash = route(
+			{ identity: "alice", activeProject: "proj-a" },
+			"schema_hash",
+			{ projectId: "proj-a" },
+		);
+		expect(schemaHash.outcome).toBe("route");
+		expect(schemaHash.tool?.server).toBe("entity-modeler");
+		for (const tool of ["carve", "freeze", "refactor"]) {
+			const d = route({ identity: "alice", activeProject: "proj-a" }, tool, {
+				projectId: "proj-a",
+			});
+			expect(d.outcome).toBe("unknown_tool");
+			expect(d.blockReason?.code).toBe(CODE_UNKNOWN_TOOL);
+		}
+	});
 });
