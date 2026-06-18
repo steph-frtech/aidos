@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { cookies } from "next/headers";
@@ -16,7 +17,9 @@ import { filesOf } from "@/lib/v3/emit-files";
 import {
 	classifyNewName,
 	type ProjectRecord,
+	parseBody,
 	parseProject,
+	serializeBody,
 	serializeProject,
 	sortProjects,
 } from "@/lib/v3/project";
@@ -85,42 +88,100 @@ function rootNodeIdLabel(p: Project): string {
 }
 
 /**
- * registerV3Project — ENREGISTRE (best-effort, idempotent) un projet V3 dans le
- * truth-store `projects.project` + son `dag_root`, content-adressé et append-only,
- * via le MÊME chemin que /projects (lib/project). Un échec (DB injoignable, slug
- * invalide) est AVALÉ : le flux fichier reste la garantie — l'enregistrement est un
- * ajout, jamais un point de rupture (§9 anti-overwrite, fallback gouverné ADR 0074).
+ * registerV3Project — PERSISTE (best-effort, idempotent, append-only) l'ÉTAT d'un projet V3
+ * dans le truth-store Postgres (ADR 0073 — Plan A, le PORTEUR de fidélité). Le transcript (la
+ * SEULE vérité, event-sourcing) est porté dans le body content-adressé de `projects.project`.
+ *
+ * DEUX LIGNES par projet : (1) la ligne-GENESIS = le body-identité (id = p.id, content-adressé
+ * sur l'identité seule), ANCRE STABLE du `dag_root` (la FK dag_root.project_id → project.id
+ * exige une ligne qui existe pour toujours ; l'append-only la garde même superseded) ; (2) la
+ * ligne-TÊTE = le body-COMPLET (id = hash du body complet AVEC transcript). Chaque sauvegarde
+ * d'un transcript modifié insère une nouvelle ligne-tête et SUPERSEDE l'ancienne (§9 « supersede
+ * via version », jamais un UPDATE destructif ni un DELETE).
+ *
+ * ORDRE DE TRANSACTION SÛR (vérifié contre le schéma réel) : superseded_by n'a PAS de FK (on
+ * peut le poser avant que la nouvelle ligne existe) ; l'index unique partiel (owner_ref, slug)
+ * WHERE superseded_by IS NULL est IMMÉDIAT → on SUPERSEDE la tête courante AVANT d'insérer la
+ * nouvelle (jamais deux têtes vivantes). Idempotent : même transcript → même hash → supersede
+ * no-op (id <> hash exclut la tête identique) + insert ON CONFLICT resurrect.
+ *
+ * Un échec (DB injoignable, slug invalide) est AVALÉ : le flux fichier reste la garantie — la
+ * persistance Postgres est un AJOUT, jamais un point de rupture (fallback gouverné ADR 0074).
  */
-async function registerV3Project(id: string, name: string): Promise<void> {
-	if (!isValidSlug(id)) return;
+async function registerV3Project(record: {
+	id: string;
+	name: string;
+	transcript: readonly string[];
+	replies: Readonly<Record<string, string>>;
+	savedAt: number;
+}): Promise<void> {
+	const { id } = record;
+	const name = record.name.trim();
+	if (!isValidSlug(id) || name === "") return;
 	const c = pg();
 	if (!c) return;
-	const createdAt = `${new Date().toISOString().slice(0, 10)}T00:00:00Z`;
 	try {
-		const p = newProject(id, name, V3_OWNER, createdAt);
-		// The body MUST land as a jsonb OBJECT. canonicalBody returns the canonical JSON
-		// TEXT (used for the content-address id); passing that text with `::jsonb` made
-		// postgres.js store a double-encoded jsonb STRING SCALAR (`"{…}"`), which the Go
-		// project store could not decode (found-by-running, S59 fan-out). We parse it back to
-		// the object and let postgres.js serialise it as jsonb (c.json) — guaranteed object
-		// type. The id stays the content-address of the canonical text (unchanged).
-		const body = canonicalBody({
-			slug: id,
-			name,
+		// createdAt STABLE : la date de la ligne genesis existante (la 1re du slug), sinon
+		// aujourd'hui (1re création) — garde p.id (l'ancre dag_root content-adressée) stable
+		// d'une sauvegarde à l'autre (sinon le genesis dériverait à chaque jour).
+		const existing = await c<{ ca: string }[]>`
+			select body->>'created_at' as ca from projects.project
+			where body->>'owner_ref' = ${V3_OWNER} and body->>'slug' = ${id}
+			order by created_at asc limit 1`;
+		const createdAt =
+			existing[0]?.ca ?? `${new Date().toISOString().slice(0, 10)}T00:00:00Z`;
+		const identity = {
 			ownerRef: V3_OWNER,
 			createdAt,
-			lifecycle: "active",
-		});
-		const bodyObject = JSON.parse(body) as Parameters<typeof c.json>[0];
+			lifecycle: "active" as const,
+		};
+		const p = newProject(id, name, V3_OWNER, createdAt);
+		// Le body-identité (genesis, ancre dag_root). c.json garantit un OBJET jsonb (jamais le
+		// texte ::jsonb — le scar du double-encodage, S59 found-by-running).
+		const identityBody = JSON.parse(
+			canonicalBody({
+				slug: id,
+				name,
+				ownerRef: V3_OWNER,
+				createdAt,
+				lifecycle: "active",
+			}),
+		) as Parameters<typeof c.json>[0];
+		// Le body-COMPLET porteur du transcript + son content-address (le hash du body canonique).
+		const fullText = serializeBody(
+			{
+				id,
+				name,
+				transcript: record.transcript,
+				replies: record.replies,
+				savedAt: record.savedAt,
+			},
+			identity,
+		);
+		const bodyHash = createHash("sha256")
+			.update(fullText, "utf8")
+			.digest("hex");
+		const fullBody = JSON.parse(fullText) as Parameters<typeof c.json>[0];
 		await c.begin(async (tx) => {
+			// 1. GENESIS (idempotent) : la ligne-identité (ancre dag_root, id stable) + le dag_root.
 			await tx`
 				insert into projects.project (id, body, version)
-				values (${p.id}, ${c.json(bodyObject)}, ${p.id})
+				values (${p.id}, ${c.json(identityBody)}, ${p.id})
 				on conflict (id) do nothing`;
 			await tx`
 				insert into projects.dag_root (project_id, node_id, label)
 				values (${p.id}, ${contentAddress({ slug: id, name, ownerRef: V3_OWNER, createdAt, lifecycle: "active" })}, ${rootNodeIdLabel(p)})
 				on conflict (project_id) do nothing`;
+			// 2. SUPERSEDE la tête courante si elle diffère du body complet (append-only, §9).
+			await tx`
+				update projects.project set superseded_by = ${bodyHash}
+				where body->>'owner_ref' = ${V3_OWNER} and body->>'slug' = ${id}
+				  and superseded_by is null and id <> ${bodyHash}`;
+			// 3. La ligne-TÊTE porteuse du transcript (resurrect si on revient à un transcript antérieur).
+			await tx`
+				insert into projects.project (id, body, version)
+				values (${bodyHash}, ${c.json(fullBody)}, ${bodyHash})
+				on conflict (id) do update set superseded_by = null`;
 		});
 	} catch (err) {
 		console.warn("[/v3 projects] register failed:", (err as Error).message);
@@ -218,11 +279,37 @@ export async function listProjectsAction(): Promise<ProjectSummary[]> {
 	return [...byId.values()].sort((a, b) => b.savedAt - a.savedAt);
 }
 
-/** CHARGE un projet par id — fail-closed (id hostile, fichier absent ou bruité → null). */
+/**
+ * CHARGE un projet par id — ADR 0073 : Postgres EST la source, le fichier devient projection.
+ * CASCADE GOUVERNÉE, jamais une page vide : (1) la tête vivante `projects.project` AVEC son
+ * transcript (la vérité ADR 0073) ; (2) DB injoignable OU body identité-seule (projet
+ * pré-migration, parseBody → null) → repli sur le FICHIER (le comportement antérieur EXACT,
+ * zéro régression) ; (3) fichier absent/bruité → null (fail-closed). Reprendre = rejouer le
+ * transcript relu (V3SessionProvider le rejoue par turnsOf) — « le même état partout ».
+ */
 export async function loadProjectAction(
 	id: string,
 ): Promise<ProjectRecord | null> {
 	if (!SAFE_ID.test(id)) return null;
+	// 1. Postgres d'abord (la tête vivante porteuse du transcript).
+	const c = pg();
+	if (c) {
+		try {
+			const rows = await c<{ body: unknown }[]>`
+				select body from projects.project
+				where body->>'owner_ref' = ${V3_OWNER} and body->>'slug' = ${id}
+				  and superseded_by is null and body->>'lifecycle' <> 'deleted'
+				limit 1`;
+			const rec = rows[0] ? parseBody(rows[0].body) : null;
+			if (rec) return rec;
+		} catch (err) {
+			console.warn(
+				"[/v3 projects] load from PG failed:",
+				(err as Error).message,
+			);
+		}
+	}
+	// 2-3. Repli gouverné : le FICHIER (pré-migration / DB injoignable), sinon null.
 	ensureDir();
 	try {
 		return parseProject(readFileSync(fileOf(id), "utf8"));
@@ -244,13 +331,22 @@ export async function saveProjectAction(record: {
 	if (!SAFE_ID.test(record.id)) return;
 	if (record.name.trim() === "") return;
 	ensureDir();
+	const savedAt = Math.floor(Date.now() / 1000);
+	// Le FICHIER reste écrit en PREMIER (la garantie ; projection régénérable).
 	writeFileSync(
 		fileOf(record.id),
-		serializeProject({ ...record, savedAt: Math.floor(Date.now() / 1000) }),
+		serializeProject({ ...record, savedAt }),
 		"utf8",
 	);
-	// ADR 0073 — (ré)enregistre le projet dans le truth-store (idempotent, best-effort).
-	await registerV3Project(record.id, record.name.trim());
+	// ADR 0073 — PERSISTE l'état (transcript inclus) dans le truth-store Postgres
+	// (append-only, idempotent, best-effort). Le body porte désormais le transcript.
+	await registerV3Project({
+		id: record.id,
+		name: record.name.trim(),
+		transcript: record.transcript,
+		replies: record.replies,
+		savedAt,
+	});
 }
 
 /**
@@ -292,9 +388,15 @@ export async function createProjectAction(
 		savedAt: Math.floor(Date.now() / 1000),
 	};
 	writeFileSync(fileOf(id), serializeProject(record), "utf8");
-	// ADR 0073 — enregistre le nouveau projet dans le truth-store Postgres (source
-	// d'existence, content-adressé, append-only). Best-effort : le fichier reste la garantie.
-	await registerV3Project(id, clean);
+	// ADR 0073 — persiste le nouveau projet (transcript vide) dans le truth-store Postgres
+	// (genesis + tête, content-adressé, append-only). Best-effort : le fichier reste la garantie.
+	await registerV3Project({
+		id,
+		name: clean,
+		transcript: record.transcript,
+		replies: record.replies,
+		savedAt: record.savedAt,
+	});
 	return { ok: true, record };
 }
 
