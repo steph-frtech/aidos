@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import { bareTree } from "../v2/composition";
 import {
 	classifyNewName,
+	type ProjectIdentity,
 	type ProjectRecord,
+	parseBody,
 	parseProject,
 	projectSlug,
+	serializeBody,
 	serializeProject,
 	sortProjects,
 } from "./project";
@@ -64,6 +67,54 @@ describe("serializeProject / parseProject — l'aller-retour SANS PERTE", () => 
 		expect(
 			parseProject('{"id":"x","name":"n","transcript":["a",5]}'),
 		).toBeNull(); // un transcript non-textuel est refusé
+	});
+});
+
+// ADR 0073 — MIROIR 1 : le body Postgres `projects.project.body` est le PORTEUR de
+// fidélité (le transcript content-adressé). L'aller-retour body↔ProjectRecord doit être
+// une BIJECTION sur les 5 champs (aucune perte) ; et relire le body puis REJOUER doit
+// donner le même état que rejouer le transcript direct (le body ne corrompt pas l'état dérivé).
+const identityArb: fc.Arbitrary<ProjectIdentity> = fc.record({
+	ownerRef: fc.constant("v3"),
+	createdAt: fc.constant("2026-06-18T00:00:00Z"),
+	lifecycle: fc.constantFrom("active", "archived"),
+});
+
+describe("serializeBody / parseBody — le PORTEUR de fidélité ADR 0073", () => {
+	it("∀ projet : parseBody(serializeBody(p, id)) ≡ p (transcript, replies, savedAt, tout)", () => {
+		fc.assert(
+			fc.property(recordArb, identityArb, (p, id) => {
+				expect(parseBody(serializeBody(p, id))).toEqual(p);
+			}),
+		);
+	});
+
+	it("∀ projet : relire le body puis REJOUER ≡ rejouer le transcript direct", () => {
+		fc.assert(
+			fc.property(recordArb, identityArb, (p, id) => {
+				const back = parseBody(serializeBody(p, id));
+				expect(back).not.toBeNull();
+				if (back === null) throw new Error("unreachable");
+				expect(
+					replayTo(back.transcript, back.transcript.length, [], bareTree()),
+				).toEqual(replayTo(p.transcript, p.transcript.length, [], bareTree()));
+			}),
+		);
+	});
+
+	it("parseBody est FAIL-CLOSED : un body IDENTITÉ-SEULE (sans transcript) → null (repli fichier)", () => {
+		// Le body-identité Go (created_at·kind·lifecycle·name·owner_ref·slug) n'a pas d'état :
+		// parseBody le refuse pour que loadProjectAction retombe sur le fichier (cascade ADR 0074).
+		expect(
+			parseBody(
+				'{"created_at":"2026-06-18T00:00:00Z","kind":"project","lifecycle":"active","name":"n","owner_ref":"v3","slug":"toto"}',
+			),
+		).toBeNull();
+		expect(parseBody("")).toBeNull();
+		expect(parseBody("@@@")).toBeNull();
+		expect(
+			parseBody({ slug: "x", name: "n", transcript: ["a", 5] }),
+		).toBeNull();
 	});
 });
 
