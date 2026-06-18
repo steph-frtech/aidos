@@ -25,15 +25,23 @@ import {
 	validateImpacts,
 	validatePlacements,
 } from "@/lib/ai-lab";
+import {
+	demoCockpit,
+	findCockpitScenario,
+	gatewayBuildCockpitArgs,
+	SAMPLE_GATE,
+} from "@/lib/ai-lab-data";
 import type { Facet } from "@/lib/facetwire";
+import { readVia } from "@/lib/gateway-sdk";
+import { panelScope } from "@/lib/panelScope";
 import {
 	type CockpitView,
 	DEFAULT_MODE,
 	emptyView,
 	type LabView,
-	SAMPLE_GATE,
 	scenario,
 } from "./fixtures";
+import { cockpitDecoder } from "./live";
 
 const execFileP = promisify(execFile);
 /** The Claude Code CLI wired behind the chat (the « cerveau gauche »). Overridable. */
@@ -381,20 +389,38 @@ export async function loadCockpitAction(
 	const scenarioId = String(formData.get("scenarioId") ?? "");
 	const mode =
 		(String(formData.get("mode") ?? DEFAULT_MODE) as Mode) ?? DEFAULT_MODE;
-	const sc = scenario(scenarioId);
+	const sc = findCockpitScenario(scenarioId);
 	if (!sc) {
 		return {
 			...emptyView,
 			error: `scénario inconnu : ${scenarioId || "(vide)"}`,
 		};
 	}
-	const args = { report: sc.report, mode, gate: SAMPLE_GATE };
-	const a = buildCockpit(args);
-	const b = buildCockpit(args);
+	const scope = await panelScope();
+	const args = gatewayBuildCockpitArgs(sc, mode);
+	// LIVE read through the passerelle (the dispatched ai-lab `build_cockpit` tool); the twin
+	// demoCockpit() is the deterministic fallback (source:"live"|"demo") — ADR 0092.
+	const { data, source } = await readVia(
+		scope,
+		"build_cockpit",
+		args,
+		cockpitDecoder,
+		demoCockpit(sc, mode),
+	);
+	// re-run the SAME read to prove the cockpit is deterministic (same input → same state). Both the
+	// live decoder and the demo twin are pure, so the cockpit is byte-stable.
+	const { data: again } = await readVia(
+		scope,
+		"build_cockpit",
+		args,
+		cockpitDecoder,
+		demoCockpit(sc, mode),
+	);
 	return {
 		ok: true,
-		state: a,
-		deterministic: JSON.stringify(a) === JSON.stringify(b),
+		state: data,
+		source,
+		deterministic: JSON.stringify(data) === JSON.stringify(again),
 	};
 }
 

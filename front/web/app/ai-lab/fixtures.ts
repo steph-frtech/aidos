@@ -121,6 +121,8 @@ export const SAMPLE_GATE = { level: 2, canPromote: false, nextLevel: 3 };
 export interface CockpitView {
 	ok: boolean;
 	state?: CockpitState;
+	/** whether the cockpit came from the live gateway or the demo fallback (ADR 0092). */
+	source?: "live" | "demo";
 	deterministic?: boolean;
 	slot?: ProposedSlot;
 	refusal?: WallRefusal;

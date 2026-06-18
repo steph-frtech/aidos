@@ -1,4 +1,4 @@
-package main
+package opsobservabilitysrv
 
 import (
 	"context"
@@ -78,7 +78,7 @@ func TestFingerprintTool(t *testing.T) {
 }
 
 func TestServerRegisters(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatalf("server should construct")
 	}
 }

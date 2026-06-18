@@ -61,7 +61,7 @@ export interface RouteDecision {
 	blockReason?: GatewayBlockReason;
 }
 
-/** The 34 MCP servers the gateway fronts — byte-identical to Go GatewayServers(). */
+/** The 44 MCP servers the gateway fronts — byte-identical to Go GatewayServers(). */
 export const GATEWAY_SERVERS: readonly string[] = [
 	"store",
 	"mirror-runner",
@@ -238,6 +238,21 @@ export const GATEWAY_SERVERS: readonly string[] = [
 	"links",
 	"anatomy",
 	"kernel-tree",
+	// ── ADR 0092 PHASE-3 emitted-app + library READ servers (the Go engine is the SINGLE live source). ──
+	// 43rd–48th — blob-attribute · deploy · ai-lab · hono-emitter · mirror-library · ops-observability —
+	// six DEP-FREE pure-read servers whose demo-twin panels flip to the Go engine. Each dispatches
+	// CHEAP/pure reads whose output is a scalar object VALUE (the blob/file attribute door, the S96
+	// phase-keyed deploy verdicts, the FK11 cockpit state, the S87 emitted-app SERVER emitter — its
+	// Artifact.Bytes is a STRING field, NOT a json.RawMessage byte-array, so the S59 scar is avoided —,
+	// the S70 per-project mirror library, the S92 per-app ops dashboard) — WroteKernel always false (the
+	// wall). Without these entries route(blob_address)→unknown_tool→demo (a hollow flip — the cliquet's
+	// readVia-frontier blind spot). Byte-faithful to the Go GatewayServers() (registry.go).
+	"blob-attribute",
+	"deploy",
+	"ai-lab",
+	"hono-emitter",
+	"mirror-library",
+	"ops-observability",
 ];
 
 /** defaultTools mirrors Go DefaultTools() — the closed exposed surface. */
@@ -582,6 +597,58 @@ export function defaultTools(): Tool[] {
 		// `kernel-tree` (KRD §108/§109) — tree_aggregate (the /v3/arbres §109 recursive verdict +
 		// §110 drill-down) + weights/reopens (the §112 weighted activation). A cycle is a typed refusal.
 		...below("kernel-tree", ["tree_weights", "tree_aggregate", "tree_reopens"]),
+		// ── ADR 0092 PHASE-3 emitted-app + library READ servers (the Go engine is the SINGLE live source). ──
+		// Six DEP-FREE pure-read servers whose demo-twin panels flip to the Go engine. Every dispatched
+		// tool's I/O is a scalar OBJECT (no json.RawMessage — the emitted Hono/Pulumi bytes are STRING
+		// fields, not byte-arrays — so the S59 transport scar is avoided). ALL BELOW THE LINE: WroteKernel
+		// always false (the wall §2). Byte-faithful to the Go registry (back/runtime/gateway/registry.go).
+		// `blob-attribute` (S72) — the blob/file attribute door: content-address + the CLOSED MIME/size
+		// validation + the project-scoped key + the cross-project refusal + the byte-stable handler emission.
+		...below("blob-attribute", [
+			"blob_address",
+			"blob_validate_upload",
+			"blob_storage_key",
+			"blob_cross_project",
+			"blob_emit_handler",
+		]),
+		// `deploy` (S96) — plan/gate/check_served/forward_only: the phase-keyed deploy reads. plan builds a
+		// content-addressed DeployPlan ONLY from a STABLE phase (PHASE_NOT_STABLE otherwise); gate is the
+		// « done is computed » verdict; check_served the re-projection property; forward_only the migration check.
+		...below("deploy", ["plan", "gate", "check_served", "forward_only"]),
+		// `ai-lab` (FK11) — build_cockpit/propose_slot/scope_pair/validate_card: the AI Lab cockpit reads.
+		// build_cockpit composes the FK09 report; propose_slot is the chat (a PROPOSED slot or a wall refusal,
+		// never a truth); validate_card's above-the-wall option opens a /goal. ALL PURE — WroteKernel false.
+		...below("ai-lab", [
+			"build_cockpit",
+			"propose_slot",
+			"scope_pair",
+			"validate_card",
+		]),
+		// `hono-emitter` (S87) — emit_server/emit_worker/emit_pulumi/server_hash/manifest_hash: the emitted-app
+		// SERVER emitter reads. PURE PROJECTION — Artifact.Bytes is a STRING field (NOT a json.RawMessage);
+		// same cut → byte-identical output. Writes nothing.
+		...below("hono-emitter", [
+			"emit_server",
+			"emit_worker",
+			"emit_pulumi",
+			"server_hash",
+			"manifest_hash",
+		]),
+		// `mirror-library` (S70) — library_list_by_app/library_scoped_health: the per-project mirror-library
+		// reads. PURE grouping (mirrors BY APP + the liveness tally) + the project-scoped completeness law
+		// (the monster set + verdict). Writes nothing (the wall).
+		...below("mirror-library", [
+			"library_list_by_app",
+			"library_scoped_health",
+		]),
+		// `ops-observability` (S92) — ops_ingest/ops_dashboard/ops_fingerprint: the per-app ops engine reads.
+		// VALIDATE one OTel signal / AGGREGATE a project's panel / content-address the dashboard. DISTINCT from
+		// the E12 telemetry-reader on-ramp — WroteKernel ALWAYS false (the wall).
+		...below("ops-observability", [
+			"ops_ingest",
+			"ops_dashboard",
+			"ops_fingerprint",
+		]),
 		// The fenced truth-zone write namespace (§2) — refused with a ChangeSet hint.
 		{ name: "kernel_write", server: "kernel", disposition: "truth_write" },
 		{ name: "mirror_write", server: "mirrors", disposition: "truth_write" },

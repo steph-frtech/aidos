@@ -1,4 +1,4 @@
-package main
+package mirrorlibrarysrv
 
 import (
 	"context"
@@ -62,7 +62,7 @@ func TestLibraryListByApp(t *testing.T) {
 }
 
 func TestNewMCPServer(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("server must build")
 	}
 }

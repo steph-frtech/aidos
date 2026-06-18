@@ -303,6 +303,52 @@ func DefaultTools() []Tool {
 	// is the §112 weighted/thresholded activation. Weights/thresholds are DECLARED, never learned.
 	t = append(t, below("kernel-tree", "tree_weights", "tree_aggregate", "tree_reopens")...)
 
+	// ── ADR 0092 PHASE-3 emitted-app + library READ servers (the Go engine is the SINGLE live source). ──
+	// Six DEP-FREE servers (no DSN, no store, no clock, no embedder, no LLM in the dispatch path —
+	// determinism-first §6/§8) whose every dispatched tool is a CHEAP/pure read whose output is a
+	// scalar OBJECT VALUE (no json.RawMessage body — the S59 byte-array transport scar is avoided by
+	// construction: a blob handler / a deploy plan / a cockpit state / an emitted Hono artifact's
+	// bytes are rendered as STRING fields, a mirror library / an ops dashboard are plain object
+	// structs). ALL BELOW THE LINE: WroteKernel always false — no kernel/mirrors/fitness write reaches
+	// a backend (the router refuses a truth-write before any dispatch, the wall §2). The builder
+	// ignores its ctx and returns the default server; it dispatches identically whatever DSN is set.
+	//
+	// 43. blob-attribute (S72) — blob_address/validate_upload/storage_key/cross_project/emit_handler:
+	// the blob/file attribute door over back/kernel/entities/blob. PURE content-addressing + the CLOSED
+	// MIME/size validation (BLOB_MIME_REFUSED / BLOB_SIZE_REFUSED, never coerced) + the project-scoped
+	// key + the cross-project refusal (BLOB_CROSS_PROJECT) + the byte-stable handler emission. A blob
+	// attribute is a SOURCE above the line; freezing it stays the aidos CLI's job (WroteKernel false).
+	t = append(t, below("blob-attribute", "blob_address", "blob_validate_upload", "blob_storage_key", "blob_cross_project", "blob_emit_handler")...)
+	// 44. deploy (S96) — plan/gate/check_served/forward_only: the phase-keyed deploy reads over
+	// runtime/deploy. plan builds a content-addressed DeployPlan ONLY from a STABLE phase (a non-stable
+	// phase is refused PHASE_NOT_STABLE; a breaking-no-backfill migration BREAKING_MIGRATION_NO_BACKFILL);
+	// gate is the « done is computed » verdict; check_served is the re-projection property; forward_only
+	// the migration ordering check. PURE planning + comparisons over supplied facts — writes nothing.
+	t = append(t, below("deploy", "plan", "gate", "check_served", "forward_only")...)
+	// 45. ai-lab (FK11) — build_cockpit/propose_slot/scope_pair/validate_card: the AI Lab cockpit reads
+	// over runtime/ailab. build_cockpit composes the FK09 conscience report into the zoomable cockpit
+	// state; propose_slot is the GAUCHE chat (a PROPOSED slot, or a wall refusal AI_LAB_DIRECT_TRUTH_WRITE
+	// — never a truth); scope_pair the CENTRE click; validate_card the DROITE card (fix_below_wall flips a
+	// pair; an above-the-wall option opens a /goal). ALL PURE — WroteKernel always false (the wall §2).
+	t = append(t, below("ai-lab", "build_cockpit", "propose_slot", "scope_pair", "validate_card")...)
+	// 46. hono-emitter (S87) — emit_server/emit_worker/emit_pulumi/server_hash/manifest_hash: the
+	// emitted-app SERVER emitter reads over runtime/honoemit. PURE PROJECTION — it renders the bootable
+	// Hono/TS server + the async worker + the Pulumi/TS infra program as VALUES (Artifact.Bytes is a
+	// STRING field, NOT a json.RawMessage — the S59 byte-array scar is avoided) and the two content
+	// addresses; a malformed spec/manifest is a typed BlockReason. Same cut → byte-identical, writes nothing.
+	t = append(t, below("hono-emitter", "emit_server", "emit_worker", "emit_pulumi", "server_hash", "manifest_hash")...)
+	// 47. mirror-library (S70) — library_list_by_app/library_scoped_health: the project mirror-library
+	// reads over back/kernel/mirror/library. PURE grouping (mirrors BY APP + the liveness tally) + the
+	// project-scoped completeness law (the monster set + verdict, reusing records.ComputeCompleteness).
+	// Project isolation is the S55 RLS wall, made explicit here as a deterministic scope. Writes nothing.
+	t = append(t, below("mirror-library", "library_list_by_app", "library_scoped_health")...)
+	// 48. ops-observability (S92) — ops_ingest/ops_dashboard/ops_fingerprint: the per-app ops engine
+	// reads over runtime/opsobservability. ops_ingest VALIDATEs one OTel signal (closed kind set, project
+	// scope); ops_dashboard AGGREGATEs a project's signals into its ops panel (error rate + latency
+	// p50/p95/p99 + redacted feeds); ops_fingerprint content-addresses the panel (same signals → same
+	// fingerprint). DISTINCT from the E12 telemetry-reader on-ramp — WroteKernel ALWAYS false (the wall).
+	t = append(t, below("ops-observability", "ops_ingest", "ops_dashboard", "ops_fingerprint")...)
+
 	// THE FENCED TRUTH-ZONE WRITE NAMESPACE (§2). Not a real tool of any server — the
 	// door a caller might craft to move truth directly. Registered as TruthWrite so the
 	// gateway refuses it with a ChangeSet-pointing BlockReason (server-side wall).
@@ -371,5 +417,14 @@ func GatewayServers() []string {
 		// ADR 0092 PHASE-2 conceptual-lens servers — the four V3 lenses whose pure-calcul twins
 		// (lib/v2/grid · lib/v2/links · lib/v2/anatomy · lib/v2/kernel-tree) flip to the Go engine.
 		"grid", "links", "anatomy", "kernel-tree",
+		// ADR 0092 PHASE-3 emitted-app + library READ servers — six DEP-FREE pure-read servers whose
+		// demo-twin panels flip to the Go engine: blob-attribute (the S72 blob/file attribute door) ·
+		// deploy (the S96 phase-keyed deploy reads) · ai-lab (the FK11 cockpit reads) · hono-emitter
+		// (the S87 emitted-app SERVER emitter reads — Artifact.Bytes is a STRING, not a json.RawMessage,
+		// so the byte-array scar is avoided) · mirror-library (the S70 per-project mirror library reads) ·
+		// ops-observability (the S92 per-app ops dashboard reads). Each dispatches CHEAP/pure reads whose
+		// output is a scalar object VALUE — WroteKernel always false (the wall). Without these entries
+		// route(blob_address)→unknown_tool→demo (a hollow flip — the cliquet's readVia-frontier blind spot).
+		"blob-attribute", "deploy", "ai-lab", "hono-emitter", "mirror-library", "ops-observability",
 	}
 }

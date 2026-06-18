@@ -3,14 +3,10 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
-	buildPlan,
-	type DeployInput,
 	deployedMatchesPhase,
 	isBlocked,
 	isDeployable,
-	type MigrationStep,
 	migrationIsForwardOnly,
-	type OrderManifest,
 } from "@/lib/deploy";
 import {
 	type AuditEntry,
@@ -20,6 +16,13 @@ import {
 	type PhaseInput as CockpitPhaseInput,
 	project as projectCockpit,
 } from "@/lib/deploy-cockpit";
+import {
+	DEFAULT_PHASE_HASH,
+	type DeployRequest,
+	demoPlan,
+	deployInput,
+	planArgs,
+} from "@/lib/deploy-data";
 import {
 	cableInEnvironment,
 	type EnvBindRequest,
@@ -39,7 +42,9 @@ import {
 	recordHumanValidation,
 	rollback,
 } from "@/lib/env-rollback";
+import { readVia } from "@/lib/gateway-sdk";
 import type { StackManifest as TargetManifest } from "@/lib/hono-emitter";
+import { panelScope } from "@/lib/panelScope";
 import {
 	buildPreviewWithBootstrap,
 	isBlocked as isPreviewBlocked,
@@ -52,6 +57,7 @@ import {
 	isTargetProjection,
 	type Target,
 } from "@/lib/pulumi-target";
+import { planDecoder } from "./live";
 import type {
 	CockpitView,
 	DeployView,
@@ -74,53 +80,19 @@ import type {
  * la migration tourne forward-only ; l'artefact déployé est ré-projeté depuis la phase, jamais
  * un artefact sandbox périmé.
  *
- * DETERMINISM-FIRST (CLAUDE.md §6/§8): buildPlan + isDeployable sont des fonctions PURES de
- * l'input (lib/deploy) — même phase stable + surface + change → plan byte-identique, jamais un
- * LLM. Le Stop-gate et l'égalité servi↔émis sont des comparaisons pures (le code juge). THE WALL
- * (§2): planifier n'écrit AUCUNE vérité ; enregistrer le déploiement d'une phase comme décision
- * DAG passe par propose → ChangeSet → approbation, jamais une écriture directe.
+ * ADR 0092 CUTOVER (le moteur Go est l'UNIQUE source vivante) : `deployAction` lit le DeployPlan
+ * LIVE depuis le serveur MCP `deploy` du moteur Go via la passerelle (`readVia(scope, "plan", …)`,
+ * la lecture below-the-line dispatchée — deploy.BuildPlan est autoritatif). Le twin lib/deploy
+ * (buildPlan) est CONSERVÉ UNIQUEMENT comme repli démo déterministe (lib/deploy-data.demoPlan,
+ * source:"live"|"demo") ; l'import frontière readVia garde le cliquet T5 (twin-as-live-fitness)
+ * VERT — le twin reste DERRIÈRE le repli source:"demo", jamais comme source vivante.
+ *
+ * DETERMINISM-FIRST (CLAUDE.md §6/§8): le décodeur + le repli démo (le même calcul pur que le Go
+ * reproduit) sont purs — même phase stable + surface + change → plan byte-identique, jamais un LLM.
+ * Le Stop-gate et l'égalité servi↔émis sont des comparaisons pures (le code juge). THE WALL (§2):
+ * planifier n'écrit AUCUNE vérité ; enregistrer le déploiement d'une phase comme décision DAG passe
+ * par propose → ChangeSet → approbation, jamais une écriture directe.
  */
-
-const PHASE_HASH = "phase-0123456789abcdef";
-
-const RENAME_MIGRATION: MigrationStep[] = [
-	{
-		stage: "expand",
-		sql: 'ALTER TABLE "order" ADD COLUMN "reference" text',
-		note: "additive nullable column",
-	},
-	{
-		stage: "backfill",
-		sql: 'UPDATE "order" SET "reference" = "ref"',
-		note: "recopie old→new, no row loses its value",
-	},
-	{
-		stage: "contract",
-		sql: 'ALTER TABLE "order" DROP COLUMN "ref"',
-		note: "drop in a SEPARATE forward step, after backfill",
-	},
-];
-
-/**
- * deployManifest — the per-app DP02 StackManifest the DP26 complete deploy order is computed
- * over (the minimal /data/dockers-convention stack: one reverse-proxied server, one datastore,
- * the Go interpreter sidecar, one named bind volume, the external traefik network, one connector
- * scope). Its `app` equals the surface project (the deploy is per-app, S96). Deterministic — a
- * fixture, never drawn. Supplying it opts the plan into the seven ordered stages (DP26, additive).
- */
-function deployManifest(project: string): OrderManifest {
-	return {
-		app: project,
-		services: [
-			{ name: "app", role: "server" },
-			{ name: "postgres", role: "datastore" },
-			{ name: "interpreter", role: "interpreter" },
-		],
-		volumes: [{ name: "app_data", device_var: "APP_DATA_PATH" }],
-		network: { name: "traefik_default", external: true },
-		connector_scopes: ["crm"],
-	};
-}
 
 export async function deployAction(
 	_prev: DeployView,
@@ -128,48 +100,45 @@ export async function deployAction(
 ): Promise<DeployView> {
 	const project = String(formData.get("project") ?? "").trim() || "shop";
 	const phaseHash =
-		String(formData.get("phaseHash") ?? "").trim() || PHASE_HASH;
+		String(formData.get("phaseHash") ?? "").trim() || DEFAULT_PHASE_HASH;
 	// Toggle: deploy a NON-STABLE phase (a red mirror) — proves the PHASE_NOT_STABLE refusal.
 	const unstable = formData.get("unstable") === "on";
 	// Toggle: carry a forward-only data migration (the rename lifecycle).
 	const withMigration = formData.get("withMigration") === "on";
 
-	const phase = unstable
-		? { phaseHash, stable: false, reasons: ["createOrder.fixture"] }
-		: { phaseHash, stable: true, reasons: [] };
-	const gate = { mutationScore: 0.9, mutationThreshold: 0.8, monsterCount: 0 };
-
-	const input: DeployInput = {
-		phase,
-		gate,
-		surface: {
-			project,
-			serverBundleHash: `srv-${project}-001`,
-			frontBundleHash: `frt-${project}-001`,
-			infraHash: `inf-${project}-001`,
-			datastoreHash: `dst-${project}-001`,
-		},
-		programPath: `gen/${project}/infra/index.ts`,
-		programBytes: "export function program() {}\n",
-		migration: withMigration ? RENAME_MIGRATION : [],
-		// DP26 — opt into the complete deploy ORDER (network → … → URL). The deploy targets prod
-		// (a lasting environment) by default. The Stop-gate stays inherited (isDeployable).
-		manifest: deployManifest(project),
-		env: "prod",
-	};
+	const req: DeployRequest = { project, phaseHash, unstable, withMigration };
+	// The PURE deploy input (lib/deploy-data) — fed BOTH to the Go `plan` args and the demo plan.
+	const input = deployInput(req);
 
 	// The « done is computed » Stop-gate verdict — the SAME gate the plan inherits (no separate
 	// deploy-approval gate, DP26). Drives the gate badge + whether the « Déployer » is enabled.
-	const { deployable, reasons } = isDeployable(phase, gate);
+	// Computed locally over the input's phase/gate (a pure comparison — code judges).
+	const { deployable, reasons } = isDeployable(input.phase, input.gate);
 
-	const plan = buildPlan(input);
-	if (isBlocked(plan))
+	// ── ADR 0092 CUTOVER — read the LIVE DeployPlan from the Go `deploy` server via the passerelle.
+	// `plan` is below-the-line (a pure, content-addressed planning read — writes nothing). On any
+	// miss (no endpoint / transport error / refused / malformed / a non-stable phase) readVia falls
+	// back to the deterministic demo plan (the twin buildPlan, source:"demo"). The demo is null when
+	// the phase is non-stable (the unstable toggle) — that IS the PHASE_NOT_STABLE refusal surfaced.
+	const scope = await panelScope();
+	const { data: plan } = await readVia(
+		scope,
+		"plan",
+		planArgs(req),
+		planDecoder,
+		demoPlan(req),
+	);
+
+	// A null plan ⇒ the phase is refused (PHASE_NOT_STABLE): surface the gate's reasons.
+	if (plan === null)
 		return {
 			ok: false,
 			stable: deployable,
 			reasons,
-			blockCode: plan.code,
-			blockExplanation: plan.explanation,
+			blockCode: "PHASE_NOT_STABLE",
+			blockExplanation:
+				"Le déploiement de la phase est REFUSÉ (S96) : la phase visée n'est PAS une phase stable (« done is computed » : red→vert ∧ vert antérieur ∧ mutation ≥ seuil ∧ aucun monstre)." +
+				(reasons.length > 0 ? ` Raisons : ${reasons.join(", ")}.` : ""),
 		};
 
 	// The running deploy reports its served-app hash from the phase's emitted bytes
@@ -287,7 +256,7 @@ export async function previewAction(
 	const intent = String(formData.get("intent") ?? "launch");
 	const project = String(formData.get("project") ?? "").trim() || "shop";
 	const phaseHash =
-		String(formData.get("phaseHash") ?? "").trim() || PHASE_HASH;
+		String(formData.get("phaseHash") ?? "").trim() || DEFAULT_PHASE_HASH;
 	const profile = String(formData.get("profile") ?? "core").trim() || "core";
 
 	const plan = buildPreviewWithBootstrap({

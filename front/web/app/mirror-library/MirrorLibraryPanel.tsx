@@ -25,6 +25,7 @@ const initial: ScopedHealthView = {
 	hasMonster: false,
 	monsters: [],
 	apps: [],
+	source: "demo",
 };
 
 function Submit({ label, testId }: { label: string; testId: string }) {
@@ -208,9 +209,22 @@ export function MirrorLibraryPanel({
 			{/* The user's mirrors listed BY APP with liveness. */}
 			{state.apps.length > 0 && (
 				<section className="space-y-3" data-testid="apps">
-					<h2 className="text-sm font-semibold tracking-tight text-foreground">
-						{t("appsHeading")}
-					</h2>
+					<div className="flex flex-wrap items-center gap-2">
+						<h2 className="text-sm font-semibold tracking-tight text-foreground">
+							{t("appsHeading")}
+						</h2>
+						<span
+							data-testid="apps-source"
+							data-source={state.source}
+							className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+								state.source === "live"
+									? "bg-primary/10 text-primary"
+									: "bg-muted text-muted-foreground"
+							}`}
+						>
+							{t(state.source === "live" ? "sourceLive" : "sourceDemo")}
+						</span>
+					</div>
 					<div className="grid gap-3 sm:grid-cols-2">
 						{state.apps.map((app) => (
 							<AppCard key={app.project} app={app} />

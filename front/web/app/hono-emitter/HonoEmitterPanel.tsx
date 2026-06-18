@@ -58,6 +58,24 @@ function Result({ state }: { state: EmitView }) {
 					>
 						{t("emittedBadge")} · {state.surface}
 					</span>
+					{state.source ? (
+						<span
+							data-testid="source-badge"
+							data-source={state.source}
+							title={
+								state.source === "live"
+									? t("sourceLiveTitle")
+									: t("sourceDemoTitle")
+							}
+							className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+								state.source === "live"
+									? "bg-primary/15 text-primary"
+									: "bg-muted text-muted-foreground"
+							}`}
+						>
+							{state.source === "live" ? t("sourceLive") : t("sourceDemo")}
+						</span>
+					) : null}
 					<span className="font-mono text-xs text-muted-foreground">
 						{t("hashLabel")}: <span data-testid="emit-hash">{state.hash}</span>
 					</span>

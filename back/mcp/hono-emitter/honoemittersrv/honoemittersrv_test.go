@@ -1,4 +1,4 @@
-package main
+package honoemittersrv
 
 import (
 	"context"
@@ -79,7 +79,7 @@ func TestHashTools_Deterministic(t *testing.T) {
 }
 
 func TestServerRegistersTools(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("newMCPServer returned nil")
 	}
 }

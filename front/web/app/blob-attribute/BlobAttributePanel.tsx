@@ -4,10 +4,10 @@ import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import {
-	DEMO_BLOB,
+	demoBlob as DEMO_BLOB,
 	DEMO_PROJECT_A,
 	DEMO_PROJECT_B,
-} from "@/lib/blob-attribute";
+} from "@/lib/blob-attribute-data";
 import { checkUploadAction, type UploadCheckView } from "./actions";
 
 /**
@@ -30,6 +30,7 @@ const initial: UploadCheckView = {
 	blobBody: "",
 	allowedMime: DEMO_BLOB.allowed_mime,
 	maxBytes: DEMO_BLOB.max_bytes,
+	source: "demo",
 };
 
 function Submit({ label, testId }: { label: string; testId: string }) {
@@ -74,6 +75,15 @@ export function BlobAttributePanel({
 				>
 					{activeProjectId ?? t("noProject")}
 				</span>
+				{state.ok && (
+					<span
+						data-testid="source-badge"
+						data-source={state.source}
+						className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 font-mono"
+					>
+						{state.source === "live" ? t("sourceLive") : t("sourceDemo")}
+					</span>
+				)}
 			</div>
 
 			{/* The declared blob node: allow-list + size ceiling. */}

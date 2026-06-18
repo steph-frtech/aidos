@@ -42,6 +42,7 @@ import (
 	cs "github.com/steph-frtech/aidos/back/archive/changeset"
 	"github.com/steph-frtech/aidos/back/archive/contentstore"
 	"github.com/steph-frtech/aidos/back/archive/dag"
+	ailabsrv "github.com/steph-frtech/aidos/back/mcp/ai-lab/ailabsrv"
 	anatomysrv "github.com/steph-frtech/aidos/back/mcp/anatomy/anatomysrv"
 	appauthsrv "github.com/steph-frtech/aidos/back/mcp/app-auth/appauthsrv"
 	archfitnesssrv "github.com/steph-frtech/aidos/back/mcp/arch-fitness/archfitnesssrv"
@@ -50,6 +51,7 @@ import (
 	"github.com/steph-frtech/aidos/back/mcp/behaviors/behaviorssrv"
 	besoinintakesrv "github.com/steph-frtech/aidos/back/mcp/besoin-intake/besoinintakesrv"
 	"github.com/steph-frtech/aidos/back/mcp/billing/billingsrv"
+	blobattributesrv "github.com/steph-frtech/aidos/back/mcp/blob-attribute/blobattributesrv"
 	buildconsolesrv "github.com/steph-frtech/aidos/back/mcp/build-console/buildconsolesrv"
 	buildloopsrv "github.com/steph-frtech/aidos/back/mcp/build-loop/buildloopsrv"
 	"github.com/steph-frtech/aidos/back/mcp/changeset/changesetsrv"
@@ -58,6 +60,7 @@ import (
 	"github.com/steph-frtech/aidos/back/mcp/context/contextsrv"
 	costmetersrv "github.com/steph-frtech/aidos/back/mcp/cost-meter/costmetersrv"
 	"github.com/steph-frtech/aidos/back/mcp/dag/dagsrv"
+	deploysrv "github.com/steph-frtech/aidos/back/mcp/deploy/deploysrv"
 	dsleditorsrv "github.com/steph-frtech/aidos/back/mcp/dsl-editor/dsleditorsrv"
 	entitymodelersrv "github.com/steph-frtech/aidos/back/mcp/entity-modeler/entitymodelersrv"
 	"github.com/steph-frtech/aidos/back/mcp/evolve/evolvesrv"
@@ -65,14 +68,17 @@ import (
 	goalpilotingsrv "github.com/steph-frtech/aidos/back/mcp/goal-piloting/goalpilotingsrv"
 	"github.com/steph-frtech/aidos/back/mcp/grid/gridsrv"
 	grillingloopsrv "github.com/steph-frtech/aidos/back/mcp/grilling-loop/grillingloopsrv"
+	honoemittersrv "github.com/steph-frtech/aidos/back/mcp/hono-emitter/honoemittersrv"
 	ideaintakesrv "github.com/steph-frtech/aidos/back/mcp/idea-intake/ideaintakesrv"
 	kernelgardensrv "github.com/steph-frtech/aidos/back/mcp/kernel-garden/kernelgardensrv"
 	kerneltreesrv "github.com/steph-frtech/aidos/back/mcp/kernel-tree/kerneltreesrv"
-	"github.com/steph-frtech/aidos/back/mcp/links/linksrv"
 	"github.com/steph-frtech/aidos/back/mcp/learn/learnsrv"
+	"github.com/steph-frtech/aidos/back/mcp/links/linksrv"
 	"github.com/steph-frtech/aidos/back/mcp/memory/memorysrv"
+	mirrorlibrarysrv "github.com/steph-frtech/aidos/back/mcp/mirror-library/mirrorlibrarysrv"
 	"github.com/steph-frtech/aidos/back/mcp/mirror-runner/mirrorrunnersrv"
 	"github.com/steph-frtech/aidos/back/mcp/mutation-runner/mutationrunnersrv"
+	opsobservabilitysrv "github.com/steph-frtech/aidos/back/mcp/ops-observability/opsobservabilitysrv"
 	pactverifiersrv "github.com/steph-frtech/aidos/back/mcp/pact-verifier/pactverifiersrv"
 	"github.com/steph-frtech/aidos/back/mcp/project/projectsrv"
 	"github.com/steph-frtech/aidos/back/mcp/provision/provisionsrv"
@@ -684,6 +690,52 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	// DECLARED, never learned (§8). Writes nothing (the wall).
 	"kernel-tree": func(context.Context) (*mcp.Server, error) {
 		return kerneltreesrv.NewServer(), nil
+	},
+	// ── ADR 0092 PHASE-3 emitted-app + library DEP-FREE read servers (the Go engine is the SINGLE
+	// live source). ── Each of the six below is DEP-FREE + STATELESS like context/self-cert/workspace:
+	// no DSN, no store, no clock, no embedder, NO LLM in the dispatch path (determinism-first §6/§8).
+	// The builder ignores its ctx and returns the default server; it dispatches identically whatever
+	// DSN is set. Every dispatched tool is a CHEAP/pure read whose output is a scalar OBJECT VALUE (no
+	// json.RawMessage body — the S59 byte-array transport scar avoided by construction: blob handlers /
+	// deploy plans / cockpit states / emitted Hono bytes are STRING fields, mirror libraries / ops
+	// dashboards are plain object structs). All dispatched tools are below the line — WroteKernel always
+	// false (the wall, §2).
+	//
+	// blob-attribute (S72) — blob_address/validate_upload/storage_key/cross_project/emit_handler: the
+	// blob/file attribute door (back/kernel/entities/blob). PURE content-addressing + the CLOSED MIME/size
+	// validation + the project-scoped key + the cross-project refusal + the byte-stable handler emission.
+	"blob-attribute": func(context.Context) (*mcp.Server, error) {
+		return blobattributesrv.NewServer(), nil
+	},
+	// deploy (S96) — plan/gate/check_served/forward_only: the phase-keyed deploy reads (runtime/deploy).
+	// plan builds a content-addressed DeployPlan ONLY from a STABLE phase (PHASE_NOT_STABLE otherwise);
+	// gate/check_served/forward_only are pure verdicts. PURE planning over supplied facts — writes nothing.
+	"deploy": func(context.Context) (*mcp.Server, error) {
+		return deploysrv.NewServer(), nil
+	},
+	// ai-lab (FK11) — build_cockpit/propose_slot/scope_pair/validate_card: the AI Lab cockpit reads
+	// (runtime/ailab). build_cockpit composes the FK09 conscience report; propose_slot is the chat (a
+	// PROPOSED slot or a wall refusal, never a truth); validate_card's above-the-wall option opens a /goal.
+	"ai-lab": func(context.Context) (*mcp.Server, error) {
+		return ailabsrv.NewServer(), nil
+	},
+	// hono-emitter (S87) — emit_server/emit_worker/emit_pulumi/server_hash/manifest_hash: the emitted-app
+	// SERVER emitter reads (runtime/honoemit). PURE PROJECTION — Artifact.Bytes is a STRING field (NOT a
+	// json.RawMessage, the S59 byte-array scar avoided); same cut → byte-identical output. Writes nothing.
+	"hono-emitter": func(context.Context) (*mcp.Server, error) {
+		return honoemittersrv.NewServer(), nil
+	},
+	// mirror-library (S70) — library_list_by_app/library_scoped_health: the per-project mirror-library
+	// reads (back/kernel/mirror/library). PURE grouping + the project-scoped completeness law (the monster
+	// set + verdict, reusing records.ComputeCompleteness). Writes nothing (the wall).
+	"mirror-library": func(context.Context) (*mcp.Server, error) {
+		return mirrorlibrarysrv.NewServer(), nil
+	},
+	// ops-observability (S92) — ops_ingest/ops_dashboard/ops_fingerprint: the per-app ops engine reads
+	// (runtime/opsobservability). VALIDATE one OTel signal / AGGREGATE a project's panel / content-address
+	// the dashboard. DISTINCT from the E12 telemetry-reader on-ramp — WroteKernel ALWAYS false (the wall).
+	"ops-observability": func(context.Context) (*mcp.Server, error) {
+		return opsobservabilitysrv.NewServer(), nil
 	},
 }
 

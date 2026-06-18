@@ -1,4 +1,4 @@
-package main
+package deploysrv
 
 import (
 	"context"
@@ -108,7 +108,7 @@ func TestForwardOnlyTool(t *testing.T) {
 }
 
 func TestServerBuilds(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("nil server")
 	}
 }

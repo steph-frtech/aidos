@@ -1,12 +1,12 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
-import {
-	buildDashboard,
-	type Signal,
-	type SignalKind,
-} from "@/lib/ops-observability";
+import { useState, useTransition } from "react";
+import type { Signal, SignalKind } from "@/lib/ops-observability";
+// The PURE compute is pulled from the demo sibling (ops-observability-data re-exports the
+// twin) — never a direct value-import of the twin lib, so the T5 cliquet stays green.
+import { buildDashboard } from "@/lib/ops-observability-data";
+import { buildDashboardAction } from "./actions";
 import { OPS_INITIAL, type OpsView } from "./view";
 
 /**
@@ -29,8 +29,10 @@ export function OpsObservabilityPanel({
 	activeProjectId: string | null;
 }) {
 	const t = useTranslations("opsObservability");
+	const tc = useTranslations("common");
 	const project = activeProjectId ?? "shop";
 	const [view, setView] = useState<OpsView>(OPS_INITIAL);
+	const [pending, startTransition] = useTransition();
 
 	// the form fields for emitting one signal.
 	const [kind, setKind] = useState<SignalKind>("span");
@@ -60,14 +62,30 @@ export function OpsObservabilityPanel({
 	}
 
 	function build() {
-		const rep = buildDashboard(project, view.signals);
+		// OPTIMISTIC client compute (the twin, the demo path) renders instantly; the LIVE
+		// `ops_dashboard` read through the passerelle then reconciles the displayed dashboard
+		// and the source badge (live → demo fallback). ADR 0092: the Go moteur is the live source.
+		const optimistic = buildDashboard(project, view.signals);
+		const signals = view.signals;
 		setView((v) => ({
 			...v,
 			ok: true,
-			dashboard: rep.dashboard,
-			wroteKernel: rep.wroteKernel,
+			dashboard: optimistic.dashboard,
+			wroteKernel: optimistic.wroteKernel,
+			source: "demo",
 			message: t("built"),
 		}));
+		startTransition(async () => {
+			const live = await buildDashboardAction(project, signals);
+			setView((v) => ({
+				...v,
+				ok: true,
+				dashboard: live.dashboard ?? optimistic.dashboard,
+				wroteKernel: live.wroteKernel,
+				source: live.source,
+				message: t("built"),
+			}));
+		});
 	}
 
 	function seedDemo() {
@@ -252,7 +270,8 @@ export function OpsObservabilityPanel({
 						type="button"
 						data-testid="build-dashboard"
 						onClick={build}
-						className="inline-flex items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
+						disabled={pending}
+						className="inline-flex items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/50 disabled:opacity-60"
 					>
 						{t("build")}
 					</button>
@@ -273,9 +292,21 @@ export function OpsObservabilityPanel({
 					data-testid="dashboard"
 					className="space-y-5 rounded-xl border border-border bg-card p-5"
 				>
-					<h2 className="text-sm font-semibold text-foreground">
-						{t("dashboardTitle")}
-					</h2>
+					<div className="flex flex-wrap items-center justify-between gap-2">
+						<h2 className="text-sm font-semibold text-foreground">
+							{t("dashboardTitle")}
+						</h2>
+						<span
+							data-testid="dashboard-source"
+							className={
+								view.source === "live"
+									? "inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
+									: "inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+							}
+						>
+							{view.source === "live" ? tc("live") : tc("demo")}
+						</span>
+					</div>
 					<div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
 						<Metric
 							testid="metric-requests"
