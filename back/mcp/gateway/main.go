@@ -798,8 +798,8 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	// reports are plain object structs — the S59 byte-array transport scar avoided by construction).
 	// All dispatched tools are below the line — WroteKernel always false (the wall, §2).
 	//
-	// relation-emitter (S74) — emit_ddl/emit_ts/emit_all dispatch (the relation-aware MULTI-ENTITY
-	// emitter reads). emit_worker + schema_hash stay EXPOSED by the server but are NOT in the registry
+	// relation-emitter (S74) — emit_ddl/emit_ts dispatch (the relation-aware MULTI-ENTITY
+	// emitter reads). emit_all (dormant fan, no panel consumer), emit_worker + schema_hash stay EXPOSED by the server but are NOT in the registry
 	// (they collide by name with hono-emitter.emit_worker / entity-modeler.schema_hash — route(<them>)
 	// → unknown_tool, the preview/deploy collision precedent); the /relation-emitter panel keeps its
 	// own voie propre for those two.

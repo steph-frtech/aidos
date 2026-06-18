@@ -280,8 +280,8 @@ export const GATEWAY_SERVERS: readonly string[] = [
 	// CHEAP/pure reads whose output is a scalar object VALUE — WroteKernel always false (the wall).
 	// Byte-faithful to the Go GatewayServers() (back/runtime/gateway/registry.go). Without these entries
 	// route(emit_ddl)→unknown_tool→demo (a hollow flip — the cliquet's readVia-frontier blind spot).
-	// `relation-emitter` (S74) — emit_ddl/emit_ts/emit_all: the relation-aware MULTI-ENTITY emitter reads
-	// (a whole schema cut → Postgres DDL / TS model / the fan over the closed target set). emit_worker +
+	// `relation-emitter` (S74) — emit_ddl/emit_ts: the relation-aware MULTI-ENTITY emitter reads
+	// (a whole schema cut → Postgres DDL / TS model). emit_all (the fan) is off-dispatch (dormant). emit_worker +
 	// schema_hash stay OFF-dispatch (they collide by name with hono-emitter/entity-modeler — the
 	// preview/deploy collision precedent). The artifact's rendered code rides as a STRING (the S59
 	// []byte-array scar guard), so the object survives the HTTP round-trip.
@@ -737,13 +737,16 @@ export function defaultTools(): Tool[] {
 		// Three DEP-FREE pure-read servers whose demo-twin panels flip to the Go engine. Every dispatched
 		// tool's I/O is a scalar OBJECT (no json.RawMessage); WroteKernel always false (the wall). Byte-faithful
 		// to the Go registry (back/runtime/gateway/registry.go).
-		// `relation-emitter` (S74) — emit_ddl/emit_ts/emit_all: the relation-aware MULTI-ENTITY emitter reads.
-		// emit_worker + schema_hash are OMITTED: they collide by name with hono-emitter.emit_worker /
-		// entity-modeler.schema_hash (the flat registry would shadow the prior owner — the preview/deploy
-		// collision precedent), so route(emit_worker)→those servers, never relation-emitter (the panel keeps
-		// its own voie propre for those two). The artifact's rendered code rides as a STRING (the S59 []byte-
+		// `relation-emitter` (S74) — emit_ddl/emit_ts: the relation-aware MULTI-ENTITY emitter reads, both
+		// CONSUMED by the panel (EmitTarget="ddl"|"ts") and screen-reachable. emit_all is OMITTED: it is the
+		// convenience FAN (DDL+TS+Worker-iff-async) — a pure aggregate of the two already-reachable targets,
+		// with no panel consumer and no emitAllOutput decoder; dispatching it would be a HOLLOW registration
+		// (dispatched≠consumed, §5 anti-monster), so it stays off-dispatch (exposed via stdio/CI), re-dispatched
+		// the day a panel consumes it. emit_worker + schema_hash are OMITTED too: they collide by name with
+		// hono-emitter.emit_worker / entity-modeler.schema_hash (the flat registry would shadow the prior owner —
+		// the preview/deploy collision precedent). The artifact's rendered code rides as a STRING (the S59 []byte-
 		// array scar guard), so the object survives the HTTP round-trip.
-		...below("relation-emitter", ["emit_ddl", "emit_ts", "emit_all"]),
+		...below("relation-emitter", ["emit_ddl", "emit_ts"]),
 		// `truth-level` (FK01) — compute/check_parity/levels: the seven FKE-5 truth levels (Raw→Reconciled) +
 		// their deterministic transition. compute is the SOLE legal writer of a truth_level (a VALUE the
 		// transition computes; persisting it onto a record stays the aidos CLI's job — WroteKernel false).

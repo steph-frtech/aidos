@@ -262,13 +262,16 @@ describe("gateway registry completeness", () => {
 
 	// ── ADR 0092 PHASE-5 emitter/kernel/mirror servers: the dispatched read tools resolve below the line ──
 	// relation-emitter (S74) · truth-level (FK01) · facet-completeness (FK04) · facet-wire (FK08) are
-	// DEP-FREE pure-read servers. Each fronts only its CHEAP/pure read tools; relation-emitter OMITS
-	// emit_worker + schema_hash (they collide by name with hono-emitter / entity-modeler — registering
-	// them would shadow the prior owner). Without the lookup resolving, the flip would be HOLLOW
-	// (route(emit_ddl)→unknown_tool→demo, the cliquet's readVia-frontier blind spot).
+	// DEP-FREE pure-read servers. Each fronts only its CHEAP/pure read tools that a PANEL CONSUMES;
+	// relation-emitter OMITS emit_worker + schema_hash (they collide by name with hono-emitter /
+	// entity-modeler — registering them would shadow the prior owner) AND emit_all (the convenience
+	// fan = a pure aggregate of the two already-reachable emit_ddl/emit_ts, with no panel consumer
+	// and no decoder — dispatching it would be a HOLLOW registration, dispatched≠consumed, §5).
+	// Without the lookup resolving, the flip would be HOLLOW (route(emit_ddl)→unknown_tool→demo,
+	// the cliquet's readVia-frontier blind spot).
 	it("fronts the phase-5 emitter/kernel/mirror servers — their read tools route below the line", () => {
 		const expected: Record<string, string[]> = {
-			"relation-emitter": ["emit_ddl", "emit_ts", "emit_all"],
+			"relation-emitter": ["emit_ddl", "emit_ts"],
 			"truth-level": ["compute", "check_parity", "levels"],
 			"facet-completeness": ["check"],
 			"facet-wire": ["facet_wire", "facet_skeleton"],
@@ -290,7 +293,9 @@ describe("gateway registry completeness", () => {
 	// hono-emitter / entity-modeler (the flat registry's prior owner). The collision is exactly why
 	// relation-emitter must not re-register them (a §9 anti-overwrite). strangler's carve/freeze/refactor
 	// are unregistered everywhere (the json.RawMessage byte-array scar + heavy gestures) → unknown_tool.
-	it("the colliding emit_worker/schema_hash keep their prior owner; strangler tools never resolve", () => {
+	// emit_all is the dormant aggregate (no panel consumer / no decoder) → off-dispatch → unknown_tool
+	// (the §5 anti-monster: a dispatched-but-unconsumed tool would be a hollow registration).
+	it("the colliding emit_worker/schema_hash keep their prior owner; strangler + dormant emit_all never resolve", () => {
 		const emitWorker = route(
 			{ identity: "alice", activeProject: "proj-a" },
 			"emit_worker",
@@ -305,7 +310,7 @@ describe("gateway registry completeness", () => {
 		);
 		expect(schemaHash.outcome).toBe("route");
 		expect(schemaHash.tool?.server).toBe("entity-modeler");
-		for (const tool of ["carve", "freeze", "refactor"]) {
+		for (const tool of ["carve", "freeze", "refactor", "emit_all"]) {
 			const d = route({ identity: "alice", activeProject: "proj-a" }, tool, {
 				projectId: "proj-a",
 			});

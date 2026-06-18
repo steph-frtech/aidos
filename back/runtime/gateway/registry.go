@@ -398,14 +398,20 @@ func DefaultTools() []Tool {
 	// routed to idea → mirror → /goal, never a write). The builder ignores its ctx and returns the
 	// default server; it dispatches identically whatever DSN is set.
 	//
-	// 55. relation-emitter (S74) — emit_ddl/emit_ts/emit_all: the relation-aware MULTI-ENTITY emitter
-	// reads (a whole schema cut → Postgres DDL / TS model / the fan over the closed target set).
-	// emit_worker and schema_hash are DELIBERATELY NOT registered: emit_worker COLLIDES by name with
-	// hono-emitter.emit_worker, schema_hash with entity-modeler.schema_hash — the flat name→server
-	// registry would shadow the prior owner (a §9 anti-overwrite). They stay EXPOSED by the server
-	// (the stdio binary + CI use them) but off-dispatch (the preview/deploy tool-collision precedent;
-	// a dedup namespacing pass is the OpenQuestion). PURE PROJECTION — writes nothing.
-	t = append(t, below("relation-emitter", "emit_ddl", "emit_ts", "emit_all")...)
+	// 55. relation-emitter (S74) — emit_ddl/emit_ts: the relation-aware MULTI-ENTITY emitter
+	// reads (a whole schema cut → Postgres DDL / TS model). Both are CONSUMED by the panel
+	// (EmitTarget="ddl"|"ts", relation-emitter-data.ts) and reachable from the screen.
+	// emit_all is DELIBERATELY NOT registered: it is the convenience FAN over the closed target
+	// set (DDL+TS+Worker-iff-async in one pass) — a pure AGGREGATE of emit_ddl/emit_ts which are
+	// each already screen-reachable, with NO panel consumer and NO decoder path (live.ts decodes
+	// the single-artifact artifactOutput, not emitAllOutput). Dispatching it would be a HOLLOW
+	// registration (dispatched≠consumed, the §5 anti-monster) — so it stays EXPOSED by the server
+	// (the stdio binary + CI use it) but off-dispatch, re-dispatched the day a panel consumes it
+	// (the "a tool that never fires from a screen is dead" rule). emit_worker and schema_hash are
+	// also off-dispatch: emit_worker COLLIDES by name with hono-emitter.emit_worker, schema_hash
+	// with entity-modeler.schema_hash — the flat name→server registry would shadow the prior owner
+	// (a §9 anti-overwrite); a dedup namespacing pass is the OpenQuestion. PURE PROJECTION — writes nothing.
+	t = append(t, below("relation-emitter", "emit_ddl", "emit_ts")...)
 	// 56. truth-level (FK01) — compute/check_parity/levels: the seven FKE-5 truth levels (Raw→
 	// Reconciled) and their deterministic transition. compute is the SOLE legal writer of a
 	// truth_level (a VALUE the transition computes — persisting it onto a record stays the aidos CLI's
@@ -528,7 +534,7 @@ func GatewayServers() []string {
 		"entity-relation", "behavior-capture", "behavior-expander", "mirror-watch", "front-emitter",
 		// ADR 0092 PHASE-5 emitter/kernel/mirror READ servers — three DEP-FREE pure-read servers whose
 		// demo-twin panels flip to the Go engine: relation-emitter (the S74 relation-aware MULTI-ENTITY
-		// emitter — emit_ddl/emit_ts/emit_all; emit_worker + schema_hash stay off-dispatch, they collide
+		// emitter — emit_ddl/emit_ts; emit_all (dormant fan) + emit_worker + schema_hash stay off-dispatch (the latter two collide
 		// by name with hono-emitter/entity-modeler — the preview/deploy collision precedent) · truth-level
 		// (the FK01 seven truth levels — compute/check_parity/levels) · facet-completeness (the FK04
 		// facet-aware completeness law — check) · facet-wire (the FK08 non-functional skeleton judge —
