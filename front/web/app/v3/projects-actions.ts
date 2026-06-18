@@ -230,64 +230,70 @@ async function saveProjectBacklog(record: {
 		if (backlog.ideas.length === 0 && backlog.changesets.length === 0) {
 			return; // rien à projeter (transcript sans idée/kernel) — no-op.
 		}
+		// Le GENESIS du projet : project_id (l'ANCRE content-adressée — la FK ideas_idea_project_fk
+		// EXIGE un projects.project.id EXISTANT, JAMAIS le slug ; found-by-running, l'e2e live l'a
+		// révélé) + node_id (le parent_phase/from du dag). C'est la ligne-identité, toujours présente
+		// après Plan A (append-only). Sans elle (Plan A pas passé / DB down) idea_capture violerait
+		// la FK projet → best-effort : on s'arrête (le transcript reste la vérité reprenable).
+		const c = pg();
+		if (!c) return;
+		let projectId: string | null = null;
+		let genesisNode: string | null = null;
+		try {
+			const rows = await c<{ project_id: string; node_id: string }[]>`
+				select dr.project_id, dr.node_id from projects.dag_root dr
+				join projects.project p on p.id = dr.project_id
+				where p.body->>'owner_ref' = ${V3_OWNER} and p.body->>'slug' = ${record.id}
+				limit 1`;
+			projectId = rows[0]?.project_id ?? null;
+			genesisNode = rows[0]?.node_id ?? null;
+		} catch {
+			projectId = null;
+		}
+		if (!projectId) return;
 		// 1. Les idées (idea_capture — below-the-line, idempotent, le mur via firewall.ViaIdea).
+		//    project_id = l'ANCRE content-adressée du projet (satisfait ideas_idea_project_fk).
 		for (const idea of backlog.ideas) {
 			await callGateway(scope, "idea_capture", {
 				proposes: idea.proposes,
 				intent: idea.intent,
 				source: idea.source,
 				detail: idea.detail,
-				project_id: record.id,
+				project_id: projectId,
 			});
 		}
 		// 2-3. Les changesets + le dag, branchés sur le nœud GENESIS du projet (projection lossy).
-		if (backlog.changesets.length > 0) {
-			const c = pg();
-			let genesis: string | null = null;
-			if (c) {
-				try {
-					const rows = await c<{ node_id: string }[]>`
-						select dr.node_id from projects.dag_root dr
-						join projects.project p on p.id = dr.project_id
-						where p.body->>'owner_ref' = ${V3_OWNER} and p.body->>'slug' = ${record.id}
-						limit 1`;
-					genesis = rows[0]?.node_id ?? null;
-				} catch {
-					genesis = null;
+		if (backlog.changesets.length > 0 && genesisNode) {
+			const applied = new Map<string, string>(); // backlog id → applied changeset id
+			for (const cs of backlog.changesets) {
+				const open = await callGateway(scope, "changeset_open", {
+					label: cs.label,
+					parent_phase: genesisNode,
+					spec_delta: cs.specDelta,
+					mirror_delta: cs.mirrorDelta,
+				});
+				const openId =
+					open.ok &&
+					typeof open.content === "object" &&
+					open.content !== null &&
+					typeof (open.content as { id?: unknown }).id === "string"
+						? (open.content as { id: string }).id
+						: null;
+				if (openId) {
+					const ap = await callGateway(scope, "changeset_apply", {
+						id: openId,
+					});
+					if (ap.ok) applied.set(cs.id, openId);
 				}
 			}
-			if (genesis) {
-				const applied = new Map<string, string>(); // backlog id → applied changeset id
-				for (const cs of backlog.changesets) {
-					const open = await callGateway(scope, "changeset_open", {
-						label: cs.label,
-						parent_phase: genesis,
-						spec_delta: cs.specDelta,
-						mirror_delta: cs.mirrorDelta,
+			for (const edge of backlog.dagEdges) {
+				const appliedId = applied.get(edge.changeset);
+				if (appliedId) {
+					await callGateway(scope, "dag_branch", {
+						from: genesisNode,
+						label: edge.label,
+						changeset: appliedId,
 					});
-					const openId =
-						open.ok &&
-						typeof open.content === "object" &&
-						open.content !== null &&
-						typeof (open.content as { id?: unknown }).id === "string"
-							? (open.content as { id: string }).id
-							: null;
-					if (openId) {
-						const ap = await callGateway(scope, "changeset_apply", {
-							id: openId,
-						});
-						if (ap.ok) applied.set(cs.id, openId);
-					}
-				}
-				for (const edge of backlog.dagEdges) {
-					const appliedId = applied.get(edge.changeset);
-					if (appliedId) {
-						await callGateway(scope, "dag_branch", {
-							from: genesis,
-							label: edge.label,
-							changeset: appliedId,
-						});
-					}
 				}
 			}
 		}
