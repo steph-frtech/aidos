@@ -1,4 +1,4 @@
-package main
+package facetcompletenesssrv
 
 import (
 	"context"
@@ -81,7 +81,7 @@ func TestCheck_Divergence(t *testing.T) {
 }
 
 func TestServerBuilds(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("newMCPServer returned nil")
 	}
 }

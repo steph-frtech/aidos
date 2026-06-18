@@ -1,4 +1,4 @@
-package main
+package stranglersrv
 
 import (
 	"context"
@@ -95,7 +95,7 @@ func TestRefactorTool_DriftRefused(t *testing.T) {
 }
 
 func TestNewMCPServer(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("server must build")
 	}
 }

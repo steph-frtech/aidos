@@ -275,9 +275,34 @@ export const GATEWAY_SERVERS: readonly string[] = [
 	// Artifact.Bytes is a []byte number-array (NOT a json.RawMessage), so the object payload survives the
 	// HTTP round-trip. Byte-identical output (same Kernel cut → same bundle, the S93 done-criterion).
 	"front-emitter",
+	// ── ADR 0092 PHASE-5 emitter/kernel/mirror READ servers (the Go engine is the SINGLE live source). ──
+	// Three DEP-FREE pure-read servers whose demo-twin panels flip to the Go engine. Each dispatches
+	// CHEAP/pure reads whose output is a scalar object VALUE — WroteKernel always false (the wall).
+	// Byte-faithful to the Go GatewayServers() (back/runtime/gateway/registry.go). Without these entries
+	// route(emit_ddl)→unknown_tool→demo (a hollow flip — the cliquet's readVia-frontier blind spot).
+	// `relation-emitter` (S74) — emit_ddl/emit_ts/emit_all: the relation-aware MULTI-ENTITY emitter reads
+	// (a whole schema cut → Postgres DDL / TS model / the fan over the closed target set). emit_worker +
+	// schema_hash stay OFF-dispatch (they collide by name with hono-emitter/entity-modeler — the
+	// preview/deploy collision precedent). The artifact's rendered code rides as a STRING (the S59
+	// []byte-array scar guard), so the object survives the HTTP round-trip.
+	"relation-emitter",
+	// `truth-level` (FK01) — compute/check_parity/levels: the seven FKE-5 truth levels (Raw→Reconciled)
+	// + their deterministic transition. compute is the SOLE legal writer of a truth_level (a VALUE the
+	// transition computes; persisting it onto a record stays the aidos CLI's job — WroteKernel false).
+	"truth-level",
+	// `facet-completeness` (FK04) — check: the completeness law made FACET-AWARE (the S06 test_kind
+	// monsters + the per-facet monsters + the soft-X advisories). A monster is a SIGNAL → idea → mirror →
+	// /goal, never a write (WroteKernel always false).
+	"facet-completeness",
+	// `facet-wire` (FK08) — facet_wire/facet_skeleton: the pure STRUCTURAL judge wiring the five
+	// non-functional facet columns (S/R/V/M/X) as parallel six-pair skeletons (the soft X is ADVISORY).
+	"facet-wire",
 	// NOTE — preview (S94) is DELIBERATELY ABSENT: its `plan`/`check_served` tools collide by name with
 	// the live `deploy` server in the flat gateway registry, so fronting it would break deploy (§9
 	// anti-overwrite). The /preview panel stays pure-demo until preview's tools are uniquely namespaced.
+	// strangler (S104) is DELIBERATELY ABSENT: every tool's I/O embeds a json.RawMessage (the S59
+	// byte-array scar) AND carve/freeze/refactor are heavy generate-fixture-mirror gestures, not cheap
+	// reads — the /strangler panel stays pure-demo (an OpenQuestion, the watch_materialize precedent).
 ];
 
 /** defaultTools mirrors Go DefaultTools() — the closed exposed surface. */
@@ -708,9 +733,33 @@ export function defaultTools(): Tool[] {
 		// the deploy `plan` precedent), so the object payload survives the HTTP round-trip. Byte-identical
 		// output (same Kernel cut → same bundle, the S93 done-criterion). Writes nothing (the wall).
 		...below("front-emitter", ["emit_front", "emit_bundle", "front_hash"]),
+		// ── ADR 0092 PHASE-5 emitter/kernel/mirror READ servers (the Go engine is the SINGLE live source). ──
+		// Three DEP-FREE pure-read servers whose demo-twin panels flip to the Go engine. Every dispatched
+		// tool's I/O is a scalar OBJECT (no json.RawMessage); WroteKernel always false (the wall). Byte-faithful
+		// to the Go registry (back/runtime/gateway/registry.go).
+		// `relation-emitter` (S74) — emit_ddl/emit_ts/emit_all: the relation-aware MULTI-ENTITY emitter reads.
+		// emit_worker + schema_hash are OMITTED: they collide by name with hono-emitter.emit_worker /
+		// entity-modeler.schema_hash (the flat registry would shadow the prior owner — the preview/deploy
+		// collision precedent), so route(emit_worker)→those servers, never relation-emitter (the panel keeps
+		// its own voie propre for those two). The artifact's rendered code rides as a STRING (the S59 []byte-
+		// array scar guard), so the object survives the HTTP round-trip.
+		...below("relation-emitter", ["emit_ddl", "emit_ts", "emit_all"]),
+		// `truth-level` (FK01) — compute/check_parity/levels: the seven FKE-5 truth levels (Raw→Reconciled) +
+		// their deterministic transition. compute is the SOLE legal writer of a truth_level (a VALUE the
+		// transition computes; persisting it onto a record stays the aidos CLI's job — WroteKernel false).
+		...below("truth-level", ["compute", "check_parity", "levels"]),
+		// `facet-completeness` (FK04) — check: the completeness law made FACET-AWARE (the S06 test_kind monsters
+		// + the per-facet monsters + the soft-X advisories). A monster is a SIGNAL → idea → mirror → /goal.
+		...below("facet-completeness", ["check"]),
+		// `facet-wire` (FK08) — facet_wire/facet_skeleton: the pure STRUCTURAL judge wiring the five
+		// non-functional facet columns (S/R/V/M/X) as parallel six-pair skeletons (the soft X is ADVISORY,
+		// never flips the verdict). A red column is a SIGNAL → idea → mirror → /goal, never a write.
+		...below("facet-wire", ["facet_wire", "facet_skeleton"]),
 		// NOTE — preview (S94) is DELIBERATELY ABSENT: its `plan`/`check_served` tools collide by name with the
 		// live `deploy` server in the flat gateway registry (a dup tool name shadows the earlier owner), so
-		// fronting it would break deploy (§9). The /preview panel stays pure-demo (an OpenQuestion).
+		// fronting it would break deploy (§9). The /preview panel stays pure-demo (an OpenQuestion). strangler
+		// (S104) is DELIBERATELY ABSENT: every tool's I/O embeds a json.RawMessage (the S59 byte-array scar) AND
+		// carve/freeze/refactor are heavy generate-fixture-mirror gestures — the /strangler panel stays demo.
 		// The fenced truth-zone write namespace (§2) — refused with a ChangeSet hint.
 		{ name: "kernel_write", server: "kernel", disposition: "truth_write" },
 		{ name: "mirror_write", server: "mirrors", disposition: "truth_write" },

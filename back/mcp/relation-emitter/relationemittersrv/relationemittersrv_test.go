@@ -1,4 +1,4 @@
-package main
+package relationemittersrv
 
 import (
 	"context"
@@ -46,7 +46,7 @@ func TestEmitDDL_JoinTableAndOutbox(t *testing.T) {
 	if err != nil || !out.OK || out.Artifact == nil {
 		t.Fatalf("emit_ddl must succeed on a valid schema: %+v err=%v", out, err)
 	}
-	ddl := string(out.Artifact.Bytes)
+	ddl := out.Artifact.Source
 	if !strings.Contains(ddl, `CREATE TABLE "book_tags"`) {
 		t.Errorf("N-N did not emit a join table:\n%s", ddl)
 	}
@@ -63,8 +63,8 @@ func TestEmitWorker_OK(t *testing.T) {
 	if !out.OK || out.Artifact == nil {
 		t.Fatalf("emit_worker must succeed on an async schema: %+v", out)
 	}
-	if !strings.Contains(string(out.Artifact.Bytes), "dispatchRemind(") {
-		t.Errorf("worker missing dispatch function:\n%s", out.Artifact.Bytes)
+	if !strings.Contains(out.Artifact.Source, "dispatchRemind(") {
+		t.Errorf("worker missing dispatch function:\n%s", out.Artifact.Source)
 	}
 }
 
@@ -101,7 +101,7 @@ func TestSchemaHash_OK(t *testing.T) {
 }
 
 func TestNewServer(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("server nil")
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package facetwiresrv
 
 import (
 	"context"
@@ -117,7 +117,7 @@ func TestFacetSkeleton_OnlyXBrokenStaysGreen(t *testing.T) {
 
 // TestMCPServer_Registers — the server constructs with both tools registered.
 func TestMCPServer_Registers(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("server must construct")
 	}
 }

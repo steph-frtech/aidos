@@ -388,6 +388,52 @@ func DefaultTools() []Tool {
 	// output (same Kernel cut → same bundle, the S93 done-criterion). Writes nothing.
 	t = append(t, below("front-emitter", "emit_front", "emit_bundle", "front_hash")...)
 
+	// ── ADR 0092 PHASE-5 emitter/kernel/mirror DEP-FREE read servers (the Go engine is the SINGLE
+	// live source). ── Four DEP-FREE pure-read servers whose demo-twin panels flip to the Go engine:
+	// no DSN, no store, no clock, no embedder, no LLM in the dispatch path (determinism-first §6/§8).
+	// Every dispatched tool is a CHEAP/pure read whose output is a scalar OBJECT VALUE (no
+	// json.RawMessage body — the S59 byte-array transport scar avoided by construction: relemit's
+	// Artifact.Bytes is a []byte number-array, the facet/truth-level reports are plain object structs).
+	// ALL BELOW THE LINE — WroteKernel always false (the wall §2; a red verdict / monster is a SIGNAL
+	// routed to idea → mirror → /goal, never a write). The builder ignores its ctx and returns the
+	// default server; it dispatches identically whatever DSN is set.
+	//
+	// 55. relation-emitter (S74) — emit_ddl/emit_ts/emit_all: the relation-aware MULTI-ENTITY emitter
+	// reads (a whole schema cut → Postgres DDL / TS model / the fan over the closed target set).
+	// emit_worker and schema_hash are DELIBERATELY NOT registered: emit_worker COLLIDES by name with
+	// hono-emitter.emit_worker, schema_hash with entity-modeler.schema_hash — the flat name→server
+	// registry would shadow the prior owner (a §9 anti-overwrite). They stay EXPOSED by the server
+	// (the stdio binary + CI use them) but off-dispatch (the preview/deploy tool-collision precedent;
+	// a dedup namespacing pass is the OpenQuestion). PURE PROJECTION — writes nothing.
+	t = append(t, below("relation-emitter", "emit_ddl", "emit_ts", "emit_all")...)
+	// 56. truth-level (FK01) — compute/check_parity/levels: the seven FKE-5 truth levels (Raw→
+	// Reconciled) and their deterministic transition. compute is the SOLE legal writer of a
+	// truth_level (a VALUE the transition computes — persisting it onto a record stays the aidos CLI's
+	// job, WroteKernel always false); check_parity is the parity mirror (stored vs computed); levels
+	// the closed reference table. PURE, total — writes nothing (the wall).
+	t = append(t, below("truth-level", "compute", "check_parity", "levels")...)
+	// 57. facet-completeness (FK04) — check: the completeness law made FACET-AWARE (FKE-1.3 cons. 5).
+	// A cut (layers + their instantiated facets, mirrors + the facet each proves) → the verdict (the
+	// S06 test_kind monsters + the per-facet monsters + the soft-X advisories). COMPLETE iff no hard
+	// monster. A monster is a SIGNAL routed to idea → mirror → /goal, never a write — WroteKernel
+	// always false (the wall). PURE.
+	t = append(t, below("facet-completeness", "check")...)
+	// 58. facet-wire (FK08) — facet_wire/facet_skeleton: the pure STRUCTURAL judge that wires the five
+	// non-functional facet columns (S/R/V/M/X) as parallel six-pair skeletons, each reusing an existing
+	// sensor. A broken declared-not-proven pair reddens its column (the soft X is ADVISORY, never flips
+	// the verdict). A red column is a SIGNAL → idea → mirror → /goal, never a write — WroteKernel always
+	// false (the wall). PURE.
+	t = append(t, below("facet-wire", "facet_wire", "facet_skeleton")...)
+	// NOTE — strangler (S104) is DELIBERATELY NOT registered. Every tool's I/O embeds a json.RawMessage
+	// (strangler.Trace.Input/Output, CharacterizationMirror.Input/ExpectedOutput, RefactorObservation.
+	// Outputs, RefactorVerdict) — an arbitrary-JSON-value field the go-sdk reflects to a BYTE-ARRAY
+	// input schema, so the real HTTP `args:{object}` payload is REFUSED at input validation (the S59
+	// byte-array transport scar). AND carve/freeze/refactor are NOT cheap synchronous reads — they
+	// consume observed legacy traces and GENERATE fixture mirrors (a refactor-time, governed gesture,
+	// the run_mutation precedent). It stays EXPOSED by its server (the stdio binary + CI use it) but
+	// off-dispatch; the /strangler panel keeps its own voie propre. A dispatch-safe `any`-typed wrapper
+	// is the OpenQuestion (the watch_materialize / arch-fitness `propose` precedent).
+
 	// THE FENCED TRUTH-ZONE WRITE NAMESPACE (§2). Not a real tool of any server — the
 	// door a caller might craft to move truth directly. Registered as TruthWrite so the
 	// gateway refuses it with a ChangeSet-pointing BlockReason (server-side wall).
@@ -480,5 +526,18 @@ func GatewayServers() []string {
 		// deploy (§9 anti-overwrite). The /preview panel stays pure-demo until preview's tools are uniquely
 		// namespaced (an OpenQuestion, alongside the latent provision.plan / arch-fitness.gate collisions).
 		"entity-relation", "behavior-capture", "behavior-expander", "mirror-watch", "front-emitter",
+		// ADR 0092 PHASE-5 emitter/kernel/mirror READ servers — three DEP-FREE pure-read servers whose
+		// demo-twin panels flip to the Go engine: relation-emitter (the S74 relation-aware MULTI-ENTITY
+		// emitter — emit_ddl/emit_ts/emit_all; emit_worker + schema_hash stay off-dispatch, they collide
+		// by name with hono-emitter/entity-modeler — the preview/deploy collision precedent) · truth-level
+		// (the FK01 seven truth levels — compute/check_parity/levels) · facet-completeness (the FK04
+		// facet-aware completeness law — check) · facet-wire (the FK08 non-functional skeleton judge —
+		// facet_wire/facet_skeleton). Each dispatches CHEAP/pure reads whose output is a scalar object
+		// VALUE — WroteKernel always false (the wall). Without these entries route(emit_ddl)→unknown_tool→
+		// demo (a hollow flip — the cliquet's readVia-frontier blind spot). strangler (S104) is
+		// DELIBERATELY ABSENT: every tool's I/O embeds a json.RawMessage (the S59 byte-array scar) AND
+		// carve/freeze/refactor are heavy generate-fixture-mirror gestures, not cheap reads — the
+		// /strangler panel stays pure-demo (an OpenQuestion, the watch_materialize precedent).
+		"relation-emitter", "truth-level", "facet-completeness", "facet-wire",
 	}
 }

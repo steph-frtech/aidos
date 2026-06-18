@@ -67,6 +67,8 @@ import (
 	entitymodelersrv "github.com/steph-frtech/aidos/back/mcp/entity-modeler/entitymodelersrv"
 	entityrelationsrv "github.com/steph-frtech/aidos/back/mcp/entity-relation/entityrelationsrv"
 	"github.com/steph-frtech/aidos/back/mcp/evolve/evolvesrv"
+	facetcompletenesssrv "github.com/steph-frtech/aidos/back/mcp/facet-completeness/facetcompletenesssrv"
+	facetwiresrv "github.com/steph-frtech/aidos/back/mcp/facet-wire/facetwiresrv"
 	"github.com/steph-frtech/aidos/back/mcp/federation/federationsrv"
 	frontemittersrv "github.com/steph-frtech/aidos/back/mcp/front-emitter/frontemittersrv"
 	goalpilotingsrv "github.com/steph-frtech/aidos/back/mcp/goal-piloting/goalpilotingsrv"
@@ -88,11 +90,13 @@ import (
 	"github.com/steph-frtech/aidos/back/mcp/project/projectsrv"
 	"github.com/steph-frtech/aidos/back/mcp/provision/provisionsrv"
 	realityingestsrv "github.com/steph-frtech/aidos/back/mcp/reality-ingest/realityingestsrv"
+	relationemittersrv "github.com/steph-frtech/aidos/back/mcp/relation-emitter/relationemittersrv"
 	selfcertsrv "github.com/steph-frtech/aidos/back/mcp/self-cert/selfcertsrv"
 	shapeeditorsrv "github.com/steph-frtech/aidos/back/mcp/shape-editor/shapeeditorsrv"
 	"github.com/steph-frtech/aidos/back/mcp/store/storesrv"
 	"github.com/steph-frtech/aidos/back/mcp/telemetry-reader/telemetryreadersrv"
 	"github.com/steph-frtech/aidos/back/mcp/templates/templatessrv"
+	truthlevelsrv "github.com/steph-frtech/aidos/back/mcp/truth-level/truthlevelsrv"
 	whytreesrv "github.com/steph-frtech/aidos/back/mcp/why-tree/whytreesrv"
 	workspacesrv "github.com/steph-frtech/aidos/back/mcp/workspace/workspacesrv"
 	"github.com/steph-frtech/aidos/back/runtime/gateway"
@@ -785,6 +789,47 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	"front-emitter": func(context.Context) (*mcp.Server, error) {
 		return frontemittersrv.NewServer(), nil
 	},
+	// ── ADR 0092 PHASE-5 emitter/kernel/mirror DEP-FREE read servers (the Go engine is the SINGLE
+	// live source). ── Each of the four below is DEP-FREE + STATELESS like context/self-cert/workspace:
+	// no DSN, no store, no clock, no embedder, NO LLM in the dispatch path (determinism-first §6/§8).
+	// The builder ignores its ctx and returns the default server; it dispatches identically whatever
+	// DSN is set. Every dispatched tool is a CHEAP/pure read whose output is a scalar OBJECT VALUE (no
+	// json.RawMessage body — relemit's Artifact.Bytes is a []byte number-array; the facet/truth-level
+	// reports are plain object structs — the S59 byte-array transport scar avoided by construction).
+	// All dispatched tools are below the line — WroteKernel always false (the wall, §2).
+	//
+	// relation-emitter (S74) — emit_ddl/emit_ts/emit_all dispatch (the relation-aware MULTI-ENTITY
+	// emitter reads). emit_worker + schema_hash stay EXPOSED by the server but are NOT in the registry
+	// (they collide by name with hono-emitter.emit_worker / entity-modeler.schema_hash — route(<them>)
+	// → unknown_tool, the preview/deploy collision precedent); the /relation-emitter panel keeps its
+	// own voie propre for those two.
+	"relation-emitter": func(context.Context) (*mcp.Server, error) {
+		return relationemittersrv.NewServer(), nil
+	},
+	// truth-level (FK01) — compute/check_parity/levels: the seven FKE-5 truth levels (Raw→Reconciled)
+	// + their deterministic transition. compute is the SOLE legal writer of a truth_level (a VALUE the
+	// transition computes; persisting it onto a record stays the aidos CLI's job — WroteKernel always
+	// false). PURE, total.
+	"truth-level": func(context.Context) (*mcp.Server, error) {
+		return truthlevelsrv.NewServer(), nil
+	},
+	// facet-completeness (FK04) — check: the completeness law made FACET-AWARE (the S06 test_kind
+	// monsters + the per-facet monsters + the soft-X advisories). A monster is a SIGNAL routed to idea
+	// → mirror → /goal, never a write (WroteKernel always false). PURE.
+	"facet-completeness": func(context.Context) (*mcp.Server, error) {
+		return facetcompletenesssrv.NewServer(), nil
+	},
+	// facet-wire (FK08) — facet_wire/facet_skeleton: the pure STRUCTURAL judge wiring the five
+	// non-functional facet columns (S/R/V/M/X) as parallel six-pair skeletons. A red column is a SIGNAL
+	// → idea → mirror → /goal (the soft X is ADVISORY, never flips the verdict); WroteKernel always
+	// false. PURE.
+	"facet-wire": func(context.Context) (*mcp.Server, error) {
+		return facetwiresrv.NewServer(), nil
+	},
+	// NOTE — strangler (S104) is DELIBERATELY NOT wired: every tool's I/O embeds a json.RawMessage (the
+	// S59 byte-array transport scar) AND carve/freeze/refactor are heavy generate-fixture-mirror
+	// gestures, not cheap reads — it stays exposed by its own server (back/mcp/strangler) but off-
+	// dispatch; the /strangler panel keeps its own voie propre (the watch_materialize precedent).
 }
 
 // gatewayMemorySeed is the fixed seed the gateway injects into the dispatched memory store's
