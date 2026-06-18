@@ -1,4 +1,4 @@
-package main
+package mirrorwatchsrv
 
 import (
 	"context"
@@ -68,7 +68,7 @@ func TestWatchMaterializeRefusesEmpty(t *testing.T) {
 }
 
 func TestNewMCPServer(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("server must build")
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package behaviorcapturesrv
 
 import (
 	"context"
@@ -100,7 +100,7 @@ func TestAttachUnknownBehaviorRefusedByS76(t *testing.T) {
 }
 
 func TestServerBuilds(t *testing.T) {
-	if newMCPServer() == nil {
-		t.Fatal("newMCPServer returned nil")
+	if NewServer() == nil {
+		t.Fatal("NewServer returned nil")
 	}
 }

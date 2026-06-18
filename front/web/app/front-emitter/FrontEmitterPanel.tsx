@@ -150,6 +150,23 @@ export function FrontEmitterPanel({
 
 			{state.ok && (
 				<div className="space-y-6" data-testid="front-result">
+					{/* The live/demo provenance badge (ADR 0092 — the Go front-emitter is the
+					    single live source; the twin is the deterministic demo fallback). */}
+					<div className="flex items-center gap-2 text-xs">
+						<span className="font-medium text-foreground">source:</span>
+						<span
+							data-testid="emit-source"
+							data-source={state.source ?? "demo"}
+							className={`inline-flex items-center rounded-full px-2.5 py-0.5 font-mono ${
+								state.source === "live"
+									? "bg-emerald-500/10 text-emerald-600"
+									: "bg-muted text-muted-foreground"
+							}`}
+						>
+							{state.source === "live" ? t("sourceLive") : t("sourceDemo")}
+						</span>
+					</div>
+
 					{/* The bundle — byte-identity surface. */}
 					<section className="space-y-2 rounded-xl border border-border p-5">
 						<div className="flex flex-wrap items-center justify-between gap-2">

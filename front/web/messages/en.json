@@ -4878,6 +4878,9 @@
 		"tutorialHeading": "How it works",
 		"tutorialBody": "Pick a behavior (ownable / soft-deletable / auditable) and an entity, own/version/tag/localize the record, then “Propose”. The ONE Expand produces the pieces the macro implies (ownable → owner_id + an owner→User relation + the owner-scoping policy + fixtures), content-addressed (same behavior+entity → byte-identical, idempotent expansion). A DRAFT ChangeSet carries the expansion. The wall (§2): proposing writes NO truth — the ChangeSet stays DRAFT; only the `aidos` CLI, after human approval, applies it. Everything is PURE (no LLM, determinism-first §6/§8).",
 		"proposeHeading": "Attach a behavior-macro · propose the expansion (→ DRAFT ChangeSet)",
+		"catalogueSource": "Catalogue",
+		"sourceLive": "live (Go engine)",
+		"sourceDemo": "demo (fallback)",
 		"behaviorLabel": "Behavior-macro",
 		"entityLabel": "Entity",
 		"ownerLabel": "Owner (ownable)",
@@ -5663,7 +5666,9 @@
 		"controlsHeading": "control+action verticale (real buttons + sensors)",
 		"formSourceHeading": "Emitted form source (order)",
 		"liveFormHeading": "Generated form — submit a real operation",
-		"submitOrderLabel": "Create the order"
+		"submitOrderLabel": "Create the order",
+		"sourceLive": "live — Go engine (gateway)",
+		"sourceDemo": "demo — deterministic fallback"
 	},
 	"preview": {
 		"eyebrow": "S94 · ephemeral preview",

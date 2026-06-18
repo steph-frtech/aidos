@@ -1,4 +1,4 @@
-package main
+package frontemittersrv
 
 import (
 	"context"
@@ -86,8 +86,8 @@ func TestFrontHashTool(t *testing.T) {
 }
 
 func TestServerRegistersTools(t *testing.T) {
-	if newMCPServer() == nil {
-		t.Fatal("newMCPServer returned nil")
+	if NewServer() == nil {
+		t.Fatal("NewServer returned nil")
 	}
 }
 

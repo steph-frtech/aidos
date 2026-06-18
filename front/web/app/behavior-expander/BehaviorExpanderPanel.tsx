@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { catalogue } from "@/lib/behavior-expander";
+import type { Source } from "@/lib/gateway-sdk";
 import { type ProposeView, proposeAction } from "./actions";
 
 /**
@@ -13,10 +13,17 @@ import { type ProposeView, proposeAction } from "./actions";
  * the ONE Expand and produce a `proposed` (DRAFT) ChangeSet carrying the attributes / relations /
  * operations / policies / fixtures it implies, with the expansion + record content addresses.
  *
- * DETERMINISM-FIRST (CLAUDE.md §6/§8): the control runs the PURE twin lib/behavior-expander (the ONE
- * compound expander + propose), never an LLM. THE WALL (§2): the screen WRITES NOTHING — propose
- * returns a DRAFT changeset; the `aidos` CLI applies it only after human approval; a reject leaves
- * the kernel intact. Themed on the ADR 0010 tokens; strings via next-intl (0011).
+ * ADR 0092 CUTOVER. The `kinds` dropdown is no longer computed from the TS twin: the page reads the
+ * declared catalogue LIVE from the Go engine through the passerelle (`catalogueLive` →
+ * `behavior_catalogue`) and passes it in as a prop (with its `source`), so this client component NEVER
+ * value-imports the twin (the T5 cliquet stays green). PROPOSE keeps its OWN voie: `behavior_propose`
+ * returns a DRAFT ChangeSet (a truth-PROPOSAL), so it is NOT dispatched — `proposeAction` runs the twin
+ * `propose` behind the demo-fallback frontier (the propose → ChangeSet → approval door).
+ *
+ * DETERMINISM-FIRST (CLAUDE.md §6/§8): the catalogue + the expansion are the PURE Go Expand (or the twin
+ * behind the demo fallback), never an LLM. THE WALL (§2): the screen WRITES NOTHING — propose returns a
+ * DRAFT changeset; the `aidos` CLI applies it only after human approval; a reject leaves the kernel
+ * intact. Themed on the ADR 0010 tokens; strings via next-intl (0011).
  */
 
 const initial: ProposeView = { ok: false };
@@ -54,11 +61,16 @@ function PieceList({ heading, names }: { heading: string; names: string[] }) {
 	);
 }
 
-export function BehaviorExpanderPanel() {
+export function BehaviorExpanderPanel({
+	kinds,
+	catalogueSource,
+}: {
+	kinds: string[];
+	catalogueSource: Source;
+}) {
 	const t = useTranslations("behaviorExpander");
 	const [state, doPropose] = useActionState(proposeAction, initial);
 
-	const kinds = catalogue();
 	const proposed = state.ok && state.proposal?.ok === true;
 	const refused = state.ok && state.error !== undefined;
 	const e = state.proposal?.expansion;
@@ -70,9 +82,18 @@ export function BehaviorExpanderPanel() {
 				action={doPropose}
 				className="space-y-5 rounded-xl border border-border bg-card p-6"
 			>
-				<h2 className="text-sm font-semibold tracking-tight text-foreground">
-					{t("proposeHeading")}
-				</h2>
+				<div className="flex flex-wrap items-center justify-between gap-2">
+					<h2 className="text-sm font-semibold tracking-tight text-foreground">
+						{t("proposeHeading")}
+					</h2>
+					<span
+						data-testid="catalogue-source"
+						className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+					>
+						{t("catalogueSource")}:{" "}
+						{catalogueSource === "live" ? t("sourceLive") : t("sourceDemo")}
+					</span>
+				</div>
 
 				<div className="grid gap-4 sm:grid-cols-2">
 					<label className="space-y-1 text-sm">

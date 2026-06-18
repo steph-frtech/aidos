@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { WorkbenchHeader } from "@/components/WorkbenchHeader";
+import { catalogueLive } from "./actions";
 import { BehaviorExpanderPanel } from "./BehaviorExpanderPanel";
 
 export const metadata: Metadata = {
@@ -27,6 +28,9 @@ export const dynamic = "force-dynamic";
  */
 export default async function BehaviorExpanderPage() {
 	const t = await getTranslations("behaviorExpander");
+	// ADR 0092: the declared catalogue is read LIVE from the Go engine through the passerelle
+	// (`behavior_catalogue`), with the twin demoCatalogue() as the deterministic demo fallback.
+	const { kinds, source } = await catalogueLive();
 
 	return (
 		<div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -64,7 +68,7 @@ export default async function BehaviorExpanderPage() {
 				</section>
 
 				<div className="mt-10">
-					<BehaviorExpanderPanel />
+					<BehaviorExpanderPanel kinds={kinds} catalogueSource={source} />
 				</div>
 
 				<footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">

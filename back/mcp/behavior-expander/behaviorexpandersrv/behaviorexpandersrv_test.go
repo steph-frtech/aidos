@@ -1,4 +1,4 @@
-package main
+package behaviorexpandersrv
 
 import (
 	"context"
@@ -104,7 +104,7 @@ func TestProposeKindMismatchRefused(t *testing.T) {
 }
 
 func TestServerBuilds(t *testing.T) {
-	if newMCPServer() == nil {
-		t.Fatal("newMCPServer returned nil")
+	if NewServer() == nil {
+		t.Fatal("NewServer returned nil")
 	}
 }

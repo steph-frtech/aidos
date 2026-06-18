@@ -48,6 +48,8 @@ import (
 	archfitnesssrv "github.com/steph-frtech/aidos/back/mcp/arch-fitness/archfitnesssrv"
 	"github.com/steph-frtech/aidos/back/mcp/autonomy/autonomysrv"
 	"github.com/steph-frtech/aidos/back/mcp/backtester/backtestersrv"
+	behaviorcapturesrv "github.com/steph-frtech/aidos/back/mcp/behavior-capture/behaviorcapturesrv"
+	behaviorexpandersrv "github.com/steph-frtech/aidos/back/mcp/behavior-expander/behaviorexpandersrv"
 	"github.com/steph-frtech/aidos/back/mcp/behaviors/behaviorssrv"
 	besoinintakesrv "github.com/steph-frtech/aidos/back/mcp/besoin-intake/besoinintakesrv"
 	"github.com/steph-frtech/aidos/back/mcp/billing/billingsrv"
@@ -63,8 +65,10 @@ import (
 	deploysrv "github.com/steph-frtech/aidos/back/mcp/deploy/deploysrv"
 	dsleditorsrv "github.com/steph-frtech/aidos/back/mcp/dsl-editor/dsleditorsrv"
 	entitymodelersrv "github.com/steph-frtech/aidos/back/mcp/entity-modeler/entitymodelersrv"
+	entityrelationsrv "github.com/steph-frtech/aidos/back/mcp/entity-relation/entityrelationsrv"
 	"github.com/steph-frtech/aidos/back/mcp/evolve/evolvesrv"
 	"github.com/steph-frtech/aidos/back/mcp/federation/federationsrv"
+	frontemittersrv "github.com/steph-frtech/aidos/back/mcp/front-emitter/frontemittersrv"
 	goalpilotingsrv "github.com/steph-frtech/aidos/back/mcp/goal-piloting/goalpilotingsrv"
 	"github.com/steph-frtech/aidos/back/mcp/grid/gridsrv"
 	grillingloopsrv "github.com/steph-frtech/aidos/back/mcp/grilling-loop/grillingloopsrv"
@@ -77,6 +81,7 @@ import (
 	"github.com/steph-frtech/aidos/back/mcp/memory/memorysrv"
 	mirrorlibrarysrv "github.com/steph-frtech/aidos/back/mcp/mirror-library/mirrorlibrarysrv"
 	"github.com/steph-frtech/aidos/back/mcp/mirror-runner/mirrorrunnersrv"
+	mirrorwatchsrv "github.com/steph-frtech/aidos/back/mcp/mirror-watch/mirrorwatchsrv"
 	"github.com/steph-frtech/aidos/back/mcp/mutation-runner/mutationrunnersrv"
 	opsobservabilitysrv "github.com/steph-frtech/aidos/back/mcp/ops-observability/opsobservabilitysrv"
 	pactverifiersrv "github.com/steph-frtech/aidos/back/mcp/pact-verifier/pactverifiersrv"
@@ -736,6 +741,49 @@ var serverBuilders = map[string]func(ctx context.Context) (*mcp.Server, error){
 	// the dashboard. DISTINCT from the E12 telemetry-reader on-ramp — WroteKernel ALWAYS false (the wall).
 	"ops-observability": func(context.Context) (*mcp.Server, error) {
 		return opsobservabilitysrv.NewServer(), nil
+	},
+	// ── ADR 0092 PHASE-4 entity/behavior/mirror/emit DEP-FREE read servers (the Go engine is the SINGLE
+	// live source). ── Each of the six below is DEP-FREE + STATELESS like context/self-cert/workspace:
+	// no DSN, no store, no clock, no embedder, NO LLM in the dispatch path (determinism-first §6/§8).
+	// The builder ignores its ctx and returns the default server; it dispatches identically whatever DSN
+	// is set. Only the CHEAP/pure READ tools are in the registry (the registry's below() set) — the
+	// OMITTED tools (behavior_propose · watch_materialize) stay EXPOSED by each server but route to
+	// unknown_tool, so those panels keep their own voie propre (the arch-fitness `propose` precedent).
+	// Every dispatched I/O is a scalar OBJECT (front-emitter's Artifact.Bytes is a []byte number-array,
+	// not a json.RawMessage — the S59 byte-array transport scar avoided). WroteKernel always false (the wall).
+	//
+	// entity-relation (S71) — relation_resolve/relation_address: the relation-node door over
+	// back/kernel/entities/ref (resolve against the declared set, content-address the round-trip).
+	"entity-relation": func(context.Context) (*mcp.Server, error) {
+		return entityrelationsrv.NewServer(), nil
+	},
+	// behavior-capture (S67) — behavior_library/behavior_attach_at_capture: the capture-library surface +
+	// the dry-run attach (a DRAFT ChangeSet PROPOSAL by string ref/status, WroteKernel always false).
+	"behavior-capture": func(context.Context) (*mcp.Server, error) {
+		return behaviorcapturesrv.NewServer(), nil
+	},
+	// behavior-expander (S76) — behavior_catalogue/validate_record/expand dispatch (scalar pieces);
+	// behavior_propose stays exposed but off-dispatch (the truth-PROPOSAL ChangeSet door).
+	"behavior-expander": func(context.Context) (*mcp.Server, error) {
+		return behaviorexpandersrv.NewServer(), nil
+	},
+	// mirror-watch (S69) — watch_run dispatches (the live red→green stream over a MaterializedMirror,
+	// scalar I/O); watch_materialize stays exposed but off-dispatch (its Proposal input embeds a
+	// json.RawMessage ChangeSet body, the S59 byte-array scar).
+	"mirror-watch": func(context.Context) (*mcp.Server, error) {
+		return mirrorwatchsrv.NewServer(), nil
+	},
+	// NOTE — preview (S94) is DELIBERATELY NOT wired: its `plan`/`check_served` tools collide by name
+	// with the live `deploy` server in the flat gateway registry (a dup tool name shadows the earlier
+	// owner). Wiring it would break deploy (§9 anti-overwrite); the /preview panel stays pure-demo until
+	// preview's tools are uniquely namespaced (an OpenQuestion). The previewsrv lib still exists (the
+	// stdio binary uses it) — it is simply absent from the dispatcher's registry.
+	//
+	// front-emitter (S93) — emit_front/emit_bundle/front_hash: the emitted-app FRONT emitter reads.
+	// Artifact.Bytes is a []byte → a JSON number-array schema (the deploy `plan` precedent), so the
+	// object payload survives the HTTP round-trip. Byte-identical output (the S93 done-criterion).
+	"front-emitter": func(context.Context) (*mcp.Server, error) {
+		return frontemittersrv.NewServer(), nil
 	},
 }
 

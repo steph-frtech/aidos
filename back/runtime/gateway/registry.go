@@ -349,6 +349,45 @@ func DefaultTools() []Tool {
 	// fingerprint). DISTINCT from the E12 telemetry-reader on-ramp — WroteKernel ALWAYS false (the wall).
 	t = append(t, below("ops-observability", "ops_ingest", "ops_dashboard", "ops_fingerprint")...)
 
+	// ── ADR 0092 PHASE-4 entity/behavior/mirror/emit READ servers (the Go engine is the SINGLE live
+	// source). ── Six DEP-FREE pure-read servers whose demo-twin panels flip to the Go engine. Every
+	// dispatched tool's I/O is a scalar OBJECT (no json.RawMessage body); WroteKernel always false (the
+	// wall §2). The DELIBERATELY-OMITTED tools stay EXPOSED by their server (the stdio binary + CI use
+	// them) but are NOT registered here, so route(<omitted>) → unknown_tool and the panel keeps its
+	// own voie propre (the arch-fitness `propose` precedent).
+	//
+	// 49. entity-relation (S71) — relation_resolve resolves a relation node against the declared entity
+	// set (UNKNOWN_RELATION_TARGET, never guessed); relation_address content-addresses it (the round-trip).
+	t = append(t, below("entity-relation", "relation_resolve", "relation_address")...)
+	// 50. behavior-capture (S67) — behavior_library surfaces the reusable behaviours catalogue at
+	// idea-capture; behavior_attach_at_capture dry-run-expands an attached behavior into a DRAFT ChangeSet
+	// PROPOSAL (WroteKernel false; the ChangeSet rides by string ref/status, no RawMessage body).
+	t = append(t, below("behavior-capture", "behavior_library", "behavior_attach_at_capture")...)
+	// 51. behavior-expander (S76) — behavior_catalogue/validate_record/expand are the CHEAP reads (scalar
+	// pieces, no RawMessage). behavior_propose is DELIBERATELY OMITTED: it is a truth-PROPOSAL the front
+	// never fires synchronously (the propose → ChangeSet → approval door), so it keeps that voie propre.
+	t = append(t, below("behavior-expander", "behavior_catalogue", "behavior_validate_record", "behavior_expand")...)
+	// 52. mirror-watch (S69) — watch_run runs a materialized mirror against a code-probe → the live
+	// red→green stream (the /mirror-watch panel read). watch_materialize is DELIBERATELY OMITTED: its
+	// input (shapeeditor.Proposal) EMBEDS a changeset.ChangeSet whose Delta.Body is a json.RawMessage
+	// (the S59 byte-array transport scar), so it would be refused at input validation — the panel
+	// materializes via its own path (the arch-fitness `propose` precedent).
+	t = append(t, below("mirror-watch", "watch_run")...)
+	// NOTE — preview (S94) is DELIBERATELY NOT fronted here. Its panel-read tools `plan` and
+	// `check_served` COLLIDE by name with the already-live `deploy` server (the gateway registry is a
+	// flat name→server map — a duplicate tool name silently shadows the earlier owner, breaking deploy).
+	// Only `app_hash` is unique to preview, and the /preview panel computes its plan PURELY client-side
+	// (lib/preview.buildPlan/servedMatchesEmitted) — so fronting preview would be a hollow flip AND a
+	// §9 anti-overwrite of deploy's tools. preview stays a pure-demo panel until its tools are uniquely
+	// namespaced (a separate dedup pass — the latent provision.plan/deploy.plan + arch-fitness.gate/
+	// deploy.gate collisions live alongside it). Recorded as an OpenQuestion, not dispatched.
+	//
+	// 54. front-emitter (S93) — emit_front/emit_bundle/front_hash are the emitted-app FRONT emitter reads.
+	// Artifact.Bytes is a Go []byte → a JSON number-array schema (NOT a json.RawMessage base64 string,
+	// the deploy `plan` precedent), so the object payload survives the HTTP round-trip. Byte-identical
+	// output (same Kernel cut → same bundle, the S93 done-criterion). Writes nothing.
+	t = append(t, below("front-emitter", "emit_front", "emit_bundle", "front_hash")...)
+
 	// THE FENCED TRUTH-ZONE WRITE NAMESPACE (§2). Not a real tool of any server — the
 	// door a caller might craft to move truth directly. Registered as TruthWrite so the
 	// gateway refuses it with a ChangeSet-pointing BlockReason (server-side wall).
@@ -426,5 +465,20 @@ func GatewayServers() []string {
 		// output is a scalar object VALUE — WroteKernel always false (the wall). Without these entries
 		// route(blob_address)→unknown_tool→demo (a hollow flip — the cliquet's readVia-frontier blind spot).
 		"blob-attribute", "deploy", "ai-lab", "hono-emitter", "mirror-library", "ops-observability",
+		// ADR 0092 PHASE-4 entity/behavior/mirror/emit READ servers — five DEP-FREE pure-read servers
+		// whose demo-twin panels flip to the Go engine: entity-relation (the S71 relation-node door —
+		// resolve/address) · behavior-capture (the S67 capture-library + dry-run attach) · behavior-expander
+		// (the S76 catalogue/validate/expand — propose stays the ChangeSet door) · mirror-watch (the S69
+		// watch_run red→green stream — watch_materialize stays off-dispatch, its Proposal input embeds a
+		// json.RawMessage ChangeSet body) · front-emitter (the S93 emitted-app front emitter — Artifact.Bytes
+		// is a []byte number-array, not a json.RawMessage, so the byte-array scar is avoided). Each dispatches
+		// CHEAP/pure reads whose output is a scalar object VALUE — WroteKernel always false (the wall). Without
+		// these entries route(relation_resolve)→unknown_tool→demo (a hollow flip — the cliquet's blind spot).
+		// preview (S94) is held back — a name collision with deploy (see DefaultTools, below).
+		// preview (S94) is DELIBERATELY NOT listed: its `plan`/`check_served` tools collide by name with the
+		// live `deploy` server (the flat registry shadows the earlier owner), so fronting it would break
+		// deploy (§9 anti-overwrite). The /preview panel stays pure-demo until preview's tools are uniquely
+		// namespaced (an OpenQuestion, alongside the latent provision.plan / arch-fitness.gate collisions).
+		"entity-relation", "behavior-capture", "behavior-expander", "mirror-watch", "front-emitter",
 	}
 }

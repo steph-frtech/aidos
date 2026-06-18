@@ -1,4 +1,4 @@
-package main
+package previewsrv
 
 import (
 	"context"
@@ -84,7 +84,7 @@ func TestCheckServedTool(t *testing.T) {
 }
 
 func TestServerBuilds(t *testing.T) {
-	if newMCPServer() == nil {
+	if NewServer() == nil {
 		t.Fatal("nil server")
 	}
 }

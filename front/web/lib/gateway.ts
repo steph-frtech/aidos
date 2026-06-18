@@ -253,6 +253,31 @@ export const GATEWAY_SERVERS: readonly string[] = [
 	"hono-emitter",
 	"mirror-library",
 	"ops-observability",
+	// ── ADR 0092 PHASE-4 entity/behavior/mirror/emit READ servers (the Go engine is the SINGLE live
+	// source). ── Five DEP-FREE pure-read servers whose demo-twin panels flip to the Go engine. Each
+	// dispatches CHEAP/pure reads whose output is a scalar object VALUE — WroteKernel always false (the
+	// wall). Without these entries route(relation_resolve)→unknown_tool→demo (a hollow flip — the
+	// cliquet's readVia-frontier blind spot). Byte-faithful to the Go GatewayServers() (registry.go).
+	// `entity-relation` (S71) — relation_resolve/relation_address: the relation-node door (resolve a
+	// relation against the declared entity set; content-address the round-trip).
+	"entity-relation",
+	// `behavior-capture` (S67) — behavior_library/behavior_attach_at_capture: the capture-library surface
+	// + the dry-run attach (a DRAFT ChangeSet PROPOSAL by string ref/status — WroteKernel always false).
+	"behavior-capture",
+	// `behavior-expander` (S76) — behavior_catalogue/validate_record/expand are the CHEAP dispatched reads;
+	// behavior_propose is OMITTED (a truth-PROPOSAL the front never fires — the propose → ChangeSet door).
+	"behavior-expander",
+	// `mirror-watch` (S69) — watch_run runs a materialized mirror against a code-probe → the live red→green
+	// stream. watch_materialize is OMITTED: its Proposal input embeds a changeset.ChangeSet whose Delta.Body
+	// is a json.RawMessage (the S59 byte-array scar), so it stays the panel's own materialize path.
+	"mirror-watch",
+	// `front-emitter` (S93) — emit_front/emit_bundle/front_hash: the emitted-app FRONT emitter reads.
+	// Artifact.Bytes is a []byte number-array (NOT a json.RawMessage), so the object payload survives the
+	// HTTP round-trip. Byte-identical output (same Kernel cut → same bundle, the S93 done-criterion).
+	"front-emitter",
+	// NOTE — preview (S94) is DELIBERATELY ABSENT: its `plan`/`check_served` tools collide by name with
+	// the live `deploy` server in the flat gateway registry, so fronting it would break deploy (§9
+	// anti-overwrite). The /preview panel stays pure-demo until preview's tools are uniquely namespaced.
 ];
 
 /** defaultTools mirrors Go DefaultTools() — the closed exposed surface. */
@@ -649,6 +674,43 @@ export function defaultTools(): Tool[] {
 			"ops_dashboard",
 			"ops_fingerprint",
 		]),
+		// ── ADR 0092 PHASE-4 entity/behavior/mirror/emit READ servers (the Go engine is the SINGLE live
+		// source). ── Five DEP-FREE pure-read servers whose demo-twin panels flip to the Go engine. Every
+		// dispatched tool's I/O is a scalar OBJECT (no json.RawMessage); WroteKernel always false (the wall).
+		// The OMITTED tools (behavior_propose · watch_materialize) are NOT registered — each is a truth-proposal
+		// / RawMessage-input tool the front never fires synchronously, so route(<omitted>) → unknown_tool and the
+		// panel keeps its own voie propre (the arch-fitness `propose` precedent). Byte-faithful to the Go registry.
+		// `entity-relation` (S71) — relation_resolve resolves a relation node against the declared entity set
+		// (UNKNOWN_RELATION_TARGET, never guessed); relation_address content-addresses it (the round-trip).
+		...below("entity-relation", ["relation_resolve", "relation_address"]),
+		// `behavior-capture` (S67) — behavior_library surfaces the reusable behaviours catalogue at capture;
+		// behavior_attach_at_capture dry-run-expands an attached behavior into a DRAFT ChangeSet PROPOSAL
+		// (the ChangeSet rides by string ref/status, no RawMessage body — WroteKernel always false).
+		...below("behavior-capture", [
+			"behavior_library",
+			"behavior_attach_at_capture",
+		]),
+		// `behavior-expander` (S76) — behavior_catalogue/validate_record/expand are the CHEAP reads (scalar
+		// pieces, no RawMessage). behavior_propose is OMITTED: it is a truth-PROPOSAL (a DRAFT ChangeSet — the
+		// propose → ChangeSet → approval door), so route(behavior_propose) → unknown_tool (the panel's voie propre).
+		...below("behavior-expander", [
+			"behavior_catalogue",
+			"behavior_validate_record",
+			"behavior_expand",
+		]),
+		// `mirror-watch` (S69) — watch_run runs a materialized mirror against a code-probe → the live red→green
+		// stream (the /mirror-watch panel read). watch_materialize is OMITTED: its input (shapeeditor.Proposal)
+		// EMBEDS a changeset.ChangeSet whose Delta.Body is a json.RawMessage (the S59 byte-array scar), so it
+		// would be refused at input validation — the panel materializes via its own path.
+		...below("mirror-watch", ["watch_run"]),
+		// `front-emitter` (S93) — emit_front/emit_bundle/front_hash are the emitted-app FRONT emitter reads.
+		// Artifact.Bytes is a Go []byte → a JSON number-array schema (NOT a json.RawMessage base64 string —
+		// the deploy `plan` precedent), so the object payload survives the HTTP round-trip. Byte-identical
+		// output (same Kernel cut → same bundle, the S93 done-criterion). Writes nothing (the wall).
+		...below("front-emitter", ["emit_front", "emit_bundle", "front_hash"]),
+		// NOTE — preview (S94) is DELIBERATELY ABSENT: its `plan`/`check_served` tools collide by name with the
+		// live `deploy` server in the flat gateway registry (a dup tool name shadows the earlier owner), so
+		// fronting it would break deploy (§9). The /preview panel stays pure-demo (an OpenQuestion).
 		// The fenced truth-zone write namespace (§2) — refused with a ChangeSet hint.
 		{ name: "kernel_write", server: "kernel", disposition: "truth_write" },
 		{ name: "mirror_write", server: "mirrors", disposition: "truth_write" },

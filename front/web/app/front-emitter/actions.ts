@@ -8,6 +8,15 @@ import {
 	isBlocked,
 	sourceHash,
 } from "@/lib/front-emitter";
+import { ORDER_ENTITY } from "@/lib/front-emitter-data";
+import { readVia } from "@/lib/gateway-sdk";
+import { panelScope } from "@/lib/panelScope";
+import {
+	bundleDecoder,
+	filesDecoder,
+	gatewaySpecArgs,
+	hashDecoder,
+} from "./live";
 import type { FrontView } from "./view";
 
 /**
@@ -18,43 +27,18 @@ import type { FrontView } from "./view";
  * user's entities (scalars + relations + blobs) and the control+action verticale rendered to
  * REAL buttons, each carrying its control-spec fixture as a SENSOR — wired to the emitted API.
  *
- * DETERMINISM-FIRST (CLAUDE.md §6/§8): the front is a PURE function of the spec
- * (lib/front-emitter) — same Kernel cut → byte-identical bundle, never an LLM. THE WALL (§2):
- * it WRITES NOTHING — the front is a projection.
+ * S59 CUTOVER (ADR 0092 — the Go engine is the SINGLE live source). `frontAction` now reads the
+ * LIVE emit from the Go front-emitter MCP server through the passerelle: `emit_front` (the
+ * FrontFile[]), `emit_bundle` (the byte-identity bundle) and `front_hash` (the content address)
+ * are the dispatched below-the-line reads. The twin (lib/front-emitter) is preserved ONLY as the
+ * deterministic demo fallback (`source:"live"|"demo"`). A malformed / undispatched / refused
+ * answer yields the demo emit — NEVER a partial value (ADR 0074: an honest source:"demo").
+ *
+ * DETERMINISM-FIRST (CLAUDE.md §6/§8): the front is a PURE function of the spec — same Kernel
+ * cut → byte-identical bundle, both on the Go side and the twin fallback, never an LLM. THE WALL
+ * (§2): it WRITES NOTHING — the front is a projection.
  */
 
-const ORDER_ENTITY: EntityModel = {
-	name: "order",
-	attributes: [
-		{ name: "id", type: "int", identifier: true },
-		{ name: "total", type: "decimal", required: true },
-		{ name: "paid", type: "bool" },
-	],
-	blobs: [
-		{
-			name: "receipt",
-			allowedMime: ["image/png", "application/pdf"],
-			maxBytes: 5_000_000,
-			required: false,
-		},
-	],
-	refs: [
-		{
-			name: "customer",
-			target: "Customer",
-			cardinality: "1-N",
-			required: true,
-		},
-	],
-};
-
-/**
- * frontAction is the action-capable control (CLAUDE.md §7 ui-completeness): the user toggles
- * whether the order entity carries its blob upload + its relation, then EMITS the front
- * deterministically. The screen shows the bundle (byte-identity hash), the emitted order form
- * (rendered live so it can be SUBMITTED against the datastore), and the control buttons (each
- * carrying its control-spec sensor) — or the BlockReason if the spec is malformed.
- */
 export async function frontAction(
 	_prev: FrontView,
 	formData: FormData,
@@ -87,21 +71,59 @@ export async function frontAction(
 		],
 	};
 
-	const files = emitFront(spec);
-	if (isBlocked(files))
-		return { ok: false, blockExplanation: files.explanation };
-	const bundle = emitBundle(spec);
-	if (isBlocked(bundle))
-		return { ok: false, blockExplanation: bundle.explanation };
+	// The deterministic demo fallback: the PURE twin emit of the SAME spec (the Go frontemit
+	// reproduces these bytes). A malformed spec surfaces the twin's own BlockReason.
+	const demoFiles = emitFront(spec);
+	if (isBlocked(demoFiles))
+		return { ok: false, blockExplanation: demoFiles.explanation };
+	const demoBundle = emitBundle(spec);
+	if (isBlocked(demoBundle))
+		return { ok: false, blockExplanation: demoBundle.explanation };
+	const demoHash = sourceHash(spec);
 
+	const scope = await panelScope();
+	const args = gatewaySpecArgs(spec);
+	// LIVE reads through the passerelle (the dispatched front-emitter tools); each falls back to
+	// the deterministic twin emit on any miss (source:"live"|"demo") — ADR 0092.
+	const filesRead = await readVia(
+		scope,
+		"emit_front",
+		args,
+		filesDecoder,
+		demoFiles,
+	);
+	const bundleRead = await readVia(
+		scope,
+		"emit_bundle",
+		args,
+		bundleDecoder,
+		demoBundle,
+	);
+	const hashRead = await readVia(
+		scope,
+		"front_hash",
+		args,
+		hashDecoder,
+		demoHash,
+	);
+
+	const files = filesRead.data;
 	const orderForm = files.find((f) => f.target === "front-entity-form");
+	// The snapshot is "live" only when the whole emit (files+bundle+hash) came from the gateway.
+	const source =
+		filesRead.source === "live" &&
+		bundleRead.source === "live" &&
+		hashRead.source === "live"
+			? "live"
+			: "demo";
 
 	return {
 		ok: true,
 		files,
-		bundle,
-		bundleHash: sourceHash(spec),
+		bundle: bundleRead.data,
+		bundleHash: hashRead.data,
 		controls: spec.controls,
 		orderFormBytes: orderForm?.bytes,
+		source,
 	};
 }

@@ -14,11 +14,15 @@ import { type AttachResultView, attachBehaviorAction } from "./actions";
  *     library → the dry-run expansion (byte-identical to S76) + a DRAFT ChangeSet PROPOSAL. A
  *     no-idea / unknown-behavior / entity-less attach is refused with a traced message.
  *
- * DETERMINISM-FIRST (CLAUDE.md §6/§8): the control runs the ONE authoritative `expand` (the pure
- * twin lib/behavior, byte-identical to back/kernel/behavior — the expansionId matches the Go content
- * address). The expansion on screen is what S76 computes; no LLM, no second implementation. THE WALL
- * (§2): the attach WRITES NOTHING — it returns a DRAFT ChangeSet PROPOSAL for human approval; the
- * screen PROPOSES, never writes the Kernel. Themed on the ADR 0010 tokens; strings via next-intl (0011).
+ * ADR 0092 CUTOVER (the Go engine is the SINGLE live source). The control now runs the dispatched Go
+ * `behavior_attach_at_capture` dry-run through the passerelle (the surfaced library reads the Go
+ * `behavior_library` tool); the pure TS twin (lib/behavior-capture) survives ONLY as the deterministic
+ * demo fallback (`source:"live"|"demo"`). The expansion on screen is what S76 computes — no LLM, no
+ * second implementation (the expansionId matches the Go content address).
+ *
+ * THE WALL (§2): the attach WRITES NOTHING — it is a DRY-RUN returning a DRAFT ChangeSet PROPOSAL for
+ * human approval; the screen PROPOSES, never writes the Kernel. Themed on the ADR 0010 tokens; strings
+ * via next-intl (0011).
  */
 
 const initial: AttachResultView = { ok: false, messageKey: "" };
@@ -190,7 +194,7 @@ export function BehaviorCapturePanel({
 						</p>
 					)}
 
-					{state.ok && state.expansion && (
+					{state.ok && state.expansionId && (
 						<div className="space-y-4">
 							<div className="flex flex-wrap items-center gap-2 text-xs">
 								<span
@@ -208,6 +212,14 @@ export function BehaviorCapturePanel({
 										{state.pieceCount}
 									</span>
 								</span>
+								{state.source && (
+									<span
+										data-testid="attach-source"
+										className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-muted-foreground"
+									>
+										{state.source}
+									</span>
+								)}
 							</div>
 
 							<div className="space-y-1">
@@ -228,25 +240,23 @@ export function BehaviorCapturePanel({
 							<div className="grid gap-3 sm:grid-cols-2">
 								<PieceGroup
 									label={t("attributesLabel")}
-									names={state.expansion.attributes.map((a) => a.name)}
+									names={state.attributes ?? []}
 								/>
 								<PieceGroup
 									label={t("relationsLabel")}
-									names={state.expansion.relations.map(
-										(r) => `${r.name}→${r.target}`,
-									)}
+									names={state.relations ?? []}
 								/>
 								<PieceGroup
 									label={t("operationsLabel")}
-									names={state.expansion.operations.map((o) => o.name)}
+									names={state.operations ?? []}
 								/>
 								<PieceGroup
 									label={t("policiesLabel")}
-									names={state.expansion.policies.map((p) => p.name)}
+									names={state.policies ?? []}
 								/>
 								<PieceGroup
 									label={t("fixturesLabel")}
-									names={state.expansion.fixtures.map((f) => f.name)}
+									names={state.fixtures ?? []}
 								/>
 							</div>
 						</div>

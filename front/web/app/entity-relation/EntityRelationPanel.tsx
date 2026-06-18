@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { CARDINALITIES, DEMO_ENTITIES, SEMANTICS } from "@/lib/entity-relation";
+import { CARDINALITIES, DEMO_ENTITIES, SEMANTICS } from "@/lib/entity-relation-data";
 import { type RelationResolveView, resolveAction } from "./actions";
 
 /**

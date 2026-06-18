@@ -1,4 +1,5 @@
 import type { ControlModel, FrontFile } from "@/lib/front-emitter";
+import type { Source } from "@/lib/gateway-sdk";
 
 /**
  * View model for the /front-emitter panel (S93 — the emitted app's FRONT-END). Kept OUT of
@@ -7,6 +8,8 @@ import type { ControlModel, FrontFile } from "@/lib/front-emitter";
  */
 export interface FrontView {
 	ok: boolean;
+	/** whether the emit came from the LIVE gateway (Go front-emitter) or the demo twin (ADR 0092). */
+	source?: Source;
 	/** the emitted front files (index + per-entity forms + controls). */
 	files?: FrontFile[];
 	/** the concatenated bundle bytes + its display digest (byte-identity surface). */

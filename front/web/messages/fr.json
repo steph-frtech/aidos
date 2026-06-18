@@ -4878,6 +4878,9 @@
 		"tutorialHeading": "Comment ça marche",
 		"tutorialBody": "Choisissez un behavior (ownable / soft-deletable / auditable) et une entité, possédez/versionnez/taggez/localisez le record, puis « Proposer ». L'UNIQUE Expand produit les pièces que le macro implique (ownable → owner_id + relation owner→User + policy owner-scoping + fixtures), content-adressées (même behavior+entité → expansion byte-identique et idempotente). Un ChangeSet DRAFT porte l'expansion. Le mur (§2) : proposer n'écrit AUCUNE vérité — le ChangeSet reste DRAFT ; seul le CLI `aidos`, après approbation humaine, l'applique. Tout est PUR (pas de LLM, déterminisme-first §6/§8).",
 		"proposeHeading": "Attacher un behavior-macro · proposer l'expansion (→ ChangeSet DRAFT)",
+		"catalogueSource": "Catalogue",
+		"sourceLive": "live (moteur Go)",
+		"sourceDemo": "démo (repli)",
 		"behaviorLabel": "Behavior-macro",
 		"entityLabel": "Entité",
 		"ownerLabel": "Propriétaire (ownable)",
@@ -5663,7 +5666,9 @@
 		"controlsHeading": "Verticale control+action (vrais boutons + senseurs)",
 		"formSourceHeading": "Source du formulaire émis (order)",
 		"liveFormHeading": "Formulaire généré — soumettre une vraie operation",
-		"submitOrderLabel": "Créer la commande"
+		"submitOrderLabel": "Créer la commande",
+		"sourceLive": "live — moteur Go (passerelle)",
+		"sourceDemo": "demo — repli déterministe"
 	},
 	"preview": {
 		"eyebrow": "S94 · aperçu éphémère",
