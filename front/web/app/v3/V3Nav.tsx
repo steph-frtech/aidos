@@ -101,6 +101,7 @@ export const SECTIONS: readonly NavSection[] = [
 				Icon: GitBranch,
 			},
 			{ route: "/v3/history", key: "navHistory", Icon: History },
+			{ route: "/v3/inspection", key: "navInspection", Icon: Search },
 		],
 	},
 	{

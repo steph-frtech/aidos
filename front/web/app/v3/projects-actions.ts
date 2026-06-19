@@ -436,6 +436,30 @@ export async function loadProjectAction(
 }
 
 /**
+ * genesisProjectIdAction — l'ANCRE content-adressée (le `project_id` genesis) d'un projet v3
+ * par slug, ou null. C'est l'id `projects.project` de la ligne-identité (toujours présente après
+ * Plan A) que les lectures truth-store scopées par projet exigent (la FK projet) : la vue
+ * d'inspection /v3 l'utilise pour lire `idea_list {project_id}` (ADR 0073 Plan B). Lecture seule.
+ */
+export async function genesisProjectIdAction(
+	slug: string,
+): Promise<string | null> {
+	if (!SAFE_ID.test(slug)) return null;
+	const c = pg();
+	if (!c) return null;
+	try {
+		const rows = await c<{ project_id: string }[]>`
+			select dr.project_id from projects.dag_root dr
+			join projects.project p on p.id = dr.project_id
+			where p.body->>'owner_ref' = ${V3_OWNER} and p.body->>'slug' = ${slug}
+			limit 1`;
+		return rows[0]?.project_id ?? null;
+	} catch {
+		return null;
+	}
+}
+
+/**
  * SAUVE un projet — la SEULE lecture d'horloge de toute la persistance V3 :
  * savedAt est fourni ICI (couche impure), jamais lu dans le twin pur.
  */
